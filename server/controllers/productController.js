@@ -158,6 +158,11 @@ exports.deleteProduct = async (req, res) => {
         res.json({ message: "Product deleted successfully" });
 
     } catch (error) {
+        if (error.code === "23503") {
+            return res.status(409).json({
+                error: "This product can't be deleted because it's part of an existing order. Consider setting its stock to 0 instead to hide it from customers."
+            });
+        }
         res.status(500).json({ error: error.message });
     }
 };
