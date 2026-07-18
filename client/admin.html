@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<title>Lizimas Store — Admin Dashboard</title>
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+    <div id="login-screen" class="login-screen">
+        <div class="login-box">
+            <h1>Lizimas Store</h1>
+            <p class="subtitle">Admin Login</p>
+            <input type="email" id="login-email" placeholder="Admin email">
+            <input type="password" id="login-password" placeholder="Password">
+            <button onclick="handleLogin()">Log In</button>
+            <p id="login-error" class="error-text"></p>
+        </div>
+    </div>
+
+    <div id="dashboard-screen" class="dashboard-screen hidden">
+
+        <div class="admin-shell">
+
+            <aside class="admin-sidebar">
+                <div class="sidebar-brand">
+                    <span class="sidebar-brand-icon">L</span>
+                    <span>Lizimas Admin</span>
+                </div>
+
+                <nav class="sidebar-nav">
+                    <button class="tab-btn active" data-tab="overview">
+                        <span class="sidebar-icon">&#9635;</span> Dashboard
+                    </button>
+                    <button class="tab-btn" data-tab="products">
+                        <span class="sidebar-icon">&#128230;</span> Products
+                    </button>
+                    <button class="tab-btn" data-tab="orders">
+                        <span class="sidebar-icon">&#128203;</span> Orders
+                    </button>
+                    <button class="tab-btn" data-tab="customers">
+                        <span class="sidebar-icon">&#128101;</span> Customers
+                    </button>
+                </nav>
+
+                <button class="logout-btn" onclick="handleLogout()">Log Out</button>
+            </aside>
+
+            <main class="admin-main">
+
+                <header class="admin-topbar">
+                    <input type="text" class="admin-topbar-search" placeholder="Search...">
+                    <div class="admin-topbar-title">Lizimas Store Admin</div>
+                </header>
+
+                <section id="tab-overview" class="tab-content">
+                    <h2 class="admin-page-title">Welcome Back!</h2>
+                    <p class="admin-page-subtitle">Here's what's happening with your store today.</p>
+
+                    <div class="stats-grid" id="stats-grid">
+                        <p>Loading stats...</p>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Low Stock Products</h2>
+                        <div id="low-stock-list">Loading...</div>
+                    </div>
+                </section>
+
+                <section id="tab-orders" class="tab-content hidden">
+                    <h2 class="admin-page-title">All Orders</h2>
+                    <div id="orders-table">Loading...</div>
+                </section>
+
+                <section id="tab-customers" class="tab-content hidden">
+                    <h2 class="admin-page-title">All Customers</h2>
+                    <div id="customers-table">Loading...</div>
+                </section>
+
+                <section id="tab-products" class="tab-content hidden">
+                    <h2 class="admin-page-title">Products</h2>
+
+                    <button class="add-btn" onclick="openProductForm()">+ Add Product</button>
+
+                    <div id="product-form-container" class="hidden panel">
+                        <h3 id="product-form-title">Add Product</h3>
+                        <input type="hidden" id="product-id">
+                        <input type="text" id="product-name" placeholder="Product name">
+                        <select id="product-category"></select>
+                        <textarea id="product-description" placeholder="Description"></textarea>
+                        <input type="number" id="product-price" placeholder="Price (UGX)">
+                        <input type="number" id="product-stock" placeholder="Stock quantity">
+                        <input type="file" id="product-image" accept="image/*" multiple>
+
+                        <div id="variants-section" class="hidden">
+                            <h4>Variants</h4>
+                            <div id="variants-list"></div>
+
+                            <div class="variant-form">
+                                <input type="text" id="variant-name" placeholder="Variant name (e.g. Red, Large)">
+                                <input type="number" id="variant-price" placeholder="Price (UGX)">
+                                <input type="number" id="variant-stock" placeholder="Stock quantity">
+                                <input type="file" id="variant-image" accept="image/*">
+                                <button type="button" onclick="addVariant()">+ Add Variant</button>
+                            </div>
+                            <p id="variant-form-error" class="error-text"></p>
+                        </div>
+                        <div class="form-actions">
+                            <button onclick="saveProduct()">Save</button>
+                            <button onclick="closeProductForm()">Cancel</button>
+                        </div>
+                        <p id="product-form-error" class="error-text"></p>
+                    </div>
+
+                    <div id="products-table">Loading...</div>
+                </section>
+
+            </main>
+
+        </div>
+
+        <div id="order-detail-modal" class="hidden modal-overlay">
+            <div class="modal-box">
+                <button class="modal-close-btn" onclick="closeOrderDetails()">&times;</button>
+                <h3>Order #<span id="order-detail-id"></span></h3>
+
+                <div class="order-detail-section">
+                    <p><strong>Customer:</strong> <span id="order-detail-customer"></span></p>
+                    <p><strong>Phone:</strong> <span id="order-detail-phone"></span></p>
+                    <p><strong>Payment Method:</strong> <span id="order-detail-payment"></span></p>
+                    <p><strong>Delivery Method:</strong> <span id="order-detail-method"></span></p>
+                    <p><strong>Delivery Address:</strong> <span id="order-detail-address"></span></p>
+                    <p><strong>Delivery Fee:</strong> <span id="order-detail-fee"></span></p>
+                </div>
+
+                <h4>Items</h4>
+                <div id="order-detail-items">Loading...</div>
+
+                <p class="order-detail-total"><strong>Order Total:</strong> <span id="order-detail-total"></span></p>
+            </div>
+        </div>
+
+    </div>
+
+<script src="js/admin.js"></script>
+</body>
+</html>

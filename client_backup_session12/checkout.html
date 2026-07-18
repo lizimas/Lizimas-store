@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<title>Checkout - Lizimas Store</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+
+
+<body>
+
+<header>
+<h1>Lizimas & Talent Enterprise Ltd</h1>
+<p>Checkout</p>
+</header>
+
+
+<nav>
+<a href="index.html">Home</a>
+<a href="products.html">Products</a>
+<a href="cart.html">Cart</a>
+<a href="checkout.html">Checkout</a>
+</nav>
+
+
+<h2 style="text-align:center;margin:30px;">
+Complete Your Order
+</h2>
+
+
+<div class="card">
+
+<label>Name</label>
+<input id="name" type="text">
+
+
+<label>Phone Number</label>
+<input id="phone" type="text">
+
+
+<label>Delivery Address</label>
+<textarea id="address"></textarea>
+
+
+<label>Payment Method</label>
+
+<select id="payment">
+<option>Mobile Money</option>
+<option>FlexiPay</option>
+<option>Cash on Delivery</option>
+</select>
+
+
+<button onclick="placeOrder()">
+Place Order
+</button>
+
+
+</div>
+
+
+<script src="js/app.js"></script>
+
+</body>
+
+</html>

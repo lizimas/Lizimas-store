@@ -1,0 +1,331 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>
+Lizimas & Talent Enterprise Ltd | Online Shopping
+</title>
+
+<link rel="stylesheet" href="css/style.css">
+
+</head>
+
+
+<body>
+
+
+<!-- Header -->
+
+<header class="site-header">
+
+<div class="container header-container">
+
+
+<a href="index.html" class="brand">
+
+<img src="images/logo/logo.png"
+alt="Lizimas Logo">
+
+<div>
+
+<h1>Lizimas</h1>
+
+<span>
+& Talent Enterprise Ltd
+</span>
+
+</div>
+
+</a>
+
+
+
+<nav class="main-nav">
+
+<a href="index.html">
+Home
+</a>
+
+<a href="products.html">
+Shop
+</a>
+
+<a href="#">
+Supermarket
+</a>
+
+<a href="#">
+Boutique
+</a>
+
+<a href="cart.html" class="cart-link">
+🛒 Cart
+<span id="cart-count">0</span>
+</a>
+
+</nav>
+
+
+
+</div>
+
+</header>
+
+<img src="images/banners/promo-banner.png" alt="Lizimas & Talent Enterprise Ltd - Welcome" class="promo-banner-img">
+
+
+
+<!-- Hero Section -->
+
+
+<section class="hero-carousel">
+
+    <div class="hero-slide active" data-slide="0">
+        <div class="container hero-content">
+            <h2>Quality Products Delivered To Your Door</h2>
+            <p>Shop supermarket essentials, beverages, household items and boutique fashion from Lizimas &amp; Talent Enterprise Ltd.</p>
+            <a href="products.html" class="btn-primary">Start Shopping</a>
+        </div>
+    </div>
+
+    <div class="hero-slide" data-slide="1">
+        <div class="container hero-content">
+            <h2>Daily Essentials For Everyday Needs</h2>
+            <p>Groceries, household items, and everyday essentials all available today.</p>
+            <a href="products.html" class="btn-primary">Browse Products</a>
+        </div>
+    </div>
+
+    <div class="hero-slide" data-slide="2">
+        <div class="container hero-content">
+            <h2>Fast &amp; Reliable Delivery</h2>
+            <p>From our Bugolobi store to your doorstep, across Kampala and beyond.</p>
+            <a href="products.html" class="btn-primary">Shop Now</a>
+        </div>
+    </div>
+
+    <div class="hero-dots">
+        <button class="hero-dot active" onclick="goToHeroSlide(0)"></button>
+        <button class="hero-dot" onclick="goToHeroSlide(1)"></button>
+        <button class="hero-dot" onclick="goToHeroSlide(2)"></button>
+    </div>
+
+</section>
+
+
+
+
+
+
+<!-- Categories -->
+
+
+<section class="container">
+
+
+<h2 class="section-title">
+
+Shop By Category
+
+</h2>
+
+
+
+<div class="category-grid">
+
+
+<div class="category-card">
+
+<h3>
+🛒 Supermarket
+</h3>
+
+<p>
+Rice, sugar, cooking oil,
+drinks and daily essentials.
+</p>
+
+</div>
+
+
+
+
+<div class="category-card">
+
+<h3>
+👕 Boutique
+</h3>
+
+<p>
+Fashion items for men,
+women and children.
+</p>
+
+</div>
+
+
+
+
+<div class="category-card">
+
+<h3>
+🚚 Delivery
+</h3>
+
+<p>
+Fast delivery with cash
+on delivery available.
+</p>
+
+</div>
+
+
+</div>
+
+
+</section>
+
+
+
+
+
+
+
+<!-- Featured Products -->
+
+
+<section class="container">
+
+
+<h2 class="section-title">
+
+Featured Products
+
+</h2>
+
+
+
+<div id="featured-products"
+class="product-grid">
+
+
+<!-- Products loaded from API -->
+
+</div>
+
+
+</section>
+
+
+
+
+
+
+
+
+<footer class="site-footer">
+
+
+<div class="container footer-container">
+
+
+<div>
+
+<h3>
+Lizimas & Talent Enterprise Ltd
+</h3>
+
+
+<p>
+Your trusted online shopping partner.
+</p>
+
+
+</div>
+
+
+
+<div>
+
+<h4>
+Payments
+</h4>
+
+<p>
+Mobile Money:
++256792363104
+</p>
+
+<p>
+Cash on Delivery
+</p>
+
+
+</div>
+
+
+
+</div>
+
+
+
+<div class="copyright">
+
+© 2026 Lizimas & Talent Enterprise Ltd <a href="admin.html" style="color: inherit; opacity: 0.3; text-decoration: none; font-size: 0.75em; margin-left: 10px;">•</a> 
+
+</div>
+
+
+
+</footer>
+
+
+
+
+
+
+<div id="product-modal" class="product-modal hidden">
+    <div class="product-modal-content">
+        <button class="product-modal-close" onclick="closeProductModal()">&times;</button>
+        <div class="product-modal-body">
+            <div class="product-modal-gallery">
+                <img id="modal-main-image" src="" alt="" class="product-modal-main-image">
+                <div id="modal-thumbnails" class="product-modal-thumbnails"></div>
+            </div>
+            <div class="product-modal-info">
+                <h2 id="modal-product-name"></h2>
+                <p id="modal-selected-variant" class="modal-variant-label"></p>
+                <div id="modal-product-rating"></div>
+                <div id="modal-product-price"></div>
+                <p id="modal-product-description"></p>
+                <button id="modal-add-to-cart-btn" class="add-to-cart-btn">Add To Cart 🛒</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/hero.js"></script>
+
+<script src="js/cart.js"></script>
+
+<script src="js/products.js"></script>
+
+
+<a href="https://wa.me/256792363104" target="_blank" rel="noopener" class="whatsapp-float" aria-label="Chat with us on WhatsApp">
+    <svg viewBox="0 0 24 24" width="28" height="28" fill="#FFFFFF"><path d="M17.6 6.32A8.86 8.86 0 0 0 12.02 3a8.94 8.94 0 0 0-7.75 13.4L3 21l4.72-1.24a8.9 8.9 0 0 0 4.29 1.1h.01c4.94 0 8.95-4 8.95-8.94a8.9 8.9 0 0 0-2.37-6.1ZM12.02 19.4a7.4 7.4 0 0 1-3.78-1.04l-.27-.16-2.8.74.75-2.73-.18-.28a7.43 7.43 0 0 1 11.62-9.2 7.36 7.36 0 0 1 2.18 5.25c0 4.1-3.34 7.42-7.52 7.42Zm4.08-5.56c-.22-.11-1.32-.65-1.53-.72-.2-.08-.35-.11-.5.11-.15.22-.58.72-.71.87-.13.15-.26.16-.48.06-.22-.11-.94-.35-1.79-1.11-.66-.59-1.11-1.32-1.24-1.54-.13-.22-.01-.34.1-.45.1-.1.22-.26.33-.39.11-.13.15-.22.22-.37.07-.15.04-.28-.02-.39-.06-.11-.5-1.21-.69-1.66-.18-.44-.37-.38-.5-.39h-.43c-.15 0-.39.06-.6.28-.2.22-.79.77-.79 1.87s.81 2.17.92 2.32c.11.15 1.6 2.44 3.87 3.42.54.23.96.37 1.29.48.54.17 1.03.15 1.42.09.43-.06 1.32-.54 1.51-1.06.19-.52.19-.96.13-1.06-.06-.09-.2-.15-.42-.26Z"/></svg>
+</a>
+
+
+<a href="https://wa.me/256792363104" target="_blank" rel="noopener" class="whatsapp-float" aria-label="Chat with us on WhatsApp">
+    <svg viewBox="0 0 24 24" width="28" height="28" fill="#FFFFFF"><path d="M17.6 6.32A8.86 8.86 0 0 0 12.02 3a8.94 8.94 0 0 0-7.75 13.4L3 21l4.72-1.24a8.9 8.9 0 0 0 4.29 1.1h.01c4.94 0 8.95-4 8.95-8.94a8.9 8.9 0 0 0-2.37-6.1ZM12.02 19.4a7.4 7.4 0 0 1-3.78-1.04l-.27-.16-2.8.74.75-2.73-.18-.28a7.43 7.43 0 0 1 11.62-9.2 7.36 7.36 0 0 1 2.18 5.25c0 4.1-3.34 7.42-7.52 7.42Zm4.08-5.56c-.22-.11-1.32-.65-1.53-.72-.2-.08-.35-.11-.5.11-.15.22-.58.72-.71.87-.13.15-.26.16-.48.06-.22-.11-.94-.35-1.79-1.11-.66-.59-1.11-1.32-1.24-1.54-.13-.22-.01-.34.1-.45.1-.1.22-.26.33-.39.11-.13.15-.22.22-.37.07-.15.04-.28-.02-.39-.06-.11-.5-1.21-.69-1.66-.18-.44-.37-.38-.5-.39h-.43c-.15 0-.39.06-.6.28-.2.22-.79.77-.79 1.87s.81 2.17.92 2.32c.11.15 1.6 2.44 3.87 3.42.54.23.96.37 1.29.48.54.17 1.03.15 1.42.09.43-.06 1.32-.54 1.51-1.06.19-.52.19-.96.13-1.06-.06-.09-.2-.15-.42-.26Z"/></svg>
+</a>
+
+</body>
+
+</html>

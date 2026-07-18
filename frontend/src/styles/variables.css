@@ -1,0 +1,49 @@
+:root {
+
+  /* Brand Colors */
+  --primary-color: #0f766e;
+  --primary-dark: #115e59;
+  --secondary-color: #f59e0b;
+  --accent-color: #dc2626;
+
+  /* Neutral Colors */
+  --white: #ffffff;
+  --black: #111827;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-500: #6b7280;
+  --gray-700: #374151;
+
+  /* Typography */
+  --font-family:
+    "Inter",
+    "Segoe UI",
+    Arial,
+    sans-serif;
+
+  --heading-weight: 700;
+  --text-weight: 400;
+
+  /* Spacing */
+  --container-width: 1200px;
+
+  --space-xs: 0.5rem;
+  --space-sm: 1rem;
+  --space-md: 1.5rem;
+  --space-lg: 2rem;
+  --space-xl: 4rem;
+
+  /* Border */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+
+  /* Shadow */
+  --shadow-sm:
+    0 2px 8px rgba(0,0,0,0.08);
+
+  --shadow-md:
+    0 10px 30px rgba(0,0,0,0.12);
+
+}

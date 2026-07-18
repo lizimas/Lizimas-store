@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Products - Lizimas & Talent Enterprise Ltd</title>
+
+<link rel="stylesheet" href="css/style.css">
+
+</head>
+
+<body>
+
+<!-- Header -->
+
+<header class="site-header">
+
+<div class="container header-container">
+
+<a href="index.html" class="brand">
+
+<img src="images/logo/logo.png" alt="Lizimas Logo">
+
+<div>
+<h1>Lizimas</h1>
+<span>& Talent Enterprise Ltd</span>
+</div>
+
+</a>
+
+<nav class="main-nav">
+
+<a href="index.html">Home</a>
+<a href="products.html">Shop</a>
+<a href="#">Supermarket</a>
+<a href="#">Boutique</a>
+
+<a href="cart.html" class="cart-link">
+🛒 Cart
+<span id="cart-count">0</span>
+</a>
+
+</nav>
+
+</div>
+
+</header>
+
+<h2 style="text-align:center;margin:30px;">Available Products</h2>
+
+<div class="container">
+    <input
+        type="text"
+        id="search-input"
+        placeholder="Search products..."
+        oninput="searchProducts()"
+        style="width:100%; padding:12px 16px; border-radius:30px; border:1px solid #ddd; margin-bottom:20px; font-size:16px;"
+    >
+</div>
+
+<div id="products-container" class="product-grid container"></div>
+
+<script src="js/api.js"></script>
+<script src="js/cart.js"></script>
+<script src="js/products.js"></script>
+
+
+<a href="https://wa.me/256792363104" target="_blank" rel="noopener" class="whatsapp-float" aria-label="Chat with us on WhatsApp">
+    <svg viewBox="0 0 24 24" width="28" height="28" fill="#FFFFFF"><path d="M17.6 6.32A8.86 8.86 0 0 0 12.02 3a8.94 8.94 0 0 0-7.75 13.4L3 21l4.72-1.24a8.9 8.9 0 0 0 4.29 1.1h.01c4.94 0 8.95-4 8.95-8.94a8.9 8.9 0 0 0-2.37-6.1ZM12.02 19.4a7.4 7.4 0 0 1-3.78-1.04l-.27-.16-2.8.74.75-2.73-.18-.28a7.43 7.43 0 0 1 11.62-9.2 7.36 7.36 0 0 1 2.18 5.25c0 4.1-3.34 7.42-7.52 7.42Zm4.08-5.56c-.22-.11-1.32-.65-1.53-.72-.2-.08-.35-.11-.5.11-.15.22-.58.72-.71.87-.13.15-.26.16-.48.06-.22-.11-.94-.35-1.79-1.11-.66-.59-1.11-1.32-1.24-1.54-.13-.22-.01-.34.1-.45.1-.1.22-.26.33-.39.11-.13.15-.22.22-.37.07-.15.04-.28-.02-.39-.06-.11-.5-1.21-.69-1.66-.18-.44-.37-.38-.5-.39h-.43c-.15 0-.39.06-.6.28-.2.22-.79.77-.79 1.87s.81 2.17.92 2.32c.11.15 1.6 2.44 3.87 3.42.54.23.96.37 1.29.48.54.17 1.03.15 1.42.09.43-.06 1.32-.54 1.51-1.06.19-.52.19-.96.13-1.06-.06-.09-.2-.15-.42-.26Z"/></svg>
+</a>
+
+</body>
+
+</html>
