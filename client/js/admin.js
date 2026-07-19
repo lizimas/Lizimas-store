@@ -172,6 +172,14 @@ async function loadStats() {
                 <div class="label">Searches (7 days)</div>
                 <div class="value">...</div>
             </div>
+            <div class="stat-card">
+                <div class="label">Total Visitors</div>
+                <div class="value">${stats.totalVisitors}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Paid Orders</div>
+                <div class="value">${stats.paidOrders}</div>
+            </div>
         `;
 
         const lowStockList = document.getElementById("low-stock-list");

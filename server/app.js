@@ -5,6 +5,7 @@ const path = require("path");
 require("dotenv").config();
 
 const { generalLimiter } = require("./middleware/rateLimiter");
+const logVisitor = require("./middleware/visitorLogger");
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
 app.use(generalLimiter);
+app.use(logVisitor);
 
 // Database connection
 require("./config/database");

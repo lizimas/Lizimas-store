@@ -30,13 +30,23 @@ exports.getDashboardStats = async (req, res) => {
             `SELECT id, name, stock FROM products WHERE stock < 10 ORDER BY stock ASC`
         );
 
+        const totalVisitorsResult = await pool.query(
+            `SELECT COUNT(*) AS total_visitors FROM visitor_logs`
+        );
+
+        const paidOrdersResult = await pool.query(
+            `SELECT COUNT(*) AS paid_orders FROM orders WHERE status = 'paid'`
+        );
+
         res.json({
             totalRevenue: totalRevenueResult.rows[0].total_revenue,
             totalOrders: Number(totalOrdersResult.rows[0].total_orders),
             pendingOrders: Number(pendingOrdersResult.rows[0].pending_orders),
             totalCustomers: Number(totalCustomersResult.rows[0].total_customers),
             pendingPayments: Number(pendingPaymentsResult.rows[0].pending_payments),
-            lowStockProducts: lowStockResult.rows
+            lowStockProducts: lowStockResult.rows,
+            totalVisitors: Number(totalVisitorsResult.rows[0].total_visitors),
+            paidOrders: Number(paidOrdersResult.rows[0].paid_orders)
         });
 
     } catch (error) {
