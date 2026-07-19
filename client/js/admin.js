@@ -24,6 +24,8 @@ function showLogin(errorMessage) {
     document.getElementById("login-error").textContent = errorMessage || "";
 }
 
+let pendingLoginToken = null;
+
 async function handleLogin() {
     const email = document.getElementById("login-email").value.trim();
     const password = document.getElementById("login-password").value;
@@ -47,6 +49,17 @@ async function handleLogin() {
             return;
         }
 
+        if (data.requires2FA) {
+            pendingLoginToken = data.pendingToken;
+            document.getElementById("login-email").classList.add("hidden");
+            document.getElementById("login-password").classList.add("hidden");
+            document.getElementById("login-2fa-code").classList.remove("hidden");
+            document.getElementById("login-btn").classList.add("hidden");
+            document.getElementById("login-2fa-btn").classList.remove("hidden");
+            document.getElementById("login-error").textContent = "Enter the 6-digit code from your authenticator app.";
+            return;
+        }
+
         if (data.user.role !== "admin") {
             document.getElementById("login-error").textContent = "This account does not have admin access.";
             return;
@@ -57,6 +70,42 @@ async function handleLogin() {
 
     } catch (error) {
         console.error("Login error:", error);
+        document.getElementById("login-error").textContent = "Could not connect to server.";
+    }
+}
+
+async function submitLogin2FA() {
+    const code = document.getElementById("login-2fa-code").value.trim();
+
+    if (!code) {
+        document.getElementById("login-error").textContent = "Please enter the 6-digit code.";
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/auth/login/2fa`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pendingToken: pendingLoginToken, code })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            document.getElementById("login-error").textContent = data.error || "Invalid code.";
+            return;
+        }
+
+        if (data.user.role !== "admin") {
+            document.getElementById("login-error").textContent = "This account does not have admin access.";
+            return;
+        }
+
+        setToken(data.token);
+        showDashboard();
+
+    } catch (error) {
+        console.error("2FA login verification error:", error);
         document.getElementById("login-error").textContent = "Could not connect to server.";
     }
 }
@@ -119,6 +168,10 @@ async function loadStats() {
                 <div class="label">Pending Payments</div>
                 <div class="value">${stats.pendingPayments}</div>
             </div>
+            <div class="stat-card" id="search-stat-card">
+                <div class="label">Searches (7 days)</div>
+                <div class="value">...</div>
+            </div>
         `;
 
         const lowStockList = document.getElementById("low-stock-list");
@@ -142,6 +195,36 @@ async function loadStats() {
 
     } catch (error) {
         console.error("Load stats error:", error);
+    }
+
+    try {
+        const searchStats = await authorizedFetch("/api/search/stats");
+
+        const searchStatCard = document.getElementById("search-stat-card");
+        if (searchStatCard) {
+            searchStatCard.querySelector(".value").textContent = searchStats.searchesLast7Days;
+        }
+
+        const topSearchesList = document.getElementById("top-searches-list");
+        if (!searchStats.topTerms || searchStats.topTerms.length === 0) {
+            topSearchesList.innerHTML = `<p class="no-data">No searches logged yet.</p>`;
+        } else {
+            topSearchesList.innerHTML = `
+                <table>
+                    <thead><tr><th>Search Term</th><th>Times Searched</th></tr></thead>
+                    <tbody>
+                        ${searchStats.topTerms.map(t => `
+                            <tr>
+                                <td data-label="Term">${t.query}</td>
+                                <td data-label="Count">${t.count}</td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            `;
+        }
+    } catch (error) {
+        console.error("Load search stats error:", error);
     }
 }
 
@@ -218,8 +301,8 @@ async function updateOrderStatus(orderId, newStatus) {
         if (!response.ok) {
             const data = await response.json();
             alert(data.error || "Failed to update order status.");
-            loadOrders();
         }
+        loadOrders();
 
     } catch (error) {
         console.error("Update order status error:", error);
@@ -454,6 +537,11 @@ function setupTabs() {
 
             button.classList.add("active");
             document.getElementById(`tab-${button.dataset.tab}`).classList.remove("hidden");
+
+            if (button.dataset.tab === "account") {
+                loadAccount2FAStatus();
+                loadAccountSessions();
+            }
         });
     });
 }
@@ -634,4 +722,307 @@ async function viewOrderDetails(orderId) {
 
 function closeOrderDetails() {
     document.getElementById("order-detail-modal").classList.add("hidden");
+}
+
+// ===== Account Settings =====
+
+async function submitChangeUsername() {
+    const input = document.getElementById("account-username-input");
+    const msg = document.getElementById("account-username-msg");
+    const username = input.value.trim();
+
+    if (!username) {
+        msg.textContent = "Please enter a username.";
+        msg.className = "account-msg error";
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/auth/username`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${getToken()}`
+            },
+            body: JSON.stringify({ username })
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            msg.textContent = "Username updated successfully.";
+            msg.className = "account-msg success";
+            input.value = "";
+        } else {
+            msg.textContent = data.error || "Something went wrong.";
+            msg.className = "account-msg error";
+        }
+    } catch (error) {
+        msg.textContent = "Could not connect to server.";
+        msg.className = "account-msg error";
+    }
+}
+
+async function submitChangeEmail() {
+    const emailInput = document.getElementById("account-email-input");
+    const passwordInput = document.getElementById("account-email-password");
+    const msg = document.getElementById("account-email-msg");
+    const email = emailInput.value.trim();
+    const currentPassword = passwordInput.value;
+
+    if (!email || !currentPassword) {
+        msg.textContent = "Please fill in both fields.";
+        msg.className = "account-msg error";
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/auth/email`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${getToken()}`
+            },
+            body: JSON.stringify({ email, currentPassword })
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            msg.textContent = "Email updated successfully.";
+            msg.className = "account-msg success";
+            emailInput.value = "";
+            passwordInput.value = "";
+        } else {
+            msg.textContent = data.error || "Something went wrong.";
+            msg.className = "account-msg error";
+        }
+    } catch (error) {
+        msg.textContent = "Could not connect to server.";
+        msg.className = "account-msg error";
+    }
+}
+
+async function submitChangePassword() {
+    const currentInput = document.getElementById("account-current-password");
+    const newInput = document.getElementById("account-new-password");
+    const msg = document.getElementById("account-password-msg");
+    const currentPassword = currentInput.value;
+    const newPassword = newInput.value;
+
+    if (!currentPassword || !newPassword) {
+        msg.textContent = "Please fill in both fields.";
+        msg.className = "account-msg error";
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/auth/password`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${getToken()}`
+            },
+            body: JSON.stringify({ currentPassword, newPassword })
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            msg.textContent = "Password updated successfully.";
+            msg.className = "account-msg success";
+            currentInput.value = "";
+            newInput.value = "";
+        } else {
+            msg.textContent = data.error || "Something went wrong.";
+            msg.className = "account-msg error";
+        }
+    } catch (error) {
+        msg.textContent = "Could not connect to server.";
+        msg.className = "account-msg error";
+    }
+}
+
+let twoFactorCurrentlyEnabled = false;
+
+async function loadAccount2FAStatus() {
+    const statusEl = document.getElementById("account-2fa-status");
+    const toggleBtn = document.getElementById("account-2fa-toggle-btn");
+
+    try {
+        const response = await fetch(`${API_URL}/api/auth/me`, {
+            headers: { "Authorization": `Bearer ${getToken()}` }
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            twoFactorCurrentlyEnabled = !!data.user.two_factor_enabled;
+            statusEl.textContent = twoFactorCurrentlyEnabled
+                ? "Two-factor authentication is ON."
+                : "Two-factor authentication is OFF.";
+            toggleBtn.textContent = twoFactorCurrentlyEnabled ? "Disable 2FA" : "Enable 2FA";
+        } else {
+            statusEl.textContent = "Could not load 2FA status.";
+        }
+    } catch (error) {
+        statusEl.textContent = "Could not connect to server.";
+    }
+}
+
+async function handle2FAToggle() {
+    if (twoFactorCurrentlyEnabled) {
+        const currentPassword = prompt("Enter your current password to disable 2FA:");
+        if (!currentPassword) return;
+
+        try {
+            const response = await fetch(`${API_URL}/api/auth/2fa/disable`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${getToken()}`
+                },
+                body: JSON.stringify({ currentPassword })
+            });
+            const data = await response.json();
+            const msg = document.getElementById("account-2fa-msg");
+
+            if (response.ok) {
+                msg.textContent = "2FA disabled.";
+                msg.className = "account-msg success";
+                document.getElementById("account-2fa-setup").classList.add("hidden");
+                loadAccount2FAStatus();
+            } else {
+                msg.textContent = data.error || "Something went wrong.";
+                msg.className = "account-msg error";
+            }
+        } catch (error) {
+            document.getElementById("account-2fa-msg").textContent = "Could not connect to server.";
+        }
+    } else {
+        try {
+            const response = await fetch(`${API_URL}/api/auth/2fa/setup`, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${getToken()}` }
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                document.getElementById("account-2fa-qr").src = data.qrCode;
+                document.getElementById("account-2fa-key").textContent = data.manualEntryKey;
+                document.getElementById("account-2fa-setup").classList.remove("hidden");
+            } else {
+                document.getElementById("account-2fa-msg").textContent = data.error || "Something went wrong.";
+            }
+        } catch (error) {
+            document.getElementById("account-2fa-msg").textContent = "Could not connect to server.";
+        }
+    }
+}
+
+async function submitVerify2FA() {
+    const codeInput = document.getElementById("account-2fa-code");
+    const msg = document.getElementById("account-2fa-msg");
+    const token = codeInput.value.trim();
+
+    if (!token) {
+        msg.textContent = "Please enter the 6-digit code.";
+        msg.className = "account-msg error";
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/auth/2fa/verify`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${getToken()}`
+            },
+            body: JSON.stringify({ token })
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            msg.textContent = "Two-factor authentication enabled successfully.";
+            msg.className = "account-msg success";
+            document.getElementById("account-2fa-setup").classList.add("hidden");
+            codeInput.value = "";
+            loadAccount2FAStatus();
+        } else {
+            msg.textContent = data.error || "Invalid code.";
+            msg.className = "account-msg error";
+        }
+    } catch (error) {
+        msg.textContent = "Could not connect to server.";
+        msg.className = "account-msg error";
+    }
+}
+
+// ===== Logged-In Devices =====
+
+function formatSessionDate(isoString) {
+    const date = new Date(isoString);
+    return date.toLocaleString();
+}
+
+function describeDevice(userAgentString) {
+    if (!userAgentString) return "Unknown device";
+    if (userAgentString.includes("curl")) return "Command line (curl)";
+    if (/android/i.test(userAgentString)) return "Android device";
+    if (/iphone|ipad/i.test(userAgentString)) return "iOS device";
+    if (/windows/i.test(userAgentString)) return "Windows computer";
+    if (/mac os/i.test(userAgentString)) return "Mac computer";
+    return "Browser session";
+}
+
+async function loadAccountSessions() {
+    const container = document.getElementById("account-sessions-list");
+
+    try {
+        const response = await fetch(`${API_URL}/api/auth/sessions`, {
+            headers: { "Authorization": `Bearer ${getToken()}` }
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+            container.textContent = data.error || "Could not load devices.";
+            return;
+        }
+
+        if (data.sessions.length === 0) {
+            container.textContent = "No active devices found.";
+            return;
+        }
+
+        container.innerHTML = data.sessions.map(session => `
+            <div class="session-row">
+                <div class="session-info">
+                    <strong>${describeDevice(session.deviceLabel)}</strong>${session.isCurrent ? ' <span class="session-current-tag">This device</span>' : ''}
+                    <div class="session-meta">IP: ${session.ipAddress} &middot; Last active: ${formatSessionDate(session.lastUsedAt)}</div>
+                </div>
+                ${session.isCurrent ? '' : `<button class="session-logout-btn" onclick="revokeSession(${session.id})">Log Out</button>`}
+            </div>
+        `).join("");
+
+    } catch (error) {
+        container.textContent = "Could not connect to server.";
+    }
+}
+
+async function revokeSession(sessionId) {
+    if (!confirm("Log out this device? It will need to sign in again to access the dashboard.")) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/auth/sessions/${sessionId}`, {
+            method: "DELETE",
+            headers: { "Authorization": `Bearer ${getToken()}` }
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            loadAccountSessions();
+        } else {
+            alert(data.error || "Could not log out that device.");
+        }
+    } catch (error) {
+        alert("Could not connect to server.");
+    }
 }

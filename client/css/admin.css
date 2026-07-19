@@ -496,3 +496,132 @@ select.status-select {
 #stats-grid .stat-card:nth-child(3) { background: #fdeee9; }
 #stats-grid .stat-card:nth-child(4) { background: #eafaf1; }
 #stats-grid .stat-card:nth-child(5) { background: #fdeee9; }
+
+/* ===== Account Settings ===== */
+
+.account-card {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    padding: 24px;
+    margin-bottom: 20px;
+    max-width: 480px;
+}
+
+.account-card h3 {
+    color: #1a1a2e;
+    font-size: 16px;
+    margin-bottom: 14px;
+}
+
+.account-card input {
+    display: block;
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.account-card input:focus {
+    outline: none;
+    border-color: #f4b400;
+}
+
+.account-card button {
+    background: #1a1a2e;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.account-card button:hover {
+    background: #f4b400;
+    color: #1a1a2e;
+}
+
+.account-msg {
+    margin-top: 10px;
+    font-size: 13px;
+}
+
+.account-msg.success {
+    color: #1e7e34;
+}
+
+.account-msg.error {
+    color: #c0392b;
+}
+
+#account-2fa-setup {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #eee;
+}
+
+#account-2fa-setup img {
+    display: block;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+#account-2fa-key {
+    background: #f4f4f4;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.session-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #eee;
+    gap: 10px;
+}
+
+.session-row:last-child {
+    border-bottom: none;
+}
+
+.session-info {
+    font-size: 14px;
+}
+
+.session-meta {
+    font-size: 12px;
+    color: #777;
+    margin-top: 2px;
+}
+
+.session-current-tag {
+    background: #e6f4ea;
+    color: #1e7e34;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.session-logout-btn {
+    background: #ffffff;
+    color: #c0392b;
+    border: 1px solid #c0392b;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.session-logout-btn:hover {
+    background: #c0392b;
+    color: #ffffff;
+}

@@ -1,4 +1,6 @@
 const pool = require("../config/database");
+const XLSX = require("xlsx");
+const { parse } = require("csv-parse/sync");
 
 exports.getDashboardStats = async (req, res) => {
     try {
@@ -124,4 +126,126 @@ exports.updateOrderStatus = async (req, res) => {
         console.error("Update order status error:", error);
         res.status(500).json({ error: "Something went wrong." });
     }
+};
+
+exports.importProducts = async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded (field name must be \"file\")." });
+    }
+
+    let rows;
+    try {
+        const isCsv = req.file.originalname.toLowerCase().endsWith(".csv");
+        if (isCsv) {
+            rows = parse(req.file.buffer.toString("utf-8"), {
+                columns: true,
+                skip_empty_lines: true,
+                trim: true
+            });
+        } else {
+            const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        }
+    } catch (error) {
+        return res.status(400).json({ error: `Could not parse file: ${error.message}` });
+    }
+
+    if (!rows.length) {
+        return res.status(400).json({ error: "File contains no rows." });
+    }
+
+    const results = { created: 0, updated: 0, skipped: 0, errors: [] };
+    const categoryCache = new Map();
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        for (let i = 0; i < rows.length; i++) {
+            const rowNum = i + 2;
+            const row = rows[i];
+
+            const name = String(row.name || "").trim();
+            const price = Number(row.price);
+            const stock = row.stock === "" || row.stock === undefined ? 0 : Number(row.stock);
+            const description = String(row.description || "").trim();
+            const categoryName = String(row.category || "").trim();
+            const existingId = row.id ? Number(row.id) : null;
+
+            const rowErrors = [];
+            if (!name) rowErrors.push("name is required");
+            if (row.price === "" || row.price === undefined || isNaN(price) || price < 0) {
+                rowErrors.push("price must be a non-negative number");
+            }
+            if (isNaN(stock) || stock < 0) rowErrors.push("stock must be a non-negative number");
+
+            if (rowErrors.length) {
+                results.skipped++;
+                results.errors.push({ row: rowNum, name: name || "(missing)", errors: rowErrors });
+                continue;
+            }
+
+            let categoryId = null;
+            if (categoryName) {
+                const key = categoryName.toLowerCase();
+                if (categoryCache.has(key)) {
+                    categoryId = categoryCache.get(key);
+                } else {
+                    const existingCat = await client.query(
+                        "SELECT id FROM categories WHERE LOWER(name) = LOWER($1)",
+                        [categoryName]
+                    );
+                    if (existingCat.rows.length) {
+                        categoryId = existingCat.rows[0].id;
+                    } else {
+                        const newCat = await client.query(
+                            "INSERT INTO categories (name) VALUES ($1) RETURNING id",
+                            [categoryName]
+                        );
+                        categoryId = newCat.rows[0].id;
+                    }
+                    categoryCache.set(key, categoryId);
+                }
+            }
+
+            if (existingId) {
+                const updateResult = await client.query(
+                    `UPDATE products
+                     SET name = $1, description = $2, price = $3, stock = $4, category_id = $5
+                     WHERE id = $6
+                     RETURNING id`,
+                    [name, description, price, stock, categoryId, existingId]
+                );
+
+                if (updateResult.rows.length) {
+                    results.updated++;
+                } else {
+                    results.skipped++;
+                    results.errors.push({ row: rowNum, name, errors: [`No product with id ${existingId} found`] });
+                }
+            } else {
+                await client.query(
+                    `INSERT INTO products (name, description, price, stock, category_id)
+                     VALUES ($1, $2, $3, $4, $5)`,
+                    [name, description, price, stock, categoryId]
+                );
+                results.created++;
+            }
+        }
+
+        await client.query("COMMIT");
+    } catch (error) {
+        await client.query("ROLLBACK");
+        console.error("Import products error:", error);
+        return res.status(500).json({ error: "Import failed and was rolled back." });
+    } finally {
+        client.release();
+    }
+
+    res.json({
+        message: "Import complete",
+        totalRows: rows.length,
+        ...results
+    });
 };

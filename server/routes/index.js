@@ -9,5 +9,6 @@ router.use("/momo", require("./momo"));
 router.use("/products", require("./products"));
 router.use("/variants", require("./variants"));
 router.use("/delivery", require("./delivery"));
+router.use("/search", require("./search"));
 
 module.exports = router;

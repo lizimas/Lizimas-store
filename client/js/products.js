@@ -166,6 +166,16 @@ function showAddToCartFeedback(productName) {
     }, 2000);
 }
 
+let searchLogTimeout = null;
+
+function logSearchToServer(query) {
+    fetch(`${API_URL}/api/search/log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query })
+    }).catch(error => console.error("Search log error:", error));
+}
+
 function searchProducts() {
     const searchValue = document
         .getElementById("search-input")
@@ -191,6 +201,11 @@ function searchProducts() {
     });
 
     displayProducts(filteredProducts);
+
+    clearTimeout(searchLogTimeout);
+    searchLogTimeout = setTimeout(() => {
+        logSearchToServer(searchValue);
+    }, 800);
 }
 
 function displayFeaturedProducts(products, limit = 8) {
@@ -336,6 +351,27 @@ async function openProductModal(productId) {
         }
     } catch (error) {
         console.error("Could not load variants:", error);
+    }
+
+    try {
+        const galleryResponse = await fetch(`${API_URL}/api/products/${productId}/images`);
+        const galleryImages = await galleryResponse.json();
+
+        if (Array.isArray(galleryImages)) {
+            galleryImages.forEach(img => {
+                const thumb = document.createElement("img");
+                thumb.src = img.image_path;
+                thumb.alt = product.name;
+                thumb.onclick = () => {
+                    applySelection(product.stock, product.price, img.image_path, null);
+                    thumbnailsContainer.querySelectorAll("img").forEach(t => t.classList.remove("active-thumbnail"));
+                    thumb.classList.add("active-thumbnail");
+                };
+                thumbnailsContainer.appendChild(thumb);
+            });
+        }
+    } catch (error) {
+        console.error("Could not load gallery images:", error);
     }
 
     document.getElementById("product-modal").classList.remove("hidden");

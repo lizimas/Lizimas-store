@@ -14,7 +14,9 @@
             <p class="subtitle">Admin Login</p>
             <input type="email" id="login-email" placeholder="Admin email">
             <input type="password" id="login-password" placeholder="Password">
-            <button onclick="handleLogin()">Log In</button>
+            <button id="login-btn" onclick="handleLogin()">Log In</button>
+            <input type="text" id="login-2fa-code" class="hidden" placeholder="Enter 6-digit code">
+            <button id="login-2fa-btn" class="hidden" onclick="submitLogin2FA()">Verify Code</button>
             <p id="login-error" class="error-text"></p>
         </div>
     </div>
@@ -42,6 +44,9 @@
                     <button class="tab-btn" data-tab="customers">
                         <span class="sidebar-icon">&#128101;</span> Customers
                     </button>
+                    <button class="tab-btn" data-tab="account">
+                        <span class="sidebar-icon">&#9881;</span> Account
+                    </button>
                 </nav>
 
                 <button class="logout-btn" onclick="handleLogout()">Log Out</button>
@@ -65,6 +70,21 @@
                     <div class="panel">
                         <h2>Low Stock Products</h2>
                         <div id="low-stock-list">Loading...</div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Top Searches</h2>
+                        <div id="top-searches-list">Loading...</div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Top Searches</h2>
+                        <div id="top-searches-list">Loading...</div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Top Searches</h2>
+                        <div id="top-searches-list">Loading...</div>
                     </div>
                 </section>
 
@@ -114,6 +134,53 @@
                     </div>
 
                     <div id="products-table">Loading...</div>
+                </section>
+
+                <section id="tab-account" class="tab-content hidden">
+                    <h2 class="admin-page-title">Account Settings</h2>
+                    <p class="admin-page-subtitle">Manage your login credentials and security.</p>
+
+                    <div class="account-card">
+                        <h3>Change Username</h3>
+                        <input type="text" id="account-username-input" placeholder="New username">
+                        <button onclick="submitChangeUsername()">Update Username</button>
+                        <p id="account-username-msg" class="account-msg"></p>
+                    </div>
+
+                    <div class="account-card">
+                        <h3>Update Email</h3>
+                        <input type="email" id="account-email-input" placeholder="New email">
+                        <input type="password" id="account-email-password" placeholder="Current password">
+                        <button onclick="submitChangeEmail()">Update Email</button>
+                        <p id="account-email-msg" class="account-msg"></p>
+                    </div>
+
+                    <div class="account-card">
+                        <h3>Change Password</h3>
+                        <input type="password" id="account-current-password" placeholder="Current password">
+                        <input type="password" id="account-new-password" placeholder="New password">
+                        <button onclick="submitChangePassword()">Update Password</button>
+                        <p id="account-password-msg" class="account-msg"></p>
+                    </div>
+
+                    <div class="account-card">
+                        <h3>Two-Factor Authentication</h3>
+                        <p id="account-2fa-status">Checking status...</p>
+                        <button id="account-2fa-toggle-btn" onclick="handle2FAToggle()">Enable 2FA</button>
+                        <div id="account-2fa-setup" class="hidden">
+                            <img id="account-2fa-qr" alt="2FA QR Code" style="max-width:200px;">
+                            <p>Manual entry key: <code id="account-2fa-key"></code></p>
+                            <input type="text" id="account-2fa-code" placeholder="Enter 6-digit code">
+                            <button onclick="submitVerify2FA()">Verify &amp; Enable</button>
+                        </div>
+                        <p id="account-2fa-msg" class="account-msg"></p>
+                    </div>
+
+                    <div class="account-card">
+                        <h3>Logged-In Devices</h3>
+                        <p>Devices currently signed in to your account.</p>
+                        <div id="account-sessions-list">Loading...</div>
+                    </div>
                 </section>
 
             </main>
