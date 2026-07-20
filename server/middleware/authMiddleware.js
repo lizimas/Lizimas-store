@@ -38,6 +38,26 @@ async function requireAuth(req, res, next) {
     }
 }
 
+async function optionalAuth(req, res, next) {
+    const authHeader = req.headers["authorization"];
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        req.user = null;
+        return next();
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
+    } catch (error) {
+        req.user = null;
+    }
+
+    next();
+}
+
 function requireAdmin(req, res, next) {
     if (!req.user || req.user.role !== "admin") {
         return res.status(403).json({ error: "Admin access required." });
@@ -45,4 +65,4 @@ function requireAdmin(req, res, next) {
     next();
 }
 
-module.exports = { requireAuth, requireAdmin };
+module.exports = { requireAuth, requireAdmin, optionalAuth };

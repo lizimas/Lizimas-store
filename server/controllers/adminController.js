@@ -259,3 +259,30 @@ exports.importProducts = async (req, res) => {
         ...results
     });
 };
+
+exports.getVisitorStats = async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT
+                COUNT(*) FILTER (WHERE visited_at >= CURRENT_DATE) AS visitors_today,
+                COUNT(*) FILTER (WHERE visited_at >= date_trunc('week', CURRENT_DATE)) AS visitors_this_week,
+                COUNT(*) FILTER (WHERE visited_at >= date_trunc('month', CURRENT_DATE)) AS visitors_this_month,
+                COUNT(DISTINCT ip_address) FILTER (WHERE visited_at >= CURRENT_DATE) AS unique_visitors_today,
+                COUNT(DISTINCT ip_address) AS unique_visitors_total
+            FROM visitor_logs
+        `);
+
+        const row = result.rows[0];
+
+        res.json({
+            visitorsToday: Number(row.visitors_today),
+            visitorsThisWeek: Number(row.visitors_this_week),
+            visitorsThisMonth: Number(row.visitors_this_month),
+            uniqueVisitorsToday: Number(row.unique_visitors_today),
+            uniqueVisitorsTotal: Number(row.unique_visitors_total)
+        });
+    } catch (error) {
+        console.error("Get visitor stats error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+};

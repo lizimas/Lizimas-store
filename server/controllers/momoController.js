@@ -4,14 +4,14 @@ const { requestToPay, checkPaymentStatus } = require("../services/momoService");
 exports.initiateMomoPayment = async (req, res) => {
     try {
         const { orderId, phoneNumber } = req.body;
-        const userId = req.user.userId;
+        const userId = req.user ? req.user.userId : null;
 
         if (!orderId || !phoneNumber) {
             return res.status(400).json({ error: "orderId and phoneNumber are required." });
         }
 
         const orderResult = await pool.query(
-            "SELECT id, total, user_id, status FROM orders WHERE id = $1",
+            "SELECT id, total, user_id, status, phone FROM orders WHERE id = $1",
             [orderId]
         );
 
@@ -21,8 +21,17 @@ exports.initiateMomoPayment = async (req, res) => {
 
         const order = orderResult.rows[0];
 
-        if (order.user_id !== userId) {
-            return res.status(403).json({ error: "This order does not belong to you." });
+        if (order.user_id) {
+            // Order was placed by a logged-in user - must match that user
+            if (!userId || order.user_id !== userId) {
+                return res.status(403).json({ error: "This order does not belong to you." });
+            }
+        } else {
+            // Guest order - verify by matching the phone number on the order
+            const normalize = (p) => (p || "").replace(/\D/g, "").slice(-9);
+            if (normalize(order.phone) !== normalize(phoneNumber)) {
+                return res.status(403).json({ error: "Phone number does not match this order." });
+            }
         }
 
         if (order.status === "paid") {

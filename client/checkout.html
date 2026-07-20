@@ -180,6 +180,26 @@
 
 </div>
 
+<div id="confirm-order-modal" class="order-modal-overlay" style="display:none;">
+    <div class="order-modal-box">
+        <h3>Confirm Your Order</h3>
+        <div id="confirm-order-details" class="order-modal-details"></div>
+        <div class="order-modal-buttons">
+            <button id="confirm-order-cancel" class="order-modal-btn-cancel">Cancel</button>
+            <button id="confirm-order-proceed" class="order-modal-btn-confirm">Confirm &amp; Place Order</button>
+        </div>
+    </div>
+</div>
+
+<div id="momo-waiting-modal" class="order-modal-overlay" style="display:none;">
+    <div class="order-modal-box">
+        <div class="momo-spinner"></div>
+        <h3>Check Your Phone</h3>
+        <p id="momo-waiting-text">A payment prompt has been sent to your phone. Approve it to complete your order.</p>
+        <button id="momo-cancel-wait" class="order-modal-btn-cancel">Cancel</button>
+    </div>
+</div>
+
 <script src="js/api.js"></script>
 <script src="js/checkout.js"></script>
 

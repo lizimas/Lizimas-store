@@ -137,9 +137,43 @@ async function authorizedFetch(path, options = {}) {
 
 async function loadAllDashboardData() {
     await loadStats();
+    await loadVisitorStats();
     await loadOrders();
     await loadCustomers();
     await loadProducts();
+}
+
+async function loadVisitorStats() {
+    try {
+        const stats = await authorizedFetch("/api/admin/visitor-stats");
+        const container = document.getElementById("visitor-analytics-grid");
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="stat-card">
+                <div class="label">Visitors Today</div>
+                <div class="value">${stats.visitorsToday}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Visitors This Week</div>
+                <div class="value">${stats.visitorsThisWeek}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Visitors This Month</div>
+                <div class="value">${stats.visitorsThisMonth}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Unique Visitors Today</div>
+                <div class="value">${stats.uniqueVisitorsToday}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Unique Visitors (All Time)</div>
+                <div class="value">${stats.uniqueVisitorsTotal}</div>
+            </div>
+        `;
+    } catch (error) {
+        console.error("Load visitor stats error:", error);
+    }
 }
 
 async function loadStats() {
