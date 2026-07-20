@@ -22,8 +22,8 @@ router.get("/:id/images", getProductImages);
 router.get("/:id", getProductById);
 
 // Admin only: add, update, delete (with image uploads, up to 6 photos per product)
-router.post("/", requireAuth, requireAdmin, upload.array("images", 6), addProduct);
-router.put("/:id", requireAuth, requireAdmin, upload.array("images", 6), updateProduct);
+router.post("/", requireAuth, requireAdmin, upload.array("images", 20), addProduct);
+router.put("/:id", requireAuth, requireAdmin, upload.array("images", 20), updateProduct);
 router.delete("/:id", requireAuth, requireAdmin, deleteProduct);
 router.delete("/images/:imageId", requireAuth, requireAdmin, deleteProductImage);
 

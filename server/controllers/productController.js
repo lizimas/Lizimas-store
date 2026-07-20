@@ -1,4 +1,19 @@
 const pool = require("../config/database");
+const cloudinary = require("../config/cloudinary");
+
+// Upload a single file buffer to Cloudinary, returns the secure URL
+function uploadBufferToCloudinary(fileBuffer) {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            { folder: "lizimas-store/products" },
+            (error, result) => {
+                if (error) return reject(error);
+                resolve(result.secure_url);
+            }
+        );
+        stream.end(fileBuffer);
+    });
+}
 
 // Add product (with optional multiple image uploads)
 exports.addProduct = async (req, res) => {
@@ -6,7 +21,9 @@ exports.addProduct = async (req, res) => {
         const { name, category_id, description, price, stock } = req.body;
 
         const uploadedFiles = req.files || [];
-        const imagePaths = uploadedFiles.map(f => `uploads/products/${f.filename}`);
+        const imagePaths = await Promise.all(
+            uploadedFiles.map(f => uploadBufferToCloudinary(f.buffer))
+        );
         const mainImage = imagePaths.length > 0 ? imagePaths[0] : (req.body.image || null);
 
         const product = await pool.query(
@@ -87,7 +104,9 @@ exports.updateProduct = async (req, res) => {
         const { name, category_id, description, price, stock } = req.body;
 
         const uploadedFiles = req.files || [];
-        const newImagePaths = uploadedFiles.map(f => `uploads/products/${f.filename}`);
+        const newImagePaths = await Promise.all(
+            uploadedFiles.map(f => uploadBufferToCloudinary(f.buffer))
+        );
 
         let updateQuery = `UPDATE products SET name=$1, category_id=$2, description=$3, price=$4, stock=$5`;
         let params = [name, category_id, description, price, stock];
