@@ -2052,3 +2052,70 @@ width:90%;
 @keyframes momo-spin {
     to { transform: rotate(360deg); }
 }
+
+/* =====================================
+   TEMU-STYLE PRODUCT GRID UPGRADE
+===================================== */
+
+.product-price {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.product-price-original {
+    color: #9ca3af;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: line-through;
+}
+
+.product-badge.sale {
+    background: #e02020;
+    color: #ffffff;
+    font-weight: 800;
+}
+
+.product-badge.new {
+    background: #16a34a;
+    color: #ffffff;
+}
+
+.product-badge.out-of-stock {
+    background: #6b7280;
+    color: #ffffff;
+}
+
+.product-rating {
+    color: #fbbf24;
+    font-size: 14px;
+    display: block;
+    margin: 4px 0;
+}
+
+@media (max-width: 600px) {
+    .product-grid {
+        gap: 10px;
+    }
+    .product-card {
+        padding: 10px;
+        border-radius: 14px;
+    }
+    .product-card img {
+        height: 150px;
+    }
+    .product-card h3 {
+        font-size: 14px;
+        min-height: 36px;
+        margin: 8px 0;
+    }
+    .product-price {
+        font-size: 17px;
+    }
+    .product-card button {
+        padding: 9px;
+        font-size: 13px;
+        border-radius: 20px;
+    }
+}

@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const pool = require("../config/database");
 const crypto = require("crypto");
+const { sendAdminLoginAlert } = require("../utils/mailer");
 
 const JWT_SECRET = process.env.JWT_SECRET || "change_this_secret_in_env_file";
 const TOKEN_EXPIRY = "7d";
@@ -106,6 +107,15 @@ async function loginUser(req, res) {
             JWT_SECRET,
             { expiresIn: TOKEN_EXPIRY }
         );
+
+        if (user.role === "admin") {
+            sendAdminLoginAlert({
+                name: user.name,
+                email: user.email,
+                time: new Date().toISOString(),
+                ip: req.ip || req.connection.remoteAddress || "Unknown"
+            }).catch(err => console.error("Admin login alert failed:", err));
+        }
 
         res.json({
             message: "Login successful.",
@@ -366,6 +376,15 @@ async function verifyLogin2FA(req, res) {
             JWT_SECRET,
             { expiresIn: TOKEN_EXPIRY }
         );
+
+        if (user.role === "admin") {
+            sendAdminLoginAlert({
+                name: user.name,
+                email: user.email,
+                time: new Date().toISOString(),
+                ip: req.ip || req.connection.remoteAddress || "Unknown"
+            }).catch(err => console.error("Admin login alert failed:", err));
+        }
 
         res.json({
             message: "Login successful.",
