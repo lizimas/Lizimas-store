@@ -302,6 +302,9 @@ async function openProductModal(productId) {
     const thumbnailsContainer = document.getElementById("modal-thumbnails");
     const variantLabel = document.getElementById("modal-selected-variant");
 
+    let galleryItems = [];
+    let currentIndex = 0;
+
     function applySelection(stock, price, image, variant) {
         mainImage.src = image;
         mainImage.alt = product.name;
@@ -316,19 +319,34 @@ async function openProductModal(productId) {
         };
     }
 
+    function updateActiveThumbnail(index) {
+        const thumbs = thumbnailsContainer.querySelectorAll("img");
+        thumbs.forEach(t => t.classList.remove("active-thumbnail"));
+        if (thumbs[index]) {
+            thumbs[index].classList.add("active-thumbnail");
+        }
+    }
+
+    function showGalleryItem(index) {
+        if (galleryItems.length === 0) return;
+        const wrapped = (index + galleryItems.length) % galleryItems.length;
+        const item = galleryItems[wrapped];
+        applySelection(item.stock, item.price, item.image, item.variant);
+        currentIndex = wrapped;
+        updateActiveThumbnail(wrapped);
+    }
+
     applySelection(product.stock, product.price, product.image, null);
 
     thumbnailsContainer.innerHTML = "";
+
+    galleryItems.push({ stock: product.stock, price: product.price, image: product.image, variant: null });
 
     const baseThumb = document.createElement("img");
     baseThumb.src = product.image;
     baseThumb.alt = product.name;
     baseThumb.classList.add("active-thumbnail");
-    baseThumb.onclick = () => {
-        applySelection(product.stock, product.price, product.image, null);
-        thumbnailsContainer.querySelectorAll("img").forEach(t => t.classList.remove("active-thumbnail"));
-        baseThumb.classList.add("active-thumbnail");
-    };
+    baseThumb.onclick = () => showGalleryItem(0);
     thumbnailsContainer.appendChild(baseThumb);
 
     try {
@@ -337,15 +355,14 @@ async function openProductModal(productId) {
 
         if (Array.isArray(variants)) {
             variants.forEach(variant => {
+                const idx = galleryItems.length;
+                galleryItems.push({ stock: variant.stock, price: variant.price, image: variant.image_path || product.image, variant });
+
                 const thumb = document.createElement("img");
                 thumb.src = variant.image_path || product.image;
                 thumb.alt = `${product.name} - ${variant.variant_name}`;
                 thumb.title = variant.variant_name;
-                thumb.onclick = () => {
-                    applySelection(variant.stock, variant.price, variant.image_path || product.image, variant);
-                    thumbnailsContainer.querySelectorAll("img").forEach(t => t.classList.remove("active-thumbnail"));
-                    thumb.classList.add("active-thumbnail");
-                };
+                thumb.onclick = () => showGalleryItem(idx);
                 thumbnailsContainer.appendChild(thumb);
             });
         }
@@ -359,20 +376,43 @@ async function openProductModal(productId) {
 
         if (Array.isArray(galleryImages)) {
             galleryImages.forEach(img => {
+                const idx = galleryItems.length;
+                galleryItems.push({ stock: product.stock, price: product.price, image: img.image_path, variant: null });
+
                 const thumb = document.createElement("img");
                 thumb.src = img.image_path;
                 thumb.alt = product.name;
-                thumb.onclick = () => {
-                    applySelection(product.stock, product.price, img.image_path, null);
-                    thumbnailsContainer.querySelectorAll("img").forEach(t => t.classList.remove("active-thumbnail"));
-                    thumb.classList.add("active-thumbnail");
-                };
+                thumb.onclick = () => showGalleryItem(idx);
                 thumbnailsContainer.appendChild(thumb);
             });
         }
     } catch (error) {
         console.error("Could not load gallery images:", error);
     }
+
+    currentIndex = 0;
+    updateActiveThumbnail(0);
+
+    let touchStartX = 0;
+    const SWIPE_THRESHOLD = 40;
+
+    mainImage.ontouchstart = (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+    };
+
+    mainImage.ontouchend = (e) => {
+        const touchEndX = e.changedTouches[0].screenX;
+        const deltaX = touchEndX - touchStartX;
+        if (Math.abs(deltaX) > SWIPE_THRESHOLD) {
+            if (deltaX < 0) {
+                showGalleryItem(currentIndex + 1);
+            } else {
+                showGalleryItem(currentIndex - 1);
+            }
+        }
+    };
+
+    mainImage.style.touchAction = "pan-y";
 
     document.getElementById("product-modal").classList.remove("hidden");
 }
