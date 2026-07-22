@@ -24,7 +24,7 @@ function Header() {
           />
 
           <h1>
-            Lizimas & Talent Enterprise Ltd
+            Lizimas & Talent Enterprise
           </h1>
 
         </Link>

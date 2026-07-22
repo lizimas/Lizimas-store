@@ -4,7 +4,7 @@ function Header() {
   return (
     <header className="header">
       <div className="logo">
-        Lizimas & Talent Enterprise Ltd
+        Lizimas & Talent Enterprise
       </div>
 
       <nav>

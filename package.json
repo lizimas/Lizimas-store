@@ -1,7 +1,7 @@
 {
   "name": "lizimas-store",
   "version": "1.0.0",
-  "description": "Lizimas & Talent Enterprise Ltd E-commerce Platform",
+  "description": "Lizimas & Talent Enterprise E-commerce Platform",
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",
@@ -12,7 +12,7 @@
     "supermarket",
     "boutique"
   ],
-  "author": "Lizimas & Talent Enterprise Ltd",
+  "author": "Lizimas & Talent Enterprise",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {

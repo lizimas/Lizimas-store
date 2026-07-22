@@ -20,7 +20,7 @@ function Hero() {
           <p>
             Shop groceries, boutique items,
             beverages and household essentials
-            from Lizimas & Talent Enterprise Ltd.
+            from Lizimas & Talent Enterprise.
           </p>
 
 

@@ -11,7 +11,7 @@ function Footer() {
         <div>
 
           <h3>
-            Lizimas & Talent Enterprise Ltd
+            Lizimas & Talent Enterprise
           </h3>
 
 
@@ -52,7 +52,7 @@ function Footer() {
 
       <p className="copyright">
 
-        © 2026 Lizimas & Talent Enterprise Ltd.
+        © 2026 Lizimas & Talent Enterprise.
         All rights reserved.
 
       </p>
