@@ -85,10 +85,9 @@
 
         <div class="checkout-input-group" id="address-group">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-            <input id="address" type="text" placeholder="Delivery Address" onblur="calculateDeliveryFee()">
-            <button type="button" class="use-location-btn" onclick="useMyLocation()" title="Use my current location">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>
-            </button>
+            <select id="district-select" onchange="calculateDeliveryFee()">
+                <option value="">Select delivery district...</option>
+            </select>
         </div>
         <p id="delivery-fee-status" class="delivery-fee-status"></p>
 

@@ -60,11 +60,21 @@ function onDeliveryMethodChange() {
 async function calculateDeliveryFee() {
     if (currentDeliveryMethod === "pickup") return;
 
-    const address = document.getElementById("address").value.trim();
+    const district = document.getElementById("district-select").value;
     const statusEl = document.getElementById("delivery-fee-status");
 
-    if (!address) {
+    if (!district) {
         currentDeliveryFee = null;
+        renderOrderSummary();
+        return;
+    }
+
+    const cart = JSON.parse(localStorage.getItem("cart")) || [];
+    const productIds = cart.map(item => parseCartItemId(item.id).productId).filter(Boolean);
+
+    if (productIds.length === 0) {
+        currentDeliveryFee = null;
+        statusEl.textContent = "Your cart is empty.";
         renderOrderSummary();
         return;
     }
@@ -72,15 +82,53 @@ async function calculateDeliveryFee() {
     statusEl.textContent = "Calculating delivery fee...";
 
     try {
-        const result = await apiGet(`/delivery/fee?address=${encodeURIComponent(address)}&method=delivery`);
+        const result = await apiGet(`/delivery/fee?district=${encodeURIComponent(district)}&product_ids=${productIds.join(",")}&method=delivery`);
+
+        if (result.quoteRequired) {
+            currentDeliveryFee = null;
+            statusEl.textContent = result.message || "This order requires a custom delivery quote. Contact us to arrange delivery.";
+            renderOrderSummary();
+            return;
+        }
+
         currentDeliveryFee = result.fee;
-        statusEl.textContent = `Approx. ${result.distanceKm} km from our Bugolobi store`;
+        statusEl.textContent = `${result.zone} \u00b7 Estimated delivery: ${result.eta}`;
         renderOrderSummary();
     } catch (error) {
         console.error(error);
         currentDeliveryFee = null;
-        statusEl.textContent = "Could not calculate fee. Please check the address and try again.";
+        statusEl.textContent = "Could not calculate fee for that district. Please try again.";
         renderOrderSummary();
+    }
+}
+
+async function loadDistricts() {
+    const select = document.getElementById("district-select");
+    try {
+        const result = await apiGet("/delivery/districts");
+        const districts = result.districts || [];
+
+        let currentZone = null;
+        let optgroup = null;
+
+        districts.forEach(d => {
+            if (d.zone !== currentZone) {
+                currentZone = d.zone;
+                optgroup = document.createElement("optgroup");
+                optgroup.label = d.zone;
+                select.appendChild(optgroup);
+            }
+            const option = document.createElement("option");
+            option.value = d.district;
+            option.textContent = d.district;
+            optgroup.appendChild(option);
+        });
+    } catch (error) {
+        console.error("Failed to load districts:", error);
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "Could not load districts - please refresh";
+        select.appendChild(option);
     }
 }
 
@@ -90,7 +138,7 @@ let momoPollInterval = null;
 function placeOrder() {
     const name = document.getElementById("name").value.trim();
     const phone = document.getElementById("phone").value.trim();
-    const address = document.getElementById("address").value.trim();
+    const district = document.getElementById("district-select").value;
     const payment = document.getElementById("payment").value;
     const deliveryMethod = document.getElementById("delivery-method").value;
 
@@ -99,8 +147,8 @@ function placeOrder() {
         return;
     }
 
-    if (deliveryMethod === "delivery" && !address) {
-        alert("Please enter a delivery address.");
+    if (deliveryMethod === "delivery" && !district) {
+        alert("Please select a delivery district.");
         return;
     }
 
@@ -132,7 +180,7 @@ function placeOrder() {
     pendingOrder = {
         customer_name: name,
         phone: phone,
-        delivery_address: deliveryMethod === "pickup" ? "Self pickup - Bugolobi store" : address,
+        delivery_address: deliveryMethod === "pickup" ? "Self pickup - Bugolobi store" : district,
         delivery_method: deliveryMethod,
         delivery_fee: deliveryFee,
         payment_method: payment,
@@ -266,41 +314,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 document.addEventListener("DOMContentLoaded", () => {
     renderOrderSummary();
+    loadDistricts();
 });
 
-function useMyLocation() {
-    const statusEl = document.getElementById("delivery-fee-status");
 
-    if (!navigator.geolocation) {
-        statusEl.textContent = "Location services are not available on this device.";
-        return;
-    }
-
-    statusEl.textContent = "Getting your location...";
-
-    navigator.geolocation.getCurrentPosition(
-        async (position) => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-
-            statusEl.textContent = "Calculating delivery fee...";
-
-            try {
-                const result = await apiGet(`/delivery/fee?lat=${lat}&lng=${lng}&method=delivery`);
-
-                currentDeliveryFee = result.fee;
-                document.getElementById("address").value = result.resolvedAddress || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-                statusEl.textContent = `Approx. ${result.distanceKm} km from our Bugolobi store`;
-                renderOrderSummary();
-
-            } catch (error) {
-                console.error(error);
-                statusEl.textContent = "Could not calculate fee for your location. Please type your address instead.";
-            }
-        },
-        (error) => {
-            console.error(error);
-            statusEl.textContent = "Could not access your location. Please allow location access or type your address instead.";
-        }
-    );
-}
