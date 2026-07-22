@@ -393,11 +393,36 @@ async function openProductModal(productId) {
     currentIndex = 0;
     updateActiveThumbnail(0);
 
+    const fsOverlay = document.getElementById("fullscreen-viewer");
+    const fsImage = document.getElementById("fullscreen-image");
+    const fsClose = document.getElementById("fullscreen-close");
+
+    function openFullscreenViewer() {
+        fsImage.src = mainImage.src;
+        fsImage.alt = product.name;
+        fsOverlay.classList.remove("hidden");
+    }
+
+    function closeFullscreenViewer() {
+        fsOverlay.classList.add("hidden");
+    }
+
+    fsClose.onclick = closeFullscreenViewer;
+
     let touchStartX = 0;
+    let wasSwipe = false;
     const SWIPE_THRESHOLD = 40;
 
     mainImage.ontouchstart = (e) => {
         touchStartX = e.changedTouches[0].screenX;
+        wasSwipe = false;
+    };
+
+    mainImage.ontouchmove = (e) => {
+        const currentX = e.changedTouches[0].screenX;
+        if (Math.abs(currentX - touchStartX) > 10) {
+            wasSwipe = true;
+        }
     };
 
     mainImage.ontouchend = (e) => {
@@ -412,7 +437,59 @@ async function openProductModal(productId) {
         }
     };
 
+    mainImage.onclick = () => {
+        if (!wasSwipe) {
+            openFullscreenViewer();
+        }
+    };
+
     mainImage.style.touchAction = "pan-y";
+
+    let fsStartX = 0;
+    let fsStartY = 0;
+    let fsWasSwipe = false;
+
+    fsImage.ontouchstart = (e) => {
+        fsStartX = e.changedTouches[0].screenX;
+        fsStartY = e.changedTouches[0].screenY;
+        fsWasSwipe = false;
+    };
+
+    fsImage.ontouchmove = (e) => {
+        const curX = e.changedTouches[0].screenX;
+        const curY = e.changedTouches[0].screenY;
+        if (Math.abs(curX - fsStartX) > 10 || Math.abs(curY - fsStartY) > 10) {
+            fsWasSwipe = true;
+        }
+    };
+
+    fsImage.ontouchend = (e) => {
+        const endX = e.changedTouches[0].screenX;
+        const endY = e.changedTouches[0].screenY;
+        const deltaX = endX - fsStartX;
+        const deltaY = endY - fsStartY;
+
+        if (deltaY > 60 && Math.abs(deltaY) > Math.abs(deltaX)) {
+            closeFullscreenViewer();
+            fsWasSwipe = true;
+            return;
+        }
+
+        if (Math.abs(deltaX) > SWIPE_THRESHOLD) {
+            if (deltaX < 0) {
+                showGalleryItem(currentIndex + 1);
+            } else {
+                showGalleryItem(currentIndex - 1);
+            }
+            fsImage.src = mainImage.src;
+        }
+    };
+
+    fsImage.onclick = () => {
+        if (!fsWasSwipe) {
+            closeFullscreenViewer();
+        }
+    };
 
     document.getElementById("product-modal").classList.remove("hidden");
 }
