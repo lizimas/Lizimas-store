@@ -9,6 +9,7 @@ function parseCartItemId(cartItemId) {
 
 let currentDeliveryFee = null;
 let currentDeliveryMethod = "delivery";
+let lastKnownZone = null;
 
 function getCartTotal() {
     const cart = JSON.parse(localStorage.getItem("cart")) || [];
@@ -50,7 +51,7 @@ function onDeliveryMethodChange() {
         statusEl.textContent = "";
         currentDeliveryFee = 0;
     } else {
-        addressGroup.style.display = "flex";
+        addressGroup.style.display = "block";
         currentDeliveryFee = null;
     }
 
@@ -92,7 +93,10 @@ async function calculateDeliveryFee() {
         }
 
         currentDeliveryFee = result.fee;
-        statusEl.textContent = `${result.zone} \u00b7 Estimated delivery: ${result.eta}`;
+        lastKnownZone = result.zone;
+        const zoneDisplayEl = document.getElementById("zone-display");
+        if (zoneDisplayEl) zoneDisplayEl.textContent = `Delivery Zone: ${result.zone}`;
+        statusEl.textContent = `Estimated delivery: ${result.eta}`;
         renderOrderSummary();
     } catch (error) {
         console.error(error);
@@ -136,14 +140,29 @@ let pendingOrder = null;
 let momoPollInterval = null;
 
 function placeOrder() {
-    const name = document.getElementById("name").value.trim();
-    const phone = document.getElementById("phone").value.trim();
+    const firstName = document.getElementById("first-name").value.trim();
+    const lastName = document.getElementById("last-name").value.trim();
+    const name = `${firstName} ${lastName}`.trim();
+
+    const phoneDigits = document.getElementById("phone").value.trim();
+    const altPhoneDigits = document.getElementById("alt-phone").value.trim();
+    const phone = phoneDigits ? `+256${phoneDigits}` : "";
+    const altPhone = altPhoneDigits ? `+256${altPhoneDigits}` : "";
+
     const district = document.getElementById("district-select").value;
+    const region = document.getElementById("region-select").value;
+    const street = document.getElementById("street").value.trim();
+    const landmark = document.getElementById("landmark").value.trim();
     const payment = document.getElementById("payment").value;
     const deliveryMethod = document.getElementById("delivery-method").value;
 
-    if (!name || !phone) {
+    if (!firstName || !lastName || !phoneDigits) {
         alert("Please complete your name and phone number.");
+        return;
+    }
+
+    if (phoneDigits.length !== 9) {
+        alert("Please enter a valid 9-digit phone number (without the +256 prefix).");
         return;
     }
 
@@ -177,10 +196,22 @@ function placeOrder() {
         };
     });
 
+    let deliveryAddress = "Self pickup - Bugolobi store";
+    if (deliveryMethod === "delivery") {
+        const addressParts = [];
+        if (region) addressParts.push(`${region} Region`);
+        addressParts.push(`${district} District`);
+        addressParts.push(`Zone: ${lastKnownZone || "N/A"}`);
+        if (street) addressParts.push(`Street/Road: ${street}`);
+        if (landmark) addressParts.push(`Plot/Landmark: ${landmark}`);
+        deliveryAddress = addressParts.join(", ");
+    }
+
     pendingOrder = {
         customer_name: name,
         phone: phone,
-        delivery_address: deliveryMethod === "pickup" ? "Self pickup - Bugolobi store" : district,
+        alt_phone: altPhone || null,
+        delivery_address: deliveryAddress,
         delivery_method: deliveryMethod,
         delivery_fee: deliveryFee,
         payment_method: payment,
@@ -318,3 +349,109 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 
+
+
+// --- Leaflet map picker (Select on Map / Share Live Location) ---
+let leafletMapInstance = null;
+let leafletMarker = null;
+let selectedMapAddressText = "";
+
+function initLeafletMapIfNeeded() {
+    if (leafletMapInstance) return;
+
+    leafletMapInstance = L.map("leaflet-map").setView([0.3476, 32.5825], 12); // Kampala default
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(leafletMapInstance);
+
+    leafletMarker = L.marker([0.3476, 32.5825], { draggable: true }).addTo(leafletMapInstance);
+
+    leafletMarker.on("dragend", () => {
+        const pos = leafletMarker.getLatLng();
+        reverseGeocodeAndPreview(pos.lat, pos.lng);
+    });
+
+    leafletMapInstance.on("click", (e) => {
+        leafletMarker.setLatLng(e.latlng);
+        reverseGeocodeAndPreview(e.latlng.lat, e.latlng.lng);
+    });
+}
+
+function toggleMapPicker() {
+    const container = document.getElementById("map-picker-container");
+    const isHidden = container.style.display === "none" || !container.style.display;
+
+    if (isHidden) {
+        container.style.display = "block";
+        initLeafletMapIfNeeded();
+        setTimeout(() => { leafletMapInstance.invalidateSize(); }, 100);
+    } else {
+        container.style.display = "none";
+    }
+}
+
+function useLiveLocation() {
+    const previewEl = document.getElementById("map-address-preview");
+
+    if (!navigator.geolocation) {
+        alert("Location services are not available on this device.");
+        return;
+    }
+
+    const container = document.getElementById("map-picker-container");
+    container.style.display = "block";
+    initLeafletMapIfNeeded();
+
+    previewEl.textContent = "Getting your location...";
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+
+            leafletMapInstance.setView([lat, lng], 16);
+            leafletMarker.setLatLng([lat, lng]);
+            setTimeout(() => { leafletMapInstance.invalidateSize(); }, 100);
+
+            reverseGeocodeAndPreview(lat, lng);
+        },
+        (error) => {
+            console.error(error);
+            previewEl.textContent = "Could not access your location. Please select on the map instead.";
+        }
+    );
+}
+
+async function reverseGeocodeAndPreview(lat, lng) {
+    const previewEl = document.getElementById("map-address-preview");
+    previewEl.textContent = "Looking up address...";
+
+    try {
+        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`;
+        const response = await fetch(url, {
+            headers: { "User-Agent": "LizimasStore/1.0 (checkout address lookup)" }
+        });
+        const data = await response.json();
+
+        selectedMapAddressText = (data && data.display_name) || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        previewEl.textContent = selectedMapAddressText;
+    } catch (error) {
+        console.error("Reverse geocoding failed:", error);
+        selectedMapAddressText = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        previewEl.textContent = "Could not look up address name, but location was captured.";
+    }
+}
+
+function confirmMapLocation() {
+    if (!selectedMapAddressText) {
+        alert("Please select a location on the map first.");
+        return;
+    }
+
+    const parts = selectedMapAddressText.split(",").map(p => p.trim());
+    document.getElementById("street").value = parts[0] || selectedMapAddressText;
+    document.getElementById("landmark").value = parts.slice(1, 3).join(", ") || "";
+
+    document.getElementById("map-picker-container").style.display = "none";
+}

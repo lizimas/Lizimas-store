@@ -1,7 +1,7 @@
 const pool = require("../config/database");
 
 exports.checkout = async (req, res) => {
-    const { items, payment_method, delivery_address, customer_name, phone, delivery_fee, delivery_method } = req.body;
+    const { items, payment_method, delivery_address, customer_name, phone, alt_phone, delivery_fee, delivery_method } = req.body;
     const safeDeliveryFee = Number(delivery_fee) >= 0 ? Number(delivery_fee) : 0;
     const safeDeliveryMethod = delivery_method === "pickup" ? "pickup" : "delivery";
 
@@ -101,10 +101,10 @@ exports.checkout = async (req, res) => {
 
         const orderResult = await client.query(
             `INSERT INTO orders
-                (user_id, customer_name, phone, total, payment_method, delivery_address, status, delivery_fee, delivery_method)
-             VALUES (NULL, $1, $2, $3, $4, $5, 'pending', $6, $7)
+                (user_id, customer_name, phone, alt_phone, total, payment_method, delivery_address, status, delivery_fee, delivery_method)
+             VALUES (NULL, $1, $2, $3, $4, $5, $6, 'pending', $7, $8)
              RETURNING *`,
-            [customer_name, phone, finalTotal, payment_method, delivery_address, safeDeliveryFee, safeDeliveryMethod]
+            [customer_name, phone, alt_phone || null, finalTotal, payment_method, delivery_address, safeDeliveryFee, safeDeliveryMethod]
         );
 
         const order = orderResult.rows[0];

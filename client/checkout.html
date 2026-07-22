@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Checkout - Lizimas Store</title>
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 
 <body>
@@ -67,12 +68,24 @@
 
         <div class="checkout-input-group">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            <input id="name" type="text" placeholder="Full Name">
+            <input id="first-name" type="text" placeholder="First Name">
+        </div>
+
+        <div class="checkout-input-group">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <input id="last-name" type="text" placeholder="Last Name">
         </div>
 
         <div class="checkout-input-group">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-            <input id="phone" type="text" placeholder="Phone Number">
+            <span class="phone-prefix">+256</span>
+            <input id="phone" type="tel" placeholder="7XX XXX XXX" maxlength="9" inputmode="numeric">
+        </div>
+
+        <div class="checkout-input-group">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            <span class="phone-prefix">+256</span>
+            <input id="alt-phone" type="tel" placeholder="Alternate Phone (optional)" maxlength="9" inputmode="numeric">
         </div>
 
         <div class="checkout-input-group">
@@ -83,13 +96,57 @@
             </select>
         </div>
 
-        <div class="checkout-input-group" id="address-group">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-            <select id="district-select" onchange="calculateDeliveryFee()">
-                <option value="">Select delivery district...</option>
-            </select>
+        <div id="address-group">
+            <div class="map-picker-buttons">
+                <button type="button" class="map-picker-btn" onclick="toggleMapPicker()">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                    Select on Map
+                </button>
+                <button type="button" class="map-picker-btn" onclick="useLiveLocation()">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>
+                    Share Live Location
+                </button>
+            </div>
+
+            <div id="map-picker-container" style="display:none;">
+                <div id="leaflet-map"></div>
+                <p id="map-address-preview" class="delivery-fee-status"></p>
+                <button type="button" class="map-confirm-btn" onclick="confirmMapLocation()">Use This Location</button>
+            </div>
+
+            <p class="address-divider">Or enter address manually</p>
+
+            <div class="checkout-input-group">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M12 2v20"/></svg>
+                <select id="region-select">
+                    <option value="">Select region...</option>
+                    <option value="Central">Central</option>
+                    <option value="Eastern">Eastern</option>
+                    <option value="Northern">Northern</option>
+                    <option value="Western">Western</option>
+                </select>
+            </div>
+
+            <div class="checkout-input-group">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                <select id="district-select" onchange="calculateDeliveryFee()">
+                    <option value="">Select delivery district (City)...</option>
+                </select>
+            </div>
+
+            <p id="zone-display" class="delivery-fee-status"></p>
+            <p id="delivery-fee-status" class="delivery-fee-status"></p>
+
+            <div class="checkout-input-group">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+                <input id="street" type="text" placeholder="Street / Road / Village">
+            </div>
+
+            <div class="checkout-input-group">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                <input id="landmark" type="text" placeholder="Plot/House Number & Landmark">
+            </div>
         </div>
-        <p id="delivery-fee-status" class="delivery-fee-status"></p>
 
         <div class="checkout-input-group">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
@@ -199,6 +256,7 @@
     </div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/api.js"></script>
 <script src="js/checkout.js"></script>
 
