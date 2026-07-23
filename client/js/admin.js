@@ -36,7 +36,7 @@ async function handleLogin() {
     }
 
     try {
-        const response = await fetch(`${API_URL}/api/auth/login`, {
+        const response = await fetch(`${API_URL}/api/auth/admin-login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email, password })
@@ -57,11 +57,6 @@ async function handleLogin() {
             document.getElementById("login-btn").classList.add("hidden");
             document.getElementById("login-2fa-btn").classList.remove("hidden");
             document.getElementById("login-error").textContent = "Enter the 6-digit code from your authenticator app.";
-            return;
-        }
-
-        if (data.user.role !== "admin") {
-            document.getElementById("login-error").textContent = "This account does not have admin access.";
             return;
         }
 
@@ -120,6 +115,7 @@ async function authorizedFetch(path, options = {}) {
 
     const response = await fetch(`${API_URL}${path}`, {
         ...options,
+        cache: "no-store",
         headers: {
             ...(options.headers || {}),
             "Authorization": `Bearer ${token}`
@@ -163,6 +159,10 @@ async function loadVisitorStats() {
                 <div class="value">${stats.visitorsThisMonth}</div>
             </div>
             <div class="stat-card">
+                <div class="label">Visitors This Year</div>
+                <div class="value">${stats.visitorsThisYear}</div>
+            </div>
+            <div class="stat-card">
                 <div class="label">Unique Visitors Today</div>
                 <div class="value">${stats.uniqueVisitorsToday}</div>
             </div>
@@ -195,8 +195,16 @@ async function loadStats() {
                 <div class="value">${stats.pendingOrders}</div>
             </div>
             <div class="stat-card">
-                <div class="label">Total Customers</div>
+                <div class="label">Total Registered Customers</div>
                 <div class="value">${stats.totalCustomers}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Total Deleted Accounts</div>
+                <div class="value">${stats.totalDeletedAccounts}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Total Guest Customers</div>
+                <div class="value">${stats.totalGuestCustomers}</div>
             </div>
             <div class="stat-card ${stats.pendingPayments > 0 ? "warning" : ""}">
                 <div class="label">Pending Payments</div>
@@ -352,13 +360,16 @@ async function updateOrderStatus(orderId, newStatus) {
     }
 }
 
-async function loadCustomers() {
+let customerSearchDebounce = null;
+
+async function loadCustomers(search) {
     try {
-        const customers = await authorizedFetch("/api/admin/customers");
+        const query = search ? `?search=${encodeURIComponent(search)}` : "";
+        const customers = await authorizedFetch(`/api/admin/customers${query}`);
         const customersTable = document.getElementById("customers-table");
 
         if (!customers || customers.length === 0) {
-            customersTable.innerHTML = `<p class="no-data">No customers yet.</p>`;
+            customersTable.innerHTML = `<p class="no-data">No customers found.</p>`;
             return;
         }
 
@@ -370,7 +381,9 @@ async function loadCustomers() {
                         <th>Email</th>
                         <th>Phone</th>
                         <th>Role</th>
+                        <th>Status</th>
                         <th>Joined</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -380,7 +393,9 @@ async function loadCustomers() {
                             <td data-label="Email">${c.email}</td>
                             <td data-label="Phone">${c.phone || "—"}</td>
                             <td data-label="Role"><span class="status-badge status-${c.role === "admin" ? "delivered" : "paid"}">${c.role}</span></td>
+                            <td data-label="Status">${c.deleted_at ? `<span class="status-badge status-cancelled">Deleted</span>` : `<span class="status-badge status-paid">Active</span>`}</td>
                             <td data-label="Joined">${new Date(c.created_at).toLocaleDateString()}</td>
+                            <td data-label="Action">${c.deleted_at || c.role === "admin" ? "—" : `<button onclick="deleteCustomerAccount(${c.id}, '${c.name.replace(/'/g, "\\'")}')" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Delete</button>`}</td>
                         </tr>
                     `).join("")}
                 </tbody>
@@ -389,6 +404,47 @@ async function loadCustomers() {
 
     } catch (error) {
         console.error("Load customers error:", error);
+    }
+}
+
+function filterCustomers() {
+    const value = document.getElementById("customer-search-input").value.trim();
+    clearTimeout(customerSearchDebounce);
+    customerSearchDebounce = setTimeout(() => {
+        loadCustomers(value);
+    }, 300);
+}
+
+async function deleteCustomerAccount(id, name) {
+    if (!confirm(`Delete the account for "${name}"? This cannot be undone from here.`)) {
+        return;
+    }
+
+    try {
+        const token = getToken();
+        const response = await fetch(`${API_URL}/api/admin/customers/${id}`, {
+            method: "DELETE",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            alert(data.error || "Failed to delete account.");
+            return;
+        }
+
+        showToast(`${name}'s account has been deleted.`);
+
+        const searchValue = document.getElementById("customer-search-input").value.trim();
+        loadCustomers(searchValue);
+        loadStats();
+
+        const staffContainer = document.getElementById("staff-accounts-list");
+        if (staffContainer) loadStaffAccounts();
+
+    } catch (error) {
+        console.error("Delete customer error:", error);
+        alert("Something went wrong while deleting the account.");
     }
 }
 
@@ -583,6 +639,15 @@ function setupTabs() {
             if (button.dataset.tab === "account") {
                 loadAccount2FAStatus();
                 loadAccountSessions();
+            }
+
+            if (button.dataset.tab === "staff") {
+                loadStaffAccounts();
+                loadPendingProducts();
+                loadDeletionRequests();
+                loadTrash();
+                loadActivityLog();
+                loadStaffSessions();
             }
         });
     });
@@ -1067,4 +1132,435 @@ async function revokeSession(sessionId) {
     } catch (error) {
         alert("Could not connect to server.");
     }
+}
+
+
+// --- Staff & Approvals tab ---
+
+async function createStaffAccount() {
+    const name = document.getElementById("staff-name").value.trim();
+    const email = document.getElementById("staff-email").value.trim();
+    const password = document.getElementById("staff-password").value;
+    const role = document.getElementById("staff-role").value;
+    const statusEl = document.getElementById("staff-create-status");
+
+    if (!name || !email || !password) {
+        statusEl.textContent = "Please fill in all fields.";
+        return;
+    }
+
+    statusEl.textContent = "Creating account...";
+
+    try {
+        const token = getToken();
+        const response = await fetch(`${API_URL}/api/admin/staff`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ name, email, password, role })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            statusEl.textContent = data.error || "Failed to create staff account.";
+            return;
+        }
+
+        statusEl.textContent = `Staff account created for ${name}.`;
+        document.getElementById("staff-name").value = "";
+        document.getElementById("staff-email").value = "";
+        document.getElementById("staff-password").value = "";
+        loadCustomers();
+
+    } catch (error) {
+        console.error("Create staff error:", error);
+        statusEl.textContent = "Something went wrong.";
+    }
+}
+
+async function loadPendingProducts() {
+    try {
+        const products = await authorizedFetch("/api/admin/products/pending");
+        const container = document.getElementById("pending-products-list");
+
+        if (!products || products.length === 0) {
+            container.innerHTML = `<p class="no-data">No products awaiting approval.</p>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Product</th><th>Submitted By</th><th>Price</th><th>Actions</th></tr></thead>
+                <tbody>
+                    ${products.map(p => `
+                        <tr>
+                            <td data-label="Product">${p.name}</td>
+                            <td data-label="Submitted By">${p.submitted_by_name || "Unknown"}</td>
+                            <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
+                            <td data-label="Actions">
+                                <button onclick="approvePendingProduct(${p.id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Approve</button>
+                                <button onclick="rejectPendingProduct(${p.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Reject</button>
+                            </td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load pending products error:", error);
+    }
+}
+
+async function approvePendingProduct(id) {
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/products/${id}/approve`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        loadPendingProducts();
+    } catch (error) {
+        console.error("Approve product error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function rejectPendingProduct(id) {
+    if (!confirm("Reject this product submission?")) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/products/${id}/reject`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        loadPendingProducts();
+    } catch (error) {
+        console.error("Reject product error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function loadDeletionRequests() {
+    try {
+        const requests = await authorizedFetch("/api/admin/deletion-requests");
+        const container = document.getElementById("deletion-requests-list");
+
+        if (!requests || requests.length === 0) {
+            container.innerHTML = `<p class="no-data">No pending deletion requests.</p>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Product</th><th>Requested By</th><th>Requested</th><th>Actions</th></tr></thead>
+                <tbody>
+                    ${requests.map(r => `
+                        <tr>
+                            <td data-label="Product">${r.product_name}</td>
+                            <td data-label="Requested By">${r.requested_by_name || "Unknown"}</td>
+                            <td data-label="Requested">${new Date(r.requested_at).toLocaleDateString()}</td>
+                            <td data-label="Actions">
+                                <button onclick="approveDeletion(${r.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Approve Deletion</button>
+                                <button onclick="rejectDeletion(${r.id})" style="background:#666; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Keep Product</button>
+                            </td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load deletion requests error:", error);
+    }
+}
+
+async function approveDeletion(requestId) {
+    if (!confirm("Approve this deletion? The product will move to Trash.")) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/deletion-requests/${requestId}/approve`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        loadDeletionRequests();
+        loadTrash();
+    } catch (error) {
+        console.error("Approve deletion error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function rejectDeletion(requestId) {
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/deletion-requests/${requestId}/reject`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        loadDeletionRequests();
+    } catch (error) {
+        console.error("Reject deletion error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function loadTrash() {
+    try {
+        const items = await authorizedFetch("/api/admin/trash");
+        const container = document.getElementById("trash-list");
+
+        if (!items || items.length === 0) {
+            container.innerHTML = `<p class="no-data">Trash is empty.</p>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Product</th><th>Deleted</th><th>Actions</th></tr></thead>
+                <tbody>
+                    ${items.map(p => `
+                        <tr>
+                            <td data-label="Product">${p.name}</td>
+                            <td data-label="Deleted">${new Date(p.deleted_at).toLocaleDateString()}</td>
+                            <td data-label="Actions">
+                                <button onclick="restoreTrashedProduct(${p.id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Restore</button>
+                                <button onclick="permanentlyDeleteTrashedProduct(${p.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Delete Forever</button>
+                            </td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load trash error:", error);
+    }
+}
+
+async function restoreTrashedProduct(id) {
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/products/${id}/restore`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        loadTrash();
+    } catch (error) {
+        console.error("Restore product error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function permanentlyDeleteTrashedProduct(id) {
+    if (!confirm("Permanently delete this product? This CANNOT be undone.")) return;
+    try {
+        const token = getToken();
+        const response = await fetch(`${API_URL}/api/admin/products/${id}/permanent`, {
+            method: "DELETE",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.error || "Could not permanently delete this product.");
+            return;
+        }
+        loadTrash();
+    } catch (error) {
+        console.error("Permanent delete error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function loadActivityLog() {
+    try {
+        const logs = await authorizedFetch("/api/admin/activity-log");
+        const container = document.getElementById("activity-log-list");
+
+        if (!logs || logs.length === 0) {
+            container.innerHTML = `<p class="no-data">No activity recorded yet.</p>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>User</th><th>Action</th><th>Details</th><th>When</th></tr></thead>
+                <tbody>
+                    ${logs.map(log => `
+                        <tr>
+                            <td data-label="User">${log.user_name || "Unknown"}</td>
+                            <td data-label="Action">${log.action.replace(/_/g, " ")}</td>
+                            <td data-label="Details">${log.details || "—"}</td>
+                            <td data-label="When">${new Date(log.created_at).toLocaleString()}</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load activity log error:", error);
+    }
+}
+
+
+async function loadStaffAccounts() {
+    try {
+        const customers = await authorizedFetch("/api/admin/customers");
+        const staff = (customers || []).filter(c => c.role === "product_staff" || c.role === "store_manager");
+        const container = document.getElementById("staff-accounts-list");
+
+        if (staff.length === 0) {
+            container.innerHTML = `<p class="no-data">No staff accounts yet.</p>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody>
+                    ${staff.map(s => {
+                        let statusBadge;
+                        if (s.deleted_at) {
+                            statusBadge = `<span class="status-badge status-cancelled">Deleted</span>`;
+                        } else if (s.blocked_at) {
+                            statusBadge = `<span class="status-badge status-cancelled">Blocked</span>`;
+                        } else if (!s.is_active) {
+                            statusBadge = `<span class="status-badge status-pending">Inactive</span>`;
+                        } else {
+                            statusBadge = `<span class="status-badge status-paid">Active</span>`;
+                        }
+
+                        const roleLabel = s.role === "product_staff" ? "Product Staff" : "Store Manager";
+
+                        let actions = "";
+                        if (!s.deleted_at) {
+                            if (!s.is_active) {
+                                actions += `<button onclick="activateStaff(${s.id}, '${s.name.replace(/'/g, "\\'")}')" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Activate</button>`;
+                            }
+                            if (s.is_active && !s.blocked_at) {
+                                actions += `<button onclick="blockStaff(${s.id}, '${s.name.replace(/'/g, "\\'")}')" style="background:#F59E0B; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Block</button>`;
+                            }
+                            actions += `<button onclick="deleteCustomerAccount(${s.id}, '${s.name.replace(/'/g, "\\'")}')" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Delete</button>`;
+                        } else {
+                            actions = "—";
+                        }
+
+                        return `
+                            <tr>
+                                <td data-label="Name">${s.name}</td>
+                                <td data-label="Email">${s.email}</td>
+                                <td data-label="Role">${roleLabel}</td>
+                                <td data-label="Status">${statusBadge}</td>
+                                <td data-label="Actions">${actions}</td>
+                            </tr>
+                        `;
+                    }).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load staff accounts error:", error);
+    }
+}
+
+async function activateStaff(id, name) {
+    try {
+        const token = getToken();
+        const response = await fetch(`${API_URL}/api/admin/staff/${id}/activate`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.error || "Could not activate account.");
+            return;
+        }
+        showToast(`${name} has been activated.`);
+        loadStaffAccounts();
+    } catch (error) {
+        console.error("Activate staff error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+
+function formatDuration(startISO, endISO) {
+    const start = new Date(startISO);
+    const end = new Date(endISO);
+    const diffMs = end - start;
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m`;
+}
+
+async function loadStaffSessions() {
+    try {
+        const sessions = await authorizedFetch("/api/admin/staff-sessions");
+        const container = document.getElementById("staff-sessions-list");
+
+        if (!sessions || sessions.length === 0) {
+            container.innerHTML = `<p class="no-data">No staff login sessions recorded yet.</p>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Name</th><th>Login Time</th><th>Last Active</th><th>Duration</th><th>Device</th></tr></thead>
+                <tbody>
+                    ${sessions.map(s => `
+                        <tr>
+                            <td data-label="Name">${s.name}</td>
+                            <td data-label="Login Time">${new Date(s.login_time).toLocaleString()}</td>
+                            <td data-label="Last Active">${new Date(s.last_used_at).toLocaleString()}</td>
+                            <td data-label="Duration">${formatDuration(s.login_time, s.last_used_at)}</td>
+                            <td data-label="Device">${s.device_label || "Unknown"}</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load staff sessions error:", error);
+    }
+}
+
+
+async function blockStaff(id, name) {
+    if (!confirm(`Block ${name}'s account? They will be logged out and unable to log in until you reactivate them.`)) return;
+    try {
+        const token = getToken();
+        const response = await fetch(`${API_URL}/api/admin/staff/${id}/block`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.error || "Could not block account.");
+            return;
+        }
+        showToast(`${name} has been blocked.`);
+        loadStaffAccounts();
+    } catch (error) {
+        console.error("Block staff error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+function showToast(message) {
+    let toast = document.getElementById("admin-toast");
+    if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "admin-toast";
+        toast.style.cssText = "position:fixed; top:20px; right:20px; background:#1a1a2e; color:#fff; padding:12px 20px; border-radius:8px; font-size:14px; z-index:9999; box-shadow:0 4px 12px rgba(0,0,0,0.2); transition:opacity 0.3s;";
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.style.opacity = "1";
+    toast.style.display = "block";
+
+    clearTimeout(window._toastTimeout);
+    window._toastTimeout = setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => { toast.style.display = "none"; }, 300);
+    }, 2500);
 }

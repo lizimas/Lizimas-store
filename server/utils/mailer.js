@@ -50,4 +50,57 @@ async function sendOrderStatusEmail(email, order, status) {
     }
 }
 
-module.exports = { sendAdminLoginAlert, sendOrderStatusEmail };
+async function sendPasswordResetEmail(email, resetLink) {
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: "Reset Your Password - Lizimas Store",
+            text: `We received a request to reset your password.\n\nClick the link below to set a new password (valid for 15 minutes):\n${resetLink}\n\nIf you didn't request this, you can safely ignore this email - your password will remain unchanged.`
+        });
+    } catch (error) {
+        console.error("Password reset email error:", error);
+        // Don't throw - a failed email should never crash the request
+    }
+}
+
+async function sendStaffActivationEmail(email, name) {
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: "Your Staff Account Has Been Approved - Lizimas Store",
+            text: `Hi ${name},\n\nYour staff account has been approved and is now active. You can log in to the staff dashboard anytime.\n\nWelcome to the team!\n\nLizimas Store`
+        });
+    } catch (error) {
+        console.error("Staff activation email error:", error);
+    }
+}
+
+async function sendAccountBlockedEmail(email, name) {
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: "Your Account Has Been Blocked - Lizimas Store",
+            text: `Hi ${name},\n\nYour account has been blocked due to repeated unauthorized attempts to access the admin panel.\n\nPlease stop trying to log in and contact the administrator to have your account reviewed and reactivated.\n\nLizimas Store`
+        });
+    } catch (error) {
+        console.error("Account blocked email error:", error);
+    }
+}
+
+async function sendAdminBlockAlert(details) {
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: process.env.ADMIN_ALERT_EMAIL,
+            subject: "Staff Account Auto-Blocked - Lizimas Store",
+            text: `A staff account was automatically blocked after 3 unauthorized admin panel access attempts.\n\nName: ${details.name}\nEmail: ${details.email}\nTime: ${details.time}\n\nYou can review and reactivate this account from the Staff & Approvals tab in your admin dashboard.`
+        });
+    } catch (error) {
+        console.error("Admin block alert email error:", error);
+    }
+}
+
+module.exports = { sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert };

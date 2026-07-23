@@ -21,7 +21,15 @@ exports.getDashboardStats = async (req, res) => {
         );
 
         const totalCustomersResult = await pool.query(
-            `SELECT COUNT(*) AS total_customers FROM users WHERE role = 'customer'`
+            `SELECT COUNT(*) AS total_customers FROM users WHERE role = 'customer' AND deleted_at IS NULL`
+        );
+
+        const deletedAccountsResult = await pool.query(
+            `SELECT COUNT(*) AS deleted_accounts FROM users WHERE deleted_at IS NOT NULL`
+        );
+
+        const guestCustomersResult = await pool.query(
+            `SELECT COUNT(DISTINCT phone) AS guest_customers FROM orders WHERE user_id IS NULL`
         );
 
         const pendingPaymentsResult = await pool.query(
@@ -48,7 +56,9 @@ exports.getDashboardStats = async (req, res) => {
             pendingPayments: Number(pendingPaymentsResult.rows[0].pending_payments),
             lowStockProducts: lowStockResult.rows,
             totalVisitors: Number(totalVisitorsResult.rows[0].total_visitors),
-            paidOrders: Number(paidOrdersResult.rows[0].paid_orders)
+            paidOrders: Number(paidOrdersResult.rows[0].paid_orders),
+            totalDeletedAccounts: Number(deletedAccountsResult.rows[0].deleted_accounts),
+            totalGuestCustomers: Number(guestCustomersResult.rows[0].guest_customers)
         });
 
     } catch (error) {
@@ -96,11 +106,19 @@ exports.getOrderItems = async (req, res) => {
 
 exports.getAllCustomers = async (req, res) => {
     try {
-        const customers = await pool.query(
-            `SELECT id, name, email, phone, role, created_at
-             FROM users
-             ORDER BY created_at DESC`
-        );
+        const { search } = req.query;
+
+        let query = `SELECT id, name, email, phone, role, created_at, deleted_at, is_active, blocked_at, failed_admin_attempts FROM users`;
+        const params = [];
+
+        if (search) {
+            params.push(`%${search}%`);
+            query += ` WHERE (name ILIKE $1 OR email ILIKE $1 OR phone ILIKE $1)`;
+        }
+
+        query += ` ORDER BY created_at DESC`;
+
+        const customers = await pool.query(query, params);
 
         res.json(customers.rows);
 
@@ -285,6 +303,7 @@ exports.getVisitorStats = async (req, res) => {
                 COUNT(*) FILTER (WHERE visited_at >= CURRENT_DATE) AS visitors_today,
                 COUNT(*) FILTER (WHERE visited_at >= date_trunc('week', CURRENT_DATE)) AS visitors_this_week,
                 COUNT(*) FILTER (WHERE visited_at >= date_trunc('month', CURRENT_DATE)) AS visitors_this_month,
+                COUNT(*) FILTER (WHERE visited_at >= date_trunc('year', CURRENT_DATE)) AS visitors_this_year,
                 COUNT(DISTINCT ip_address) FILTER (WHERE visited_at >= CURRENT_DATE) AS unique_visitors_today,
                 COUNT(DISTINCT ip_address) AS unique_visitors_total
             FROM visitor_logs
@@ -296,11 +315,75 @@ exports.getVisitorStats = async (req, res) => {
             visitorsToday: Number(row.visitors_today),
             visitorsThisWeek: Number(row.visitors_this_week),
             visitorsThisMonth: Number(row.visitors_this_month),
+            visitorsThisYear: Number(row.visitors_this_year),
             uniqueVisitorsToday: Number(row.unique_visitors_today),
             uniqueVisitorsTotal: Number(row.unique_visitors_total)
         });
     } catch (error) {
         console.error("Get visitor stats error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+};
+
+
+// DELETE /api/admin/customers/:id - soft delete (sets deleted_at, keeps order history intact)
+exports.deleteCustomer = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query(
+            "UPDATE users SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING id",
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Customer not found or already deleted." });
+        }
+
+        res.json({ message: "Account deleted." });
+
+    } catch (error) {
+        console.error("Delete customer error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+};
+
+
+// GET /api/admin/activity-log
+exports.getActivityLog = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT al.id, al.action, al.target_type, al.target_id, al.details, al.created_at,
+                    u.name AS user_name
+             FROM activity_log al
+             LEFT JOIN users u ON u.id = al.user_id
+             ORDER BY al.created_at DESC
+             LIMIT 200`
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error("Get activity log error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+};
+
+
+// GET /api/admin/staff-sessions - login sessions for staff, for time tracking / salary settlement
+exports.getStaffSessions = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT s.id, s.device_label, s.ip_address, s.created_at AS login_time, s.last_used_at,
+                    u.id AS user_id, u.name, u.role
+             FROM sessions s
+             JOIN users u ON u.id = s.user_id
+             WHERE u.role IN ('product_staff', 'store_manager')
+             ORDER BY s.created_at DESC
+             LIMIT 200`
+        );
+
+        res.json(result.rows);
+    } catch (error) {
+        console.error("Get staff sessions error:", error);
         res.status(500).json({ error: "Something went wrong." });
     }
 };

@@ -2,7 +2,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const pool = require("../config/database");
 const crypto = require("crypto");
-const { sendAdminLoginAlert } = require("../utils/mailer");
+const { sendAdminLoginAlert, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert } = require("../utils/mailer");
 
 const JWT_SECRET = process.env.JWT_SECRET || "change_this_secret_in_env_file";
 const TOKEN_EXPIRY = "7d";
@@ -88,7 +88,7 @@ async function loginUser(req, res) {
 
     try {
         const result = await pool.query(
-            "SELECT id, name, email, password, phone, role, two_factor_enabled FROM users WHERE email = $1",
+            "SELECT id, name, email, password, phone, role, two_factor_enabled, is_active, blocked_at FROM users WHERE email = $1",
             [email]
         );
 
@@ -101,6 +101,14 @@ async function loginUser(req, res) {
 
         if (!passwordMatches) {
             return res.status(401).json({ error: "Invalid email or password." });
+        }
+
+        if (user.blocked_at) {
+            return res.status(403).json({ error: "This account has been blocked. Please contact the administrator." });
+        }
+
+        if (!user.is_active) {
+            return res.status(403).json({ error: "Your account is pending activation by the administrator." });
         }
 
         if (user.two_factor_enabled) {
@@ -142,6 +150,294 @@ async function loginUser(req, res) {
     } catch (error) {
         console.error("Login error:", error);
         res.status(500).json({ error: "Something went wrong while logging in." });
+    }
+}
+
+async function createStaffAccount(req, res) {
+    try {
+        const { name, email, password, role } = req.body;
+
+        const allowedStaffRoles = ["product_staff", "store_manager"];
+
+        if (!name || !email || !password || !role) {
+            return res.status(400).json({ error: "Name, email, password, and role are required." });
+        }
+
+        if (!allowedStaffRoles.includes(role)) {
+            return res.status(400).json({ error: `Role must be one of: ${allowedStaffRoles.join(", ")}` });
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({ error: "Password must be at least 6 characters." });
+        }
+
+        const existingUser = await pool.query(
+            "SELECT id FROM users WHERE email = $1",
+            [email]
+        );
+
+        if (existingUser.rows.length > 0) {
+            return res.status(409).json({ error: "An account with this email already exists." });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const usernameBase = email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "").toLowerCase() || "staff";
+        let username = usernameBase;
+        let usernameSuffix = 0;
+
+        while (true) {
+            const existingUsername = await pool.query(
+                "SELECT id FROM users WHERE username = $1",
+                [username]
+            );
+            if (existingUsername.rows.length === 0) break;
+            usernameSuffix += 1;
+            username = `${usernameBase}${usernameSuffix}`;
+        }
+
+        const result = await pool.query(
+            "INSERT INTO users (name, email, password, role, username, is_active) VALUES ($1, $2, $3, $4, $5, false) RETURNING id, name, email, role, is_active",
+            [name, email, hashedPassword, role, username]
+        );
+
+        res.status(201).json({
+            message: "Staff account created successfully.",
+            user: result.rows[0]
+        });
+
+    } catch (error) {
+        console.error("Create staff account error:", error);
+        res.status(500).json({ error: "Something went wrong while creating the staff account." });
+    }
+}
+
+async function adminLogin(req, res) {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ error: "Email and password are required." });
+        }
+
+        const result = await pool.query(
+            "SELECT id, name, email, password, role, two_factor_enabled, is_active, blocked_at, failed_admin_attempts FROM users WHERE email = $1",
+            [email]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(401).json({ error: "Invalid email or password." });
+        }
+
+        const user = result.rows[0];
+        const passwordMatches = await bcrypt.compare(password, user.password);
+
+        if (!passwordMatches) {
+            return res.status(401).json({ error: "Invalid email or password." });
+        }
+
+        if (user.blocked_at) {
+            return res.status(403).json({ error: "This account has been blocked due to repeated unauthorized admin access attempts." });
+        }
+
+        if (user.role !== "admin") {
+            const newAttempts = (user.failed_admin_attempts || 0) + 1;
+
+            if (newAttempts >= 3) {
+                await pool.query(
+                    "UPDATE users SET failed_admin_attempts = $1, blocked_at = NOW(), is_active = false WHERE id = $2",
+                    [newAttempts, user.id]
+                );
+
+                sendAccountBlockedEmail(user.email, user.name).catch(err => console.error("Blocked email failed:", err));
+                sendAdminBlockAlert({
+                    name: user.name,
+                    email: user.email,
+                    time: new Date().toISOString()
+                }).catch(err => console.error("Admin block alert failed:", err));
+
+                return res.status(403).json({ error: "This account has been blocked due to repeated unauthorized admin access attempts." });
+            }
+
+            await pool.query(
+                "UPDATE users SET failed_admin_attempts = $1 WHERE id = $2",
+                [newAttempts, user.id]
+            );
+
+            const attemptsRemaining = 3 - newAttempts;
+            return res.status(403).json({ error: `This account does not have admin access. ${attemptsRemaining} attempt(s) remaining before it is blocked.` });
+        }
+
+        if (!user.is_active) {
+            return res.status(403).json({ error: "Your account is pending activation." });
+        }
+
+        if (user.two_factor_enabled) {
+            const pendingToken = jwt.sign(
+                { userId: user.id, email: user.email, pending2FA: true },
+                JWT_SECRET,
+                { expiresIn: "15m" }
+            );
+
+            return res.json({
+                message: "Password verified. Two-factor code required.",
+                requires2FA: true,
+                pendingToken
+            });
+        }
+
+        const sessionToken = await createSession(user.id, req);
+        const token = jwt.sign(
+            { userId: user.id, email: user.email, role: user.role, sessionToken },
+            JWT_SECRET,
+            { expiresIn: TOKEN_EXPIRY }
+        );
+
+        sendAdminLoginAlert({
+            name: user.name,
+            email: user.email,
+            time: new Date().toISOString(),
+            ip: req.ip || req.connection.remoteAddress || "Unknown"
+        }).catch(err => console.error("Admin login alert failed:", err));
+
+        res.json({
+            message: "Login successful.",
+            token,
+            user: { id: user.id, name: user.name, email: user.email, role: user.role }
+        });
+
+    } catch (error) {
+        console.error("Admin login error:", error);
+        res.status(500).json({ error: "Something went wrong while logging in." });
+    }
+}
+
+async function activateStaffAccount(req, res) {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query(
+            "UPDATE users SET is_active = true, failed_admin_attempts = 0, blocked_at = NULL WHERE id = $1 RETURNING id, name, email",
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Account not found." });
+        }
+
+        const user = result.rows[0];
+
+        sendStaffActivationEmail(user.email, user.name).catch(err => console.error("Staff activation email failed:", err));
+
+        res.json({ message: `${user.name}'s account has been activated.` });
+
+    } catch (error) {
+        console.error("Activate staff account error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+}
+
+async function blockStaffAccount(req, res) {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query(
+            "UPDATE users SET is_active = false, blocked_at = NOW() WHERE id = $1 RETURNING id, name, email",
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Account not found." });
+        }
+
+        const user = result.rows[0];
+
+        sendAccountBlockedEmail(user.email, user.name).catch(err => console.error("Blocked email failed:", err));
+
+        res.json({ message: `${user.name}'s account has been blocked.` });
+
+    } catch (error) {
+        console.error("Block staff account error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+}
+
+async function forgotPassword(req, res) {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ error: "Email is required." });
+        }
+
+        const genericMessage = "If an account with that email exists, a password reset link has been sent.";
+
+        const result = await pool.query(
+            "SELECT id, name, email FROM users WHERE email = $1 AND role = 'customer'",
+            [email]
+        );
+
+        if (result.rows.length === 0) {
+            // Don't reveal whether the email is registered, or that staff/admin accounts
+            // are intentionally excluded from self-service password reset
+            return res.json({ message: genericMessage });
+        }
+
+        const user = result.rows[0];
+
+        const resetToken = jwt.sign(
+            { userId: user.id, email: user.email, purpose: "passwordReset" },
+            JWT_SECRET,
+            { expiresIn: "15m" }
+        );
+
+        const resetLink = `${req.protocol}://${req.get("host")}/reset-password.html?token=${resetToken}`;
+
+        sendPasswordResetEmail(user.email, resetLink).catch(err => console.error("Password reset email failed:", err));
+
+        res.json({ message: genericMessage });
+
+    } catch (error) {
+        console.error("Forgot password error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+}
+
+async function resetPassword(req, res) {
+    try {
+        const { token, newPassword } = req.body;
+
+        if (!token || !newPassword) {
+            return res.status(400).json({ error: "Token and new password are required." });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: "Password must be at least 6 characters." });
+        }
+
+        let decoded;
+        try {
+            decoded = jwt.verify(token, JWT_SECRET);
+        } catch (err) {
+            return res.status(401).json({ error: "This reset link has expired or is invalid. Please request a new one." });
+        }
+
+        if (decoded.purpose !== "passwordReset") {
+            return res.status(401).json({ error: "Invalid reset link." });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        await pool.query(
+            "UPDATE users SET password = $1 WHERE id = $2",
+            [hashedPassword, decoded.userId]
+        );
+
+        res.json({ message: "Password reset successfully. You can now log in with your new password." });
+
+    } catch (error) {
+        console.error("Reset password error:", error);
+        res.status(500).json({ error: "Something went wrong." });
     }
 }
 
@@ -333,6 +629,12 @@ exports.disable2FA = async (req, res) => {
 module.exports = {
     registerUser,
     loginUser,
+    forgotPassword,
+    resetPassword,
+    createStaffAccount,
+    adminLogin,
+    activateStaffAccount,
+    blockStaffAccount,
     getCurrentUser,
     changePassword: exports.changePassword,
     changeUsername: exports.changeUsername,

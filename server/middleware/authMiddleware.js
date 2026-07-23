@@ -65,4 +65,15 @@ function requireAdmin(req, res, next) {
     next();
 }
 
-module.exports = { requireAuth, requireAdmin, optionalAuth };
+// Allows admin, product_staff, and store_manager - used for product add/edit endpoints.
+// Role-specific behavior (pending approval, publish, delete restrictions) is handled
+// inside the controllers themselves, not by this middleware.
+function requireStaffOrAdmin(req, res, next) {
+    const allowedRoles = ["admin", "product_staff", "store_manager"];
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+        return res.status(403).json({ error: "Staff or admin access required." });
+    }
+    next();
+}
+
+module.exports = { requireAuth, requireAdmin, requireStaffOrAdmin, optionalAuth };

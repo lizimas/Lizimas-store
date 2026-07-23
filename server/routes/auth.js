@@ -6,6 +6,9 @@ const { authLimiter } = require("../middleware/rateLimiter");
 const {
     registerUser,
     loginUser,
+    forgotPassword,
+    resetPassword,
+    adminLogin,
     getCurrentUser,
     changePassword,
     changeUsername,
@@ -22,7 +25,10 @@ const { requireAuth } = require("../middleware/authMiddleware");
 
 router.post("/register", registerUser);
 router.post("/login", loginUser);
+router.post("/admin-login", adminLogin);
 router.post("/login/2fa", verifyLogin2FA);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
 router.get("/me", requireAuth, getCurrentUser);
 
 router.patch("/password", requireAuth, changePassword);
