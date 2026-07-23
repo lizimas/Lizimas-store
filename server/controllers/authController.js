@@ -38,9 +38,25 @@ async function registerUser(req, res) {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
+        // Auto-generate a unique username from the email prefix, since customers
+        // registering via the storefront don't provide one directly.
+        const usernameBase = email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "").toLowerCase() || "user";
+        let username = usernameBase;
+        let usernameSuffix = 0;
+
+        while (true) {
+            const existingUsername = await pool.query(
+                "SELECT id FROM users WHERE username = $1",
+                [username]
+            );
+            if (existingUsername.rows.length === 0) break;
+            usernameSuffix += 1;
+            username = `${usernameBase}${usernameSuffix}`;
+        }
+
         const result = await pool.query(
-            "INSERT INTO users (name, email, password, phone) VALUES ($1, $2, $3, $4) RETURNING id, name, email, phone, role",
-            [name, email, hashedPassword, phone || null]
+            "INSERT INTO users (name, email, password, phone, username) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, phone, role",
+            [name, email, hashedPassword, phone || null, username]
         );
 
         const newUser = result.rows[0];

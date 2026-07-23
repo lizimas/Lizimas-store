@@ -106,35 +106,67 @@ async function calculateDeliveryFee() {
     }
 }
 
+let allDistricts = [];
+
 async function loadDistricts() {
-    const select = document.getElementById("district-select");
     try {
         const result = await apiGet("/delivery/districts");
-        const districts = result.districts || [];
-
-        let currentZone = null;
-        let optgroup = null;
-
-        districts.forEach(d => {
-            if (d.zone !== currentZone) {
-                currentZone = d.zone;
-                optgroup = document.createElement("optgroup");
-                optgroup.label = d.zone;
-                select.appendChild(optgroup);
-            }
-            const option = document.createElement("option");
-            option.value = d.district;
-            option.textContent = d.district;
-            optgroup.appendChild(option);
-        });
+        allDistricts = result.districts || [];
     } catch (error) {
         console.error("Failed to load districts:", error);
-        const option = document.createElement("option");
-        option.value = "";
-        option.textContent = "Could not load districts - please refresh";
-        select.appendChild(option);
+        allDistricts = [];
     }
 }
+
+function filterDistrictResults() {
+    const query = document.getElementById("district-search").value.trim().toLowerCase();
+    const dropdown = document.getElementById("district-results-dropdown");
+
+    if (!allDistricts.length) {
+        dropdown.innerHTML = "<div class='district-result-empty'>Districts still loading...</div>";
+        dropdown.style.display = "block";
+        return;
+    }
+
+    const matches = query
+        ? allDistricts.filter(d => d.district.toLowerCase().includes(query))
+        : allDistricts;
+
+    if (matches.length === 0) {
+        dropdown.innerHTML = "<div class='district-result-empty'>No matching district found</div>";
+        dropdown.style.display = "block";
+        return;
+    }
+
+    let currentZone = null;
+    let html = "";
+    matches.forEach(d => {
+        if (d.zone !== currentZone) {
+            currentZone = d.zone;
+            html += `<div class="district-result-zone-label">${d.zone}</div>`;
+        }
+        const safeName = d.district.replace(/'/g, "\\'");
+        html += `<div class="district-result-item" onclick="selectDistrict('${safeName}')">${d.district}</div>`;
+    });
+
+    dropdown.innerHTML = html;
+    dropdown.style.display = "block";
+}
+
+function selectDistrict(districtName) {
+    document.getElementById("district-select").value = districtName;
+    document.getElementById("district-search").value = districtName;
+    document.getElementById("district-results-dropdown").style.display = "none";
+    calculateDeliveryFee();
+}
+
+document.addEventListener("click", (e) => {
+    const dropdown = document.getElementById("district-results-dropdown");
+    const searchGroup = document.querySelector(".district-search-group");
+    if (dropdown && searchGroup && !searchGroup.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.style.display = "none";
+    }
+});
 
 let pendingOrder = null;
 let momoPollInterval = null;
@@ -246,7 +278,7 @@ async function confirmAndSubmitOrder() {
     hideConfirmModal();
 
     try {
-        const result = await apiPost("/checkout", pendingOrder);
+        const result = await apiPostAuth("/checkout", pendingOrder);
         const orderId = result.order.id;
 
         if (pendingOrder.payment_method === "Mobile Money") {

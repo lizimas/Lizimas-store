@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create Account - Lizimas Store</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+<div class="checkout-page">
+
+    <header class="checkout-header">
+        <div class="checkout-logo-row">
+            <div class="checkout-logo-badge">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            </div>
+            <h1 class="checkout-brand-name">Lizimas &amp; Talent<br>Enterprise</h1>
+        </div>
+        <div class="checkout-secure-badge">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+            Secure Account
+        </div>
+    </header>
+
+    <nav class="checkout-nav-links">
+        <a href="index.html">Home</a>
+        <a href="products.html">Products</a>
+        <a href="cart.html">Cart</a>
+        <a href="login.html">Login</a>
+    </nav>
+
+    <div class="checkout-card">
+        <h2 class="checkout-card-title">Create Your Account</h2>
+        <p class="checkout-card-subtitle">Sign up to track your orders and check out faster next time.</p>
+
+        <div class="checkout-input-group">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <input id="reg-name" type="text" placeholder="Full Name">
+        </div>
+
+        <div class="checkout-input-group">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="m22 6-10 7L2 6"/></svg>
+            <input id="reg-email" type="email" placeholder="Email Address">
+        </div>
+
+        <div class="checkout-input-group">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            <span class="phone-prefix">+256</span>
+            <input id="reg-phone" type="tel" placeholder="7XX XXX XXX (optional)" maxlength="9" inputmode="numeric">
+        </div>
+
+        <div class="checkout-input-group">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input id="reg-password" type="password" placeholder="Password">
+        </div>
+
+        <p id="register-status" class="delivery-fee-status"></p>
+
+        <button class="checkout-place-order-btn" onclick="registerAccount()">Create Account</button>
+
+        <p class="checkout-safe-note">
+            Already have an account? <a href="login.html" style="color:#FF6600; font-weight:600; text-decoration:none;">Log in</a>
+        </p>
+    </div>
+
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/register.js"></script>
+
+</body>
+</html>

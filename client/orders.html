@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Track Your Order - Lizimas Store</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+<div class="checkout-page">
+
+    <header class="checkout-header">
+        <div class="checkout-logo-row">
+            <div class="checkout-logo-badge">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            </div>
+            <h1 class="checkout-brand-name">Lizimas &amp; Talent<br>Enterprise</h1>
+        </div>
+        <div class="checkout-secure-badge">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+            Secure Tracking
+        </div>
+    </header>
+
+    <nav class="checkout-nav-links">
+        <a href="index.html">Home</a>
+        <a href="products.html">Products</a>
+        <a href="cart.html">Cart</a>
+        <span id="nav-account-link"></span>
+    </nav>
+
+    <!-- Logged-in order history -->
+    <div class="checkout-card" id="my-orders-card" style="display:none;">
+        <h2 class="checkout-card-title">Your Orders</h2>
+        <p class="checkout-card-subtitle">Order history for your account.</p>
+        <div id="my-orders-list"></div>
+    </div>
+
+    <!-- Logged-out prompt -->
+    <div class="checkout-card" id="logged-out-card" style="display:none;">
+        <h2 class="checkout-card-title">Your Orders</h2>
+        <p class="checkout-card-subtitle">
+            <a href="login.html" style="color:#FF6600; font-weight:600; text-decoration:none;">Log in</a>
+            to see your full order history, or track any order below using its Order ID and phone number.
+        </p>
+    </div>
+
+    <!-- Guest / Order ID tracking -->
+    <div class="checkout-card">
+        <h2 class="checkout-card-title">Track an Order</h2>
+        <p class="checkout-card-subtitle">Enter your Order ID and phone number to check its status.</p>
+
+        <div class="checkout-input-group">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+            <input id="track-order-id" type="text" placeholder="Order ID" inputmode="numeric">
+        </div>
+
+        <div class="checkout-input-group">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            <span class="phone-prefix">+256</span>
+            <input id="track-phone" type="tel" placeholder="7XX XXX XXX" maxlength="9" inputmode="numeric">
+        </div>
+
+        <p id="track-status" class="delivery-fee-status"></p>
+
+        <button class="checkout-place-order-btn" onclick="trackGuestOrder()">Track Order</button>
+
+        <div id="track-result"></div>
+    </div>
+
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/orders.js"></script>
+
+</body>
+</html>

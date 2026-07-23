@@ -1,4 +1,6 @@
 const pool = require("../config/database");
+const { sendOrderStatusSms } = require("../utils/sms");
+const { sendOrderStatusEmail } = require("../utils/mailer");
 const XLSX = require("xlsx");
 const { parse } = require("csv-parse/sync");
 
@@ -130,7 +132,23 @@ exports.updateOrderStatus = async (req, res) => {
             return res.status(404).json({ error: "Order not found." });
         }
 
-        res.json({ message: "Order status updated.", order: result.rows[0] });
+        const updatedOrder = result.rows[0];
+
+        // Status change notifications - best-effort, never block the response
+        sendOrderStatusSms(updatedOrder.phone, updatedOrder, status).catch(err => console.error("SMS notify error:", err));
+
+        if (updatedOrder.user_id) {
+            pool.query("SELECT email FROM users WHERE id = $1", [updatedOrder.user_id])
+                .then(userResult => {
+                    if (userResult.rows.length > 0) {
+                        sendOrderStatusEmail(userResult.rows[0].email, updatedOrder, status)
+                            .catch(err => console.error("Email notify error:", err));
+                    }
+                })
+                .catch(err => console.error("User email lookup error:", err));
+        }
+
+        res.json({ message: "Order status updated.", order: updatedOrder });
 
     } catch (error) {
         console.error("Update order status error:", error);

@@ -2305,3 +2305,47 @@ width:90%;
     vertical-align: middle;
     margin: 0 8px;
 }
+
+
+/* --- District search dropdown --- */
+
+.district-results-dropdown {
+    display: none;
+    position: relative;
+    max-height: 260px;
+    overflow-y: auto;
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 14px;
+    margin-top: -10px;
+    margin-bottom: 14px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+    z-index: 20;
+}
+
+.district-result-zone-label {
+    padding: 8px 16px 4px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #FF6600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.district-result-item {
+    padding: 10px 16px;
+    font-size: 14px;
+    color: #111827;
+    cursor: pointer;
+}
+
+.district-result-item:hover,
+.district-result-item:active {
+    background: #FFF3E9;
+}
+
+.district-result-empty {
+    padding: 14px 16px;
+    font-size: 13px;
+    color: #999999;
+}

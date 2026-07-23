@@ -127,12 +127,12 @@
                 </select>
             </div>
 
-            <div class="checkout-input-group">
+            <div class="checkout-input-group district-search-group" style="position: relative;">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-                <select id="district-select" onchange="calculateDeliveryFee()">
-                    <option value="">Select delivery district (City)...</option>
-                </select>
+                <input id="district-search" type="text" placeholder="Search delivery district (City)..." autocomplete="off" oninput="filterDistrictResults()" onfocus="filterDistrictResults()">
+                <input type="hidden" id="district-select">
             </div>
+            <div id="district-results-dropdown" class="district-results-dropdown"></div>
 
             <p id="zone-display" class="delivery-fee-status"></p>
             <p id="delivery-fee-status" class="delivery-fee-status"></p>
