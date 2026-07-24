@@ -625,3 +625,20 @@ select.status-select {
     background: #c0392b;
     color: #ffffff;
 }
+
+
+/* Staff Accounts dropdown menu (Force Reset / Logout All / Login History etc.) */
+.staff-menu-item {
+    padding: 10px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    color: #1a1a2e;
+    border-bottom: 1px solid #eee;
+    white-space: nowrap;
+}
+.staff-menu-item:last-child {
+    border-bottom: none;
+}
+.staff-menu-item:hover {
+    background: #f3f4f6;
+}

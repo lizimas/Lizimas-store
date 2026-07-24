@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<title>Lizimas Store — Store Manager</title>
+<link rel="stylesheet" href="../css/admin.css">
+</head>
+<body>
+
+    <div class="dashboard-screen">
+        <div class="admin-shell">
+
+            <aside class="admin-sidebar">
+                <div class="sidebar-brand">
+                    <span class="sidebar-brand-icon">L</span>
+                    <span>Lizimas Staff</span>
+                </div>
+                <div style="padding:16px; color:#ccc; font-size:13px;">
+                    Signed in as <strong id="staff-name-display">...</strong><br>
+                    Store Manager
+                </div>
+                <button onclick="staffLogout()" style="margin:16px; background:#DC2626; color:#fff; border:none; border-radius:8px; padding:10px; cursor:pointer; width:calc(100% - 32px);">Log Out</button>
+            </aside>
+
+            <main class="admin-main">
+                <header class="admin-topbar">
+                    <h1>Store Manager Dashboard</h1>
+                </header>
+
+                <div class="admin-content">
+
+                    <div class="panel">
+                        <h2 id="product-form-title">Add Product</h2>
+                        <p style="font-size:13px; color:#666; margin-top:-8px;">Products you add or edit here go live immediately.</p>
+                        <div style="display:flex; flex-direction:column; gap:10px; max-width:480px;">
+                            <input type="hidden" id="product-id">
+                            <input type="text" id="product-name" placeholder="Product name" style="padding:10px; border:1px solid #ccc; border-radius:8px;">
+                            <select id="product-category" style="padding:10px; border:1px solid #ccc; border-radius:8px;"></select>
+                            <textarea id="product-description" placeholder="Description" style="padding:10px; border:1px solid #ccc; border-radius:8px; min-height:80px;"></textarea>
+                            <input type="number" id="product-price" placeholder="Price (UGX)" style="padding:10px; border:1px solid #ccc; border-radius:8px;">
+                            <input type="number" id="product-stock" placeholder="Stock quantity" style="padding:10px; border:1px solid #ccc; border-radius:8px;">
+                            <input type="file" id="product-image" accept="image/*" multiple>
+                            <div style="display:flex; gap:10px;">
+                                <button onclick="submitProductForm()" id="product-submit-btn" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px; cursor:pointer; flex:1;">Publish Product</button>
+                                <button onclick="resetProductForm()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px; cursor:pointer;">Clear</button>
+                            </div>
+                            <p id="product-form-status" style="font-size:13px; color:#666;"></p>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>My Products</h2>
+                        <div id="my-products-list">Loading...</div>
+                    </div>
+
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="../js/staff-manager.js"></script>
+</body>
+</html>

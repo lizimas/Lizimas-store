@@ -9,7 +9,8 @@ const {
     updateProduct,
     deleteProduct,
     deleteProductImage,
-    getCategories
+    getCategories,
+    getMyProducts
 } = require("../controllers/productController");
 
 const { requireAuth, requireAdmin, requireStaffOrAdmin } = require("../middleware/authMiddleware");
@@ -18,6 +19,7 @@ const upload = require("../middleware/upload");
 // Public: anyone can view products/categories (storefront needs this)
 router.get("/", getProducts);
 router.get("/categories", getCategories);
+router.get("/mine", requireAuth, requireStaffOrAdmin, getMyProducts);
 router.get("/:id/images", getProductImages);
 router.get("/:id", getProductById);
 

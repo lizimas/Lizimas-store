@@ -49,6 +49,18 @@ async function handleLogin() {
             return;
         }
 
+        if (data.requiresPasswordReset) {
+            pendingLoginToken = data.pendingToken;
+            document.getElementById("login-email").classList.add("hidden");
+            document.getElementById("login-password").classList.add("hidden");
+            document.getElementById("login-btn").classList.add("hidden");
+            document.getElementById("login-reset-password").classList.remove("hidden");
+            document.getElementById("login-reset-password-confirm").classList.remove("hidden");
+            document.getElementById("login-reset-btn").classList.remove("hidden");
+            document.getElementById("login-error").textContent = "You must set a new password before continuing.";
+            return;
+        }
+
         if (data.requires2FA) {
             pendingLoginToken = data.pendingToken;
             document.getElementById("login-email").classList.add("hidden");
@@ -65,6 +77,48 @@ async function handleLogin() {
 
     } catch (error) {
         console.error("Login error:", error);
+        document.getElementById("login-error").textContent = "Could not connect to server.";
+    }
+}
+
+async function submitForcedReset() {
+    const newPassword = document.getElementById("login-reset-password").value;
+    const confirmPassword = document.getElementById("login-reset-password-confirm").value;
+
+    if (!newPassword || !confirmPassword) {
+        document.getElementById("login-error").textContent = "Please fill in both password fields.";
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        document.getElementById("login-error").textContent = "Password must be at least 6 characters.";
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+        document.getElementById("login-error").textContent = "Passwords do not match.";
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/auth/complete-forced-reset`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pendingToken: pendingLoginToken, newPassword })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            document.getElementById("login-error").textContent = data.error || "Could not reset password.";
+            return;
+        }
+
+        setToken(data.token);
+        showDashboard();
+
+    } catch (error) {
+        console.error("Complete forced reset error:", error);
         document.getElementById("login-error").textContent = "Could not connect to server.";
     }
 }
@@ -1403,10 +1457,81 @@ async function loadActivityLog() {
 }
 
 
+function closeStaffMenus() {
+    const menu = document.getElementById("floating-staff-menu");
+    if (menu) {
+        menu.classList.add("hidden");
+        menu.dataset.openForId = "";
+    }
+}
+
+function buildStaffMenuItems(s) {
+    const safeName = s.name.replace(/'/g, "\\'");
+    let menuItems = "";
+
+    if (!s.is_active) {
+        menuItems += `<div class="staff-menu-item" onclick="closeStaffMenus(); activateStaff(${s.id}, '${safeName}')">✅ Activate</div>`;
+    }
+    if (s.is_active && !s.blocked_at) {
+        menuItems += `<div class="staff-menu-item" onclick="closeStaffMenus(); blockStaff(${s.id}, '${safeName}')">🚫 Block</div>`;
+    }
+    menuItems += `<div class="staff-menu-item" onclick="closeStaffMenus(); forceResetStaff(${s.id}, '${safeName}')">🔑 Force Reset</div>`;
+    menuItems += `<div class="staff-menu-item" onclick="closeStaffMenus(); logoutAllStaffDevices(${s.id}, '${safeName}')">🚪 Logout All</div>`;
+    menuItems += `<div class="staff-menu-item" onclick="closeStaffMenus(); viewStaffLoginHistory(${s.id}, '${safeName}')">📜 Login History</div>`;
+    menuItems += `<div class="staff-menu-item" style="color:#DC2626;" onclick="closeStaffMenus(); deleteCustomerAccount(${s.id}, '${safeName}')">🗑 Delete</div>`;
+
+    return menuItems;
+}
+
+function toggleStaffMenu(event, id) {
+    event.stopPropagation();
+
+    let menu = document.getElementById("floating-staff-menu");
+    if (!menu) {
+        menu = document.createElement("div");
+        menu.id = "floating-staff-menu";
+        menu.className = "hidden staff-menu";
+        menu.style.cssText = "position:fixed; background:#fff; border:1px solid #ddd; border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,0.18); z-index:9999; min-width:170px; overflow:hidden;";
+        document.body.appendChild(menu);
+    }
+
+    const wasOpenForThisId = !menu.classList.contains("hidden") && menu.dataset.openForId === String(id);
+    closeStaffMenus();
+
+    if (wasOpenForThisId) {
+        return;
+    }
+
+    const staffMember = (window._staffListCache || []).find(s => s.id === id);
+    if (!staffMember) return;
+
+    menu.innerHTML = buildStaffMenuItems(staffMember);
+    menu.dataset.openForId = String(id);
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const menuWidth = 180;
+    let left = rect.right - menuWidth;
+    if (left < 8) left = 8;
+    if (left + menuWidth > window.innerWidth - 8) left = window.innerWidth - menuWidth - 8;
+
+    menu.style.left = `${left}px`;
+    menu.style.top = `${rect.bottom + 4}px`;
+    menu.classList.remove("hidden");
+}
+
+document.addEventListener("click", (event) => {
+    if (!event.target.closest(".staff-menu-btn") && !event.target.closest("#floating-staff-menu")) {
+        closeStaffMenus();
+    }
+});
+
+window.addEventListener("scroll", closeStaffMenus, true);
+
 async function loadStaffAccounts() {
     try {
         const customers = await authorizedFetch("/api/admin/customers");
         const staff = (customers || []).filter(c => c.role === "product_staff" || c.role === "store_manager");
+        window._staffListCache = staff;
         const container = document.getElementById("staff-accounts-list");
 
         if (staff.length === 0) {
@@ -1434,13 +1559,7 @@ async function loadStaffAccounts() {
 
                         let actions = "";
                         if (!s.deleted_at) {
-                            if (!s.is_active) {
-                                actions += `<button onclick="activateStaff(${s.id}, '${s.name.replace(/'/g, "\\'")}')" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Activate</button>`;
-                            }
-                            if (s.is_active && !s.blocked_at) {
-                                actions += `<button onclick="blockStaff(${s.id}, '${s.name.replace(/'/g, "\\'")}')" style="background:#F59E0B; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Block</button>`;
-                            }
-                            actions += `<button onclick="deleteCustomerAccount(${s.id}, '${s.name.replace(/'/g, "\\'")}')" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Delete</button>`;
+                            actions = `<button class="staff-menu-btn" onclick="toggleStaffMenu(event, ${s.id})" style="background:#374151; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:16px; line-height:1; cursor:pointer;">⋮</button>`;
                         } else {
                             actions = "—";
                         }
@@ -1483,6 +1602,89 @@ async function activateStaff(id, name) {
     }
 }
 
+
+function openGenericModal(title, bodyHtml) {
+    document.getElementById("generic-modal-title").textContent = title;
+    document.getElementById("generic-modal-body").innerHTML = bodyHtml;
+    document.getElementById("generic-modal").classList.remove("hidden");
+}
+
+function closeGenericModal() {
+    document.getElementById("generic-modal").classList.add("hidden");
+}
+
+async function forceResetStaff(id, name) {
+    if (!confirm(`Require ${name} to set a new password on their next login?`)) return;
+    try {
+        const token = getToken();
+        const response = await fetch(`${API_URL}/api/admin/staff/${id}/force-reset`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.error || "Could not force password reset.");
+            return;
+        }
+        showToast(`${name} will be required to reset their password on next login.`);
+    } catch (error) {
+        console.error("Force reset error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function logoutAllStaffDevices(id, name) {
+    if (!confirm(`Log ${name} out of all devices right now?`)) return;
+    try {
+        const token = getToken();
+        const response = await fetch(`${API_URL}/api/admin/staff/${id}/logout-all`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.error || "Could not log out devices.");
+            return;
+        }
+        showToast(`${name} has been logged out of all devices.`);
+    } catch (error) {
+        console.error("Logout all devices error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function viewStaffLoginHistory(id, name) {
+    try {
+        const data = await authorizedFetch(`/api/admin/staff/${id}/login-history`);
+        const history = (data && data.history) || [];
+
+        let bodyHtml;
+        if (history.length === 0) {
+            bodyHtml = `<p class="no-data">No login attempts recorded yet.</p>`;
+        } else {
+            bodyHtml = `
+                <table>
+                    <thead><tr><th>When</th><th>IP Address</th><th>Device</th><th>Result</th></tr></thead>
+                    <tbody>
+                        ${history.map(h => `
+                            <tr>
+                                <td data-label="When">${new Date(h.logged_in_at).toLocaleString()}</td>
+                                <td data-label="IP Address">${h.ip_address || "Unknown"}</td>
+                                <td data-label="Device">${(h.device_label || "Unknown").slice(0, 60)}</td>
+                                <td data-label="Result">${h.success ? '<span class="status-badge status-paid">Success</span>' : '<span class="status-badge status-cancelled">Failed</span>'}</td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        openGenericModal(`Login History — ${name}`, bodyHtml);
+    } catch (error) {
+        console.error("Load login history error:", error);
+        alert("Could not load login history.");
+    }
+}
 
 function formatDuration(startISO, endISO) {
     const start = new Date(startISO);

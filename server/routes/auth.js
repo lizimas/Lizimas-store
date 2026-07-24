@@ -8,6 +8,7 @@ const {
     loginUser,
     forgotPassword,
     resetPassword,
+    completeForcedPasswordReset,
     adminLogin,
     getCurrentUser,
     changePassword,
@@ -27,6 +28,7 @@ router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.post("/admin-login", adminLogin);
 router.post("/login/2fa", verifyLogin2FA);
+router.post("/complete-forced-reset", completeForcedPasswordReset);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
 router.get("/me", requireAuth, getCurrentUser);

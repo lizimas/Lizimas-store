@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<title>Lizimas Store — Staff Login</title>
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+    <div id="login-screen" class="login-screen">
+        <div class="login-box">
+            <h1>Lizimas Store</h1>
+            <p class="subtitle">Staff Login</p>
+            <input type="email" id="login-email" placeholder="Staff email">
+            <input type="password" id="login-password" placeholder="Password">
+            <button id="login-btn" onclick="handleStaffLogin()">Log In</button>
+
+            <input type="text" id="login-2fa-code" class="hidden" placeholder="Enter 6-digit code">
+            <button id="login-2fa-btn" class="hidden" onclick="submitStaffLogin2FA()">Verify Code</button>
+
+            <input type="password" id="login-reset-password" class="hidden" placeholder="New password">
+            <input type="password" id="login-reset-password-confirm" class="hidden" placeholder="Confirm new password">
+            <button id="login-reset-btn" class="hidden" onclick="submitStaffForcedReset()">Set New Password</button>
+
+            <p id="login-error" class="error-text"></p>
+        </div>
+    </div>
+
+    <script src="js/staff-login.js"></script>
+</body>
+</html>

@@ -17,7 +17,20 @@
             <button id="login-btn" onclick="handleLogin()">Log In</button>
             <input type="text" id="login-2fa-code" class="hidden" placeholder="Enter 6-digit code">
             <button id="login-2fa-btn" class="hidden" onclick="submitLogin2FA()">Verify Code</button>
+            <input type="password" id="login-reset-password" class="hidden" placeholder="New password">
+            <input type="password" id="login-reset-password-confirm" class="hidden" placeholder="Confirm new password">
+            <button id="login-reset-btn" class="hidden" onclick="submitForcedReset()">Set New Password</button>
             <p id="login-error" class="error-text"></p>
+        </div>
+    </div>
+
+    <div id="generic-modal" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; display:flex; align-items:center; justify-content:center;">
+        <div style="background:#fff; border-radius:12px; padding:20px; max-width:600px; width:90%; max-height:80vh; overflow-y:auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                <h3 id="generic-modal-title" style="margin:0;"></h3>
+                <button onclick="closeGenericModal()" style="border:none; background:none; font-size:22px; cursor:pointer; line-height:1;">&times;</button>
+            </div>
+            <div id="generic-modal-body"></div>
         </div>
     </div>
 

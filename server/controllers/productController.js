@@ -75,6 +75,26 @@ exports.getProducts = async (req, res) => {
     }
 };
 
+// Get the logged-in staff member's own products, with pending deletion request status
+exports.getMyProducts = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT p.*, dr.status AS deletion_request_status
+             FROM products p
+             LEFT JOIN product_deletion_requests dr
+                 ON dr.product_id = p.id AND dr.status = 'pending'
+             WHERE p.created_by = $1 AND p.deleted_at IS NULL
+             ORDER BY p.id DESC`,
+            [req.user.userId]
+        );
+
+        res.json(result.rows);
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 // Get a single product by id
 exports.getProductById = async (req, res) => {
     try {

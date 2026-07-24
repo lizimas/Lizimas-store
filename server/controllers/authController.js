@@ -19,6 +19,19 @@ async function createSession(userId, req) {
     return sessionToken;
 }
 
+async function logLoginAttempt(userId, req, success) {
+    const userAgent = (req.headers["user-agent"] || "Unknown device").slice(0, 255);
+    const ipAddress = req.ip || req.connection.remoteAddress || "Unknown";
+    try {
+        await pool.query(
+            "INSERT INTO login_history (user_id, ip_address, device_label, success) VALUES ($1, $2, $3, $4)",
+            [userId, ipAddress, userAgent, success]
+        );
+    } catch (err) {
+        console.error("Failed to log login attempt:", err);
+    }
+}
+
 async function registerUser(req, res) {
     const { name, email, password, phone } = req.body;
 
@@ -88,7 +101,7 @@ async function loginUser(req, res) {
 
     try {
         const result = await pool.query(
-            "SELECT id, name, email, password, phone, role, two_factor_enabled, is_active, blocked_at FROM users WHERE email = $1",
+            "SELECT id, name, email, password, phone, role, two_factor_enabled, is_active, blocked_at, must_reset_password FROM users WHERE email = $1",
             [email]
         );
 
@@ -100,15 +113,31 @@ async function loginUser(req, res) {
         const passwordMatches = await bcrypt.compare(password, user.password);
 
         if (!passwordMatches) {
+            await logLoginAttempt(user.id, req, false);
             return res.status(401).json({ error: "Invalid email or password." });
         }
 
         if (user.blocked_at) {
+            await logLoginAttempt(user.id, req, false);
             return res.status(403).json({ error: "This account has been blocked. Please contact the administrator." });
         }
 
         if (!user.is_active) {
+            await logLoginAttempt(user.id, req, false);
             return res.status(403).json({ error: "Your account is pending activation by the administrator." });
+        }
+
+        if (user.must_reset_password) {
+            const pendingToken = jwt.sign(
+                { userId: user.id, email: user.email, pendingPasswordReset: true },
+                JWT_SECRET,
+                { expiresIn: "15m" }
+            );
+            return res.json({
+                message: "Password reset required before continuing.",
+                requiresPasswordReset: true,
+                pendingToken
+            });
         }
 
         if (user.two_factor_enabled) {
@@ -140,6 +169,8 @@ async function loginUser(req, res) {
                 ip: req.ip || req.connection.remoteAddress || "Unknown"
             }).catch(err => console.error("Admin login alert failed:", err));
         }
+
+        await logLoginAttempt(user.id, req, true);
 
         res.json({
             message: "Login successful.",
@@ -221,7 +252,7 @@ async function adminLogin(req, res) {
         }
 
         const result = await pool.query(
-            "SELECT id, name, email, password, role, two_factor_enabled, is_active, blocked_at, failed_admin_attempts FROM users WHERE email = $1",
+            "SELECT id, name, email, password, role, two_factor_enabled, is_active, blocked_at, failed_admin_attempts, must_reset_password FROM users WHERE email = $1",
             [email]
         );
 
@@ -233,10 +264,12 @@ async function adminLogin(req, res) {
         const passwordMatches = await bcrypt.compare(password, user.password);
 
         if (!passwordMatches) {
+            await logLoginAttempt(user.id, req, false);
             return res.status(401).json({ error: "Invalid email or password." });
         }
 
         if (user.blocked_at) {
+            await logLoginAttempt(user.id, req, false);
             return res.status(403).json({ error: "This account has been blocked due to repeated unauthorized admin access attempts." });
         }
 
@@ -269,7 +302,21 @@ async function adminLogin(req, res) {
         }
 
         if (!user.is_active) {
+            await logLoginAttempt(user.id, req, false);
             return res.status(403).json({ error: "Your account is pending activation." });
+        }
+
+        if (user.must_reset_password) {
+            const pendingToken = jwt.sign(
+                { userId: user.id, email: user.email, pendingPasswordReset: true },
+                JWT_SECRET,
+                { expiresIn: "15m" }
+            );
+            return res.json({
+                message: "Password reset required before continuing.",
+                requiresPasswordReset: true,
+                pendingToken
+            });
         }
 
         if (user.two_factor_enabled) {
@@ -292,6 +339,8 @@ async function adminLogin(req, res) {
             JWT_SECRET,
             { expiresIn: TOKEN_EXPIRY }
         );
+
+        await logLoginAttempt(user.id, req, true);
 
         sendAdminLoginAlert({
             name: user.name,
@@ -437,6 +486,124 @@ async function resetPassword(req, res) {
 
     } catch (error) {
         console.error("Reset password error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+}
+
+// Admin-triggered: flags an account so the next login must go through a password reset
+async function forcePasswordReset(req, res) {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query(
+            "UPDATE users SET must_reset_password = true WHERE id = $1 RETURNING id, name, email",
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        res.json({ message: "This user will be required to reset their password on next login.", user: result.rows[0] });
+
+    } catch (error) {
+        console.error("Force password reset error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+}
+
+// Completes a forced password reset using the short-lived pendingToken issued at login
+async function completeForcedPasswordReset(req, res) {
+    try {
+        const { pendingToken, newPassword } = req.body;
+
+        if (!pendingToken || !newPassword) {
+            return res.status(400).json({ error: "Token and new password are required." });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: "Password must be at least 6 characters." });
+        }
+
+        let decoded;
+        try {
+            decoded = jwt.verify(pendingToken, JWT_SECRET);
+        } catch (err) {
+            return res.status(401).json({ error: "This session has expired. Please log in again." });
+        }
+
+        if (!decoded.pendingPasswordReset) {
+            return res.status(401).json({ error: "Invalid token." });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        await pool.query(
+            "UPDATE users SET password = $1, must_reset_password = false WHERE id = $2",
+            [hashedPassword, decoded.userId]
+        );
+
+        const userResult = await pool.query(
+            "SELECT id, name, email, phone, role FROM users WHERE id = $1",
+            [decoded.userId]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        const user = userResult.rows[0];
+
+        const sessionToken = await createSession(user.id, req);
+        const token = jwt.sign(
+            { userId: user.id, email: user.email, role: user.role, sessionToken },
+            JWT_SECRET,
+            { expiresIn: TOKEN_EXPIRY }
+        );
+
+        await logLoginAttempt(user.id, req, true);
+
+        res.json({
+            message: "Password updated. Login successful.",
+            token,
+            user
+        });
+
+    } catch (error) {
+        console.error("Complete forced password reset error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+}
+
+// Admin-triggered: force-logs-out a staff member from every device by wiping their sessions
+async function logoutAllDevices(req, res) {
+    try {
+        const { id } = req.params;
+
+        await pool.query("DELETE FROM sessions WHERE user_id = $1", [id]);
+
+        res.json({ message: "All active sessions for this user have been logged out." });
+
+    } catch (error) {
+        console.error("Logout all devices error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+}
+
+// Admin view: login history (date, time, IP, device, success/fail) for a given user
+async function getLoginHistory(req, res) {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query(
+            "SELECT id, ip_address, device_label, success, logged_in_at FROM login_history WHERE user_id = $1 ORDER BY logged_in_at DESC LIMIT 50",
+            [id]
+        );
+
+        res.json({ history: result.rows });
+
+    } catch (error) {
+        console.error("Get login history error:", error);
         res.status(500).json({ error: "Something went wrong." });
     }
 }
@@ -631,6 +798,10 @@ module.exports = {
     loginUser,
     forgotPassword,
     resetPassword,
+    forcePasswordReset,
+    completeForcedPasswordReset,
+    logoutAllDevices,
+    getLoginHistory,
     createStaffAccount,
     adminLogin,
     activateStaffAccount,
@@ -703,6 +874,8 @@ async function verifyLogin2FA(req, res) {
                 ip: req.ip || req.connection.remoteAddress || "Unknown"
             }).catch(err => console.error("Admin login alert failed:", err));
         }
+
+        await logLoginAttempt(user.id, req, true);
 
         res.json({
             message: "Login successful.",
