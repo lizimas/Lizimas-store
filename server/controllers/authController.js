@@ -428,7 +428,7 @@ async function blockStaffAccount(req, res) {
 async function getProfile(req, res) {
     try {
         const result = await pool.query(
-            `SELECT id, name, email, phone, role, profile_photo_url, first_name, last_name,
+            `SELECT id, name, email, phone, role, profile_photo_url, profile_photo_original_url, first_name, last_name,
                     display_name, gender, date_of_birth, country, city, created_at
              FROM users WHERE id = $1`,
             [req.user.userId]
@@ -480,18 +480,28 @@ async function updateProfile(req, res) {
 
 async function uploadProfilePhoto(req, res) {
     try {
-        if (!req.file) {
+        const croppedFile = req.files && req.files.photo ? req.files.photo[0] : null;
+        const originalFile = req.files && req.files.original_photo ? req.files.original_photo[0] : null;
+
+        if (!croppedFile) {
             return res.status(400).json({ error: "No photo uploaded." });
         }
 
-        const photoUrl = await uploadProfilePhotoToCloudinary(req.file.buffer);
+        const photoUrl = await uploadProfilePhotoToCloudinary(croppedFile.buffer);
+        const originalUrl = originalFile
+            ? await uploadProfilePhotoToCloudinary(originalFile.buffer)
+            : photoUrl;
 
         const result = await pool.query(
-            "UPDATE users SET profile_photo_url = $1 WHERE id = $2 RETURNING profile_photo_url",
-            [photoUrl, req.user.userId]
+            "UPDATE users SET profile_photo_url = $1, profile_photo_original_url = $2 WHERE id = $3 RETURNING profile_photo_url, profile_photo_original_url",
+            [photoUrl, originalUrl, req.user.userId]
         );
 
-        res.json({ message: "Profile photo updated.", profile_photo_url: result.rows[0].profile_photo_url });
+        res.json({
+            message: "Profile photo updated.",
+            profile_photo_url: result.rows[0].profile_photo_url,
+            profile_photo_original_url: result.rows[0].profile_photo_original_url
+        });
 
     } catch (error) {
         console.error("Upload profile photo error:", error);
@@ -502,7 +512,7 @@ async function uploadProfilePhoto(req, res) {
 async function removeProfilePhoto(req, res) {
     try {
         await pool.query(
-            "UPDATE users SET profile_photo_url = NULL WHERE id = $1",
+            "UPDATE users SET profile_photo_url = NULL, profile_photo_original_url = NULL WHERE id = $1",
             [req.user.userId]
         );
 

@@ -331,7 +331,7 @@
 
     </div>
 
-<script src="js/admin.js?v=2"></script>
+<script src="js/admin.js?v=2"></script>\n<script src="js/photo-crop.js"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>
     <div class="profile-panel" id="profile-panel">
@@ -339,9 +339,14 @@
         <button class="profile-panel-close" onclick="closeProfilePanel()">&times;</button>
 
         <div class="profile-panel-photo-section">
-            <div class="profile-photo-circle" id="profile-photo-circle">
+            <div class="profile-photo-circle" id="profile-photo-circle" onclick="triggerPhotoUpload()">
                 <span id="profile-photo-placeholder" style="font-size:32px; color:#bbb;">+</span>
                 <img id="profile-photo-img" src="" alt="Profile photo" class="hidden">
+            </div>
+            <input type="file" id="profile-photo-file-input" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="handlePhotoFileSelected(event)">
+            <div class="profile-photo-actions">
+                <button onclick="triggerPhotoUpload()">Change Photo</button>
+                <button class="remove-link" onclick="removeProfilePhotoAction()">Remove</button>
             </div>
             <div class="profile-photo-name" id="profile-photo-name">...</div>
             <div class="profile-photo-role" id="profile-photo-role">...</div>
@@ -374,6 +379,18 @@
             <button onclick="saveProfileInfo()">Save Changes</button>
         </div>
         <p id="profile-save-status" style="font-size:13px; color:#666; margin-top:8px;"></p>
+    </div>
+
+
+    <div class="crop-modal-overlay" id="crop-modal-overlay">
+        <div class="crop-viewport" id="crop-viewport">
+            <img id="crop-image" src="" alt="Crop preview">
+        </div>
+        <p class="crop-modal-hint">Drag to reposition &bull; Pinch or scroll to zoom</p>
+        <div class="crop-modal-actions">
+            <button class="crop-cancel" onclick="closeCropModal()">Cancel</button>
+            <button class="crop-confirm" onclick="confirmCrop()">Use This Photo</button>
+        </div>
     </div>
 
 </body>

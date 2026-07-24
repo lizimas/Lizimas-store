@@ -869,8 +869,8 @@ select.status-select {
 }
 
 .profile-photo-circle {
-    width: 90px;
-    height: 90px;
+    width: 150px;
+    height: 150px;
     border-radius: 50%;
     background: #eee;
     display: flex;
@@ -951,4 +951,102 @@ select.status-select {
 .profile-panel-footer button:last-child {
     background: #1a1a2e;
     color: white;
+}
+
+
+/* --- Photo crop modal --- */
+
+.profile-photo-circle {
+    cursor: pointer;
+}
+
+.profile-photo-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 8px;
+}
+
+.profile-photo-actions button {
+    background: none;
+    border: none;
+    color: #f4b400;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+
+.profile-photo-actions button.remove-link {
+    color: #DC2626;
+}
+
+.crop-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 1001;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.crop-modal-overlay.open {
+    display: flex;
+}
+
+.crop-viewport {
+    width: min(85vw, 380px);
+    height: min(85vw, 380px);
+    border-radius: 50%;
+    overflow: hidden;
+    position: relative;
+    background: #222;
+    box-shadow: 0 0 0 2000px rgba(0,0,0,0.75);
+    touch-action: none;
+    cursor: grab;
+}
+
+.crop-viewport img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    max-width: none;
+    transform-origin: center center;
+    transform: translate(-50%, -50%);
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.crop-modal-hint {
+    color: #ccc;
+    font-size: 13px;
+    margin-top: 16px;
+    text-align: center;
+}
+
+.crop-modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.crop-modal-actions button {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.crop-modal-actions button.crop-cancel {
+    background: #444;
+    color: white;
+}
+
+.crop-modal-actions button.crop-confirm {
+    background: #f4b400;
+    color: #1a1a2e;
 }

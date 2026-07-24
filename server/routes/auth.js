@@ -51,7 +51,12 @@ router.delete("/sessions/:sessionId", requireAuth, deleteSession);
 
 router.get("/profile", requireAuth, getProfile);
 router.patch("/profile", requireAuth, updateProfile);
-router.post("/profile/photo", requireAuth, upload.single("photo"), uploadProfilePhoto);
+router.post(
+    "/profile/photo",
+    requireAuth,
+    upload.fields([{ name: "photo", maxCount: 1 }, { name: "original_photo", maxCount: 1 }]),
+    uploadProfilePhoto
+);
 router.delete("/profile/photo", requireAuth, removeProfilePhoto);
 
 module.exports = router;
