@@ -2,6 +2,20 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const pool = require("../config/database");
 const crypto = require("crypto");
+const cloudinary = require("../config/cloudinary");
+
+function uploadProfilePhotoToCloudinary(fileBuffer) {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            { folder: "lizimas-store/profiles" },
+            (error, result) => {
+                if (error) return reject(error);
+                resolve(result.secure_url);
+            }
+        );
+        stream.end(fileBuffer);
+    });
+}
 const { sendAdminLoginAlert, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert } = require("../utils/mailer");
 
 const JWT_SECRET = process.env.JWT_SECRET || "change_this_secret_in_env_file";
@@ -411,6 +425,95 @@ async function blockStaffAccount(req, res) {
     }
 }
 
+async function getProfile(req, res) {
+    try {
+        const result = await pool.query(
+            `SELECT id, name, email, phone, role, profile_photo_url, first_name, last_name,
+                    display_name, gender, date_of_birth, country, city, created_at
+             FROM users WHERE id = $1`,
+            [req.user.userId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        res.json({ user: result.rows[0] });
+
+    } catch (error) {
+        console.error("Get profile error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+}
+
+async function updateProfile(req, res) {
+    try {
+        const { first_name, last_name, display_name, phone, gender, date_of_birth, country, city } = req.body;
+
+        const result = await pool.query(
+            `UPDATE users
+             SET first_name = $1, last_name = $2, display_name = $3, phone = $4,
+                 gender = $5, date_of_birth = $6, country = $7, city = $8
+             WHERE id = $9
+             RETURNING id, name, email, phone, role, profile_photo_url, first_name, last_name,
+                       display_name, gender, date_of_birth, country, city`,
+            [
+                first_name || null,
+                last_name || null,
+                display_name || null,
+                phone || null,
+                gender || null,
+                date_of_birth || null,
+                country || null,
+                city || null,
+                req.user.userId
+            ]
+        );
+
+        res.json({ message: "Profile updated successfully.", user: result.rows[0] });
+
+    } catch (error) {
+        console.error("Update profile error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+}
+
+async function uploadProfilePhoto(req, res) {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No photo uploaded." });
+        }
+
+        const photoUrl = await uploadProfilePhotoToCloudinary(req.file.buffer);
+
+        const result = await pool.query(
+            "UPDATE users SET profile_photo_url = $1 WHERE id = $2 RETURNING profile_photo_url",
+            [photoUrl, req.user.userId]
+        );
+
+        res.json({ message: "Profile photo updated.", profile_photo_url: result.rows[0].profile_photo_url });
+
+    } catch (error) {
+        console.error("Upload profile photo error:", error);
+        res.status(500).json({ error: "Could not upload photo. Please try again." });
+    }
+}
+
+async function removeProfilePhoto(req, res) {
+    try {
+        await pool.query(
+            "UPDATE users SET profile_photo_url = NULL WHERE id = $1",
+            [req.user.userId]
+        );
+
+        res.json({ message: "Profile photo removed." });
+
+    } catch (error) {
+        console.error("Remove profile photo error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+}
+
 async function forgotPassword(req, res) {
     try {
         const { email } = req.body;
@@ -806,6 +909,10 @@ module.exports = {
     adminLogin,
     activateStaffAccount,
     blockStaffAccount,
+    getProfile,
+    updateProfile,
+    uploadProfilePhoto,
+    removeProfilePhoto,
     getCurrentUser,
     changePassword: exports.changePassword,
     changeUsername: exports.changeUsername,

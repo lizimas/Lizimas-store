@@ -19,10 +19,15 @@ const {
     disable2FA,
     verifyLogin2FA,
     listSessions,
-    deleteSession
+    deleteSession,
+    getProfile,
+    updateProfile,
+    uploadProfilePhoto,
+    removeProfilePhoto
 } = require("./../controllers/authController");
 
 const { requireAuth } = require("../middleware/authMiddleware");
+const upload = require("../middleware/upload");
 
 router.post("/register", registerUser);
 router.post("/login", loginUser);
@@ -43,5 +48,10 @@ router.post("/2fa/disable", requireAuth, disable2FA);
 
 router.get("/sessions", requireAuth, listSessions);
 router.delete("/sessions/:sessionId", requireAuth, deleteSession);
+
+router.get("/profile", requireAuth, getProfile);
+router.patch("/profile", requireAuth, updateProfile);
+router.post("/profile/photo", requireAuth, upload.single("photo"), uploadProfilePhoto);
+router.delete("/profile/photo", requireAuth, removeProfilePhoto);
 
 module.exports = router;

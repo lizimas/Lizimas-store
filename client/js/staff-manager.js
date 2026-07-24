@@ -362,3 +362,180 @@ async function requestDeletion(id, name) {
 }
 
 init();
+
+
+// --- Swipeable profile panel ---
+
+let profileData = null;
+
+async function openProfilePanel() {
+    document.getElementById("profile-panel-overlay").classList.add("open");
+    document.getElementById("profile-panel").classList.add("open");
+    await loadProfileIntoPanel();
+}
+
+function closeProfilePanel() {
+    document.getElementById("profile-panel-overlay").classList.remove("open");
+    document.getElementById("profile-panel").classList.remove("open");
+}
+
+const ROLE_LABELS = { product_staff: "Product Staff", store_manager: "Store Manager", admin: "Administrator" };
+
+async function loadProfileIntoPanel() {
+    try {
+        const result = await staffAuthorizedFetch("/api/auth/profile");
+        profileData = result.user;
+
+        document.getElementById("profile-first-name").value = profileData.first_name || "";
+        document.getElementById("profile-last-name").value = profileData.last_name || "";
+        document.getElementById("profile-display-name").value = profileData.display_name || "";
+        document.getElementById("profile-phone").value = profileData.phone || "";
+        document.getElementById("profile-gender").value = profileData.gender || "";
+        document.getElementById("profile-dob").value = profileData.date_of_birth ? String(profileData.date_of_birth).split("T")[0] : "";
+        document.getElementById("profile-country").value = profileData.country || "";
+        document.getElementById("profile-city").value = profileData.city || "";
+
+        document.getElementById("profile-photo-name").textContent = profileData.display_name || profileData.name;
+        document.getElementById("profile-photo-role").textContent = ROLE_LABELS[profileData.role] || profileData.role;
+
+        const photoImg = document.getElementById("profile-photo-img");
+        const placeholder = document.getElementById("profile-photo-placeholder");
+
+        if (profileData.profile_photo_url) {
+            photoImg.src = profileData.profile_photo_url;
+            photoImg.classList.remove("hidden");
+            placeholder.classList.add("hidden");
+        } else {
+            photoImg.classList.add("hidden");
+            placeholder.classList.remove("hidden");
+        }
+
+    } catch (error) {
+        console.error("Load profile error:", error);
+    }
+}
+
+async function saveProfileInfo() {
+    const statusEl = document.getElementById("profile-save-status");
+    statusEl.textContent = "Saving...";
+
+    const payload = {
+        first_name: document.getElementById("profile-first-name").value.trim(),
+        last_name: document.getElementById("profile-last-name").value.trim(),
+        display_name: document.getElementById("profile-display-name").value.trim(),
+        phone: document.getElementById("profile-phone").value.trim(),
+        gender: document.getElementById("profile-gender").value,
+        date_of_birth: document.getElementById("profile-dob").value || null,
+        country: document.getElementById("profile-country").value.trim(),
+        city: document.getElementById("profile-city").value.trim()
+    };
+
+    try {
+        const token = getStaffToken();
+        const response = await fetch(`${API_URL}/api/auth/profile`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            statusEl.textContent = data.error || "Could not save changes.";
+            return;
+        }
+
+        statusEl.textContent = "Saved!";
+        document.getElementById("profile-photo-name").textContent = payload.display_name || payload.first_name || (profileData ? profileData.name : "");
+
+    } catch (error) {
+        console.error("Save profile error:", error);
+        statusEl.textContent = "Something went wrong.";
+    }
+}
+
+let panelDragStartX = null;
+let panelCurrentX = 0;
+
+function setupProfilePanelSwipe() {
+    const panel = document.getElementById("profile-panel");
+    if (!panel || panel.dataset.swipeWired) return;
+    panel.dataset.swipeWired = "true";
+
+    panel.addEventListener("touchstart", (e) => {
+        panelDragStartX = e.touches[0].clientX;
+        panel.classList.add("dragging");
+    });
+
+    panel.addEventListener("touchmove", (e) => {
+        if (panelDragStartX === null) return;
+        const deltaX = e.touches[0].clientX - panelDragStartX;
+        if (deltaX < 0) {
+            panelCurrentX = deltaX;
+            panel.style.transform = `translateX(${deltaX}px)`;
+        }
+    });
+
+    panel.addEventListener("touchend", () => {
+        panel.classList.remove("dragging");
+        if (panelCurrentX < -100) {
+            closeProfilePanel();
+        }
+        panel.style.transform = "";
+        panelDragStartX = null;
+        panelCurrentX = 0;
+    });
+}
+
+document.addEventListener("DOMContentLoaded", setupProfilePanelSwipe);
+
+// --- Searchable country field ---
+
+const COUNTRY_LIST = [
+    "Uganda","Kenya","Tanzania","Rwanda","Burundi","South Sudan","Democratic Republic of the Congo",
+    "Ethiopia","Somalia","Sudan","Nigeria","Ghana","South Africa","Egypt","Morocco","Algeria","Tunisia",
+    "Zambia","Zimbabwe","Malawi","Mozambique","Botswana","Namibia","Angola","Cameroon","Senegal",
+    "Ivory Coast","Mali","Niger","Chad","Libya","United States","United Kingdom","Canada","Australia",
+    "Germany","France","Italy","Spain","Portugal","Netherlands","Belgium","Switzerland","Sweden",
+    "Norway","Denmark","Finland","Ireland","Poland","Austria","Greece","Turkey","Russia","China",
+    "Japan","South Korea","India","Pakistan","Bangladesh","Indonesia","Malaysia","Singapore",
+    "Philippines","Thailand","Vietnam","United Arab Emirates","Saudi Arabia","Qatar","Israel",
+    "Brazil","Mexico","Argentina","Chile","Colombia","Peru","New Zealand"
+];
+
+function filterCountryResults() {
+    const input = document.getElementById("profile-country");
+    const query = input.value.trim().toLowerCase();
+    const dropdown = document.getElementById("country-results-dropdown");
+
+    const matches = query
+        ? COUNTRY_LIST.filter(c => c.toLowerCase().includes(query))
+        : COUNTRY_LIST;
+
+    if (matches.length === 0) {
+        dropdown.innerHTML = "<div class='district-result-empty'>No matching country</div>";
+        dropdown.style.display = "block";
+        return;
+    }
+
+    dropdown.innerHTML = matches.map(c =>
+        `<div class="district-result-item" onclick="selectCountry('${c.replace(/'/g, "\\'")}')">${c}</div>`
+    ).join("");
+    dropdown.style.display = "block";
+}
+
+function selectCountry(name) {
+    document.getElementById("profile-country").value = name;
+    document.getElementById("country-results-dropdown").style.display = "none";
+}
+
+document.addEventListener("click", (e) => {
+    const dropdown = document.getElementById("country-results-dropdown");
+    const input = document.getElementById("profile-country");
+    if (dropdown && input && e.target !== input && !dropdown.contains(e.target)) {
+        dropdown.style.display = "none";
+    }
+});

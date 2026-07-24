@@ -765,3 +765,190 @@ select.status-select {
     border-radius: 8px;
     border: 1px solid #ddd;
 }
+
+
+/* --- Swipeable profile panel --- */
+
+.sidebar-profile-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    margin: 0 12px 16px;
+    background: rgba(255,255,255,.06);
+    border-radius: 10px;
+    cursor: pointer;
+    color: white;
+    font-size: 13px;
+}
+
+.sidebar-profile-trigger:hover {
+    background: rgba(255,255,255,.1);
+}
+
+.sidebar-profile-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #f4b400;
+    color: #1a1a2e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 13px;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.sidebar-profile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.profile-panel-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 998;
+}
+
+.profile-panel-overlay.open {
+    display: block;
+}
+
+.profile-panel {
+    position: fixed;
+    top: 0;
+    left: -100%;
+    width: min(420px, 92vw);
+    height: 100vh;
+    background: #ffffff;
+    z-index: 999;
+    box-shadow: 8px 0 30px rgba(0,0,0,0.2);
+    transition: left 0.25s ease;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.profile-panel.open {
+    left: 0;
+}
+
+.profile-panel.dragging {
+    transition: none;
+}
+
+.profile-panel-handle {
+    width: 40px;
+    height: 4px;
+    background: #ddd;
+    border-radius: 4px;
+    margin: 0 auto 12px;
+}
+
+.profile-panel-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #999;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.profile-panel-photo-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 0 24px;
+}
+
+.profile-photo-circle {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    background: #eee;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    margin-bottom: 12px;
+    position: relative;
+}
+
+.profile-photo-circle img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.profile-photo-name {
+    font-size: 18px;
+    font-weight: bold;
+    color: #1a1a2e;
+}
+
+.profile-photo-role {
+    font-size: 13px;
+    color: #666;
+}
+
+.profile-form-section {
+    border-top: 1px solid #eee;
+    padding-top: 16px;
+}
+
+.profile-form-section h4 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #999;
+    margin-bottom: 12px;
+}
+
+.profile-form-section .field-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.profile-form-section input,
+.profile-form-section select {
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.profile-panel-footer {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #eee;
+}
+
+.profile-panel-footer button {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.profile-panel-footer button:first-child {
+    background: #eee;
+    color: #333;
+}
+
+.profile-panel-footer button:last-child {
+    background: #1a1a2e;
+    color: white;
+}

@@ -16,9 +16,10 @@
                     <span class="sidebar-brand-icon">L</span>
                     <span>Lizimas Staff</span>
                 </div>
-                <div style="padding:16px; color:#ccc; font-size:13px;">
+                <div style="padding:16px; color:#ccc; font-size:13px; cursor:pointer;" onclick="openProfilePanel()">
                     Signed in as <strong id="staff-name-display">...</strong><br>
                     Store Manager
+                    <div style="color:#f4b400; font-size:12px; margin-top:4px;">Tap to edit profile &rarr;</div>
                 </div>
                 <button onclick="staffLogout()" style="margin:16px; background:#DC2626; color:#fff; border:none; border-radius:8px; padding:10px; cursor:pointer; width:calc(100% - 32px);">Log Out</button>
             </aside>
@@ -91,5 +92,49 @@
     </div>
 
     <script src="../js/staff-manager.js"></script>
+
+    <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>
+    <div class="profile-panel" id="profile-panel">
+        <div class="profile-panel-handle"></div>
+        <button class="profile-panel-close" onclick="closeProfilePanel()">&times;</button>
+
+        <div class="profile-panel-photo-section">
+            <div class="profile-photo-circle" id="profile-photo-circle">
+                <span id="profile-photo-placeholder" style="font-size:32px; color:#bbb;">+</span>
+                <img id="profile-photo-img" src="" alt="Profile photo" class="hidden">
+            </div>
+            <div class="profile-photo-name" id="profile-photo-name">...</div>
+            <div class="profile-photo-role" id="profile-photo-role">...</div>
+        </div>
+
+        <div class="profile-form-section">
+            <h4>Personal Information</h4>
+            <div class="field-row">
+                <input type="text" id="profile-first-name" placeholder="First Name">
+                <input type="text" id="profile-last-name" placeholder="Last Name">
+                <input type="text" id="profile-display-name" placeholder="Display Name">
+                <input type="tel" id="profile-phone" placeholder="Phone Number">
+                <select id="profile-gender">
+                    <option value="">Gender (optional)</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                </select>
+                <input type="date" id="profile-dob">
+                <div style="position:relative;">
+                    <input type="text" id="profile-country" placeholder="Search country..." autocomplete="off" oninput="filterCountryResults()" onfocus="filterCountryResults()">
+                    <div id="country-results-dropdown" class="district-results-dropdown"></div>
+                </div>
+                <input type="text" id="profile-city" placeholder="City">
+            </div>
+        </div>
+
+        <div class="profile-panel-footer">
+            <button onclick="closeProfilePanel()">Cancel</button>
+            <button onclick="saveProfileInfo()">Save Changes</button>
+        </div>
+        <p id="profile-save-status" style="font-size:13px; color:#666; margin-top:8px;"></p>
+    </div>
+
 </body>
 </html>
