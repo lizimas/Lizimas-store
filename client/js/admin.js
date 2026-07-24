@@ -519,6 +519,8 @@ async function loadCategories() {
 
 let adminProducts = [];
 
+let currentProductFilter = "all";
+
 async function loadProducts() {
     try {
         await loadCategories();
@@ -527,44 +529,150 @@ async function loadProducts() {
         const products = await response.json();
         adminProducts = products;
 
-        const productsTable = document.getElementById("products-table");
-
-        if (!products || products.length === 0) {
-            productsTable.innerHTML = `<p class="no-data">No products yet.</p>`;
-            return;
-        }
-
-        productsTable.innerHTML = `
-            <table>
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Category</th>
-                        <th>Price</th>
-                        <th>Stock</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${products.map(p => `
-                        <tr>
-                            <td data-label="Name">${p.name}</td>
-                            <td data-label="Category">${p.category || "—"}</td>
-                            <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
-                            <td data-label="Stock">${p.stock}</td>
-                            <td data-label="Actions">
-                                <button onclick="editProduct(${p.id})">Edit</button>
-                                <button onclick="removeProduct(${p.id})">Delete</button>
-                            </td>
-                        </tr>
-                    `).join("")}
-                </tbody>
-            </table>
-        `;
+        renderProductSummary(products);
+        setupProductImageDropzone();
+        renderProductsTable();
 
     } catch (error) {
         console.error("Load products error:", error);
     }
+}
+
+function renderProductSummary(products) {
+    const container = document.getElementById("product-summary-grid");
+    if (!container) return;
+
+    const total = products.length;
+    const inStock = products.filter(p => p.stock > 10).length;
+    const lowStock = products.filter(p => p.stock > 0 && p.stock <= 10).length;
+    const outOfStock = products.filter(p => p.stock <= 0).length;
+
+    container.innerHTML = `
+        <div class="stat-card">
+            <div class="label">Total Products</div>
+            <div class="value">${total}</div>
+        </div>
+        <div class="stat-card" style="background:#eafaf1;">
+            <div class="label">In Stock</div>
+            <div class="value">${inStock}</div>
+        </div>
+        <div class="stat-card" style="background:#fef3e2;">
+            <div class="label">Low Stock</div>
+            <div class="value">${lowStock}</div>
+        </div>
+        <div class="stat-card" style="background:#fdeee9;">
+            <div class="label">Out of Stock</div>
+            <div class="value">${outOfStock}</div>
+        </div>
+    `;
+}
+
+function setProductFilter(filter) {
+    currentProductFilter = filter;
+    document.querySelectorAll("#product-filter-tabs .filter-tab").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.filter === filter);
+    });
+    renderProductsTable();
+}
+
+function renderProductsTable() {
+    const productsTable = document.getElementById("products-table");
+    const searchInput = document.getElementById("product-search-input");
+    const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : "";
+
+    let filtered = adminProducts.filter(p => {
+        if (currentProductFilter === "instock") return p.stock > 10;
+        if (currentProductFilter === "lowstock") return p.stock > 0 && p.stock <= 10;
+        if (currentProductFilter === "outofstock") return p.stock <= 0;
+        return true;
+    });
+
+    if (searchTerm) {
+        filtered = filtered.filter(p => p.name.toLowerCase().includes(searchTerm));
+    }
+
+    if (filtered.length === 0) {
+        productsTable.innerHTML = `<p class="no-data">No products found.</p>`;
+        return;
+    }
+
+    productsTable.innerHTML = `
+        <table>
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Stock</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${filtered.map(p => `
+                    <tr>
+                        <td data-label=""><img class="product-table-thumb" src="${p.image || ''}" onerror="this.style.visibility='hidden'"></td>
+                        <td data-label="Name">${p.name}</td>
+                        <td data-label="Category">${p.category || "—"}</td>
+                        <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
+                        <td data-label="Stock">${p.stock}</td>
+                        <td data-label="Actions">
+                            <button onclick="editProduct(${p.id})">Edit</button>
+                            <button onclick="removeProduct(${p.id})">Delete</button>
+                        </td>
+                    </tr>
+                `).join("")}
+            </tbody>
+        </table>
+    `;
+}
+
+function setupProductImageDropzone() {
+    const dropzone = document.getElementById("product-image-dropzone");
+    const fileInput = document.getElementById("product-image");
+    if (!dropzone || !fileInput || dropzone.dataset.wired) return;
+
+    dropzone.dataset.wired = "true";
+
+    dropzone.addEventListener("click", () => fileInput.click());
+
+    dropzone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropzone.classList.add("dragover");
+    });
+
+    dropzone.addEventListener("dragleave", () => {
+        dropzone.classList.remove("dragover");
+    });
+
+    dropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+        if (e.dataTransfer.files.length > 0) {
+            fileInput.files = e.dataTransfer.files;
+            renderImagePreviews(fileInput.files);
+        }
+    });
+
+    fileInput.addEventListener("change", () => {
+        renderImagePreviews(fileInput.files);
+    });
+}
+
+function renderImagePreviews(fileList) {
+    const preview = document.getElementById("product-image-preview");
+    if (!preview) return;
+    preview.innerHTML = "";
+
+    Array.from(fileList).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = document.createElement("img");
+            img.src = e.target.result;
+            preview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+    });
 }
 
 function openProductForm() {
@@ -575,6 +683,7 @@ function openProductForm() {
     document.getElementById("product-price").value = "";
     document.getElementById("product-stock").value = "";
     document.getElementById("product-image").value = "";
+    document.getElementById("product-image-preview").innerHTML = "";
     document.getElementById("product-form-error").textContent = "";
     document.getElementById("variants-section").classList.add("hidden");
     document.getElementById("variants-list").innerHTML = "";
@@ -597,6 +706,7 @@ function editProduct(id) {
     document.getElementById("variants-section").classList.remove("hidden");
     loadVariants(product.id);
     document.getElementById("product-image").value = "";
+    document.getElementById("product-image-preview").innerHTML = "";
     document.getElementById("product-form-error").textContent = "";
     document.getElementById("product-form-container").classList.remove("hidden");
 }

@@ -642,3 +642,126 @@ select.status-select {
 .staff-menu-item:hover {
     background: #f3f4f6;
 }
+
+
+/* --- Shopify-inspired product management redesign --- */
+
+.product-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+.product-summary-grid .stat-card {
+    margin: 0;
+}
+
+.product-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.product-search-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 10px 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.filter-tabs {
+    display: flex;
+    gap: 4px;
+    background: #eef0f3;
+    padding: 4px;
+    border-radius: 10px;
+}
+
+.filter-tab {
+    border: none;
+    background: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #666;
+    cursor: pointer;
+}
+
+.filter-tab.active {
+    background: #ffffff;
+    color: #1a1a2e;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.product-table-thumb {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #eee;
+    vertical-align: middle;
+}
+
+.product-form-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.product-form-section {
+    border: 1px solid #eee;
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.product-form-section h4 {
+    font-size: 14px;
+    color: #1a1a2e;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.product-form-section .field-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.drag-drop-zone {
+    border: 2px dashed #ccc;
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    color: #888;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.drag-drop-zone.dragover {
+    background: #fef3e2;
+    border-color: #f4b400;
+    color: #1a1a2e;
+}
+
+.drag-drop-preview-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.drag-drop-preview-grid img {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+}

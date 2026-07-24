@@ -131,36 +131,71 @@
                 <section id="tab-products" class="tab-content hidden">
                     <h2 class="admin-page-title">Products</h2>
 
+                    <div class="product-summary-grid" id="product-summary-grid"></div>
+
                     <button class="add-btn" onclick="openProductForm()">+ Add Product</button>
 
                     <div id="product-form-container" class="hidden panel">
                         <h3 id="product-form-title">Add Product</h3>
                         <input type="hidden" id="product-id">
-                        <input type="text" id="product-name" placeholder="Product name">
-                        <select id="product-category"></select>
-                        <textarea id="product-description" placeholder="Description"></textarea>
-                        <input type="number" id="product-price" placeholder="Price (UGX)">
-                        <input type="number" id="product-stock" placeholder="Stock quantity">
-                        <input type="file" id="product-image" accept="image/*" multiple>
 
-                        <div id="variants-section" class="hidden">
-                            <h4>Variants</h4>
-                            <div id="variants-list"></div>
-
-                            <div class="variant-form">
-                                <input type="text" id="variant-name" placeholder="Variant name (e.g. Red, Large)">
-                                <input type="number" id="variant-price" placeholder="Price (UGX)">
-                                <input type="number" id="variant-stock" placeholder="Stock quantity">
-                                <input type="file" id="variant-image" accept="image/*">
-                                <button type="button" onclick="addVariant()">+ Add Variant</button>
+                        <div class="product-form-sections">
+                            <div class="product-form-section">
+                                <h4>Basic Information</h4>
+                                <div class="field-row">
+                                    <input type="text" id="product-name" placeholder="Product name">
+                                    <select id="product-category"></select>
+                                    <textarea id="product-description" placeholder="Description"></textarea>
+                                </div>
                             </div>
-                            <p id="variant-form-error" class="error-text"></p>
+
+                            <div class="product-form-section">
+                                <h4>Pricing &amp; Inventory</h4>
+                                <div class="field-row">
+                                    <input type="number" id="product-price" placeholder="Price (UGX)">
+                                    <input type="number" id="product-stock" placeholder="Stock quantity">
+                                </div>
+                            </div>
+
+                            <div class="product-form-section">
+                                <h4>Images</h4>
+                                <div class="drag-drop-zone" id="product-image-dropzone">
+                                    Drag &amp; drop images here, or tap to browse
+                                </div>
+                                <input type="file" id="product-image" accept="image/*" multiple class="hidden">
+                                <div class="drag-drop-preview-grid" id="product-image-preview"></div>
+                            </div>
+
+                            <div id="variants-section" class="product-form-section hidden">
+                                <h4>Variants</h4>
+                                <div id="variants-list"></div>
+
+                                <div class="variant-form">
+                                    <input type="text" id="variant-name" placeholder="Variant name (e.g. Red, Large)">
+                                    <input type="number" id="variant-price" placeholder="Price (UGX)">
+                                    <input type="number" id="variant-stock" placeholder="Stock quantity">
+                                    <input type="file" id="variant-image" accept="image/*">
+                                    <button type="button" onclick="addVariant()">+ Add Variant</button>
+                                </div>
+                                <p id="variant-form-error" class="error-text"></p>
+                            </div>
                         </div>
+
                         <div class="form-actions">
                             <button onclick="saveProduct()">Save</button>
                             <button onclick="closeProductForm()">Cancel</button>
                         </div>
                         <p id="product-form-error" class="error-text"></p>
+                    </div>
+
+                    <div class="product-toolbar">
+                        <input type="text" id="product-search-input" class="product-search-input" placeholder="Search products..." oninput="renderProductsTable()">
+                        <div class="filter-tabs" id="product-filter-tabs">
+                            <button class="filter-tab active" data-filter="all" onclick="setProductFilter('all')">All</button>
+                            <button class="filter-tab" data-filter="instock" onclick="setProductFilter('instock')">In Stock</button>
+                            <button class="filter-tab" data-filter="lowstock" onclick="setProductFilter('lowstock')">Low Stock</button>
+                            <button class="filter-tab" data-filter="outofstock" onclick="setProductFilter('outofstock')">Out of Stock</button>
+                        </div>
                     </div>
 
                     <div id="products-table">Loading...</div>

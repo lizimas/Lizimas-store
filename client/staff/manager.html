@@ -30,27 +30,58 @@
 
                 <div class="admin-content">
 
+                    <div class="product-summary-grid" id="product-summary-grid"></div>
+
                     <div class="panel">
                         <h2 id="product-form-title">Add Product</h2>
                         <p style="font-size:13px; color:#666; margin-top:-8px;">Products you add or edit here go live immediately.</p>
-                        <div style="display:flex; flex-direction:column; gap:10px; max-width:480px;">
-                            <input type="hidden" id="product-id">
-                            <input type="text" id="product-name" placeholder="Product name" style="padding:10px; border:1px solid #ccc; border-radius:8px;">
-                            <select id="product-category" style="padding:10px; border:1px solid #ccc; border-radius:8px;"></select>
-                            <textarea id="product-description" placeholder="Description" style="padding:10px; border:1px solid #ccc; border-radius:8px; min-height:80px;"></textarea>
-                            <input type="number" id="product-price" placeholder="Price (UGX)" style="padding:10px; border:1px solid #ccc; border-radius:8px;">
-                            <input type="number" id="product-stock" placeholder="Stock quantity" style="padding:10px; border:1px solid #ccc; border-radius:8px;">
-                            <input type="file" id="product-image" accept="image/*" multiple>
-                            <div style="display:flex; gap:10px;">
-                                <button onclick="submitProductForm()" id="product-submit-btn" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px; cursor:pointer; flex:1;">Publish Product</button>
-                                <button onclick="resetProductForm()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px; cursor:pointer;">Clear</button>
+
+                        <div class="product-form-sections">
+                            <div class="product-form-section">
+                                <h4>Basic Information</h4>
+                                <div class="field-row">
+                                    <input type="hidden" id="product-id">
+                                    <input type="text" id="product-name" placeholder="Product name">
+                                    <select id="product-category"></select>
+                                    <textarea id="product-description" placeholder="Description"></textarea>
+                                </div>
                             </div>
-                            <p id="product-form-status" style="font-size:13px; color:#666;"></p>
+
+                            <div class="product-form-section">
+                                <h4>Pricing &amp; Inventory</h4>
+                                <div class="field-row">
+                                    <input type="number" id="product-price" placeholder="Price (UGX)">
+                                    <input type="number" id="product-stock" placeholder="Stock quantity">
+                                </div>
+                            </div>
+
+                            <div class="product-form-section">
+                                <h4>Images</h4>
+                                <div class="drag-drop-zone" id="product-image-dropzone">
+                                    Drag &amp; drop images here, or tap to browse
+                                </div>
+                                <input type="file" id="product-image" accept="image/*" multiple class="hidden">
+                                <div class="drag-drop-preview-grid" id="product-image-preview"></div>
+                            </div>
                         </div>
+
+                        <div style="display:flex; gap:10px; margin-top:16px;">
+                            <button onclick="submitProductForm()" id="product-submit-btn" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; flex:1;">Publish Product</button>
+                            <button onclick="resetProductForm()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Clear</button>
+                        </div>
+                        <p id="product-form-status" style="font-size:13px; color:#666; margin-top:8px;"></p>
                     </div>
 
                     <div class="panel">
                         <h2>My Products</h2>
+                        <div class="product-toolbar">
+                            <input type="text" id="product-search-input" class="product-search-input" placeholder="Search my products..." oninput="renderMyProductsTable()">
+                            <div class="filter-tabs" id="product-filter-tabs">
+                                <button class="filter-tab active" data-filter="all" onclick="setManagerFilter('all')">All</button>
+                                <button class="filter-tab" data-filter="live" onclick="setManagerFilter('live')">Live</button>
+                                <button class="filter-tab" data-filter="pending" onclick="setManagerFilter('pending')">Pending</button>
+                            </div>
+                        </div>
                         <div id="my-products-list">Loading...</div>
                     </div>
 

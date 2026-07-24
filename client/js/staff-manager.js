@@ -95,44 +95,150 @@ function statusBadge(status, deletionRequestStatus) {
     return `<span class="status-badge status-paid">Live</span>`;
 }
 
+let myProducts = [];
+let currentManagerFilter = "all";
+
 async function loadMyProducts() {
     try {
         const products = await staffAuthorizedFetch("/api/products/mine");
-        const container = document.getElementById("my-products-list");
+        myProducts = products || [];
 
-        if (!products || products.length === 0) {
-            container.innerHTML = `<p class="no-data">You haven't added any products yet.</p>`;
-            return;
-        }
+        renderManagerSummary(myProducts);
+        setupProductImageDropzone();
+        renderMyProductsTable();
 
-        container.innerHTML = `
-            <table>
-                <thead><tr><th>Name</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead>
-                <tbody>
-                    ${products.map(p => {
-                        const deletionPending = p.deletion_request_status === "pending";
-                        return `
-                        <tr>
-                            <td data-label="Name">${p.name}</td>
-                            <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
-                            <td data-label="Stock">${p.stock}</td>
-                            <td data-label="Status">${statusBadge(p.status, p.deletion_request_status)}</td>
-                            <td data-label="Actions">
-                                <button onclick='loadProductIntoForm(${JSON.stringify(p)})' style="background:#2563EB; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Edit</button>
-                                ${deletionPending
-                                    ? `<span style="font-size:12px; color:#999;">Awaiting admin review</span>`
-                                    : `<button onclick="requestDeletion(${p.id}, '${p.name.replace(/'/g, "\\'")}')" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Request Deletion</button>`
-                                }
-                            </td>
-                        </tr>
-                    `;
-                    }).join("")}
-                </tbody>
-            </table>
-        `;
     } catch (error) {
         console.error("Load my products error:", error);
     }
+}
+
+function renderManagerSummary(products) {
+    const container = document.getElementById("product-summary-grid");
+    if (!container) return;
+
+    const total = products.length;
+    const live = products.filter(p => p.status === "approved").length;
+    const pending = products.filter(p => p.status === "pending" || p.deletion_request_status === "pending").length;
+
+    container.innerHTML = `
+        <div class="stat-card">
+            <div class="label">Total Products</div>
+            <div class="value">${total}</div>
+        </div>
+        <div class="stat-card" style="background:#eafaf1;">
+            <div class="label">Live</div>
+            <div class="value">${live}</div>
+        </div>
+        <div class="stat-card" style="background:#fef3e2;">
+            <div class="label">Pending</div>
+            <div class="value">${pending}</div>
+        </div>
+    `;
+}
+
+function setManagerFilter(filter) {
+    currentManagerFilter = filter;
+    document.querySelectorAll("#product-filter-tabs .filter-tab").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.filter === filter);
+    });
+    renderMyProductsTable();
+}
+
+function renderMyProductsTable() {
+    const container = document.getElementById("my-products-list");
+    const searchInput = document.getElementById("product-search-input");
+    const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : "";
+
+    let filtered = myProducts.filter(p => {
+        if (currentManagerFilter === "live") return p.status === "approved";
+        if (currentManagerFilter === "pending") return p.status === "pending" || p.deletion_request_status === "pending";
+        return true;
+    });
+
+    if (searchTerm) {
+        filtered = filtered.filter(p => p.name.toLowerCase().includes(searchTerm));
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = `<p class="no-data">No products found.</p>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <table>
+            <thead><tr><th></th><th>Name</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+                ${filtered.map(p => {
+                    const deletionPending = p.deletion_request_status === "pending";
+                    const safeName = p.name.replace(/'/g, "\\'");
+                    return `
+                    <tr>
+                        <td data-label=""><img class="product-table-thumb" src="${p.image || ''}" onerror="this.style.visibility='hidden'"></td>
+                        <td data-label="Name">${p.name}</td>
+                        <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
+                        <td data-label="Stock">${p.stock}</td>
+                        <td data-label="Status">${statusBadge(p.status, p.deletion_request_status)}</td>
+                        <td data-label="Actions">
+                            <button onclick='loadProductIntoForm(${JSON.stringify(p)})' style="background:#2563EB; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Edit</button>
+                            ${deletionPending
+                                ? `<span style="font-size:12px; color:#999;">Awaiting admin review</span>`
+                                : `<button onclick="requestDeletion(${p.id}, '${safeName}')" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Request Deletion</button>`
+                            }
+                        </td>
+                    </tr>
+                `;
+                }).join("")}
+            </tbody>
+        </table>
+    `;
+}
+
+function setupProductImageDropzone() {
+    const dropzone = document.getElementById("product-image-dropzone");
+    const fileInput = document.getElementById("product-image");
+    if (!dropzone || !fileInput || dropzone.dataset.wired) return;
+
+    dropzone.dataset.wired = "true";
+
+    dropzone.addEventListener("click", () => fileInput.click());
+
+    dropzone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropzone.classList.add("dragover");
+    });
+
+    dropzone.addEventListener("dragleave", () => {
+        dropzone.classList.remove("dragover");
+    });
+
+    dropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+        if (e.dataTransfer.files.length > 0) {
+            fileInput.files = e.dataTransfer.files;
+            renderImagePreviews(fileInput.files);
+        }
+    });
+
+    fileInput.addEventListener("change", () => {
+        renderImagePreviews(fileInput.files);
+    });
+}
+
+function renderImagePreviews(fileList) {
+    const preview = document.getElementById("product-image-preview");
+    if (!preview) return;
+    preview.innerHTML = "";
+
+    Array.from(fileList).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = document.createElement("img");
+            img.src = e.target.result;
+            preview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+    });
 }
 
 function loadProductIntoForm(product) {
@@ -142,6 +248,7 @@ function loadProductIntoForm(product) {
     document.getElementById("product-description").value = product.description || "";
     document.getElementById("product-price").value = product.price;
     document.getElementById("product-stock").value = product.stock;
+    document.getElementById("product-image-preview").innerHTML = "";
     document.getElementById("product-form-title").textContent = `Edit Product: ${product.name}`;
     document.getElementById("product-submit-btn").textContent = "Update Product";
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -154,6 +261,7 @@ function resetProductForm() {
     document.getElementById("product-price").value = "";
     document.getElementById("product-stock").value = "";
     document.getElementById("product-image").value = "";
+    document.getElementById("product-image-preview").innerHTML = "";
     document.getElementById("product-form-title").textContent = "Add Product";
     document.getElementById("product-submit-btn").textContent = "Publish Product";
     document.getElementById("product-form-status").textContent = "";
