@@ -19,7 +19,8 @@ function uploadBufferToCloudinary(fileBuffer) {
 // Add product (with optional multiple image uploads)
 exports.addProduct = async (req, res) => {
     try {
-        const { name, category_id, description, price, stock } = req.body;
+        const { name, category_id, description, price, stock,
+                material, color, sleeve, style, length, fit, pattern, care_instructions, occasion } = req.body;
 
         const status = req.user.role === "product_staff" ? "pending" : "approved";
 
@@ -30,9 +31,12 @@ exports.addProduct = async (req, res) => {
         const mainImage = imagePaths.length > 0 ? imagePaths[0] : (req.body.image || null);
 
         const product = await pool.query(
-            `INSERT INTO products (name,category_id,description,price,stock,image,status,created_by)
-             VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-            [name, category_id, description, price, stock, mainImage, status, req.user.userId]
+            `INSERT INTO products (name,category_id,description,price,stock,image,status,created_by,
+                material,color,sleeve,style,length,fit,pattern,care_instructions,occasion)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
+            [name, category_id, description, price, stock, mainImage, status, req.user.userId,
+                material || null, color || null, sleeve || null, style || null, length || null,
+                fit || null, pattern || null, care_instructions || null, occasion || null]
         );
 
         const newProduct = product.rows[0];
@@ -50,7 +54,7 @@ exports.addProduct = async (req, res) => {
             ? "Product submitted and is pending admin approval."
             : "Product added successfully";
 
-        res.json({ message, product: newProduct });
+        res.json({ message, product: newProduct, images: imagePaths });
 
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -116,7 +120,10 @@ exports.getProductImages = async (req, res) => {
         const { id } = req.params;
 
         const images = await pool.query(
-            `SELECT * FROM product_images WHERE product_id = $1 ORDER BY id ASC`,
+            `SELECT product_images.* FROM product_images
+             LEFT JOIN product_colors ON product_images.color_id = product_colors.id
+             WHERE product_images.product_id = $1
+             ORDER BY COALESCE(product_colors.display_order, 999999) ASC, product_images.id ASC`,
             [id]
         );
 
@@ -127,11 +134,130 @@ exports.getProductImages = async (req, res) => {
     }
 };
 
+// Get the global size catalog (master list for admin checkboxes)
+exports.getSizeCatalog = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT id, name, display_order FROM size_catalog ORDER BY display_order ASC`
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Get the global color catalog (master list for admin checkboxes)
+exports.getColorCatalog = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT id, name, display_order FROM color_catalog ORDER BY display_order ASC`
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Save the chosen sizes and colors for a product (replaces existing selections)
+exports.saveProductOptions = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { sizes, colors, specs } = req.body;
+
+        await pool.query(`DELETE FROM product_sizes WHERE product_id = $1`, [id]);
+        await pool.query(`DELETE FROM product_colors WHERE product_id = $1`, [id]);
+        await pool.query(`DELETE FROM product_specifications WHERE product_id = $1`, [id]);
+
+        if (Array.isArray(sizes)) {
+            for (let i = 0; i < sizes.length; i++) {
+                await pool.query(
+                    `INSERT INTO product_sizes (product_id, name, display_order) VALUES ($1, $2, $3)`,
+                    [id, sizes[i], i + 1]
+                );
+            }
+        }
+
+        if (Array.isArray(colors)) {
+            for (let i = 0; i < colors.length; i++) {
+                const imagePaths = Array.isArray(colors[i].image_paths) ? colors[i].image_paths : [];
+                const representativeImage = imagePaths.length > 0 ? imagePaths[0] : (colors[i].image_path || null);
+
+                const colorResult = await pool.query(
+                    `INSERT INTO product_colors (product_id, name, image_path, display_order) VALUES ($1, $2, $3, $4) RETURNING id`,
+                    [id, colors[i].name, representativeImage, i + 1]
+                );
+                const newColorId = colorResult.rows[0].id;
+
+                for (const imgPath of imagePaths) {
+                    await pool.query(
+                        `UPDATE product_images SET color_id = $1 WHERE product_id = $2 AND image_path = $3`,
+                        [newColorId, id, imgPath]
+                    );
+                }
+            }
+        }
+
+        if (Array.isArray(specs)) {
+            for (let i = 0; i < specs.length; i++) {
+                if (specs[i].label && specs[i].label.trim() !== "") {
+                    await pool.query(
+                        `INSERT INTO product_specifications (product_id, label, value, display_order) VALUES ($1, $2, $3, $4)`,
+                        [id, specs[i].label.trim(), specs[i].value || "", i + 1]
+                    );
+                }
+            }
+        }
+
+        res.json({ message: "Product options saved" });
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Get colors, sizes, and variants for a product
+exports.getProductOptions = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const colors = await pool.query(
+            `SELECT id, name, image_path, display_order FROM product_colors WHERE product_id = $1 ORDER BY display_order ASC`,
+            [id]
+        );
+
+        const sizes = await pool.query(
+            `SELECT id, name, display_order FROM product_sizes WHERE product_id = $1 ORDER BY display_order ASC`,
+            [id]
+        );
+
+        const variants = await pool.query(
+            `SELECT id, color_id, size_id, price, stock FROM product_variants WHERE product_id = $1`,
+            [id]
+        );
+
+        const specs = await pool.query(
+            `SELECT id, label, value, display_order FROM product_specifications WHERE product_id = $1 ORDER BY display_order ASC`,
+            [id]
+        );
+
+        res.json({
+            colors: colors.rows,
+            sizes: sizes.rows,
+            variants: variants.rows,
+            specs: specs.rows
+        });
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 // Update product (optionally add more images)
 exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, category_id, description, price, stock } = req.body;
+        const { name, category_id, description, price, stock,
+                material, color, sleeve, style, length, fit, pattern, care_instructions, occasion } = req.body;
 
         const uploadedFiles = req.files || [];
         const newImagePaths = await Promise.all(
@@ -140,14 +266,17 @@ exports.updateProduct = async (req, res) => {
 
         const statusClause = req.user.role === "product_staff" ? `, status='pending'` : "";
 
-        let updateQuery = `UPDATE products SET name=$1, category_id=$2, description=$3, price=$4, stock=$5${statusClause}`;
-        let params = [name, category_id, description, price, stock];
+        let updateQuery = `UPDATE products SET name=$1, category_id=$2, description=$3, price=$4, stock=$5,
+            material=$6, color=$7, sleeve=$8, style=$9, length=$10, fit=$11, pattern=$12, care_instructions=$13, occasion=$14${statusClause}`;
+        let params = [name, category_id, description, price, stock,
+            material || null, color || null, sleeve || null, style || null, length || null,
+            fit || null, pattern || null, care_instructions || null, occasion || null];
 
         if (newImagePaths.length > 0) {
-            updateQuery += `, image=$6 WHERE id=$7 RETURNING *`;
+            updateQuery += `, image=$15 WHERE id=$16 RETURNING *`;
             params.push(newImagePaths[0], id);
         } else {
-            updateQuery += ` WHERE id=$6 RETURNING *`;
+            updateQuery += ` WHERE id=$15 RETURNING *`;
             params.push(id);
         }
 
@@ -170,7 +299,7 @@ exports.updateProduct = async (req, res) => {
             ? "Product updated and is pending admin approval."
             : "Product updated successfully";
 
-        res.json({ message, product: product.rows[0] });
+        res.json({ message, product: product.rows[0], images: newImagePaths });
 
     } catch (error) {
         res.status(500).json({ error: error.message });

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Product Details | Lizimas</title>
+<link rel="stylesheet" href="css/style.css?v=2">
+<link rel="stylesheet" href="css/product-detail.css">
+</head>
+<body>
+
+<div class="pd-topbar">
+    <button class="pd-back-btn" onclick="window.location.href='index.html'">&larr;</button>
+    <a href="cart.html" class="pd-cart-btn">
+        🛒 <span id="pd-cart-count">0</span>
+    </a>
+</div>
+
+<div class="pd-gallery">
+    <div id="pd-gallery-scroll" class="pd-gallery-scroll"></div>
+    <div id="pd-gallery-counter" class="pd-gallery-counter">1/1</div>
+</div>
+
+<div id="pd-fullscreen-viewer" class="pd-fullscreen-viewer hidden">
+    <button id="pd-fullscreen-close" class="pd-fullscreen-close">&times;</button>
+    <button id="pd-fullscreen-share" class="pd-fullscreen-share">&#8599;</button>
+    <div id="pd-fullscreen-counter" class="pd-fullscreen-counter">1/1</div>
+    <div id="pd-fullscreen-scroll" class="pd-fullscreen-scroll"></div>
+</div>
+
+<div class="pd-info">
+    <h1 id="pd-name"></h1>
+    <div id="pd-rating" class="pd-rating"></div>
+    <div id="pd-price" class="pd-price"></div>
+
+    <div id="pd-selector-section" class="pd-selector-section hidden"></div>
+
+    <div class="pd-section">
+        <h2>Description</h2>
+        <p id="pd-description"></p>
+    </div>
+
+    <div class="pd-section">
+        <h2>Specifications</h2>
+        <table id="pd-specs-table" class="pd-specs-table"></table>
+    </div>
+</div>
+
+<div class="pd-sticky-bar">
+    <button id="pd-add-to-cart-btn" class="pd-add-to-cart-btn">Add To Cart 🛒</button>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/cart.js"></script>
+<script src="js/product-detail.js"></script>
+
+</body>
+</html>

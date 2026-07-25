@@ -42,6 +42,23 @@
                             <input type="number" id="product-price" placeholder="Price (UGX)" style="padding:10px; border:1px solid #ccc; border-radius:8px;">
                             <input type="number" id="product-stock" placeholder="Stock quantity" style="padding:10px; border:1px solid #ccc; border-radius:8px;">
                             <input type="file" id="product-image" accept="image/*" multiple>
+
+                            <div>
+                                <label style="font-size:13px; font-weight:600; color:#333;">Specifications</label>
+                                <div id="specs-list" style="display:flex; flex-direction:column; gap:6px; margin-top:6px;"></div>
+                                <button type="button" onclick="addSpecRow()" style="margin-top:8px; padding:8px 12px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer;">+ Add Specification</button>
+                            </div>
+
+                            <div>
+                                <label style="font-size:13px; font-weight:600; color:#333;">Available Sizes</label>
+                                <div id="size-checkbox-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;">Loading...</div>
+                            </div>
+
+                            <div>
+                                <label style="font-size:13px; font-weight:600; color:#333;">Available Colors</label>
+                                <div id="color-checkbox-list" style="display:flex; flex-direction:column; gap:8px; margin-top:6px;">Loading...</div>
+                            </div>
+
                             <div style="display:flex; gap:10px;">
                                 <button onclick="submitProductForm()" id="product-submit-btn" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px; cursor:pointer; flex:1;">Submit for Approval</button>
                                 <button onclick="resetProductForm()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px; cursor:pointer;">Clear</button>

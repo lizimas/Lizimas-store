@@ -6,6 +6,10 @@ const {
     getProducts,
     getProductById,
     getProductImages,
+    getProductOptions,
+    getSizeCatalog,
+    getColorCatalog,
+    saveProductOptions,
     updateProduct,
     deleteProduct,
     deleteProductImage,
@@ -21,6 +25,10 @@ router.get("/", getProducts);
 router.get("/categories", getCategories);
 router.get("/mine", requireAuth, requireStaffOrAdmin, getMyProducts);
 router.get("/:id/images", getProductImages);
+router.get("/:id/options", getProductOptions);
+router.get("/catalog/sizes", getSizeCatalog);
+router.get("/catalog/colors", getColorCatalog);
+router.post("/:id/options", requireAuth, requireStaffOrAdmin, saveProductOptions);
 router.get("/:id", getProductById);
 
 // Admin only: add, update, delete (with image uploads, up to 6 photos per product)

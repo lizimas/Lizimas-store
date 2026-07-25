@@ -87,7 +87,7 @@ function displayProducts(products) {
             if (event.target.closest(".add-to-cart-btn")) {
                 return;
             }
-            openProductModal(product.id);
+            window.location.href = `product-detail.html?id=${product.id}`;
         };
 
         const outOfStock = product.stock !== undefined && Number(product.stock) <= 0;
@@ -232,7 +232,7 @@ function displayFeaturedProducts(products, limit = 8) {
             if (event.target.closest(".add-to-cart-btn")) {
                 return;
             }
-            openProductModal(product.id);
+            window.location.href = `product-detail.html?id=${product.id}`;
         };
 
         const outOfStock = product.stock !== undefined && Number(product.stock) <= 0;
@@ -281,7 +281,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const openProductId = urlParams.get("openProduct");
     if (openProductId) {
         cameFromCart = true;
-        openProductModal(Number(openProductId));
+        window.location.href = `product-detail.html?id=${openProductId}`;
     }
 });
 
@@ -397,14 +397,84 @@ async function openProductModal(productId) {
     const fsImage = document.getElementById("fullscreen-image");
     const fsClose = document.getElementById("fullscreen-close");
 
+    let fsScale = 1;
+    let fsTranslateX = 0;
+    let fsTranslateY = 0;
+    let fsPinchStartDist = 0;
+    let fsPinchStartScale = 1;
+    let fsLastTapTime = 0;
+    let fsVelocityX = 0;
+    let fsVelocityY = 0;
+    let fsLastMoveTime = 0;
+    let fsMomentumRaf = null;
+
+    function stopMomentum() {
+        if (fsMomentumRaf) {
+            cancelAnimationFrame(fsMomentumRaf);
+            fsMomentumRaf = null;
+        }
+    }
+
+    function clampTranslate() {
+        const containerWidth = fsOverlay.clientWidth;
+        const containerHeight = fsOverlay.clientHeight;
+        const scaledWidth = fsImage.offsetWidth * fsScale;
+        const scaledHeight = fsImage.offsetHeight * fsScale;
+        const maxX = Math.max(0, (scaledWidth - containerWidth) / 2);
+        const maxY = Math.max(0, (scaledHeight - containerHeight) / 2);
+        fsTranslateX = Math.min(maxX, Math.max(-maxX, fsTranslateX));
+        fsTranslateY = Math.min(maxY, Math.max(-maxY, fsTranslateY));
+    }
+
+    function startMomentum() {
+        stopMomentum();
+        function step() {
+            fsTranslateX += fsVelocityX * 16;
+            fsTranslateY += fsVelocityY * 16;
+            fsVelocityX *= 0.93;
+            fsVelocityY *= 0.93;
+            clampTranslate();
+            applyZoomTransform();
+            if (Math.abs(fsVelocityX) > 0.02 || Math.abs(fsVelocityY) > 0.02) {
+                fsMomentumRaf = requestAnimationFrame(step);
+            } else {
+                fsMomentumRaf = null;
+            }
+        }
+        fsMomentumRaf = requestAnimationFrame(step);
+    }
+
+    function applyZoomTransform() {
+        fsImage.style.transform = `translate(${fsTranslateX}px, ${fsTranslateY}px) scale(${fsScale})`;
+    }
+
+    function resetZoom() {
+        stopMomentum();
+        fsScale = 1;
+        fsTranslateX = 0;
+        fsTranslateY = 0;
+        fsVelocityX = 0;
+        fsVelocityY = 0;
+        applyZoomTransform();
+    }
+
+    function getTouchDistance(touches) {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
     function openFullscreenViewer() {
         fsImage.src = mainImage.src;
         fsImage.alt = product.name;
+        fsImage.style.touchAction = "none";
+        resetZoom();
         fsOverlay.classList.remove("hidden");
     }
 
     function closeFullscreenViewer() {
         fsOverlay.classList.add("hidden");
+        resetZoom();
     }
 
     fsClose.onclick = closeFullscreenViewer;
@@ -450,20 +520,78 @@ async function openProductModal(productId) {
     let fsWasSwipe = false;
 
     fsImage.ontouchstart = (e) => {
+        stopMomentum();
+
+        if (e.touches.length === 2) {
+            fsPinchStartDist = getTouchDistance(e.touches);
+            fsPinchStartScale = fsScale;
+            fsWasSwipe = true;
+            return;
+        }
+
         fsStartX = e.changedTouches[0].screenX;
         fsStartY = e.changedTouches[0].screenY;
+        fsLastMoveTime = Date.now();
+        fsVelocityX = 0;
+        fsVelocityY = 0;
         fsWasSwipe = false;
+
+        const now = Date.now();
+        if (now - fsLastTapTime < 300) {
+            if (fsScale > 1) {
+                resetZoom();
+            } else {
+                fsScale = 2.5;
+                applyZoomTransform();
+            }
+            fsWasSwipe = true;
+        }
+        fsLastTapTime = now;
     };
 
     fsImage.ontouchmove = (e) => {
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            const dist = getTouchDistance(e.touches);
+            fsScale = Math.min(Math.max(fsPinchStartScale * (dist / fsPinchStartDist), 1), 4);
+            applyZoomTransform();
+            return;
+        }
+
         const curX = e.changedTouches[0].screenX;
         const curY = e.changedTouches[0].screenY;
+
+        if (fsScale > 1) {
+            e.preventDefault();
+            const now = Date.now();
+            const dt = Math.max(now - fsLastMoveTime, 1);
+            fsVelocityX = (curX - fsStartX) / dt;
+            fsVelocityY = (curY - fsStartY) / dt;
+            fsLastMoveTime = now;
+
+            fsTranslateX += (curX - fsStartX);
+            fsTranslateY += (curY - fsStartY);
+            fsStartX = curX;
+            fsStartY = curY;
+            clampTranslate();
+            applyZoomTransform();
+            fsWasSwipe = true;
+            return;
+        }
+
         if (Math.abs(curX - fsStartX) > 10 || Math.abs(curY - fsStartY) > 10) {
             fsWasSwipe = true;
         }
     };
 
     fsImage.ontouchend = (e) => {
+        if (fsScale > 1) {
+            if (Math.abs(fsVelocityX) > 0.05 || Math.abs(fsVelocityY) > 0.05) {
+                startMomentum();
+            }
+            return;
+        }
+
         const endX = e.changedTouches[0].screenX;
         const endY = e.changedTouches[0].screenY;
         const deltaX = endX - fsStartX;
@@ -482,6 +610,7 @@ async function openProductModal(productId) {
                 showGalleryItem(currentIndex - 1);
             }
             fsImage.src = mainImage.src;
+            resetZoom();
         }
     };
 
