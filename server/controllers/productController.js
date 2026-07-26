@@ -41,10 +41,10 @@ exports.addProduct = async (req, res) => {
 
         const newProduct = product.rows[0];
 
-        for (const imgPath of imagePaths) {
+        for (const [imgIndex, imgPath] of imagePaths.entries()) {
             await pool.query(
-                `INSERT INTO product_images (product_id, image_path) VALUES ($1, $2)`,
-                [newProduct.id, imgPath]
+                `INSERT INTO product_images (product_id, image_path, display_order) VALUES ($1, $2, $3)`,
+                [newProduct.id, imgPath, imgIndex]
             );
         }
 
@@ -188,7 +188,7 @@ exports.saveProductOptions = async (req, res) => {
                 );
                 const newColorId = colorResult.rows[0].id;
 
-                for (const imgPath of imagePaths) {
+                for (const [imgIndex, imgPath] of imagePaths.entries()) {
                     await pool.query(
                         `UPDATE product_images SET color_id = $1 WHERE product_id = $2 AND image_path = $3`,
                         [newColorId, id, imgPath]
@@ -286,10 +286,12 @@ exports.updateProduct = async (req, res) => {
             return res.status(404).json({ error: "Product not found" });
         }
 
-        for (const imgPath of newImagePaths) {
+        const maxRes = await pool.query("SELECT COALESCE(MAX(display_order), -1) AS m FROM product_images WHERE product_id = $1", [id]);
+        const startAt = Number(maxRes.rows[0].m) + 1;
+        for (const [imgIndex, imgPath] of newImagePaths.entries()) {
             await pool.query(
-                `INSERT INTO product_images (product_id, image_path) VALUES ($1, $2)`,
-                [id, imgPath]
+                `INSERT INTO product_images (product_id, image_path, display_order) VALUES ($1, $2, $3)`,
+                [id, imgPath, startAt + imgIndex]
             );
         }
 
