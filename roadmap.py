@@ -272,6 +272,36 @@ def cmd_log(data, args):
     print("")
 
 
+def cmd_export(data, args):
+    import csv
+    out = os.path.join(HERE, "roadmap_progress.csv")
+    ts = sorted(data["tasks"], key=lambda t: (t["phase"], t["pri"], t["id"]))
+    done = len([t for t in ts if t["status"] == "done"])
+    with open(out, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["Lizimas Store - Roadmap Progress"])
+        w.writerow(["Exported", today(), "%d of %d done" % (done, len(ts)),
+                    "%.0f%%" % (done * 100.0 / len(ts) if ts else 0)])
+        w.writerow([])
+        w.writerow(["ID", "Phase", "Phase name", "Pri", "Area", "Task",
+                    "Status", "Date done", "Verify command", "Note"])
+        for t in ts:
+            w.writerow([t["id"], t["phase"], PHASES.get(t["phase"], ""), t["pri"],
+                        t["area"], t["title"], t["status"], t["date"],
+                        t["marker"], t["note"]])
+        w.writerow([])
+        w.writerow(["SUMMARY BY PHASE"])
+        w.writerow(["Phase", "Name", "Done", "Total"])
+        for ph in sorted(PHASES):
+            g = [t for t in ts if t["phase"] == ph]
+            if g:
+                w.writerow([ph, PHASES[ph],
+                            len([t for t in g if t["status"] == "done"]), len(g)])
+    print("\nWrote " + out)
+    print("  %d of %d tasks done" % (done, len(ts)))
+    print("  Open it in Excel, or share it straight into a Claude chat.\n")
+
+
 def cmd_help(data, args):
     print("""
 Lizimas roadmap tracker
@@ -281,6 +311,7 @@ Lizimas roadmap tracker
   list [P0|done|todo]  list tasks, optionally filtered
   show <ID>            full detail for one task
   log                  everything completed, with verify commands
+  export               write roadmap_progress.csv for Excel
 
   start <ID>                  mark in progress
   done <ID> "verify cmd"      mark done and record how to verify it
@@ -295,7 +326,8 @@ Paste the output of `status` at the start of a Claude session to resume instantl
 
 CMDS = {"status": cmd_status, "next": cmd_next, "list": cmd_list, "show": cmd_show,
         "done": cmd_done, "start": cmd_start, "block": cmd_block, "reset": cmd_reset,
-        "marker": cmd_marker, "add": cmd_add, "log": cmd_log, "help": cmd_help}
+        "marker": cmd_marker, "add": cmd_add, "log": cmd_log, "help": cmd_help,
+        "export": cmd_export}
 
 if __name__ == "__main__":
     data = load()

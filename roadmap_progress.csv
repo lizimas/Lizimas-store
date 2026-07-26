@@ -1,0 +1,64 @@
+Lizimas Store - Roadmap Progress
+Exported,2026-07-26,0 of 50 done,0%
+
+ID,Phase,Phase name,Pri,Area,Task,Status,Date done,Verify command,Note
+L01,P0,Urgent - data at risk,1,Safety,Full pg_dump backup before ANY schema change,todo,,,
+L02,P0,Urgent - data at risk,1,Orders,Add snapshot columns to order_items,todo,,,
+L03,P0,Urgent - data at risk,1,Orders,Populate snapshots on order creation,todo,,,
+L04,P0,Urgent - data at risk,2,Ops,Clean Postgres stop/start scripts,todo,,,
+L05,P1,Identity & structure,1,Identity,Add products.product_code (LM#######),todo,,,
+L06,P1,Identity & structure,1,Identity,Server-side product_code generator,todo,,,
+L07,P1,Identity & structure,1,Identity,Add product_variants.sku,todo,,,
+L08,P1,Identity & structure,1,Identity,Add products.slug + /products/<slug> routing,todo,,,
+L09,P1,Identity & structure,2,Identity,Swap on-page Item ID to show product_code,todo,,,
+L10,P1,Identity & structure,2,Lifecycle,Replace publish boolean with status enum,todo,,,
+L11,P1,Identity & structure,2,Schema,Retire duplicate attribute columns on products,todo,,,
+L12,P1,Identity & structure,3,Schema,Generic options / option_values / variant_option_values,todo,,,
+L13,P2,"Scale to 15,000 products",1,Scale,Server-side pagination on /api/products,todo,,,
+L14,P2,"Scale to 15,000 products",1,Scale,Server-side filtering and sorting,todo,,,
+L15,P2,"Scale to 15,000 products",1,Scale,Database indexes,todo,,,
+L16,P2,"Scale to 15,000 products",2,Scale,Postgres full-text search (tsvector),todo,,,
+L17,P2,"Scale to 15,000 products",2,Scale,Infinite scroll / lazy loading,todo,,,
+L18,P2,"Scale to 15,000 products",2,Ops,Automated cache-busting for static assets,todo,,,
+L19,P2,"Scale to 15,000 products",3,Scale,gzip compression + cache headers,todo,,,
+L20,P3,Premium storefront & media,1,Media,Cloudinary responsive transformations,todo,,,
+L21,P3,Premium storefront & media,1,Media,srcset + sizes on product images,todo,,,
+L24,P3,Premium storefront & media,1,Homepage,"Homepage redesign - hero, curated rows, trust",todo,,,
+L22,P3,Premium storefront & media,2,Media,Pinch-zoom / high-res gallery view,todo,,,
+L23,P3,Premium storefront & media,2,Media,Skeleton loaders + blur-up placeholders,todo,,,
+L25,P3,Premium storefront & media,2,Homepage,Collections table (separate from categories),todo,,,
+L26,P3,Premium storefront & media,3,Homepage,Recently viewed + related products,todo,,,
+L27,P4,"Ratings, reviews, promotions",1,Reviews,Denormalise rating_avg + rating_count on products,todo,,,
+L31,P4,"Ratings, reviews, promotions",1,Promotions,"Discounts table (percent/fixed, date window)",todo,,,
+L32,P4,"Ratings, reviews, promotions",1,Promotions,Free delivery rules (threshold + zone),todo,,,
+L28,P4,"Ratings, reviews, promotions",2,Reviews,Photo upload on reviews,todo,,,
+L29,P4,"Ratings, reviews, promotions",2,Reviews,Helpful voting + review sorting,todo,,,
+L33,P4,"Ratings, reviews, promotions",2,Promotions,Coupon codes + redemption tracking,todo,,,
+L34,P4,"Ratings, reviews, promotions",2,Promotions,Scheduled launch (publish_at) + countdown,todo,,,
+L30,P4,"Ratings, reviews, promotions",3,Reviews,Link review to purchased variant,todo,,,
+L35,P5,Marketplace & commission,1,Vendors,vendors table + KYC fields,todo,,,
+L36,P5,Marketplace & commission,1,Vendors,products.vendor_id + query scoping,todo,,,
+L38,P5,Marketplace & commission,1,Vendors,Product approval workflow,todo,,,
+L39,P5,Marketplace & commission,1,Commission,commission_rules table,todo,,,
+L40,P5,Marketplace & commission,1,Commission,Snapshot commission on order_items,todo,,,
+L41,P5,Marketplace & commission,1,Commission,Vendor payout ledger,todo,,,
+L37,P5,Marketplace & commission,2,Vendors,"Vendor portal - register, upload, own orders",todo,,,
+L42,P5,Marketplace & commission,2,Commission,Payout run + MoMo disbursement,todo,,,
+L43,P5,Marketplace & commission,3,Vendors,Vendor performance metrics,todo,,,
+L44,P6,Payments & go-live,1,Payments,Card acquirer integration (Flutterwave/Paystack),todo,,,
+L45,P6,Payments & go-live,1,Payments,Enable 3-D Secure on card transactions,todo,,,
+L47,P6,Payments & go-live,1,Deploy,Push completed work to GitHub + Render,todo,,,
+L48,P6,Payments & go-live,1,Deploy,Run migrations on Render production database,todo,,,
+L46,P6,Payments & go-live,2,Payments,Display-currency conversion (charge UGX),todo,,,
+L49,P6,Payments & go-live,2,Deploy,Migration runner with version tracking,todo,,,
+L50,P6,Payments & go-live,2,Ops,Error logging + uptime monitoring,todo,,,
+
+SUMMARY BY PHASE
+Phase,Name,Done,Total
+P0,Urgent - data at risk,0,4
+P1,Identity & structure,0,8
+P2,"Scale to 15,000 products",0,7
+P3,Premium storefront & media,0,7
+P4,"Ratings, reviews, promotions",0,8
+P5,Marketplace & commission,0,9
+P6,Payments & go-live,0,7
