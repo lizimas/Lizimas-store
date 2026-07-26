@@ -31,11 +31,13 @@ async function loadProductDetail() {
             ? `UGX ${Number(product.price).toLocaleString()}`
             : "";
         document.getElementById("pd-description").textContent = product.description || "No description available.";
+        const idEl = document.getElementById("pd-item-id");
+        if (idEl) idEl.textContent = "Item ID: " + product.id;
 
 
 
         document.getElementById("pd-add-to-cart-btn").onclick = () => {
-            addToCart(product.id, product.name, product.price, product.image, product.description);
+            addToCart(product.id, product.name, product.price, product.image, product.description, pdSelectedColorId, pdSelectedColorName);
         };
 
         document.getElementById("pd-fullscreen-share").onclick = () => sharePdProduct(product);
@@ -166,6 +168,7 @@ async function sharePdProduct(product) {
 }
 
 let pdSelectedColorId = null;
+let pdSelectedColorName = null;
 let pdSelectedSizeId = null;
 let pdVariants = [];
 let pdColors = [];
@@ -184,7 +187,7 @@ async function loadOptions(id, product) {
     pdColors = data.colors;
     pdVariants = data.variants;
 
-    renderSpecs(data.specs || []);
+    renderSpecs(data.specs || [], data.sizes || []);
 
     if (data.colors.length === 0 && data.sizes.length === 0) {
         section.classList.add("hidden");
@@ -232,6 +235,7 @@ async function loadOptions(id, product) {
 
 function selectColor(colorId, imagePath, colorName) {
     pdSelectedColorId = colorId;
+    pdSelectedColorName = colorName || null;
     document.querySelectorAll(".pd-color-swatch").forEach(el => {
         el.classList.toggle("selected", Number(el.dataset.colorId) === colorId);
     });
@@ -265,21 +269,105 @@ function updateSizeAvailability() {
     });
 }
 
-function renderSpecs(specs) {
-    const table = document.getElementById("pd-specs-table");
-    table.innerHTML = "";
+function pdEscape(str) {
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
 
-    specs.forEach(spec => {
+function pdCurrentId() {
+    return new URLSearchParams(window.location.search).get("id");
+}
+
+function renderSpecs(specs, sizes) {
+    const card = document.getElementById("pd-details-card");
+    const table = document.getElementById("pd-specs-table");
+    const rows = [];
+
+    (specs || []).forEach(function (spec) {
         if (spec.value && spec.value.toString().trim() !== "") {
-            const row = document.createElement("tr");
-            row.innerHTML = `<td class="pd-spec-label">${spec.label}</td><td class="pd-spec-value">${spec.value}</td>`;
-            table.appendChild(row);
+            rows.push([String(spec.label), String(spec.value).trim()]);
         }
     });
 
-    if (table.children.length === 0) {
-        table.innerHTML = `<tr><td colspan="2">No specifications listed for this product.</td></tr>`;
+    if (table) {
+        table.innerHTML = rows.length
+            ? rows.map(function (r) {
+                return '<tr><td class="pd-spec-label">' + pdEscape(r[0]) +
+                       '</td><td class="pd-spec-value">' + pdEscape(r[1]) + '</td></tr>';
+              }).join('')
+            : '<tr><td colspan="2">No specifications listed for this product.</td></tr>';
     }
+
+    if (!card) return;
+
+    if (rows.length === 0) {
+        card.style.display = "none";
+        card.innerHTML = "";
+        return;
+    }
+    card.style.display = "";
+
+    const preview = rows.slice(0, 3).map(function (r) {
+        return '<div class="pd-cell">' +
+                   '<div class="pd-cell-label">' + pdEscape(r[0]) + '</div>' +
+                   '<div class="pd-cell-value">' + pdEscape(r[1]) + '</div>' +
+               '</div>';
+    }).join('');
+
+    const sizeLabels = (sizes || [])
+        .map(function (x) { return x.label || x.name || x.size || x.size_label || ''; })
+        .filter(Boolean).join(', ');
+
+    const sizeRow = sizeLabels
+        ? '<button type="button" class="pd-size-guide" onclick="openAllDetails()">' +
+              '<span>&#128207; Size guide</span>' +
+              '<span>' + pdEscape(sizeLabels) + ' &rsaquo;</span>' +
+          '</button>'
+        : '';
+
+    card.innerHTML =
+        '<div class="pd-head">' +
+            '<h3 class="pd-title">Product details</h3>' +
+            '<div class="pd-actions">' +
+                '<button type="button" class="pd-action" onclick="toggleSaveProduct()">&#9825; Save</button>' +
+                '<span class="pd-sep"></span>' +
+                '<button type="button" class="pd-action" onclick="reportProduct()">&#9998; Report</button>' +
+            '</div>' +
+        '</div>' +
+        '<div class="pd-grid">' + preview + '</div>' +
+        '<button type="button" class="pd-see-all" onclick="openAllDetails()">See all details &rsaquo;</button>' +
+        sizeRow;
+}
+
+function openAllDetails() {
+    const el = document.getElementById("pd-sheet");
+    if (el) el.classList.remove("hidden");
+}
+
+function closeAllDetails() {
+    const el = document.getElementById("pd-sheet");
+    if (el) el.classList.add("hidden");
+}
+
+function toggleSaveProduct() {
+    const id = pdCurrentId();
+    if (!id) return;
+    try {
+        const list = JSON.parse(localStorage.getItem("savedProducts") || "[]");
+        const i = list.indexOf(id);
+        if (i === -1) { list.push(id); alert("Saved to your list"); }
+        else { list.splice(i, 1); alert("Removed from your list"); }
+        localStorage.setItem("savedProducts", JSON.stringify(list));
+    } catch (e) {
+        console.error("Save failed:", e);
+    }
+}
+
+function reportProduct() {
+    alert("Thanks - this product has been flagged for review.");
 }
 
 document.addEventListener("DOMContentLoaded", loadProductDetail);

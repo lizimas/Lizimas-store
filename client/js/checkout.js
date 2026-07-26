@@ -224,6 +224,7 @@ function placeOrder() {
         return {
             productId,
             variantId,
+            colorId: item.colorId || null,
             quantity: item.quantity
         };
     });

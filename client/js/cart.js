@@ -9,9 +9,9 @@ function saveCart(cart) {
     updateCartCount();
 }
 
-function addToCart(id, name, price, image, description) {
+function addToCart(id, name, price, image, description, colorId, colorName) {
     let cart = getCart();
-    let existing = cart.find(item => item.id === id);
+    let existing = cart.find(item => item.id === id && item.colorId === (colorId || null));
 
     if (existing) {
         existing.quantity += 1;
@@ -22,6 +22,8 @@ function addToCart(id, name, price, image, description) {
             price: Number(price),
             image,
             description: description || "",
+            colorId: colorId || null,
+            colorName: colorName || null,
             quantity: 1
         });
     }

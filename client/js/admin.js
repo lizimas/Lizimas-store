@@ -182,7 +182,8 @@ async function authorizedFetch(path, options = {}) {
         throw new Error("Unauthorized");
     }
 
-    return response.json();
+    const text = await response.text();
+    try { return JSON.parse(text); } catch (e) { throw new Error(`HTTP ${response.status}: ${text.slice(0,200)}`); }
 }
 
 async function loadAllDashboardData() {

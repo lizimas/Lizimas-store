@@ -32,6 +32,7 @@ exports.checkout = async (req, res) => {
             const productId = Number(item.productId);
             const variantId = item.variantId ? Number(item.variantId) : null;
             const quantity = Number(item.quantity);
+            const colorId = item.colorId ? Number(item.colorId) : null;
 
             if (!productId || !quantity || quantity <= 0) {
                 await client.query("ROLLBACK");
@@ -40,7 +41,7 @@ exports.checkout = async (req, res) => {
 
             if (variantId) {
                 const variantResult = await client.query(
-                    "SELECT id, product_id, variant_name, price, stock FROM product_variants WHERE id = $1 AND product_id = $2",
+                    "SELECT v.id, v.product_id, v.variant_name, v.price, v.stock, p.name AS product_name, COALESCE(v.image_path, p.image) AS image_url, c.name AS color_name, s.name AS size_name FROM product_variants v JOIN products p ON p.id = v.product_id LEFT JOIN color_catalog c ON c.id = v.color_id LEFT JOIN size_catalog s ON s.id = v.size_id WHERE v.id = $1 AND v.product_id = $2",
                     [variantId, productId]
                 );
 
@@ -64,13 +65,14 @@ exports.checkout = async (req, res) => {
                 validatedItems.push({
                     productId,
                     variantId,
+                    productName: variant.product_name, imageUrl: variant.image_url, variantColor: variant.color_name || variant.variant_name, variantSize: variant.size_name || null,
                     quantity,
                     price: itemPrice
                 });
 
             } else {
                 const productResult = await client.query(
-                    "SELECT id, name, price, stock FROM products WHERE id = $1",
+                    "SELECT id, name, price, stock, COALESCE(image, (SELECT image_path FROM product_images WHERE product_id = products.id ORDER BY id LIMIT 1)) AS image FROM products WHERE id = $1",
                     [productId]
                 );
 
@@ -88,12 +90,18 @@ exports.checkout = async (req, res) => {
                     });
                 }
 
+                let colorName = null;
+                if (colorId) {
+                    const cr = await client.query("SELECT name FROM color_catalog WHERE id = $1", [colorId]);
+                    colorName = cr.rows.length ? cr.rows[0].name : null;
+                }
                 const itemPrice = Number(product.price);
                 total += itemPrice * quantity;
 
                 validatedItems.push({
                     productId,
                     variantId: null,
+                    productName: product.name, imageUrl: product.image, variantColor: colorName, variantSize: null,
                     quantity,
                     price: itemPrice
                 });
@@ -114,9 +122,9 @@ exports.checkout = async (req, res) => {
 
         for (const item of validatedItems) {
             await client.query(
-                `INSERT INTO order_items (order_id, product_id, quantity, price)
-                 VALUES ($1, $2, $3, $4)`,
-                [order.id, item.productId, item.quantity, item.price]
+                `INSERT INTO order_items (order_id, product_id, quantity, price, product_name, image_url, variant_color, variant_size)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                [order.id, item.productId, item.quantity, item.price, item.productName, item.imageUrl, item.variantColor, item.variantSize]
             );
 
             if (item.variantId) {
