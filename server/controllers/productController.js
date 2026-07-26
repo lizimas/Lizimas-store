@@ -123,7 +123,7 @@ exports.getProductImages = async (req, res) => {
             `SELECT product_images.* FROM product_images
              LEFT JOIN product_colors ON product_images.color_id = product_colors.id
              WHERE product_images.product_id = $1
-             ORDER BY COALESCE(product_colors.display_order, 999999) ASC, product_images.id ASC`,
+             ORDER BY COALESCE(product_colors.display_order, 999999) ASC, COALESCE(product_images.display_order, 999999) ASC, product_images.id ASC`,
             [id]
         );
 

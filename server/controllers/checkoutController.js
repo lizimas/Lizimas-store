@@ -72,7 +72,7 @@ exports.checkout = async (req, res) => {
 
             } else {
                 const productResult = await client.query(
-                    "SELECT id, name, price, stock, COALESCE(image, (SELECT image_path FROM product_images WHERE product_id = products.id ORDER BY id LIMIT 1)) AS image FROM products WHERE id = $1",
+                    "SELECT id, name, price, stock, COALESCE(image, (SELECT image_path FROM product_images WHERE product_id = products.id ORDER BY COALESCE(display_order, 999999), id LIMIT 1)) AS image FROM products WHERE id = $1",
                     [productId]
                 );
 
