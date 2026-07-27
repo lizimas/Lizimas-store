@@ -907,7 +907,6 @@ async function saveProduct() {
                 image_paths: pdSelectedColors[name].map(idx => returnedImages[idx]).filter(Boolean)
             }));
 
-        alert("returnedImages=" + returnedImages.length + "\nselected=" + JSON.stringify(pdSelectedColors) + "\npayload=" + JSON.stringify(colorsPayload.map(c => c.name + ":" + c.image_paths.length)));
         const specsPayload = collectSpecRows();
 
         if (savedProductId && (pdSelectedSizes.length > 0 || colorsPayload.length > 0 || specsPayload.length > 0)) {
