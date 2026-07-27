@@ -9,9 +9,9 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 .pd-gallery-scroll img { cursor: pointer; }
 .pd-fullscreen-viewer { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #000; z-index: 1000; }
 .pd-fullscreen-viewer.hidden { display: none; }
-.pd-fullscreen-close { position: absolute; top: 16px; left: 16px; z-index: 1001; background: rgba(255,255,255,0.15); color: #fff; border: none; width: 40px; height: 40px; border-radius: 50%; font-size: 24px; line-height: 1; }
-.pd-fullscreen-share { position: absolute; top: 16px; right: 16px; z-index: 1001; background: rgba(255,255,255,0.15); color: #fff; border: none; width: 40px; height: 40px; border-radius: 50%; font-size: 18px; line-height: 1; }
-.pd-fullscreen-counter { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 1001; background: rgba(255,255,255,0.15); color: #fff; padding: 6px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; }
+.pd-fullscreen-close { position: absolute; top: 16px; left: 16px; z-index: 1001; background: rgba(0,0,0,0.45); color: #fff; border: none; width: 44px; height: 44px; border-radius: 50%; font-size: 24px; line-height: 1; }
+.pd-fullscreen-share { position: absolute; top: 16px; right: 16px; z-index: 1001; background: rgba(0,0,0,0.45); color: #fff; border: none; width: 44px; height: 44px; border-radius: 50%; font-size: 24px; line-height: 1; }
+.pd-fullscreen-counter { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 1001; background: rgba(0,0,0,0.45); color: #fff; padding: 6px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; }
 .pd-fullscreen-scroll { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; height: 100%; -webkit-overflow-scrolling: touch; }
 .pd-fullscreen-scroll img { flex: 0 0 100%; width: 100%; height: 100%; object-fit: contain; scroll-snap-align: center; scroll-snap-stop: always; }
 .pd-info { padding: 16px; }
@@ -37,3 +37,15 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 .pd-spec-value { color: #111; font-weight: 500; }
 .pd-sticky-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 10px 16px; box-shadow: 0 -1px 6px rgba(0,0,0,0.1); }
 .pd-add-to-cart-btn { width: 100%; padding: 14px; background: #ff6a00; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; }
+
+/* ---- Product details card: Temu tuning ---- */
+.pd-title { font-size: 21px; font-weight: 700; }
+.pd-action { font-size: 16px; font-weight: 600; }
+.pd-grid { padding: 18px 0 10px; }
+.pd-cell { border-right: none; position: relative; padding: 0 10px; }
+.pd-cell::after { content: ""; position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 1px; height: 58%; background: #e6e6e6; }
+.pd-cell:last-child::after { display: none; }
+.pd-cell-label { font-size: 14px; color: #999; font-weight: 400; margin-bottom: 6px; }
+.pd-cell-value { font-size: 17px; font-weight: 700; color: #000; line-height: 1.3; }
+.pd-see-all { padding: 18px 0 16px; font-size: 16px; color: #888; }
+.pd-item-id { font-size: 12px; color: #aaa; margin: 2px 0 6px; }
