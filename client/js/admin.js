@@ -517,7 +517,7 @@ function addSpecRow(label, value) {
     row.id = rowId;
     row.style.cssText = "display:flex; gap:6px;";
     row.innerHTML = `
-        <input type="text" class="spec-label-input" placeholder="Label (e.g. Material)" value="${label || ''}" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:6px;">
+        <input type="text" class="spec-label-input" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Label (e.g. Material)" value="${label || ''}" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:6px;">
         <input type="text" class="spec-value-input" placeholder="Value (e.g. Polyester)" value="${value || ''}" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:6px;">
         <button type="button" onclick="document.getElementById('${rowId}').remove()" style="padding:8px 12px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer;">&times;</button>
     `;
@@ -907,6 +907,7 @@ async function saveProduct() {
                 image_paths: pdSelectedColors[name].map(idx => returnedImages[idx]).filter(Boolean)
             }));
 
+        alert("returnedImages=" + returnedImages.length + "\nselected=" + JSON.stringify(pdSelectedColors) + "\npayload=" + JSON.stringify(colorsPayload.map(c => c.name + ":" + c.image_paths.length)));
         const specsPayload = collectSpecRows();
 
         if (savedProductId && (pdSelectedSizes.length > 0 || colorsPayload.length > 0 || specsPayload.length > 0)) {
