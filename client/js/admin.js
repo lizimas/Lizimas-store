@@ -893,6 +893,7 @@ function editProduct(id) {
     document.getElementById("variants-section").classList.remove("hidden");
     loadVariants(product.id);
     loadProductOptionsIntoForm(product.id);
+    loadProductOptionsIntoForm(product.id);
     document.getElementById("product-image").value = "";
     document.getElementById("product-image-preview").innerHTML = "";
     document.getElementById("product-form-error").textContent = "";
