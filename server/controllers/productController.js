@@ -120,7 +120,7 @@ exports.getProductImages = async (req, res) => {
         const { id } = req.params;
 
         const images = await pool.query(
-            `SELECT product_images.* FROM product_images
+            `SELECT product_images.*, product_colors.name AS color_name FROM product_images
              LEFT JOIN product_colors ON product_images.color_id = product_colors.id
              WHERE product_images.product_id = $1
              ORDER BY COALESCE(product_colors.display_order, 999999) ASC, COALESCE(product_images.display_order, 999999) ASC, product_images.id ASC`,

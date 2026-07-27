@@ -506,6 +506,7 @@ async function deleteCustomerAccount(id, name) {
 let allCategories = [];
 
 let pdLocalPreviews = [];
+let pdAllImages = [];
 let pdSelectedSizes = [];
 let pdSelectedColors = {};
 let pdSpecRowCounter = 0;
@@ -589,14 +590,14 @@ function toggleColorSelection(checkbox) {
 }
 
 function renderThumbOptions(picker) {
-    if (pdLocalPreviews.length === 0) {
+    if (!Array.isArray(pdAllImages) || pdAllImages.length === 0) {
         picker.innerHTML = `<span style="font-size:12px; color:#999;">Upload photos first</span>`;
         return;
     }
-    picker.innerHTML = pdLocalPreviews.map((url, i) => `
+    picker.innerHTML = pdAllImages.map(img => `
         <span style="position:relative; display:inline-block; margin:2px;">
-            <img src="${url}" data-index="${i}" onclick="selectColorThumb(this, '${picker.dataset.colorName}')" style="width:48px; height:48px; object-fit:cover; border-radius:6px; border:2px solid #ccc; cursor:pointer; display:block;">
-            <span class="pd-pos-badge" data-index="${i}" style="position:absolute; top:-4px; right:-4px; min-width:16px; height:16px; line-height:16px; text-align:center; border-radius:8px; background:#ff6a00; color:#fff; font-size:11px; font-weight:700; display:none;"></span>
+            <img src="${img.url}" data-key="${img.key}" onclick="selectColorThumb(this, '${picker.dataset.colorName}')" style="width:48px; height:48px; object-fit:cover; border-radius:6px; border:2px solid #ccc; cursor:pointer; display:block;">
+            <span class="pd-pos-badge" data-key="${img.key}" style="position:absolute; top:-4px; right:-4px; min-width:16px; height:16px; line-height:16px; text-align:center; border-radius:8px; background:#ff6a00; color:#fff; font-size:11px; font-weight:700; display:none;"></span>
         </span>
     `).join("");
     refreshColorThumbBadges(picker, picker.dataset.colorName);
@@ -604,10 +605,10 @@ function renderThumbOptions(picker) {
 
 function refreshColorThumbBadges(picker, colorName) {
     const order = Array.isArray(pdSelectedColors[colorName]) ? pdSelectedColors[colorName] : [];
-    picker.querySelectorAll("img[data-index]").forEach(img => {
-        const idx = Number(img.dataset.index);
-        const pos = order.indexOf(idx);
-        const badge = picker.querySelector('.pd-pos-badge[data-index="' + idx + '"]');
+    picker.querySelectorAll("img[data-key]").forEach(img => {
+        const key = img.dataset.key;
+        const pos = order.indexOf(key);
+        const badge = picker.querySelector('.pd-pos-badge[data-key="' + key + '"]');
         if (pos === -1) {
             img.style.borderColor = "#ccc";
             if (badge) badge.style.display = "none";
@@ -619,18 +620,61 @@ function refreshColorThumbBadges(picker, colorName) {
 }
 
 function selectColorThumb(imgEl, colorName) {
-    const index = Number(imgEl.dataset.index);
+    const key = imgEl.dataset.key;
     if (!Array.isArray(pdSelectedColors[colorName])) pdSelectedColors[colorName] = [];
 
-    const alreadySelected = pdSelectedColors[colorName].includes(index);
-    if (alreadySelected) {
-        pdSelectedColors[colorName] = pdSelectedColors[colorName].filter(i => i !== index);
+    if (pdSelectedColors[colorName].includes(key)) {
+        pdSelectedColors[colorName] = pdSelectedColors[colorName].filter(k => k !== key);
     } else {
-        pdSelectedColors[colorName].push(index);
+        pdSelectedColors[colorName].push(key);
     }
 
     const picker = imgEl.closest("[data-color-name]");
     if (picker) refreshColorThumbBadges(picker, colorName);
+}
+
+async function loadProductOptionsIntoForm(productId) {
+    try {
+        const [optRes, imgRes] = await Promise.all([
+            fetch(`${API_URL}/api/products/${productId}/options`),
+            fetch(`${API_URL}/api/products/${productId}/images`)
+        ]);
+        const opts = await optRes.json();
+        const images = await imgRes.json();
+
+        pdAllImages = images.map(im => ({ key: "id:" + im.id, url: im.image_path }));
+
+        pdSelectedColors = {};
+        (opts.colors || []).forEach(c => { pdSelectedColors[c.name] = []; });
+        images.forEach(im => {
+            if (!im.color_name) return;
+            if (!Array.isArray(pdSelectedColors[im.color_name])) pdSelectedColors[im.color_name] = [];
+            pdSelectedColors[im.color_name].push("id:" + im.id);
+        });
+
+        document.querySelectorAll("#color-checkbox-list input[type=checkbox]").forEach(cb => {
+            const on = Object.prototype.hasOwnProperty.call(pdSelectedColors, cb.value);
+            cb.checked = on;
+            const picker = cb.closest("div").querySelector(".pd-color-thumb-picker");
+            if (picker) {
+                picker.style.display = on ? "flex" : "none";
+                if (on) renderThumbOptions(picker);
+            }
+        });
+
+        pdSelectedSizes = (opts.sizes || []).map(s => s.name);
+        document.querySelectorAll("#size-checkbox-list input[type=checkbox]").forEach(cb => {
+            cb.checked = pdSelectedSizes.includes(cb.value);
+        });
+
+        const specsList = document.getElementById("specs-list");
+        if (specsList) {
+            specsList.innerHTML = "";
+            (opts.specs || []).forEach(sp => addSpecRow(sp.label, sp.value));
+        }
+    } catch (error) {
+        console.error("Load product options error:", error);
+    }
 }
 
 async function loadCategories() {
@@ -796,6 +840,7 @@ function renderImagePreviews(fileList) {
     preview.innerHTML = "";
 
     pdLocalPreviews = Array.from(fileList).map(f => URL.createObjectURL(f));
+    pdAllImages = pdAllImages.filter(im => im.key.startsWith("id:")).concat(Array.from(fileList).map((f, i) => ({ key: "new:" + i, url: URL.createObjectURL(f) })));
     document.querySelectorAll(".pd-color-thumb-picker").forEach(picker => renderThumbOptions(picker));
 
     Array.from(fileList).forEach(file => {
@@ -823,6 +868,7 @@ function openProductForm() {
     document.getElementById("variants-list").innerHTML = "";
     document.getElementById("specs-list").innerHTML = "";
     pdLocalPreviews = [];
+    pdAllImages = [];
     pdSelectedSizes = [];
     pdSelectedColors = {};
     document.querySelectorAll("#size-checkbox-list input[type=checkbox]").forEach(cb => cb.checked = false);
@@ -846,6 +892,7 @@ function editProduct(id) {
     document.getElementById("product-stock").value = product.stock;
     document.getElementById("variants-section").classList.remove("hidden");
     loadVariants(product.id);
+    loadProductOptionsIntoForm(product.id);
     document.getElementById("product-image").value = "";
     document.getElementById("product-image-preview").innerHTML = "";
     document.getElementById("product-form-error").textContent = "";
@@ -904,7 +951,7 @@ async function saveProduct() {
             .filter(name => Array.isArray(pdSelectedColors[name]) && pdSelectedColors[name].length > 0)
             .map(name => ({
                 name,
-                image_paths: pdSelectedColors[name].map(idx => returnedImages[idx]).filter(Boolean)
+                image_paths: pdSelectedColors[name].map(k => k.startsWith("new:") ? returnedImages[Number(k.slice(4))] : (pdAllImages.find(im => im.key === k) || {}).url).filter(Boolean)
             }));
 
         const specsPayload = collectSpecRows();
