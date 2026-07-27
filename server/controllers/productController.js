@@ -190,8 +190,8 @@ exports.saveProductOptions = async (req, res) => {
 
                 for (const [imgIndex, imgPath] of imagePaths.entries()) {
                     await pool.query(
-                        `UPDATE product_images SET color_id = $1 WHERE product_id = $2 AND image_path = $3`,
-                        [newColorId, id, imgPath]
+                        `UPDATE product_images SET color_id = $1, display_order = $4 WHERE product_id = $2 AND image_path = $3`,
+                        [newColorId, id, imgPath, imgIndex]
                     );
                 }
             }

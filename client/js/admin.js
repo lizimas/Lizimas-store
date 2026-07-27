@@ -594,8 +594,28 @@ function renderThumbOptions(picker) {
         return;
     }
     picker.innerHTML = pdLocalPreviews.map((url, i) => `
-        <img src="${url}" data-index="${i}" onclick="selectColorThumb(this, '${picker.dataset.colorName}')" style="width:48px; height:48px; object-fit:cover; border-radius:6px; border:2px solid #ccc; cursor:pointer;">
+        <span style="position:relative; display:inline-block; margin:2px;">
+            <img src="${url}" data-index="${i}" onclick="selectColorThumb(this, '${picker.dataset.colorName}')" style="width:48px; height:48px; object-fit:cover; border-radius:6px; border:2px solid #ccc; cursor:pointer; display:block;">
+            <span class="pd-pos-badge" data-index="${i}" style="position:absolute; top:-4px; right:-4px; min-width:16px; height:16px; line-height:16px; text-align:center; border-radius:8px; background:#ff6a00; color:#fff; font-size:11px; font-weight:700; display:none;"></span>
+        </span>
     `).join("");
+    refreshColorThumbBadges(picker, picker.dataset.colorName);
+}
+
+function refreshColorThumbBadges(picker, colorName) {
+    const order = Array.isArray(pdSelectedColors[colorName]) ? pdSelectedColors[colorName] : [];
+    picker.querySelectorAll("img[data-index]").forEach(img => {
+        const idx = Number(img.dataset.index);
+        const pos = order.indexOf(idx);
+        const badge = picker.querySelector('.pd-pos-badge[data-index="' + idx + '"]');
+        if (pos === -1) {
+            img.style.borderColor = "#ccc";
+            if (badge) badge.style.display = "none";
+        } else {
+            img.style.borderColor = "#ff6a00";
+            if (badge) { badge.textContent = pos + 1; badge.style.display = "block"; }
+        }
+    });
 }
 
 function selectColorThumb(imgEl, colorName) {
@@ -605,11 +625,12 @@ function selectColorThumb(imgEl, colorName) {
     const alreadySelected = pdSelectedColors[colorName].includes(index);
     if (alreadySelected) {
         pdSelectedColors[colorName] = pdSelectedColors[colorName].filter(i => i !== index);
-        imgEl.style.borderColor = "#ccc";
     } else {
         pdSelectedColors[colorName].push(index);
-        imgEl.style.borderColor = "#ff6a00";
     }
+
+    const picker = imgEl.closest("[data-color-name]");
+    if (picker) refreshColorThumbBadges(picker, colorName);
 }
 
 async function loadCategories() {
