@@ -182,9 +182,31 @@ exports.saveProductOptions = async (req, res) => {
                 const imagePaths = Array.isArray(colors[i].image_paths) ? colors[i].image_paths : [];
                 const representativeImage = imagePaths.length > 0 ? imagePaths[0] : (colors[i].image_path || null);
 
+                const rawColorName = String(colors[i].name || '').trim();
+                if (!rawColorName) continue;
+
+                // Resolve against the master colour catalogue; create it if new.
+                const findCatalog = `SELECT id, name FROM color_catalog WHERE lower(trim(name)) = lower(trim($1))`;
+                let catalogRow = (await pool.query(findCatalog, [rawColorName])).rows[0];
+
+                if (!catalogRow) {
+                    const inserted = await pool.query(
+                        `INSERT INTO color_catalog (name, display_order)
+                         VALUES (trim($1), (SELECT COALESCE(MAX(display_order), 0) + 1 FROM color_catalog))
+                         ON CONFLICT DO NOTHING
+                         RETURNING id, name`,
+                        [rawColorName]
+                    );
+                    catalogRow = inserted.rows[0]
+                        || (await pool.query(findCatalog, [rawColorName])).rows[0];
+                }
+
+                const catalogId = catalogRow ? catalogRow.id : null;
+                const canonicalName = catalogRow ? catalogRow.name : rawColorName;
+
                 const colorResult = await pool.query(
-                    `INSERT INTO product_colors (product_id, name, image_path, display_order) VALUES ($1, $2, $3, $4) RETURNING id`,
-                    [id, colors[i].name, representativeImage, i + 1]
+                    `INSERT INTO product_colors (product_id, name, image_path, display_order, color_id) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+                    [id, canonicalName, representativeImage, i + 1, catalogId]
                 );
                 const newColorId = colorResult.rows[0].id;
 

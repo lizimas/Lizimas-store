@@ -306,11 +306,27 @@ Cash on Delivery
                 <p id="modal-selected-variant" class="modal-variant-label"></p>
                 <div id="modal-product-rating"></div>
                 <div id="modal-product-price"></div>
-                <p id="modal-product-description"></p>
                 <button id="modal-add-to-cart-btn" class="add-to-cart-btn">Add To Cart 🛒</button>
+                <div id="modal-reviews-section" class="modal-section"></div>
+                <div id="modal-description-section" class="modal-section">
+                  <h3 class="modal-section-title">Description</h3>
+                  <p id="modal-product-description"></p>
+                </div>
+                <div id="modal-specs-section" class="modal-section"></div>
             </div>
         </div>
     </div>
+</div>
+
+<div id="pd-sheet" class="pd-sheet hidden">
+  <div class="pd-sheet-backdrop" onclick="closeAllDetails()"></div>
+  <div class="pd-sheet-panel">
+    <div class="pd-sheet-head">
+      <h3>Product details</h3>
+      <button type="button" class="pd-sheet-close" onclick="closeAllDetails()">&times;</button>
+    </div>
+    <div id="pd-sheet-body" class="pd-sheet-body"></div>
+  </div>
 </div>
 
 <script src="js/api.js"></script>

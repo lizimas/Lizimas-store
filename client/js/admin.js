@@ -844,13 +844,9 @@ function renderImagePreviews(fileList) {
     document.querySelectorAll(".pd-color-thumb-picker").forEach(picker => renderThumbOptions(picker));
 
     Array.from(fileList).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = document.createElement("img");
-            img.src = e.target.result;
-            preview.appendChild(img);
-        };
-        reader.readAsDataURL(file);
+        const img = document.createElement("img");
+        img.src = URL.createObjectURL(file);
+        preview.appendChild(img);
     });
 }
 
@@ -892,7 +888,6 @@ function editProduct(id) {
     document.getElementById("product-stock").value = product.stock;
     document.getElementById("variants-section").classList.remove("hidden");
     loadVariants(product.id);
-    loadProductOptionsIntoForm(product.id);
     loadProductOptionsIntoForm(product.id);
     document.getElementById("product-image").value = "";
     document.getElementById("product-image-preview").innerHTML = "";
@@ -949,7 +944,6 @@ async function saveProduct() {
         const returnedImages = result.images || [];
 
         const colorsPayload = Object.keys(pdSelectedColors)
-            .filter(name => Array.isArray(pdSelectedColors[name]) && pdSelectedColors[name].length > 0)
             .map(name => ({
                 name,
                 image_paths: pdSelectedColors[name].map(k => k.startsWith("new:") ? returnedImages[Number(k.slice(4))] : (pdAllImages.find(im => im.key === k) || {}).url).filter(Boolean)

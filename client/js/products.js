@@ -295,6 +295,8 @@ async function openProductModal(productId) {
     document.getElementById("modal-product-name").textContent = product.name;
     document.getElementById("modal-product-rating").innerHTML = buildRatingStars(product.rating);
     document.getElementById("modal-product-description").textContent = product.description || "";
+    renderProductExtras(productId, product);
+    renderProductReviews(productId);
 
     const mainImage = document.getElementById("modal-main-image");
     const priceEl = document.getElementById("modal-product-price");
@@ -629,4 +631,260 @@ function closeProductModal() {
         return;
     }
     document.getElementById("product-modal").classList.add("hidden");
+}
+
+
+const ATTR_LABELS = {
+    material: "Material",
+    color: "Color",
+    sleeve: "Sleeve",
+    style: "Style",
+    length: "Length",
+    fit: "Fit",
+    pattern: "Pattern",
+    occasion: "Occasion",
+    care_instructions: "Care Instructions",
+    product_weight_kg: "Weight (kg)",
+    package_size: "Package Size"
+};
+
+async function renderProductExtras(productId, product) {
+    const descSection = document.getElementById("modal-description-section");
+    const specsSection = document.getElementById("modal-specs-section");
+    if (!specsSection) return;
+
+    if (descSection) {
+        const text = (product.description || "").trim();
+        descSection.style.display = text ? "" : "none";
+    }
+
+    let detail = product;
+    let specs = [];
+    let sizes = [];
+
+    try {
+        const r = await fetch(`${API_URL}/api/products/${productId}`);
+        if (r.ok) {
+            const d = await r.json();
+            if (d && typeof d === "object") detail = Object.assign({}, product, d);
+        }
+    } catch (e) {
+        console.error("Could not load product detail:", e);
+    }
+
+    try {
+        const r = await fetch(`${API_URL}/api/products/${productId}/options`);
+        if (r.ok) {
+            const d = await r.json();
+            if (d && Array.isArray(d.specs)) specs = d.specs;
+            if (d && Array.isArray(d.sizes)) sizes = d.sizes;
+        }
+    } catch (e) {
+        console.error("Could not load product specs:", e);
+    }
+
+    const rows = [];
+    Object.keys(ATTR_LABELS).forEach(key => {
+        const val = detail[key];
+        if (val !== null && val !== undefined && String(val).trim() !== "") {
+            rows.push([ATTR_LABELS[key], String(val).trim()]);
+        }
+    });
+    specs.forEach(s => {
+        if (s.label && s.value) rows.push([String(s.label), String(s.value)]);
+    });
+
+    if (rows.length === 0) {
+        specsSection.style.display = "none";
+        specsSection.innerHTML = "";
+        return;
+    }
+
+    specsSection.style.display = "";
+
+    const preview = rows.slice(0, 3).map(r =>
+        '<div class="pd-cell">' +
+            '<div class="pd-cell-label">' + escapeHtml(r[0]) + '</div>' +
+            '<div class="pd-cell-value">' + escapeHtml(r[1]) + '</div>' +
+        '</div>'
+    ).join('');
+
+    const sizeLabels = sizes
+        .map(x => x.label || x.name || x.size || x.size_label || '')
+        .filter(Boolean).join(', ');
+
+    const sizeRow = sizeLabels
+        ? '<button type="button" class="pd-size-guide" onclick="openSizeGuide()">' +
+              '<span>&#128207; Size guide</span>' +
+              '<span>' + escapeHtml(sizeLabels) + ' &rsaquo;</span>' +
+          '</button>'
+        : '';
+
+    specsSection.innerHTML =
+        '<div class="pd-card">' +
+            '<div class="pd-head">' +
+                '<h3 class="pd-title">Product details</h3>' +
+                '<div class="pd-actions">' +
+                    '<button type="button" class="pd-action" onclick="toggleSaveProduct(' + productId + ')">&#9825; Save</button>' +
+                    '<span class="pd-sep"></span>' +
+                    '<button type="button" class="pd-action" onclick="reportProduct(' + productId + ')">&#9998; Report</button>' +
+                '</div>' +
+            '</div>' +
+            '<div class="pd-grid">' + preview + '</div>' +
+            '<button type="button" class="pd-see-all" onclick="openAllDetails()">See all details &rsaquo;</button>' +
+            sizeRow +
+        '</div>';
+
+    const full = rows.map(r =>
+        '<tr><th>' + escapeHtml(r[0]) + '</th><td>' + escapeHtml(r[1]) + '</td></tr>'
+    ).join('');
+    const sheetBody = document.getElementById("pd-sheet-body");
+    if (sheetBody) {
+        sheetBody.innerHTML = '<table class="modal-specs-table"><tbody>' + full + '</tbody></table>';
+    }
+}
+
+function openAllDetails() {
+    const el = document.getElementById("pd-sheet");
+    if (el) el.classList.remove("hidden");
+}
+
+function closeAllDetails() {
+    const el = document.getElementById("pd-sheet");
+    if (el) el.classList.add("hidden");
+}
+
+function openSizeGuide() {
+    openAllDetails();
+}
+
+function toggleSaveProduct(productId) {
+    try {
+        const list = JSON.parse(localStorage.getItem("savedProducts") || "[]");
+        const i = list.indexOf(productId);
+        if (i === -1) { list.push(productId); alert("Saved to your list"); }
+        else { list.splice(i, 1); alert("Removed from your list"); }
+        localStorage.setItem("savedProducts", JSON.stringify(list));
+    } catch (e) {
+        console.error("Save failed:", e);
+    }
+}
+
+function reportProduct(productId) {
+    alert("Thanks - this product has been flagged for review.");
+}
+
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
+function starRow(n) {
+    let out = "";
+    for (let i = 1; i <= 5; i++) out += i <= n ? "\u2605" : "\u2606";
+    return out;
+}
+
+async function renderProductReviews(productId) {
+    const box = document.getElementById("modal-reviews-section");
+    if (!box) return;
+    box.innerHTML = '<h3 class="modal-section-title">Customer Reviews</h3><p class="reviews-empty">Loading...</p>';
+
+    let data = null;
+    try {
+        const r = await fetch(`${API_URL}/api/reviews/product/${productId}`);
+        if (r.ok) data = await r.json();
+    } catch (e) {
+        console.error("Could not load reviews:", e);
+    }
+
+    if (!data) {
+        box.innerHTML = '<h3 class="modal-section-title">Customer Reviews</h3><p class="reviews-empty">Reviews unavailable.</p>';
+        return;
+    }
+
+    const s = data.summary || {};
+    const total = Number(s.total) || 0;
+    const avg = Number(s.average) || 0;
+
+    const ratingEl = document.getElementById("modal-product-rating");
+    if (ratingEl) {
+        ratingEl.innerHTML = total
+            ? '<span class="rating-stars">' + starRow(Math.round(avg)) + '</span> <span class="rating-count">' + avg + ' (' + total + ')</span>'
+            : '<span class="rating-count">No ratings yet</span>';
+    }
+
+    let html = '<h3 class="modal-section-title">Customer Reviews</h3>';
+
+    if (total === 0) {
+        html += '<p class="reviews-empty">No reviews yet. Be the first to review this product.</p>';
+    } else {
+        html += '<div class="reviews-summary"><div class="reviews-avg">' + avg + '<small>/5</small></div><div class="reviews-bars">';
+        [["five",5],["four",4],["three",3],["two",2],["one",1]].forEach(function (pair) {
+            const c = Number(s[pair[0]]) || 0;
+            const pct = total ? Math.round((c / total) * 100) : 0;
+            html += '<div class="reviews-bar-row"><span>' + pair[1] + '\u2605</span><div class="reviews-bar"><i style="width:' + pct + '%"></i></div><span>' + c + '</span></div>';
+        });
+        html += '</div></div>';
+
+        html += '<ul class="reviews-list">';
+        (data.reviews || []).forEach(function (rv) {
+            const when = rv.created_at ? new Date(rv.created_at).toLocaleDateString() : "";
+            const badge = rv.verified_purchase ? '<span class="verified-badge">Verified Purchase</span>' : "";
+            html += '<li class="review-item"><div class="review-head"><span class="review-stars">' + starRow(rv.rating) + '</span><span class="review-author">' + escapeHtml(rv.reviewer_name || "Customer") + '</span>' + badge + '</div>';
+            if (rv.comment) html += '<p class="review-body">' + escapeHtml(rv.comment) + '</p>';
+            html += '<span class="review-date">' + when + '</span></li>';
+        });
+        html += '</ul>';
+    }
+
+    if (localStorage.getItem("userToken")) {
+        html += '<div class="review-form"><h4>Write a review</h4>' +
+            '<div class="star-picker" id="review-star-picker">' +
+            '<span data-v="1">\u2606</span><span data-v="2">\u2606</span><span data-v="3">\u2606</span><span data-v="4">\u2606</span><span data-v="5">\u2606</span>' +
+            '</div>' +
+            '<textarea id="review-comment" rows="3" placeholder="Share your thoughts..."></textarea>' +
+            '<button type="button" id="review-submit-btn" class="add-to-cart-btn">Submit Review</button>' +
+            '<p class="review-msg" id="review-msg"></p></div>';
+    } else {
+        html += '<p class="reviews-empty">Log in to write a review.</p>';
+    }
+
+    box.innerHTML = html;
+
+    const picker = document.getElementById("review-star-picker");
+    if (!picker) return;
+    let chosen = 0;
+    picker.querySelectorAll("span").forEach(function (el) {
+        el.onclick = function () {
+            chosen = Number(el.dataset.v);
+            picker.querySelectorAll("span").forEach(function (x) {
+                x.textContent = Number(x.dataset.v) <= chosen ? "\u2605" : "\u2606";
+            });
+        };
+    });
+
+    document.getElementById("review-submit-btn").onclick = async function () {
+        const msg = document.getElementById("review-msg");
+        if (!chosen) { msg.textContent = "Please pick a star rating."; return; }
+        msg.textContent = "Submitting...";
+        try {
+            const r = await fetch(`${API_URL}/api/reviews/product/${productId}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + localStorage.getItem("userToken")
+                },
+                body: JSON.stringify({ rating: chosen, comment: document.getElementById("review-comment").value })
+            });
+            const out = await r.json();
+            if (!r.ok) { msg.textContent = out.error || "Could not submit."; return; }
+            renderProductReviews(productId);
+        } catch (e) {
+            msg.textContent = "Network error.";
+        }
+    };
 }
