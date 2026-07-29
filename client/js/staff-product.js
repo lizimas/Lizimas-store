@@ -109,11 +109,27 @@ function collectSpecRows() {
     });
     return specs;
 }
+let pdPickedFiles = [];
 let pdSelectedSizes = [];
 let pdSelectedColors = {};
 
-function handleImagePreview(e) {
-    pdLocalPreviews = Array.from(e.target.files).map(file => URL.createObjectURL(file));
+async function handleImagePreview(e) {
+    const files = Array.from(e.target.files);
+    const btn = document.getElementById("product-submit-btn");
+    if (btn) btn.disabled = true;
+    pdPickedFiles = [];
+    const failed = [];
+    for (const f of files) {
+        if (typeof preparePickedFile !== "function") { pdPickedFiles.push(f); continue; }
+        const r = await preparePickedFile(f);
+        if (r.ok) pdPickedFiles.push(r.file); else failed.push(r.name + " (" + r.reason + ")");
+    }
+    if (btn) btn.disabled = false;
+    const statusEl = document.getElementById("product-form-status");
+    if (statusEl && failed.length) statusEl.textContent =
+        failed.length + " photo(s) could not be read and were skipped: " + failed.join(", ")
+        + ". Re-select them, or pick from Files rather than a cloud gallery.";
+    pdLocalPreviews = pdPickedFiles.map(file => URL.createObjectURL(file));
     document.querySelectorAll(".pd-color-thumb-picker").forEach(picker => renderThumbOptions(picker));
 }
 
@@ -267,6 +283,7 @@ function resetProductForm() {
     document.getElementById("product-price").value = "";
     document.getElementById("product-stock").value = "";
     document.getElementById("product-image").value = "";
+    pdPickedFiles = [];
     document.getElementById("specs-list").innerHTML = "";
     document.getElementById("product-form-title").textContent = "Add Product";
     document.getElementById("product-submit-btn").textContent = "Submit for Approval";
@@ -287,7 +304,7 @@ async function submitProductForm() {
     const description = document.getElementById("product-description").value.trim();
     const price = document.getElementById("product-price").value;
     const stock = document.getElementById("product-stock").value;
-    const imageFiles = document.getElementById("product-image").files;
+    const imageFiles = pdPickedFiles;
     const statusEl = document.getElementById("product-form-status");
     const submitBtn = document.getElementById("product-submit-btn");
 

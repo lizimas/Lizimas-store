@@ -65,7 +65,14 @@ exports.addProduct = async (req, res) => {
 exports.getProducts = async (req, res) => {
     try {
         const products = await pool.query(
-            `SELECT products.*, categories.name AS category
+            `SELECT products.*, categories.name AS category,
+                    COALESCE(
+                      (SELECT pi.image_path FROM product_images pi
+                       WHERE pi.product_id = products.id
+                       ORDER BY COALESCE(pi.display_order, 999999) ASC, pi.id ASC
+                       LIMIT 1),
+                      products.image
+                    ) AS card_image
              FROM products
              LEFT JOIN categories ON products.category_id = categories.id
              WHERE products.status = 'approved' AND products.deleted_at IS NULL
@@ -123,7 +130,7 @@ exports.getProductImages = async (req, res) => {
             `SELECT product_images.*, product_colors.name AS color_name FROM product_images
              LEFT JOIN product_colors ON product_images.color_id = product_colors.id
              WHERE product_images.product_id = $1
-             ORDER BY COALESCE(product_colors.display_order, 999999) ASC, COALESCE(product_images.display_order, 999999) ASC, product_images.id ASC`,
+             ORDER BY COALESCE(product_images.display_order, 999999) ASC, product_images.id ASC`,
             [id]
         );
 
@@ -212,8 +219,8 @@ exports.saveProductOptions = async (req, res) => {
 
                 for (const [imgIndex, imgPath] of imagePaths.entries()) {
                     await pool.query(
-                        `UPDATE product_images SET color_id = $1, display_order = $4 WHERE product_id = $2 AND image_path = $3`,
-                        [newColorId, id, imgPath, imgIndex]
+                        `UPDATE product_images SET color_id = $1 WHERE product_id = $2 AND image_path = $3`,
+                        [newColorId, id, imgPath]
                     );
                 }
             }
@@ -588,5 +595,48 @@ exports.permanentlyDeleteProduct = async (req, res) => {
         }
         console.error("Permanent delete error:", error);
         res.status(500).json({ error: "Something went wrong." });
+    }
+};
+
+// Reorder a product's images. Body: { imageIds: [12, 8, 30, ...] } in desired order.
+exports.updateImageOrder = async (req, res) => {
+    const { id } = req.params;
+    const { imageIds } = req.body;
+
+    if (!Array.isArray(imageIds) || imageIds.length === 0) {
+        return res.status(400).json({ error: "imageIds must be a non-empty array" });
+    }
+    const ids = imageIds.map(Number);
+    if (ids.some((n) => !Number.isInteger(n))) {
+        return res.status(400).json({ error: "imageIds must contain integers only" });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        const owned = await client.query(
+            "SELECT id FROM product_images WHERE product_id = $1 AND id = ANY($2::int[])",
+            [id, ids]
+        );
+        if (owned.rows.length !== ids.length) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ error: "One or more image IDs do not belong to this product" });
+        }
+
+        for (let i = 0; i < ids.length; i++) {
+            await client.query(
+                "UPDATE product_images SET display_order = $1 WHERE id = $2 AND product_id = $3",
+                [i, ids[i], id]
+            );
+        }
+
+        await client.query("COMMIT");
+        res.json({ success: true, updated: ids.length });
+    } catch (error) {
+        await client.query("ROLLBACK");
+        res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
     }
 };

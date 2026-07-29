@@ -6,6 +6,7 @@ const {
     getProducts,
     getProductById,
     getProductImages,
+    updateImageOrder,
     getProductOptions,
     getSizeCatalog,
     getColorCatalog,
@@ -35,6 +36,7 @@ router.get("/:id", getProductById);
 router.post("/", requireAuth, requireStaffOrAdmin, upload.array("images", 20), addProduct);
 router.put("/:id", requireAuth, requireStaffOrAdmin, upload.array("images", 20), updateProduct);
 router.delete("/:id", requireAuth, requireStaffOrAdmin, deleteProduct);
+router.patch("/:id/images/order", requireAuth, requireStaffOrAdmin, updateImageOrder);
 router.delete("/images/:imageId", requireAuth, requireStaffOrAdmin, deleteProductImage);
 
 module.exports = router;

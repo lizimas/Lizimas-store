@@ -96,7 +96,7 @@ function displayProducts(products) {
             <div class="product-image-wrapper">
                 ${buildBadge(product)}
                 <img
-                    src="${product.image}"
+                    src="${product.card_image || product.image}"
                     alt="${product.name}"
                     class="product-image"
                     loading="lazy"
@@ -241,7 +241,7 @@ function displayFeaturedProducts(products, limit = 8) {
             <div class="product-image-wrapper">
                 ${buildBadge(product)}
                 <img
-                    src="${product.image}"
+                    src="${product.card_image || product.image}"
                     alt="${product.name}"
                     class="product-image"
                     loading="lazy"

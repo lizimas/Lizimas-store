@@ -644,6 +644,7 @@ async function loadProductOptionsIntoForm(productId) {
         const images = await imgRes.json();
 
         pdAllImages = images.map(im => ({ key: "id:" + im.id, url: im.image_path }));
+        renderPhotoOrderList();
 
         pdSelectedColors = {};
         (opts.colors || []).forEach(c => { pdSelectedColors[c.name] = []; });
@@ -835,60 +836,6 @@ function setupProductImageDropzone() {
     });
 }
 
-// Single preparation path for every image source (gallery, files, camera, drop).
-// Forces the provider to deliver real bytes now rather than at upload time.
-async function preparePickedFile(file, attempt) {
-    attempt = attempt || 1;
-    try {
-        const buf = await file.arrayBuffer();
-
-        // Guard 1: short read. Cheap, but the provider reports both numbers,
-        // so a consistently wrong provider can still pass this.
-        if (buf.byteLength !== file.size) throw new Error("size mismatch");
-        const bytes = new Uint8Array(buf);
-        if (bytes.length < 12) throw new Error("file too small");
-
-        // Guard 2: trailing marker. This is what actually catches truncation.
-        const isJpeg = bytes[0] === 0xFF && bytes[1] === 0xD8;
-        const isPng = bytes[0] === 0x89 && bytes[1] === 0x50;
-        if (isJpeg) {
-            // FFD9 need not be the final bytes: EXIF, thumbnails and padding
-            // legitimately follow it. Scan backwards for the marker instead.
-            let hasEoi = false;
-            const scanFrom = Math.max(0, bytes.length - 4096);
-            for (let i = bytes.length - 2; i >= scanFrom; i--) {
-                if (bytes[i] === 0xFF && bytes[i + 1] === 0xD9) { hasEoi = true; break; }
-            }
-            if (!hasEoi) throw new Error("truncated JPEG");
-        } else if (isPng) {
-            const iend = [0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82];
-            for (let i = 0; i < 8; i++) {
-                if (bytes[bytes.length - 8 + i] !== iend[i]) throw new Error("truncated PNG");
-            }
-        }
-        // Other formats (webp, heic) skip the marker check and rely on decode.
-
-        // Guard 3: decode. Proves the bytes are a parseable image.
-        const blob = new Blob([buf], { type: file.type || "image/jpeg" });
-        const bmp = await createImageBitmap(blob);
-        const w = bmp.width, h = bmp.height;
-        bmp.close();
-        if (!w || !h) throw new Error("decode produced no dimensions");
-
-        return {
-            ok: true,
-            file: new File([blob], file.name, { type: blob.type, lastModified: file.lastModified })
-        };
-    } catch (err) {
-        if (attempt === 1) {
-            // Delay before retry: an immediate retry hits the same cold cache.
-            await new Promise(r => setTimeout(r, 300));
-            return preparePickedFile(file, 2);
-        }
-        return { ok: false, name: file.name, reason: err.message };
-    }
-}
-
 async function renderImagePreviews(fileList) {
     const preview = document.getElementById("product-image-preview");
     if (!preview) return;
@@ -959,6 +906,7 @@ function openProductForm() {
     document.getElementById("specs-list").innerHTML = "";
     pdLocalPreviews = [];
     pdAllImages = [];
+    const _po = document.getElementById("pd-photo-order"); if (_po) _po.remove();
     pdSelectedSizes = [];
     pdSelectedColors = {};
     document.querySelectorAll("#size-checkbox-list input[type=checkbox]").forEach(cb => cb.checked = false);
@@ -2357,3 +2305,63 @@ document.addEventListener("click", (e) => {
         dropdown.style.display = "none";
     }
 });
+
+// ---- Stored photo order (edit mode only; new picks have no id yet) ----
+function renderPhotoOrderList() {
+    const preview = document.getElementById("product-image-preview");
+    if (!preview) return;
+    let block = document.getElementById("pd-photo-order");
+    const stored = pdAllImages.filter(im => im.key.startsWith("id:"));
+    if (stored.length < 2) { if (block) block.remove(); return; }
+    if (!block) {
+        block = document.createElement("div");
+        block.id = "pd-photo-order";
+        block.style.cssText = "width:100%; margin-bottom:10px;";
+        preview.parentNode.insertBefore(block, preview);
+    }
+    block.innerHTML =
+        '<div style="font-size:12px;font-weight:700;color:#444;margin-bottom:6px;">Photo order</div>' +
+        stored.map((im, i) =>
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">' +
+            '<span style="min-width:18px;font-size:12px;color:#666;">' + (i + 1) + '</span>' +
+            '<img src="' + im.url + '" style="width:40px;height:40px;object-fit:cover;border-radius:4px;">' +
+            '<button type="button" onclick="movePhotoOrder(' + i + ',-1)" ' + (i === 0 ? 'disabled' : '') + ' style="padding:6px 12px;">&uarr;</button>' +
+            '<button type="button" onclick="movePhotoOrder(' + i + ',1)" ' + (i === stored.length - 1 ? 'disabled' : '') + ' style="padding:6px 12px;">&darr;</button>' +
+            '</div>'
+        ).join("") +
+        '<button type="button" onclick="savePhotoOrder()" style="margin-top:6px;padding:6px 14px;background:#ff6a00;color:#fff;border:none;border-radius:4px;">Save order</button>' +
+        '<span id="pd-photo-order-status" style="margin-left:8px;font-size:12px;color:#666;"></span>';
+}
+
+function movePhotoOrder(index, delta) {
+    const stored = pdAllImages.filter(im => im.key.startsWith("id:"));
+    const rest = pdAllImages.filter(im => !im.key.startsWith("id:"));
+    const target = index + delta;
+    if (target < 0 || target >= stored.length) return;
+    const tmp = stored[index];
+    stored[index] = stored[target];
+    stored[target] = tmp;
+    pdAllImages = stored.concat(rest);
+    renderPhotoOrderList();
+    document.querySelectorAll(".pd-color-thumb-picker").forEach(p => renderThumbOptions(p));
+}
+
+async function savePhotoOrder() {
+    const productId = document.getElementById("product-id").value;
+    const status = document.getElementById("pd-photo-order-status");
+    if (!productId) { if (status) status.textContent = "Save the product first."; return; }
+    const imageIds = pdAllImages
+        .filter(im => im.key.startsWith("id:"))
+        .map(im => Number(im.key.slice(3)));
+    if (status) status.textContent = "Saving...";
+    try {
+        const res = await authorizedFetch("/api/products/" + productId + "/images/order", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageIds: imageIds })
+        });
+        if (status) status.textContent = (res && res.success) ? "Order saved." : "Unexpected response.";
+    } catch (e) {
+        if (status) status.textContent = "Failed: " + e.message;
+    }
+}

@@ -77,6 +77,7 @@ async function init() {
     await loadMyProducts();
 }
 
+let pdPickedFiles = [];
 let pdLocalPreviews = [];
 let pdSpecRowCounter = 0;
 
@@ -335,22 +336,46 @@ function setupProductImageDropzone() {
     });
 }
 
-function renderImagePreviews(fileList) {
+async function renderImagePreviews(fileList) {
     const preview = document.getElementById("product-image-preview");
     if (!preview) return;
     preview.innerHTML = "";
 
-    pdLocalPreviews = Array.from(fileList).map(f => URL.createObjectURL(f));
+    const files = Array.from(fileList);
+    const btn = document.getElementById("product-submit-btn");
+    if (btn) btn.disabled = true;
+    pdPickedFiles = [];
+    const failed = [];
+
+    const status = document.createElement("div");
+    status.style.cssText = "font-size:12px; color:#666; width:100%;";
+    preview.appendChild(status);
+
+    for (let i = 0; i < files.length; i++) {
+        status.textContent = "Preparing photo " + (i + 1) + " of " + files.length + "...";
+        if (typeof preparePickedFile !== "function") { pdPickedFiles.push(files[i]); continue; }
+        const r = await preparePickedFile(files[i]);
+        if (r.ok) pdPickedFiles.push(r.file); else failed.push(r.name + " (" + r.reason + ")");
+    }
+
+    if (btn) btn.disabled = false;
+    preview.innerHTML = "";
+
+    if (failed.length) {
+        const warn = document.createElement("div");
+        warn.style.cssText = "color:#c0392b; font-size:12px; width:100%; margin-bottom:6px;";
+        warn.textContent = failed.length + " photo(s) could not be read and were skipped: "
+            + failed.join(", ") + ". Re-select them, or pick from Files rather than a cloud gallery.";
+        preview.appendChild(warn);
+    }
+
+    pdLocalPreviews = pdPickedFiles.map(f => URL.createObjectURL(f));
     document.querySelectorAll(".pd-color-thumb-picker").forEach(picker => renderThumbOptions(picker));
 
-    Array.from(fileList).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = document.createElement("img");
-            img.src = e.target.result;
-            preview.appendChild(img);
-        };
-        reader.readAsDataURL(file);
+    pdLocalPreviews.forEach(url => {
+        const img = document.createElement("img");
+        img.src = url;
+        preview.appendChild(img);
     });
 }
 
@@ -374,6 +399,7 @@ function resetProductForm() {
     document.getElementById("product-price").value = "";
     document.getElementById("product-stock").value = "";
     document.getElementById("product-image").value = "";
+    pdPickedFiles = [];
     document.getElementById("product-image-preview").innerHTML = "";
     document.getElementById("specs-list").innerHTML = "";
     document.getElementById("product-form-title").textContent = "Add Product";
@@ -395,7 +421,7 @@ async function submitProductForm() {
     const description = document.getElementById("product-description").value.trim();
     const price = document.getElementById("product-price").value;
     const stock = document.getElementById("product-stock").value;
-    const imageFiles = document.getElementById("product-image").files;
+    const imageFiles = pdPickedFiles;
     const statusEl = document.getElementById("product-form-status");
     const submitBtn = document.getElementById("product-submit-btn");
 
