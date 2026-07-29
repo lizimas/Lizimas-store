@@ -61,28 +61,47 @@ async function loadGallery(id, product) {
         console.error("Failed to load gallery images", err);
     }
 
-    const imagePaths = images.length > 0
-        ? images.map(img => img.image_path)
-        : [product.image];
-
-    pdGalleryImages = imagePaths;
+    pdImageRecords = images;
     pdGalleryAlt = product.name || "";
+    pdGalleryCounter = counter;
+    pdGalleryFallback = product.image;
 
-    imagePaths.forEach((src, index) => {
-        const img = document.createElement("img");
-        img.src = src || "";
-        img.alt = product.name || "";
-        img.onclick = () => openFullscreenViewer(index);
-        scrollContainer.appendChild(img);
-    });
+    renderGallery(null);
 
-    counter.textContent = `1/${imagePaths.length}`;
     counter.onclick = () => openFullscreenViewer(getCurrentGalleryIndex());
 
     scrollContainer.onscroll = () => {
         const index = getCurrentGalleryIndex();
-        counter.textContent = `${index + 1}/${imagePaths.length}`;
+        counter.textContent = `${index + 1}/${pdGalleryImages.length}`;
+        syncColorToIndex(index);
     };
+}
+
+function renderGallery() {
+    const scrollContainer = document.getElementById("pd-gallery-scroll");
+    if (!scrollContainer) return;
+
+    const subset = pdImageRecords;
+
+    const imagePaths = subset.length > 0
+        ? subset.map(img => img.image_path)
+        : [pdGalleryFallback];
+
+    pdGalleryImages = imagePaths;
+
+    scrollContainer.innerHTML = "";
+    imagePaths.forEach((src, index) => {
+        const img = document.createElement("img");
+        img.src = src || "";
+        img.alt = pdGalleryAlt;
+        img.onclick = () => openFullscreenViewer(index);
+        scrollContainer.appendChild(img);
+    });
+
+    scrollContainer.scrollLeft = 0;
+    if (pdGalleryCounter) {
+        pdGalleryCounter.textContent = `1/${imagePaths.length}`;
+    }
 }
 
 function getCurrentGalleryIndex() {
@@ -91,8 +110,40 @@ function getCurrentGalleryIndex() {
 }
 
 let pdGalleryImages = [];
+let pdImageRecords = [];
+let pdGalleryCounter = null;
+let pdGalleryFallback = null;
 let pdGalleryAlt = "";
 let pdTouchStartY = 0;
+let pdLastSyncedIndex = -1;
+
+function applyColorSelection(colorId, colorName) {
+    pdSelectedColorId = (colorId === null || colorId === undefined)
+        ? null
+        : Number(colorId);
+    pdSelectedColorName = colorName || null;
+    document.querySelectorAll(".pd-color-swatch").forEach(el => {
+        el.classList.toggle(
+            "selected",
+            Number(el.dataset.colorId) === pdSelectedColorId
+        );
+    });
+    const nameEl = document.getElementById("pd-selected-color-name");
+    if (nameEl) {
+        nameEl.textContent = pdSelectedColorName ? `: ${pdSelectedColorName}` : "";
+    }
+    updateSizeAvailability();
+}
+
+function syncColorToIndex(index) {
+    if (index === pdLastSyncedIndex) return;
+    pdLastSyncedIndex = index;
+    const record = pdImageRecords[index];
+    if (!record) return;
+    if (record.color_id === null || record.color_id === undefined) return;
+    if (Number(record.color_id) === pdSelectedColorId) return;
+    applyColorSelection(record.color_id, record.color_name);
+}
 
 function openFullscreenViewer(startIndex) {
     const viewer = document.getElementById("pd-fullscreen-viewer");
@@ -234,19 +285,21 @@ async function loadOptions(id, product) {
 }
 
 function selectColor(colorId, imagePath, colorName) {
-    pdSelectedColorId = colorId;
-    pdSelectedColorName = colorName || null;
-    document.querySelectorAll(".pd-color-swatch").forEach(el => {
-        el.classList.toggle("selected", Number(el.dataset.colorId) === colorId);
-    });
-    const nameEl = document.getElementById("pd-selected-color-name");
-    if (nameEl) nameEl.textContent = colorName ? `: ${colorName}` : "";
-    if (imagePath) {
-        const scrollContainer = document.getElementById("pd-gallery-scroll");
-        const firstImg = scrollContainer.querySelector("img");
-        if (firstImg) firstImg.src = imagePath;
+    applyColorSelection(colorId, colorName);
+
+    const scrollContainer = document.getElementById("pd-gallery-scroll");
+    if (!scrollContainer) return;
+
+    const target = pdImageRecords.findIndex(
+        img => Number(img.color_id) === Number(colorId)
+    );
+    if (target >= 0) {
+        pdLastSyncedIndex = target;
+        scrollContainer.scrollTo({
+            left: target * scrollContainer.clientWidth,
+            behavior: "smooth"
+        });
     }
-    updateSizeAvailability();
 }
 
 function selectSize(sizeId) {
@@ -259,6 +312,8 @@ function selectSize(sizeId) {
 }
 
 function updateSizeAvailability() {
+    let clearedSize = false;
+
     document.querySelectorAll(".pd-size-btn").forEach(btn => {
         const sizeId = Number(btn.dataset.sizeId);
         const variant = pdVariants.find(v =>
@@ -266,7 +321,14 @@ function updateSizeAvailability() {
         );
         const outOfStock = variant && Number(variant.stock) <= 0;
         btn.classList.toggle("disabled", !!outOfStock);
+
+        if (outOfStock && Number(pdSelectedSizeId) === sizeId) {
+            btn.classList.remove("selected");
+            clearedSize = true;
+        }
     });
+
+    if (clearedSize) pdSelectedSizeId = null;
 }
 
 function pdEscape(str) {
