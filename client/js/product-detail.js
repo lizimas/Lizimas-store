@@ -314,15 +314,21 @@ function selectSize(sizeId) {
 function updateSizeAvailability() {
     let clearedSize = false;
 
+    const strict = pdVariants.length > 0;
+
     document.querySelectorAll(".pd-size-btn").forEach(btn => {
         const sizeId = Number(btn.dataset.sizeId);
         const variant = pdVariants.find(v =>
             v.size_id === sizeId && (pdSelectedColorId === null || v.color_id === pdSelectedColorId)
         );
-        const outOfStock = variant && Number(variant.stock) <= 0;
-        btn.classList.toggle("disabled", !!outOfStock);
 
-        if (outOfStock && Number(pdSelectedSizeId) === sizeId) {
+        const unavailable = strict
+            ? (!variant || Number(variant.stock) <= 0)
+            : (variant && Number(variant.stock) <= 0);
+
+        btn.classList.toggle("disabled", !!unavailable);
+
+        if (unavailable && Number(pdSelectedSizeId) === sizeId) {
             btn.classList.remove("selected");
             clearedSize = true;
         }
