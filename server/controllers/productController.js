@@ -41,11 +41,13 @@ exports.addProduct = async (req, res) => {
 
         const newProduct = product.rows[0];
 
+        const imageRecords = [];
         for (const [imgIndex, imgPath] of imagePaths.entries()) {
-            await pool.query(
-                `INSERT INTO product_images (product_id, image_path, display_order) VALUES ($1, $2, $3)`,
+            const ins = await pool.query(
+                `INSERT INTO product_images (product_id, image_path, display_order) VALUES ($1, $2, $3) RETURNING id, image_path`,
                 [newProduct.id, imgPath, imgIndex]
             );
+            imageRecords.push(ins.rows[0]);
         }
 
         logActivity(req.user.userId, "added_product", "product", newProduct.id, `Added "${name}" (status: ${status})`);
@@ -54,7 +56,7 @@ exports.addProduct = async (req, res) => {
             ? "Product submitted and is pending admin approval."
             : "Product added successfully";
 
-        res.json({ message, product: newProduct, images: imagePaths });
+        res.json({ message, product: newProduct, images: imagePaths, image_records: imageRecords });
 
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -217,7 +219,16 @@ exports.saveProductOptions = async (req, res) => {
                 );
                 const newColorId = colorResult.rows[0].id;
 
-                for (const [imgIndex, imgPath] of imagePaths.entries()) {
+                const imageIds = Array.isArray(colors[i].image_ids)
+                    ? colors[i].image_ids.map(Number).filter(n => Number.isInteger(n))
+                    : [];
+                if (imageIds.length > 0) {
+                    await pool.query(
+                        `UPDATE product_images SET color_id = $1 WHERE product_id = $2 AND id = ANY($3::int[])`,
+                        [newColorId, id, imageIds]
+                    );
+                }
+                for (const [imgIndex, imgPath] of (imageIds.length > 0 ? [] : imagePaths).entries()) {
                     await pool.query(
                         `UPDATE product_images SET color_id = $1 WHERE product_id = $2 AND image_path = $3`,
                         [newColorId, id, imgPath]
@@ -317,11 +328,13 @@ exports.updateProduct = async (req, res) => {
 
         const maxRes = await pool.query("SELECT COALESCE(MAX(display_order), -1) AS m FROM product_images WHERE product_id = $1", [id]);
         const startAt = Number(maxRes.rows[0].m) + 1;
+        const imageRecords = [];
         for (const [imgIndex, imgPath] of newImagePaths.entries()) {
-            await pool.query(
-                `INSERT INTO product_images (product_id, image_path, display_order) VALUES ($1, $2, $3)`,
+            const ins = await pool.query(
+                `INSERT INTO product_images (product_id, image_path, display_order) VALUES ($1, $2, $3) RETURNING id, image_path`,
                 [id, imgPath, startAt + imgIndex]
             );
+            imageRecords.push(ins.rows[0]);
         }
 
         logActivity(req.user.userId, "edited_product", "product", Number(id), `Edited "${name}"`);
@@ -330,7 +343,7 @@ exports.updateProduct = async (req, res) => {
             ? "Product updated and is pending admin approval."
             : "Product updated successfully";
 
-        res.json({ message, product: product.rows[0], images: newImagePaths });
+        res.json({ message, product: product.rows[0], images: newImagePaths, image_records: imageRecords });
 
     } catch (error) {
         res.status(500).json({ error: error.message });

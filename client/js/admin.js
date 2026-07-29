@@ -985,11 +985,15 @@ async function saveProduct() {
 
         const savedProductId = result.product ? result.product.id : id;
         const returnedImages = result.images || [];
+        const returnedRecords = result.image_records || [];
 
         const colorsPayload = Object.keys(pdSelectedColors)
             .map(name => ({
                 name,
-                image_paths: pdSelectedColors[name].map(k => k.startsWith("new:") ? returnedImages[Number(k.slice(4))] : (pdAllImages.find(im => im.key === k) || {}).url).filter(Boolean)
+                image_paths: pdSelectedColors[name].map(k => k.startsWith("new:") ? returnedImages[Number(k.slice(4))] : (pdAllImages.find(im => im.key === k) || {}).url).filter(Boolean),
+                image_ids: pdSelectedColors[name].map(k => k.startsWith("new:")
+                    ? ((returnedRecords[Number(k.slice(4))] || {}).id)
+                    : Number(k.slice(3))).filter(v => Number.isInteger(v))
             }));
 
         const specsPayload = collectSpecRows();
