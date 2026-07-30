@@ -290,11 +290,15 @@ function renderMyProductsTable() {
                         <td data-label="Stock">${p.stock}</td>
                         <td data-label="Status">${statusBadge(p.status, p.deletion_request_status)}</td>
                         <td data-label="Actions">
+                            ${p.is_own === false
+                                ? `<span style="font-size:12px; color:#999;">View only \u2014 owned by ${p.owner_name || "another user"}</span>`
+                                : `
                             <button onclick='loadProductIntoForm(${JSON.stringify(p)})' style="background:#2563EB; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Edit</button>
                             ${deletionPending
                                 ? `<span style="font-size:12px; color:#999;">Awaiting admin review</span>`
                                 : `<button onclick="requestDeletion(${p.id}, '${safeName}')" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Request Deletion</button>`
                             }
+                            `}
                         </td>
                     </tr>
                 `;

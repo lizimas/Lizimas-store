@@ -89,14 +89,43 @@ exports.getProducts = async (req, res) => {
 };
 
 // Get the logged-in staff member's own products, with pending deletion request status
+// Capability check rather than a role test, so new roles need no handler changes.
+async function canEditProduct(user, productId) {
+    if (user.role === "admin") return { allowed: true };
+    const row = (await pool.query(
+        `SELECT created_by FROM products WHERE id = $1 AND deleted_at IS NULL`,
+        [productId]
+    )).rows[0];
+    if (!row) return { allowed: false, status: 404, error: "Product not found." };
+    if (Number(row.created_by) !== Number(user.userId)) {
+        return { allowed: false, status: 403,
+            error: "You can only edit products you created. Ask the owner or an admin." };
+    }
+    return { allowed: true };
+}
+
 exports.getMyProducts = async (req, res) => {
     try {
+        // Store managers get read-only visibility of the whole catalogue so they
+        // can supervise it. Editing stays scoped to the creator: a staff edit
+        // flips the product back to pending, so letting one person edit another's
+        // product would silently pull it off sale. `is_own` tells the client
+        // which rows are editable.
+        const isManager = req.user.role === "store_manager";
+
+        const scopeClause = isManager
+            ? ""
+            : "AND p.created_by = $1";
+
         const result = await pool.query(
-            `SELECT p.*, dr.status AS deletion_request_status
+            `SELECT p.*, dr.status AS deletion_request_status,
+                    (p.created_by = $1) AS is_own,
+                    u.name AS owner_name
              FROM products p
              LEFT JOIN product_deletion_requests dr
                  ON dr.product_id = p.id AND dr.status = 'pending'
-             WHERE p.created_by = $1 AND p.deleted_at IS NULL
+             LEFT JOIN users u ON u.id = p.created_by
+             WHERE p.deleted_at IS NULL ${scopeClause}
              ORDER BY p.id DESC`,
             [req.user.userId]
         );
@@ -175,6 +204,11 @@ exports.saveProductOptions = async (req, res) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
+        const permission = await canEditProduct(req.user, id);
+        if (!permission.allowed) {
+            return res.status(permission.status).json({ error: permission.error });
+        }
+
         const { sizes, colors, specs } = req.body;
 
         await client.query("BEGIN");
@@ -564,6 +598,11 @@ exports.getProductOptions = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
+        const permission = await canEditProduct(req.user, id);
+        if (!permission.allowed) {
+            return res.status(permission.status).json({ error: permission.error });
+        }
+
         const { name, category_id, description, price, stock,
                 material, color, sleeve, style, length, fit, pattern, care_instructions, occasion } = req.body;
 
