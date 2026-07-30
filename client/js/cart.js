@@ -9,9 +9,9 @@ function saveCart(cart) {
     updateCartCount();
 }
 
-function addToCart(id, name, price, image, description, colorId, colorName) {
+function addToCart(id, name, price, image, description, colorId, colorName, sizeId, sizeName) {
     let cart = getCart();
-    let existing = cart.find(item => item.id === id && item.colorId === (colorId || null));
+    let existing = cart.find(item => item.id === id && item.colorId === (colorId || null) && item.sizeId === (sizeId || null));
 
     if (existing) {
         existing.quantity += 1;
@@ -24,6 +24,8 @@ function addToCart(id, name, price, image, description, colorId, colorName) {
             description: description || "",
             colorId: colorId || null,
             colorName: colorName || null,
+            sizeId: sizeId || null,
+            sizeName: sizeName || null,
             quantity: 1
         });
     }

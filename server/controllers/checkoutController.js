@@ -33,6 +33,7 @@ exports.checkout = async (req, res) => {
             const variantId = item.variantId ? Number(item.variantId) : null;
             const quantity = Number(item.quantity);
             const colorId = item.colorId ? Number(item.colorId) : null;
+            const sizeId = item.sizeId ? Number(item.sizeId) : null;
 
             if (!productId || !quantity || quantity <= 0) {
                 await client.query("ROLLBACK");
@@ -98,13 +99,21 @@ exports.checkout = async (req, res) => {
                     );
                     colorName = cr.rows.length ? cr.rows[0].name : null;
                 }
+                let sizeName = null;
+                if (sizeId) {
+                    const sr = await client.query(
+                        "SELECT name FROM product_sizes WHERE id = $1 AND product_id = $2",
+                        [sizeId, productId]
+                    );
+                    sizeName = sr.rows.length ? sr.rows[0].name : null;
+                }
                 const itemPrice = Number(product.price);
                 total += itemPrice * quantity;
 
                 validatedItems.push({
                     productId,
                     variantId: null,
-                    productName: product.name, imageUrl: product.image, variantColor: colorName, variantSize: null,
+                    productName: product.name, imageUrl: product.image, variantColor: colorName, variantSize: sizeName,
                     quantity,
                     price: itemPrice
                 });

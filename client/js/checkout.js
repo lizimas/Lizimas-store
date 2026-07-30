@@ -225,6 +225,7 @@ function placeOrder() {
             productId,
             variantId,
             colorId: item.colorId || null,
+            sizeId: item.sizeId || null,
             quantity: item.quantity
         };
     });

@@ -37,7 +37,7 @@ async function loadProductDetail() {
 
 
         document.getElementById("pd-add-to-cart-btn").onclick = () => {
-            addToCart(product.id, product.name, product.price, product.image, product.description, pdSelectedColorId, pdSelectedColorName);
+            addToCart(product.id, product.name, product.price, product.image, product.description, pdSelectedColorId, pdSelectedColorName, pdSelectedSizeId, pdSelectedSizeName);
         };
 
         document.getElementById("pd-fullscreen-share").onclick = () => sharePdProduct(product);
@@ -222,6 +222,7 @@ async function sharePdProduct(product) {
 let pdSelectedColorId = null;
 let pdSelectedColorName = null;
 let pdSelectedSizeId = null;
+let pdSelectedSizeName = null;
 let pdVariants = [];
 let pdVariantStockEnabled = undefined;
 let pdColors = [];
@@ -279,7 +280,7 @@ async function loadOptions(id, product) {
             btn.className = "pd-size-btn";
             btn.textContent = size.name;
             btn.dataset.sizeId = size.id;
-            btn.onclick = () => selectSize(size.id);
+            btn.onclick = () => selectSize(size.id, size.name);
             sizeContainer.appendChild(btn);
         });
     }
@@ -305,10 +306,11 @@ function selectColor(colorId, imagePath, colorName) {
     }
 }
 
-function selectSize(sizeId) {
+function selectSize(sizeId, sizeName) {
     const btn = document.querySelector(`.pd-size-btn[data-size-id="${sizeId}"]`);
     if (btn && btn.classList.contains("disabled")) return;
     pdSelectedSizeId = sizeId;
+    pdSelectedSizeName = sizeName || null;
     document.querySelectorAll(".pd-size-btn").forEach(el => {
         el.classList.toggle("selected", Number(el.dataset.sizeId) === sizeId);
     });
@@ -387,7 +389,7 @@ function updateSizeAvailability() {
         }
     });
 
-    if (clearedSize) pdSelectedSizeId = null;
+    if (clearedSize) { pdSelectedSizeId = null; pdSelectedSizeName = null; }
 }
 
 function pdEscape(str) {
