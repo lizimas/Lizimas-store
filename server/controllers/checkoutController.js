@@ -41,7 +41,7 @@ exports.checkout = async (req, res) => {
 
             if (variantId) {
                 const variantResult = await client.query(
-                    "SELECT v.id, v.product_id, v.variant_name, v.price, v.stock, p.name AS product_name, COALESCE(v.image_path, p.image) AS image_url, c.name AS color_name, s.name AS size_name FROM product_variants v JOIN products p ON p.id = v.product_id LEFT JOIN color_catalog c ON c.id = v.color_id LEFT JOIN size_catalog s ON s.id = v.size_id WHERE v.id = $1 AND v.product_id = $2",
+                    "SELECT v.id, v.product_id, v.variant_name, v.price, v.stock, p.name AS product_name, COALESCE(v.image_path, p.image) AS image_url, c.name AS color_name, s.name AS size_name FROM product_variants v JOIN products p ON p.id = v.product_id LEFT JOIN product_colors c ON c.id = v.color_id LEFT JOIN product_sizes s ON s.id = v.size_id WHERE v.id = $1 AND v.product_id = $2",
                     [variantId, productId]
                 );
 
@@ -92,7 +92,10 @@ exports.checkout = async (req, res) => {
 
                 let colorName = null;
                 if (colorId) {
-                    const cr = await client.query("SELECT name FROM color_catalog WHERE id = $1", [colorId]);
+                    const cr = await client.query(
+                        "SELECT name FROM product_colors WHERE id = $1 AND product_id = $2",
+                        [colorId, productId]
+                    );
                     colorName = cr.rows.length ? cr.rows[0].name : null;
                 }
                 const itemPrice = Number(product.price);
