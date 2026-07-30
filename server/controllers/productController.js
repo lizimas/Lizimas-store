@@ -208,7 +208,29 @@ exports.saveProductOptions = async (req, res) => {
         if (Array.isArray(colors)) {
             for (let i = 0; i < colors.length; i++) {
                 const imagePaths = Array.isArray(colors[i].image_paths) ? colors[i].image_paths : [];
-                const representativeImage = imagePaths.length > 0 ? imagePaths[0] : (colors[i].image_path || null);
+                const imageIds = Array.isArray(colors[i].image_ids)
+                    ? colors[i].image_ids.map(Number).filter(n => Number.isInteger(n))
+                    : [];
+
+                // Swatch thumbnail = first assigned photo. The admin form sends
+                // image_ids only, so resolve the path from the id rather than
+                // falling through to null and blanking the swatch.
+                let representativeImage = imagePaths.length > 0
+                    ? imagePaths[0]
+                    : (colors[i].image_path || null);
+
+                if (!representativeImage && imageIds.length > 0) {
+                    const firstImg = await client.query(
+                        `SELECT image_path FROM product_images
+                         WHERE product_id = $1 AND id = ANY($2::int[])
+                         ORDER BY COALESCE(display_order, 999999) ASC, id ASC
+                         LIMIT 1`,
+                        [id, imageIds]
+                    );
+                    if (firstImg.rows.length > 0) {
+                        representativeImage = firstImg.rows[0].image_path;
+                    }
+                }
 
                 const rawColorName = String(colors[i].name || '').trim();
                 if (!rawColorName) continue;
@@ -239,9 +261,6 @@ exports.saveProductOptions = async (req, res) => {
                 const newColorId = colorResult.rows[0].id;
                 colorIdByName.set(String(canonicalName).trim().toLowerCase(), newColorId);
 
-                const imageIds = Array.isArray(colors[i].image_ids)
-                    ? colors[i].image_ids.map(Number).filter(n => Number.isInteger(n))
-                    : [];
                 if (imageIds.length > 0) {
                     await client.query(
                         `UPDATE product_images SET color_id = $1 WHERE product_id = $2 AND id = ANY($3::int[])`,

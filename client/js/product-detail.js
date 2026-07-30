@@ -222,6 +222,7 @@ let pdSelectedColorId = null;
 let pdSelectedColorName = null;
 let pdSelectedSizeId = null;
 let pdVariants = [];
+let pdVariantStockEnabled = undefined;
 let pdColors = [];
 
 async function loadOptions(id, product) {
@@ -237,6 +238,7 @@ async function loadOptions(id, product) {
 
     pdColors = data.colors;
     pdVariants = data.variants;
+    pdVariantStockEnabled = product ? product.variant_stock_enabled : undefined;
 
     renderSpecs(data.specs || [], data.sizes || []);
 
@@ -314,7 +316,12 @@ function selectSize(sizeId) {
 function updateSizeAvailability() {
     let clearedSize = false;
 
-    const strict = pdVariants.length > 0;
+    // Transitional: before the variant_stock_enabled column exists, fall back to
+    // "has variants" so today's validation keeps working. Once the migration lands
+    // and products carry the flag, the fallback branch is dead and can be removed.
+    const strict = (pdVariantStockEnabled === undefined)
+        ? pdVariants.length > 0
+        : pdVariantStockEnabled === true;
 
     document.querySelectorAll(".pd-size-btn").forEach(btn => {
         const sizeId = Number(btn.dataset.sizeId);
