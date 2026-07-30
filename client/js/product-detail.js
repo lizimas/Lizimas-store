@@ -133,6 +133,7 @@ function applyColorSelection(colorId, colorName) {
         nameEl.textContent = pdSelectedColorName ? `: ${pdSelectedColorName}` : "";
     }
     updateSizeAvailability();
+    updateStockHint();
 }
 
 function syncColorToIndex(index) {
@@ -311,6 +312,51 @@ function selectSize(sizeId) {
     document.querySelectorAll(".pd-size-btn").forEach(el => {
         el.classList.toggle("selected", Number(el.dataset.sizeId) === sizeId);
     });
+    updateStockHint();
+}
+
+// Scarcity hint for the selected colour+size. Only shown when the product is
+// actually tracking stock per variant, and only when the number is low enough
+// to be useful to the customer.
+function updateStockHint() {
+    let el = document.getElementById("pd-stock-hint");
+
+    const sizeRow = document.querySelector(".pd-size-buttons");
+    if (!el && sizeRow && sizeRow.parentElement) {
+        el = document.createElement("div");
+        el.id = "pd-stock-hint";
+        el.style.cssText = "margin-top:6px; font-size:0.9em; font-weight:600;";
+        sizeRow.parentElement.appendChild(el);
+    }
+    if (!el) return;
+
+    if (pdVariantStockEnabled !== true || !pdSelectedColorId || !pdSelectedSizeId) {
+        el.textContent = "";
+        return;
+    }
+
+    const variant = pdVariants.find(v =>
+        Number(v.color_id) === Number(pdSelectedColorId) &&
+        Number(v.size_id) === Number(pdSelectedSizeId)
+    );
+
+    if (!variant) {
+        el.textContent = "";
+        return;
+    }
+
+    const stock = Number(variant.stock);
+    if (stock <= 0) {
+        el.textContent = "Out of stock";
+        el.style.color = "#c0392b";
+    } else if (stock <= 5) {
+        // Deliberately blank above this threshold: a hint shown on every
+        // selection stops being noticed at all.
+        el.textContent = `Only ${stock} left`;
+        el.style.color = "#c0392b";
+    } else {
+        el.textContent = "";
+    }
 }
 
 function updateSizeAvailability() {
