@@ -15,7 +15,9 @@ const {
     deleteProduct,
     deleteProductImage,
     getCategories,
-    getMyProducts
+    getMyProducts,
+    generateProductVariants,
+    setVariantStockMode
 } = require("../controllers/productController");
 
 const { requireAuth, requireAdmin, requireStaffOrAdmin } = require("../middleware/authMiddleware");
@@ -30,6 +32,11 @@ router.get("/:id/options", getProductOptions);
 router.get("/catalog/sizes", getSizeCatalog);
 router.get("/catalog/colors", getColorCatalog);
 router.post("/:id/options", requireAuth, requireStaffOrAdmin, saveProductOptions);
+
+// Variant stock mode: build the colour x size matrix, then switch the product
+// over once staff have entered real quantities.
+router.post("/:id/variants/generate", requireAuth, requireAdmin, generateProductVariants);
+router.patch("/:id/variant-stock", requireAuth, requireAdmin, setVariantStockMode);
 router.get("/:id", getProductById);
 
 // Admin only: add, update, delete (with image uploads, up to 6 photos per product)
