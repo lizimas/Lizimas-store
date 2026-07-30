@@ -432,6 +432,7 @@ async function loadCustomers(search) {
             <table>
                 <thead>
                     <tr>
+                        <th>#</th>
                         <th>Name</th>
                         <th>Email</th>
                         <th>Phone</th>
@@ -442,8 +443,9 @@ async function loadCustomers(search) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${customers.map(c => `
+                    ${customers.map((c, i) => `
                         <tr>
+                            <td data-label="#">${i + 1}</td>
                             <td data-label="Name">${c.name}</td>
                             <td data-label="Email">${c.email}</td>
                             <td data-label="Phone">${c.phone || "—"}</td>
@@ -1906,9 +1908,9 @@ async function loadStaffAccounts() {
 
         container.innerHTML = `
             <table>
-                <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+                <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
                 <tbody>
-                    ${staff.map(s => {
+                    ${staff.map((s, i) => {
                         let statusBadge;
                         if (s.deleted_at) {
                             statusBadge = `<span class="status-badge status-cancelled">Deleted</span>`;
@@ -1931,6 +1933,7 @@ async function loadStaffAccounts() {
 
                         return `
                             <tr>
+                                <td data-label="#">${i + 1}</td>
                                 <td data-label="Name">${s.name}</td>
                                 <td data-label="Email">${s.email}</td>
                                 <td data-label="Role">${roleLabel}</td>
