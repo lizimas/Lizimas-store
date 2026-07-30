@@ -789,12 +789,13 @@ function renderProductsTable() {
                 ${filtered.map(p => `
                     <tr>
                         <td data-label=""><img class="product-table-thumb" src="${p.image || ''}" onerror="this.style.visibility='hidden'"></td>
-                        <td data-label="Name">${p.name}</td>
+                        <td data-label="Name">${p.name} <span style="color:#999; font-size:0.85em; white-space:nowrap;">#${p.id}</span></td>
                         <td data-label="Category">${p.category || "—"}</td>
                         <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
                         <td data-label="Stock">${p.stock}</td>
                         <td data-label="Actions">
                             <button onclick="editProduct(${p.id})">Edit</button>
+                            <button onclick="openManageStock(${p.id})" data-pname="${String(p.name || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;")}">Stock</button>
                             <button onclick="removeProduct(${p.id})">Delete</button>
                         </td>
                     </tr>
@@ -1966,6 +1967,167 @@ async function activateStaff(id, name) {
     }
 }
 
+
+// ---- Manage Stock panel: variant matrix generation, stock entry, mode toggle ----
+
+let msProductId = null;
+let msProductName = "";
+let msVariants = [];
+let msFlagEnabled = false;
+
+async function openManageStock(productId, productName) {
+    msProductId = productId;
+    if (productName === undefined && window.event && window.event.target) {
+        const btnName = window.event.target.getAttribute("data-pname");
+        if (btnName) productName = btnName;
+    }
+    if (productName !== undefined) msProductName = productName;
+    productName = msProductName;
+    openGenericModal(`Manage Stock \u2014 ${productName}`, `<p class="no-data">Loading\u2026</p>`);
+
+    try {
+        const [optsRes, prodRes] = await Promise.all([
+            fetch(`${API_URL}/api/products/${productId}/options`),
+            fetch(`${API_URL}/api/products/${productId}`)
+        ]);
+
+        const opts = await optsRes.json();
+        let flag = false;
+        if (prodRes.ok) {
+            const prod = await prodRes.json();
+            flag = prod.variant_stock_enabled === true;
+        }
+
+        msVariants = Array.isArray(opts.variants) ? opts.variants : [];
+        msFlagEnabled = flag;
+        renderManageStock(opts.colors || [], opts.sizes || []);
+
+    } catch (err) {
+        console.error("Manage stock load error:", err);
+        document.getElementById("generic-modal-body").innerHTML =
+            `<p class="no-data">Could not load stock data.</p>`;
+    }
+}
+
+function renderManageStock(colors, sizes) {
+    const body = document.getElementById("generic-modal-body");
+    const colorName = {};
+    colors.forEach(c => { colorName[c.id] = c.name; });
+    const sizeName = {};
+    sizes.forEach(z => { sizeName[z.id] = z.name; });
+
+    const mode = msFlagEnabled
+        ? `<span style="color:#0a7d32; font-weight:600;">Variant stock active</span>`
+        : `<span style="color:#8a6d00; font-weight:600;">Simple stock (product level)</span>`;
+
+    if (msVariants.length === 0) {
+        const canGenerate = colors.length > 0 && sizes.length > 0;
+        body.innerHTML = `
+            <p style="margin:0 0 12px;">Mode: ${mode}</p>
+            <p style="margin:0 0 12px;">No variants yet. Generating creates one row per
+            colour and size combination at zero stock \u2014 ${colors.length} \u00d7 ${sizes.length}
+            = <strong>${colors.length * sizes.length}</strong> rows.</p>
+            ${canGenerate
+                ? `<button onclick="generateVariants()">Generate Variants</button>`
+                : `<p class="no-data">Add at least one colour and one size first.</p>`}
+        `;
+        return;
+    }
+
+    const inStock = msVariants.filter(v => Number(v.stock) > 0).length;
+
+    const rows = msVariants.map(v => `
+        <tr>
+            <td>${pdEsc(colorName[v.color_id] || "\u2014")}</td>
+            <td>${pdEsc(sizeName[v.size_id] || "\u2014")}</td>
+            <td>
+                <input type="number" min="0" step="1"
+                       data-variant-id="${v.id}"
+                       value="${Number(v.stock) || 0}"
+                       class="ms-stock-input"
+                       style="width:80px;">
+            </td>
+        </tr>
+    `).join("");
+
+    body.innerHTML = `
+        <p style="margin:0 0 12px;">Mode: ${mode}</p>
+        <table style="width:100%; margin-bottom:12px;">
+            <thead><tr><th>Colour</th><th>Size</th><th>Stock</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+        <p style="margin:0 0 12px; font-size:0.9em; color:#666;">
+            ${msVariants.length} variants, ${inStock} with stock.
+        </p>
+        <button onclick="saveVariantStock()">Save Stock</button>
+        <button onclick="generateVariants()" style="margin-left:8px;">Re-generate Missing</button>
+        <button onclick="toggleVariantStockMode()" style="margin-left:8px;">
+            ${msFlagEnabled ? "Revert to Simple Stock" : "Enable Variant Stock"}
+        </button>
+    `;
+}
+
+function pdEsc(str) {
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
+async function generateVariants() {
+    try {
+        const data = await authorizedFetch(`/api/products/${msProductId}/variants/generate`, {
+            method: "POST"
+        });
+        alert(`${data.created} created, ${data.skipped} already existed.`);
+        await openManageStock(msProductId);
+    } catch (err) {
+        alert(err.message || "Could not generate variants.");
+    }
+}
+
+async function saveVariantStock() {
+    const updates = Array.from(document.querySelectorAll(".ms-stock-input")).map(el => ({
+        variant_id: Number(el.dataset.variantId),
+        stock: Number(el.value)
+    }));
+
+    if (updates.some(u => !Number.isInteger(u.stock) || u.stock < 0)) {
+        alert("Stock values must be whole numbers of zero or more.");
+        return;
+    }
+
+    try {
+        const data = await authorizedFetch(`/api/products/${msProductId}/variants/stock`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ updates })
+        });
+        alert(`Saved. ${data.in_stock} of ${data.total} variants have stock (${data.total_stock} units).`);
+        await openManageStock(msProductId);
+    } catch (err) {
+        alert(err.message || "Could not save stock.");
+    }
+}
+
+async function toggleVariantStockMode() {
+    const target = !msFlagEnabled;
+    if (target && !confirm("Enable variant stock? The storefront will use per-variant quantities instead of the product stock figure.")) return;
+    if (!target && !confirm("Revert to simple stock? The storefront will use the product-level stock figure.")) return;
+
+    try {
+        const data = await authorizedFetch(`/api/products/${msProductId}/variant-stock`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ enabled: target })
+        });
+        alert(data.message);
+        await openManageStock(msProductId);
+    } catch (err) {
+        alert(err.message || "Could not change stock mode.");
+    }
+}
 
 function openGenericModal(title, bodyHtml) {
     document.getElementById("generic-modal-title").textContent = title;

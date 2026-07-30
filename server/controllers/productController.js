@@ -396,6 +396,82 @@ exports.generateProductVariants = async (req, res) => {
     }
 };
 
+// Bulk-update variant stock for one product. Single transaction so the grid
+// cannot half-save. Rows not belonging to this product are rejected outright.
+exports.updateVariantStock = async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        const updates = Array.isArray(req.body.updates) ? req.body.updates : [];
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: "No stock updates supplied." });
+        }
+
+        const clean = [];
+        for (const u of updates) {
+            const variantId = Number(u.variant_id);
+            const stock = Number(u.stock);
+            if (!Number.isInteger(variantId) || !Number.isInteger(stock) || stock < 0) {
+                return res.status(400).json({
+                    error: "Each update needs an integer variant_id and a stock value of 0 or more."
+                });
+            }
+            clean.push({ variantId, stock });
+        }
+
+        await client.query("BEGIN");
+
+        const owned = new Set(
+            (await client.query(
+                `SELECT id FROM product_variants WHERE product_id = $1`,
+                [id]
+            )).rows.map(r => r.id)
+        );
+
+        const foreign = clean.filter(u => !owned.has(u.variantId));
+        if (foreign.length > 0) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+                error: "Some variants do not belong to this product.",
+                variant_ids: foreign.map(u => u.variantId)
+            });
+        }
+
+        for (const u of clean) {
+            await client.query(
+                `UPDATE product_variants SET stock = $1 WHERE id = $2 AND product_id = $3`,
+                [u.stock, u.variantId, id]
+            );
+        }
+
+        const totals = (await client.query(
+            `SELECT count(*)::int AS total,
+                    count(*) FILTER (WHERE stock > 0)::int AS in_stock,
+                    COALESCE(sum(stock), 0)::int AS total_stock
+             FROM product_variants WHERE product_id = $1`,
+            [id]
+        )).rows[0];
+
+        await client.query("COMMIT");
+
+        res.json({
+            message: "Variant stock updated.",
+            updated: clean.length,
+            total: totals.total,
+            in_stock: totals.in_stock,
+            total_stock: totals.total_stock
+        });
+
+    } catch (error) {
+        try { await client.query("ROLLBACK"); } catch (e) { console.error("Rollback failed:", e.message); }
+        console.error("updateVariantStock error:", error.message);
+        res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
+    }
+};
+
 // Switch a product between simple stock (products.stock) and per-variant stock.
 // Refuses to enable while every variant is zero, which would silently pull the
 // product off sale.

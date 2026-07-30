@@ -17,7 +17,8 @@ const {
     getCategories,
     getMyProducts,
     generateProductVariants,
-    setVariantStockMode
+    setVariantStockMode,
+    updateVariantStock
 } = require("../controllers/productController");
 
 const { requireAuth, requireAdmin, requireStaffOrAdmin } = require("../middleware/authMiddleware");
@@ -37,6 +38,7 @@ router.post("/:id/options", requireAuth, requireStaffOrAdmin, saveProductOptions
 // over once staff have entered real quantities.
 router.post("/:id/variants/generate", requireAuth, requireAdmin, generateProductVariants);
 router.patch("/:id/variant-stock", requireAuth, requireAdmin, setVariantStockMode);
+router.patch("/:id/variants/stock", requireAuth, requireAdmin, updateVariantStock);
 router.get("/:id", getProductById);
 
 // Admin only: add, update, delete (with image uploads, up to 6 photos per product)
