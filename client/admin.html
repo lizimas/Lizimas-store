@@ -17,6 +17,7 @@
             <button id="login-btn" onclick="handleLogin()">Log In</button>
             <input type="text" id="login-2fa-code" class="hidden" placeholder="Enter 6-digit code">
             <button id="login-2fa-btn" class="hidden" onclick="submitLogin2FA()">Verify Code</button>
+            <button id="login-2fa-email-btn" class="hidden" onclick="requestEmailLoginCode()" style="background:none; border:none; color:#C9A227; text-decoration:underline; cursor:pointer; font-size:14px; padding:8px 0;">Email me a code instead</button>
             <input type="password" id="login-reset-password" class="hidden" placeholder="New password">
             <input type="password" id="login-reset-password-confirm" class="hidden" placeholder="Confirm new password">
             <button id="login-reset-btn" class="hidden" onclick="submitForcedReset()">Set New Password</button>
@@ -348,7 +349,7 @@
     </div>
 
 <script src="js/prepare-picked-file.js?v=9"></script>
-    <script src="js/admin.js?v=14"></script>
+    <script src="js/admin.js?v=15"></script>
 <script src="js/photo-crop.js"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>
