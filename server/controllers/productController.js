@@ -662,6 +662,19 @@ exports.deleteProductImage = async (req, res) => {
     try {
         const { imageId } = req.params;
 
+        // Only an imageId arrives, so resolve its product before checking rights.
+        const owner = await pool.query(
+            `SELECT product_id FROM product_images WHERE id = $1`,
+            [imageId]
+        );
+        if (owner.rows.length === 0) {
+            return res.status(404).json({ error: "Image not found" });
+        }
+        const permission = await canEditProduct(req.user, owner.rows[0].product_id);
+        if (!permission.allowed) {
+            return res.status(permission.status).json({ error: permission.error });
+        }
+
         const image = await pool.query(
             `DELETE FROM product_images WHERE id=$1 RETURNING *`,
             [imageId]
@@ -933,6 +946,12 @@ exports.updateImageOrder = async (req, res) => {
 
     const client = await pool.connect();
     try {
+        const permission = await canEditProduct(req.user, id);
+        if (!permission.allowed) {
+            client.release();
+            return res.status(permission.status).json({ error: permission.error });
+        }
+
         await client.query("BEGIN");
 
         const owned = await client.query(
