@@ -16,7 +16,7 @@ function uploadProfilePhotoToCloudinary(fileBuffer) {
         stream.end(fileBuffer);
     });
 }
-const { sendAdminLoginAlert, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert } = require("../utils/mailer");
+const { sendAdminLoginAlert, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail } = require("../utils/mailer");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -934,9 +934,74 @@ module.exports = {
     verify2FA: exports.verify2FA,
     disable2FA: exports.disable2FA,
     verifyLogin2FA,
+    requestEmail2FACode,
     listSessions,
     deleteSession
 };
+
+// Send a one-time login code by email as a fallback to the authenticator app
+async function requestEmail2FACode(req, res) {
+    try {
+        const { pendingToken } = req.body;
+        if (!pendingToken) {
+            return res.status(400).json({ error: "Missing pending token." });
+        }
+
+        let decoded;
+        try {
+            decoded = jwt.verify(pendingToken, JWT_SECRET);
+        } catch (err) {
+            return res.status(401).json({ error: "Session expired. Please log in again." });
+        }
+
+        if (!decoded.pending2FA) {
+            return res.status(401).json({ error: "Invalid session. Please log in again." });
+        }
+
+        const userResult = await pool.query(
+            "SELECT id, name, email, two_factor_enabled, email_otp_last_sent_at FROM users WHERE id = $1",
+            [decoded.userId]
+        );
+
+        if (userResult.rows.length === 0 || !userResult.rows[0].two_factor_enabled) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        const user = userResult.rows[0];
+
+        if (user.email_otp_last_sent_at) {
+            const elapsed = Date.now() - new Date(user.email_otp_last_sent_at).getTime();
+            if (elapsed < 60000) {
+                const wait = Math.ceil((60000 - elapsed) / 1000);
+                return res.status(429).json({ error: "Please wait " + wait + " seconds before requesting another code." });
+            }
+        }
+
+        const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+        const hash = await bcrypt.hash(code, 10);
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+        await pool.query(
+            "UPDATE users SET email_otp_hash = $1, email_otp_expires_at = $2, email_otp_attempts = 0, email_otp_last_sent_at = NOW() WHERE id = $3",
+            [hash, expiresAt, user.id]
+        );
+
+        try {
+            await sendTwoFactorCodeEmail(user.email, code);
+        } catch (err) {
+            await pool.query(
+                "UPDATE users SET email_otp_hash = NULL, email_otp_expires_at = NULL, email_otp_last_sent_at = NULL WHERE id = $1",
+                [user.id]
+            );
+            return res.status(500).json({ error: "Could not send the code. Please use your authenticator app." });
+        }
+
+        res.json({ message: "A login code has been sent to your email." });
+    } catch (error) {
+        console.error("Request email 2FA code error:", error);
+        res.status(500).json({ error: "Server error requesting code." });
+    }
+}
 
 // Complete login when 2FA is required
 async function verifyLogin2FA(req, res) {
@@ -959,7 +1024,7 @@ async function verifyLogin2FA(req, res) {
         }
 
         const userResult = await pool.query(
-            "SELECT id, name, email, phone, role, two_factor_secret FROM users WHERE id = $1",
+            "SELECT id, name, email, phone, role, two_factor_secret, email_otp_hash, email_otp_expires_at, email_otp_attempts FROM users WHERE id = $1",
             [decoded.userId]
         );
 
@@ -968,12 +1033,34 @@ async function verifyLogin2FA(req, res) {
         }
 
         const user = userResult.rows[0];
-        const verified = speakeasy.totp.verify({
+        let verified = speakeasy.totp.verify({
             secret: user.two_factor_secret,
             encoding: "base32",
             token: code,
             window: 1
         });
+
+        if (!verified && user.email_otp_hash) {
+            const clearOtp = "UPDATE users SET email_otp_hash = NULL, email_otp_expires_at = NULL, email_otp_attempts = 0 WHERE id = $1";
+
+            if (!user.email_otp_expires_at || new Date(user.email_otp_expires_at) < new Date()) {
+                await pool.query(clearOtp, [user.id]);
+                return res.status(401).json({ error: "That code has expired. Please request a new one." });
+            }
+
+            if (user.email_otp_attempts >= 5) {
+                await pool.query(clearOtp, [user.id]);
+                return res.status(429).json({ error: "Too many attempts. Please request a new code." });
+            }
+
+            const emailMatch = await bcrypt.compare(String(code), user.email_otp_hash);
+            if (emailMatch) {
+                verified = true;
+                await pool.query(clearOtp, [user.id]);
+            } else {
+                await pool.query("UPDATE users SET email_otp_attempts = email_otp_attempts + 1 WHERE id = $1", [user.id]);
+            }
+        }
 
         if (!verified) {
             return res.status(401).json({ error: "Invalid code. Please try again." });

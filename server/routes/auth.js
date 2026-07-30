@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 
-const { authLimiter } = require("../middleware/rateLimiter");
 
 const {
     registerUser,
@@ -18,6 +17,7 @@ const {
     verify2FA,
     disable2FA,
     verifyLogin2FA,
+    requestEmail2FACode,
     listSessions,
     deleteSession,
     getProfile,
@@ -33,6 +33,7 @@ router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.post("/admin-login", adminLogin);
 router.post("/login/2fa", verifyLogin2FA);
+router.post("/login/2fa/email", requestEmail2FACode);
 router.post("/complete-forced-reset", completeForcedPasswordReset);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);

@@ -64,6 +64,20 @@ async function sendPasswordResetEmail(email, resetLink) {
     }
 }
 
+async function sendTwoFactorCodeEmail(email, code) {
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: "Your Login Code - Lizimas Store",
+            text: `Your login verification code is:\n\n${code}\n\nThis code expires in 10 minutes and can only be used once.\n\nIf you didn't try to log in, someone may have your password. Change it immediately.`
+        });
+    } catch (error) {
+        console.error("Two-factor code email error:", error);
+        throw error;
+    }
+}
+
 async function sendStaffActivationEmail(email, name) {
     try {
         await transporter.sendMail({
@@ -103,4 +117,4 @@ async function sendAdminBlockAlert(details) {
     }
 }
 
-module.exports = { sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert };
+module.exports = { sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail };
