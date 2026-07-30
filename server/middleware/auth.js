@@ -1,6 +1,9 @@
 const jwt = require("jsonwebtoken");
 
-const JWT_SECRET = process.env.JWT_SECRET || "change_this_secret_in_env_file";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    throw new Error("JWT_SECRET is not set. Refusing to start with an insecure default.");
+}
 
 function authMiddleware(req, res, next) {
     const token = req.headers.authorization?.split(" ")[1];

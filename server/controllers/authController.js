@@ -18,7 +18,10 @@ function uploadProfilePhotoToCloudinary(fileBuffer) {
 }
 const { sendAdminLoginAlert, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert } = require("../utils/mailer");
 
-const JWT_SECRET = process.env.JWT_SECRET || "change_this_secret_in_env_file";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    throw new Error("JWT_SECRET is not set. Refusing to start with an insecure default.");
+}
 const TOKEN_EXPIRY = "7d";
 async function createSession(userId, req) {
     const sessionToken = crypto.randomBytes(32).toString("hex");
