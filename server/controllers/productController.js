@@ -112,7 +112,10 @@ exports.getMyProducts = async (req, res) => {
 exports.getProductById = async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query("SELECT * FROM products WHERE id = $1", [id]);
+        const result = await pool.query(
+            "SELECT * FROM products WHERE id = $1 AND deleted_at IS NULL AND status = 'approved'",
+            [id]
+        );
         if (result.rows.length === 0) {
             return res.status(404).json({ error: "Product not found" });
         }
@@ -169,20 +172,36 @@ exports.getColorCatalog = async (req, res) => {
 
 // Save the chosen sizes and colors for a product (replaces existing selections)
 exports.saveProductOptions = async (req, res) => {
+    const client = await pool.connect();
     try {
         const { id } = req.params;
         const { sizes, colors, specs } = req.body;
 
-        await pool.query(`DELETE FROM product_sizes WHERE product_id = $1`, [id]);
-        await pool.query(`DELETE FROM product_colors WHERE product_id = $1`, [id]);
-        await pool.query(`DELETE FROM product_specifications WHERE product_id = $1`, [id]);
+        await client.query("BEGIN");
+
+        const priorVariants = (await client.query(
+            `SELECT v.id, pc.name AS color_name, ps.name AS size_name
+             FROM product_variants v
+             LEFT JOIN product_colors pc ON pc.id = v.color_id
+             LEFT JOIN product_sizes ps ON ps.id = v.size_id
+             WHERE v.product_id = $1`,
+            [id]
+        )).rows;
+
+        const sizeIdByName = new Map();
+        const colorIdByName = new Map();
+
+        await client.query(`DELETE FROM product_sizes WHERE product_id = $1`, [id]);
+        await client.query(`DELETE FROM product_colors WHERE product_id = $1`, [id]);
+        await client.query(`DELETE FROM product_specifications WHERE product_id = $1`, [id]);
 
         if (Array.isArray(sizes)) {
             for (let i = 0; i < sizes.length; i++) {
-                await pool.query(
-                    `INSERT INTO product_sizes (product_id, name, display_order) VALUES ($1, $2, $3)`,
+                const sizeRow = await client.query(
+                    `INSERT INTO product_sizes (product_id, name, display_order) VALUES ($1, $2, $3) RETURNING id`,
                     [id, sizes[i], i + 1]
                 );
+                sizeIdByName.set(String(sizes[i] || "").trim().toLowerCase(), sizeRow.rows[0].id);
             }
         }
 
@@ -196,10 +215,10 @@ exports.saveProductOptions = async (req, res) => {
 
                 // Resolve against the master colour catalogue; create it if new.
                 const findCatalog = `SELECT id, name FROM color_catalog WHERE lower(trim(name)) = lower(trim($1))`;
-                let catalogRow = (await pool.query(findCatalog, [rawColorName])).rows[0];
+                let catalogRow = (await client.query(findCatalog, [rawColorName])).rows[0];
 
                 if (!catalogRow) {
-                    const inserted = await pool.query(
+                    const inserted = await client.query(
                         `INSERT INTO color_catalog (name, display_order)
                          VALUES (trim($1), (SELECT COALESCE(MAX(display_order), 0) + 1 FROM color_catalog))
                          ON CONFLICT DO NOTHING
@@ -207,29 +226,30 @@ exports.saveProductOptions = async (req, res) => {
                         [rawColorName]
                     );
                     catalogRow = inserted.rows[0]
-                        || (await pool.query(findCatalog, [rawColorName])).rows[0];
+                        || (await client.query(findCatalog, [rawColorName])).rows[0];
                 }
 
                 const catalogId = catalogRow ? catalogRow.id : null;
                 const canonicalName = catalogRow ? catalogRow.name : rawColorName;
 
-                const colorResult = await pool.query(
+                const colorResult = await client.query(
                     `INSERT INTO product_colors (product_id, name, image_path, display_order, color_id) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
                     [id, canonicalName, representativeImage, i + 1, catalogId]
                 );
                 const newColorId = colorResult.rows[0].id;
+                colorIdByName.set(String(canonicalName).trim().toLowerCase(), newColorId);
 
                 const imageIds = Array.isArray(colors[i].image_ids)
                     ? colors[i].image_ids.map(Number).filter(n => Number.isInteger(n))
                     : [];
                 if (imageIds.length > 0) {
-                    await pool.query(
+                    await client.query(
                         `UPDATE product_images SET color_id = $1 WHERE product_id = $2 AND id = ANY($3::int[])`,
                         [newColorId, id, imageIds]
                     );
                 }
                 for (const [imgIndex, imgPath] of (imageIds.length > 0 ? [] : imagePaths).entries()) {
-                    await pool.query(
+                    await client.query(
                         `UPDATE product_images SET color_id = $1 WHERE product_id = $2 AND image_path = $3`,
                         [newColorId, id, imgPath]
                     );
@@ -240,7 +260,7 @@ exports.saveProductOptions = async (req, res) => {
         if (Array.isArray(specs)) {
             for (let i = 0; i < specs.length; i++) {
                 if (specs[i].label && specs[i].label.trim() !== "") {
-                    await pool.query(
+                    await client.query(
                         `INSERT INTO product_specifications (product_id, label, value, display_order) VALUES ($1, $2, $3, $4)`,
                         [id, specs[i].label.trim(), specs[i].value || "", i + 1]
                     );
@@ -248,10 +268,33 @@ exports.saveProductOptions = async (req, res) => {
             }
         }
 
-        res.json({ message: "Product options saved" });
+        let variantsRelinked = 0;
+        let variantsOrphaned = 0;
+        for (const v of priorVariants) {
+            const nc = v.color_name ? colorIdByName.get(String(v.color_name).trim().toLowerCase()) : undefined;
+            const ns = v.size_name ? sizeIdByName.get(String(v.size_name).trim().toLowerCase()) : undefined;
+            if (nc === undefined && ns === undefined) {
+                if (v.color_name || v.size_name) variantsOrphaned++;
+                continue;
+            }
+            await client.query(
+                `UPDATE product_variants
+                 SET color_id = COALESCE($1, color_id), size_id = COALESCE($2, size_id)
+                 WHERE id = $3`,
+                [nc === undefined ? null : nc, ns === undefined ? null : ns, v.id]
+            );
+            variantsRelinked++;
+        }
+
+        await client.query("COMMIT");
+        res.json({ message: "Product options saved", variantsRelinked, variantsOrphaned });
 
     } catch (error) {
+        try { await client.query("ROLLBACK"); } catch (e) { console.error("Rollback failed:", e.message); }
+        console.error("saveProductOptions error:", error.message);
         res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
     }
 };
 
