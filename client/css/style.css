@@ -2686,3 +2686,365 @@ width:90%;
         transition: none;
     }
 }
+
+
+/* ============================================================
+   Compact product cards with quick add
+   Overrides the earlier .product-grid and .product-card rules.
+   Appended last so these win without !important.
+   ============================================================ */
+
+.product-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+
+.product-card {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+    border-radius: 12px;
+}
+
+.product-image-wrapper {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    background: #fafafa;
+}
+
+.product-image-wrapper .product-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.product-card-body {
+    padding: 12px 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Fixed height keeps prices aligned across a row regardless of name length. */
+.product-card-body .product-name {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 400;
+    color: #333;
+    line-height: 1.4;
+    height: 2.8em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* Quick add */
+
+.quick-add-btn {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 8px;
+    background: #C0392B;
+    color: #fff;
+    font-size: 22px;
+    line-height: 1;
+    font-weight: 400;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+    transition: background 0.15s, transform 0.1s;
+}
+
+.quick-add-btn:hover {
+    background: #a5311f;
+}
+
+.quick-add-btn:active {
+    transform: scale(0.92);
+}
+
+.quick-add-btn:disabled {
+    background: #bdbdbd;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.quick-add-btn.is-loading {
+    opacity: 0.6;
+}
+
+.quick-add-btn:focus-visible {
+    outline: 2px solid #FF6600;
+    outline-offset: 2px;
+}
+
+/* Variant sheet */
+
+body.sheet-open {
+    overflow: hidden;
+}
+
+.variant-sheet-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.variant-sheet {
+    background: #fff;
+    width: 100%;
+    max-width: 520px;
+    border-radius: 16px 16px 0 0;
+    padding: 18px 18px 24px;
+    max-height: 85vh;
+    overflow-y: auto;
+    animation: sheet-rise 0.2s ease-out;
+}
+
+@keyframes sheet-rise {
+    from { transform: translateY(18px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+
+.variant-sheet-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 16px;
+}
+
+.variant-sheet-thumb {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    border-radius: 8px;
+    background: #fafafa;
+    flex: 0 0 auto;
+}
+
+.variant-sheet-name {
+    margin: 0 0 4px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.variant-sheet-price {
+    margin: 0;
+    font-size: 14px;
+}
+
+.variant-sheet-close {
+    margin-left: auto;
+    background: none;
+    border: none;
+    font-size: 26px;
+    line-height: 1;
+    color: #888;
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+.variant-sheet-group {
+    margin-bottom: 18px;
+}
+
+.variant-sheet-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 10px;
+}
+
+.variant-sheet-chosen {
+    font-weight: 400;
+    color: #888;
+}
+
+.variant-sheet-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.variant-option {
+    border: 1px solid #d9d9d9;
+    background: #fff;
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+}
+
+.variant-option:hover {
+    border-color: #FF6600;
+}
+
+.variant-option.selected {
+    border-color: #FF6600;
+    color: #FF6600;
+    background: #fff6ef;
+    font-weight: 600;
+}
+
+.variant-option:focus-visible {
+    outline: 2px solid #FF6600;
+    outline-offset: 2px;
+}
+
+.variant-sheet-hint {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: #C0392B;
+    min-height: 1.2em;
+}
+
+.variant-sheet-confirm {
+    width: 100%;
+    background: #FF6600;
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.variant-sheet-confirm:hover {
+    background: #e65c00;
+}
+
+@media (max-width: 900px) {
+    .product-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .product-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .product-card-body {
+        padding: 10px 10px 14px;
+    }
+
+    .product-card-body .product-name {
+        font-size: 13px;
+    }
+
+    .quick-add-btn {
+        width: 30px;
+        height: 30px;
+        font-size: 20px;
+    }
+}
+
+/* The old single-column phone rule would otherwise win on width alone. */
+@media (max-width: 480px) {
+    .product-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .variant-sheet { animation: none; }
+    .quick-add-btn { transition: none; }
+}
+
+
+/* Card pricing - quieter than the old bold red, closer to the reference */
+.product-card-body .product-price,
+.product-card-body .product-price-current {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.product-card-body .product-price-original {
+    font-size: 12px;
+    font-weight: 400;
+    color: #999;
+}
+
+
+/* ============================================================
+   Quick add - overrides legacy .product-card button (0,1,1)
+   ============================================================ */
+
+.product-card .quick-add-btn {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    width: 34px;
+    height: 34px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    background: #C0392B;
+    color: #fff;
+    font-size: 22px;
+    font-weight: 400;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+    transition: background 0.15s, transform 0.1s;
+}
+
+.product-card .quick-add-btn:hover {
+    background: #a5311f;
+}
+
+.product-card .quick-add-btn:active {
+    transform: scale(0.92);
+}
+
+.product-card .quick-add-btn:disabled {
+    background: #bdbdbd;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.product-card .quick-add-btn.is-loading {
+    opacity: 0.6;
+}
+
+.product-card .quick-add-btn:focus-visible {
+    outline: 2px solid #FF6600;
+    outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+    .product-card .quick-add-btn {
+        width: 30px;
+        height: 30px;
+        font-size: 20px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .product-card .quick-add-btn { transition: none; }
+}

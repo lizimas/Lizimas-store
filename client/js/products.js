@@ -88,21 +88,19 @@ function buildProductCard(product) {
                 class="product-image"
                 loading="lazy"
             >
+            <button
+                type="button"
+                class="quick-add-btn"
+                data-quick-add="${product.id}"
+                aria-label="${outOfStock ? "Unavailable" : "Add " + product.name + " to cart"}"
+                ${outOfStock ? "disabled" : ""}
+            >${outOfStock ? "×" : "+"}</button>
         </div>
 
-        <h3 class="product-name">${product.name}</h3>
-
-        ${buildRatingStars(product.rating)}
-
-        ${buildPriceHtml(product)}
-
-        <button
-            class="add-to-cart-btn"
-            onclick="handleAddToCart(${product.id})"
-            ${outOfStock ? "disabled" : ""}
-        >
-            ${outOfStock ? "Unavailable" : "Add To Cart 🛒"}
-        </button>
+        <div class="product-card-body">
+            <h3 class="product-name">${product.name}</h3>
+            ${buildPriceHtml(product)}
+        </div>
     `;
 
     return card;
@@ -245,6 +243,196 @@ document.addEventListener("click", event => {
     }
 });
 
+// ---------------------------------------------------------------------------
+// Quick add
+// ---------------------------------------------------------------------------
+
+// Options are fetched per tap rather than flagged on every product in the list.
+// The list is going to grow into the thousands, and most cards are never tapped.
+const quickAddOptionsCache = new Map();
+
+async function fetchProductOptions(productId) {
+    if (quickAddOptionsCache.has(productId)) {
+        return quickAddOptionsCache.get(productId);
+    }
+
+    const res = await fetch(`${API_URL}/api/products/${productId}/options`);
+    if (!res.ok) throw new Error(`Options request failed: ${res.status}`);
+
+    const options = await res.json();
+    quickAddOptionsCache.set(productId, options);
+    return options;
+}
+
+async function handleQuickAdd(productId, button) {
+    const product = allProducts.find(p => p.id === productId);
+    if (!product) return;
+
+    if (button) {
+        button.disabled = true;
+        button.classList.add("is-loading");
+    }
+
+    try {
+        const options = await fetchProductOptions(productId);
+        const colors = options.colors || [];
+        const sizes = options.sizes || [];
+
+        if (colors.length === 0 && sizes.length === 0) {
+            addToCart(product.id, product.name, product.price, product.image, product.description, null, null, null, null);
+            showAddToCartFeedback(product.name);
+        } else {
+            openVariantSheet(product, colors, sizes);
+        }
+    } catch (error) {
+        console.error("Quick add failed:", error);
+        // Falling back to the detail page is better than a silent failure -
+        // the customer can still choose properly there.
+        window.location.href = `product-detail.html?id=${productId}`;
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.classList.remove("is-loading");
+        }
+    }
+}
+
+let sheetSelection = { colorId: null, colorName: null, sizeId: null, sizeName: null };
+
+function openVariantSheet(product, colors, sizes) {
+    closeVariantSheet();
+
+    sheetSelection = { colorId: null, colorName: null, sizeId: null, sizeName: null };
+
+    const overlay = document.createElement("div");
+    overlay.className = "variant-sheet-overlay";
+    overlay.id = "variant-sheet-overlay";
+
+    const colorBlock = colors.length ? `
+        <div class="variant-sheet-group">
+            <span class="variant-sheet-label">Colour<span id="sheet-color-name" class="variant-sheet-chosen"></span></span>
+            <div class="variant-sheet-options">
+                ${colors.map(c => `
+                    <button type="button" class="variant-option" data-color-id="${c.id}" data-color-name="${c.name}">${c.name}</button>
+                `).join("")}
+            </div>
+        </div>` : "";
+
+    const sizeBlock = sizes.length ? `
+        <div class="variant-sheet-group">
+            <span class="variant-sheet-label">Size<span id="sheet-size-name" class="variant-sheet-chosen"></span></span>
+            <div class="variant-sheet-options">
+                ${sizes.map(s => `
+                    <button type="button" class="variant-option" data-size-id="${s.id}" data-size-name="${s.name}">${s.name}</button>
+                `).join("")}
+            </div>
+        </div>` : "";
+
+    overlay.innerHTML = `
+        <div class="variant-sheet" role="dialog" aria-modal="true" aria-label="Choose options for ${product.name}">
+            <div class="variant-sheet-head">
+                <img src="${product.card_image || product.image}" alt="" class="variant-sheet-thumb">
+                <div>
+                    <p class="variant-sheet-name">${product.name}</p>
+                    <p class="variant-sheet-price">${buildPriceHtml(product)}</p>
+                </div>
+                <button type="button" class="variant-sheet-close" id="variant-sheet-close" aria-label="Close">×</button>
+            </div>
+            ${colorBlock}
+            ${sizeBlock}
+            <p class="variant-sheet-hint" id="variant-sheet-hint"></p>
+            <button type="button" class="variant-sheet-confirm" id="variant-sheet-confirm">Add to cart</button>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+    document.body.classList.add("sheet-open");
+
+    overlay.addEventListener("click", event => {
+        if (event.target === overlay) closeVariantSheet();
+    });
+
+    document.getElementById("variant-sheet-close").onclick = closeVariantSheet;
+
+    overlay.querySelectorAll(".variant-option").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const isColor = btn.dataset.colorId !== undefined;
+            const group = btn.closest(".variant-sheet-group");
+
+            group.querySelectorAll(".variant-option").forEach(b => b.classList.remove("selected"));
+            btn.classList.add("selected");
+
+            if (isColor) {
+                sheetSelection.colorId = Number(btn.dataset.colorId);
+                sheetSelection.colorName = btn.dataset.colorName;
+                const label = document.getElementById("sheet-color-name");
+                if (label) label.textContent = ` · ${btn.dataset.colorName}`;
+            } else {
+                sheetSelection.sizeId = Number(btn.dataset.sizeId);
+                sheetSelection.sizeName = btn.dataset.sizeName;
+                const label = document.getElementById("sheet-size-name");
+                if (label) label.textContent = ` · ${btn.dataset.sizeName}`;
+            }
+
+            const hint = document.getElementById("variant-sheet-hint");
+            if (hint) hint.textContent = "";
+        });
+    });
+
+    document.getElementById("variant-sheet-confirm").onclick = () => {
+        const hint = document.getElementById("variant-sheet-hint");
+
+        // Every option shown has to be chosen. Adding a dress with no size
+        // picked is the exact mis-sell this sheet exists to prevent.
+        if (colors.length && sheetSelection.colorId === null) {
+            if (hint) hint.textContent = "Choose a colour first.";
+            return;
+        }
+        if (sizes.length && sheetSelection.sizeId === null) {
+            if (hint) hint.textContent = "Choose a size first.";
+            return;
+        }
+
+        addToCart(
+            product.id,
+            product.name,
+            product.price,
+            product.image,
+            product.description,
+            sheetSelection.colorId,
+            sheetSelection.colorName,
+            sheetSelection.sizeId,
+            sheetSelection.sizeName
+        );
+
+        closeVariantSheet();
+
+        const parts = [sheetSelection.colorName, sheetSelection.sizeName].filter(Boolean);
+        showAddToCartFeedback(parts.length ? `${product.name} (${parts.join(", ")})` : product.name);
+    };
+}
+
+function closeVariantSheet() {
+    const existing = document.getElementById("variant-sheet-overlay");
+    if (existing) existing.remove();
+    document.body.classList.remove("sheet-open");
+}
+
+document.addEventListener("keydown", event => {
+    if (event.key === "Escape") closeVariantSheet();
+});
+
+document.addEventListener("click", event => {
+    const btn = event.target.closest("[data-quick-add]");
+    if (!btn) return;
+
+    // The card itself navigates to the detail page, so the "+" must not bubble.
+    event.stopPropagation();
+    event.preventDefault();
+
+    handleQuickAdd(Number(btn.dataset.quickAdd), btn);
+});
+
 function handleAddToCart(productId, variant = null) {
     const product = allProducts.find(p => p.id === productId);
 
@@ -371,47 +559,10 @@ function displayFeaturedProducts(products, limit = 8) {
         return;
     }
 
-    featured.forEach(product => {
-        const card = document.createElement("div");
-        card.className = "product-card";
-        card.style.cursor = "pointer";
-        card.onclick = (event) => {
-            if (event.target.closest(".add-to-cart-btn")) {
-                return;
-            }
-            window.location.href = `product-detail.html?id=${product.id}`;
-        };
-
-        const outOfStock = product.stock !== undefined && Number(product.stock) <= 0;
-
-        card.innerHTML = `
-            <div class="product-image-wrapper">
-                ${buildBadge(product)}
-                <img
-                    src="${product.card_image || product.image}"
-                    alt="${product.name}"
-                    class="product-image"
-                    loading="lazy"
-                >
-            </div>
-
-            <h3 class="product-name">${product.name}</h3>
-
-            ${buildRatingStars(product.rating)}
-
-            ${buildPriceHtml(product)}
-
-            <button
-                class="add-to-cart-btn"
-                onclick="handleAddToCart(${product.id})"
-                ${outOfStock ? "disabled" : ""}
-            >
-                ${outOfStock ? "Unavailable" : "Add To Cart 🛒"}
-            </button>
-        `;
-
-        container.appendChild(card);
-    });
+    // Shares buildProductCard with the catalogue. This used to be a second copy
+    // of the markup, which is how index.html kept the old button after the
+    // products page was restyled.
+    featured.forEach(product => container.appendChild(buildProductCard(product)));
 }
 
 let cameFromCart = false;
