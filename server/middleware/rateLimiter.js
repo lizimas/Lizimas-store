@@ -1,4 +1,5 @@
 const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
+const { PostgresStore } = require("./pgRateLimitStore");
 
 // Strict limiter for password login endpoints.
 // Keyed on normalised email + IP so that shared carrier NAT addresses
@@ -6,6 +7,7 @@ const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
+  store: new PostgresStore("login"),
   keyGenerator: (req, res) => {
     const email = String((req.body && req.body.email) || "").trim().toLowerCase();
     return `${ipKeyGenerator(req.ip)}:${email}`;
@@ -20,6 +22,7 @@ const loginLimiter = rateLimit({
 const otpLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
+  store: new PostgresStore("otp"),
   message: { error: "Too many code requests. Please try again in 15 minutes." },
   standardHeaders: true,
   legacyHeaders: false,
@@ -30,6 +33,7 @@ const otpLimiter = rateLimit({
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 50,
+  store: new PostgresStore("auth"),
   message: { error: "Too many attempts. Please try again in 15 minutes." },
   standardHeaders: true,
   legacyHeaders: false,
