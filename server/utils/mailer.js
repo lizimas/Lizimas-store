@@ -50,17 +50,20 @@ async function sendOrderStatusEmail(email, order, status) {
     }
 }
 
-async function sendPasswordResetEmail(email, resetLink) {
+async function sendPasswordResetEmail(email, resetLink, validMinutes = 15) {
     try {
         await transporter.sendMail({
             from: process.env.EMAIL_USER,
             to: email,
             subject: "Reset Your Password - Lizimas Store",
-            text: `We received a request to reset your password.\n\nClick the link below to set a new password (valid for 15 minutes):\n${resetLink}\n\nIf you didn't request this, you can safely ignore this email - your password will remain unchanged.`
+            text: `We received a request to reset your password.\n\nClick the link below to set a new password (valid for ${validMinutes} minutes):\n${resetLink}\n\nThis link can only be used once.\n\nIf you didn't request this, you can safely ignore this email - your password will remain unchanged.`
         });
+        return true;
     } catch (error) {
         console.error("Password reset email error:", error);
-        // Don't throw - a failed email should never crash the request
+        // Don't throw - a failed email should never crash the request.
+        // Callers that care (forcePasswordReset) can check the return value.
+        return false;
     }
 }
 

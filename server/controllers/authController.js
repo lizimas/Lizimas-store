@@ -553,12 +553,12 @@ async function forgotPassword(req, res) {
         const resetToken = jwt.sign(
             { userId: user.id, email: user.email, purpose: "passwordReset" },
             JWT_SECRET,
-            { expiresIn: "15m" }
+            { expiresIn: "5m" }
         );
 
         const resetLink = `${req.protocol}://${req.get("host")}/reset-password.html?token=${resetToken}`;
 
-        sendPasswordResetEmail(user.email, resetLink).catch(err => console.error("Password reset email failed:", err));
+        sendPasswordResetEmail(user.email, resetLink, 5).catch(err => console.error("Password reset email failed:", err));
 
         res.json({ message: genericMessage });
 
@@ -591,10 +591,27 @@ async function resetPassword(req, res) {
             return res.status(401).json({ error: "Invalid reset link." });
         }
 
+        // Single-use enforcement. JWTs can't be revoked, so instead any password
+        // change stamps password_changed_at, and a token issued before that stamp
+        // is treated as spent. NULL means never recorded, which stays valid.
+        const freshness = await pool.query(
+            "SELECT password_changed_at FROM users WHERE id = $1",
+            [decoded.userId]
+        );
+
+        if (freshness.rows.length === 0) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        const changedAt = freshness.rows[0].password_changed_at;
+        if (changedAt && decoded.iat * 1000 < new Date(changedAt).getTime()) {
+            return res.status(401).json({ error: "This reset link has already been used. Please request a new one." });
+        }
+
         const hashedPassword = await bcrypt.hash(newPassword, 10);
 
         await pool.query(
-            "UPDATE users SET password = $1 WHERE id = $2",
+            "UPDATE users SET password = $1, must_reset_password = false, password_changed_at = NOW() WHERE id = $2",
             [hashedPassword, decoded.userId]
         );
 
@@ -620,7 +637,27 @@ async function forcePasswordReset(req, res) {
             return res.status(404).json({ error: "User not found." });
         }
 
-        res.json({ message: "This user will be required to reset their password on next login.", user: result.rows[0] });
+        const target = result.rows[0];
+
+        // Staff and admins are excluded from self-service reset by design, so this
+        // email is their only route back in. Longer validity than the 5 minute
+        // self-service link because the person is not sitting at the screen waiting.
+        const resetToken = jwt.sign(
+            { userId: target.id, email: target.email, purpose: "passwordReset" },
+            JWT_SECRET,
+            { expiresIn: "30m" }
+        );
+
+        const resetLink = `${req.protocol}://${req.get("host")}/reset-password.html?token=${resetToken}`;
+        const emailSent = await sendPasswordResetEmail(target.email, resetLink, 30);
+
+        res.json({
+            message: emailSent
+                ? `A password reset link has been emailed to ${target.email}. It expires in 30 minutes.`
+                : `Reset flag set, but the email to ${target.email} could not be sent. Check the mail credentials and try again.`,
+            emailSent,
+            user: target
+        });
 
     } catch (error) {
         console.error("Force password reset error:", error);
@@ -655,7 +692,7 @@ async function completeForcedPasswordReset(req, res) {
         const hashedPassword = await bcrypt.hash(newPassword, 10);
 
         await pool.query(
-            "UPDATE users SET password = $1, must_reset_password = false WHERE id = $2",
+            "UPDATE users SET password = $1, must_reset_password = false, password_changed_at = NOW() WHERE id = $2",
             [hashedPassword, decoded.userId]
         );
 
@@ -775,7 +812,7 @@ async function changePassword(req, res) {
         const newHashedPassword = await bcrypt.hash(newPassword, 10);
 
         await pool.query(
-            "UPDATE users SET password = $1 WHERE id = $2",
+            "UPDATE users SET password = $1, password_changed_at = NOW() WHERE id = $2",
             [newHashedPassword, user.id]
         );
 

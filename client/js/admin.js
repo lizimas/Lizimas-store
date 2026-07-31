@@ -2203,7 +2203,7 @@ function closeGenericModal() {
 }
 
 async function forceResetStaff(id, name) {
-    if (!confirm(`Require ${name} to set a new password on their next login?`)) return;
+    if (!confirm(`Email ${name} a password reset link and require a new password before their next login?`)) return;
     try {
         const token = getToken();
         const response = await fetch(`${API_URL}/api/admin/staff/${id}/force-reset`, {
@@ -2215,7 +2215,13 @@ async function forceResetStaff(id, name) {
             alert(data.error || "Could not force password reset.");
             return;
         }
-        showToast(`${name} will be required to reset their password on next login.`);
+        // A failed email leaves the account flagged but the person with no way
+        // back in, so it needs an alert rather than a toast that scrolls past.
+        if (data.emailSent === false) {
+            alert(data.message || `${name} is flagged for reset, but the email could not be sent.`);
+            return;
+        }
+        showToast(data.message || `${name} will be required to reset their password on next login.`);
     } catch (error) {
         console.error("Force reset error:", error);
         alert("Something went wrong.");

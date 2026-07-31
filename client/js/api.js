@@ -5,7 +5,14 @@ async function apiGet(endpoint) {
         const response = await fetch(`${API_BASE}${endpoint}`);
 
         if (!response.ok) {
-            throw new Error(`Request failed: ${response.status}`);
+            let serverMessage = `Request failed: ${response.status}`;
+            try {
+                const body = await response.json();
+                if (body && body.error) serverMessage = body.error;
+            } catch (parseError) {
+                // Non-JSON error response - fall back to the status line
+            }
+            throw new Error(serverMessage);
         }
 
         return await response.json();
@@ -26,7 +33,14 @@ async function apiPost(endpoint, data) {
         });
 
         if (!response.ok) {
-            throw new Error(`Request failed: ${response.status}`);
+            let serverMessage = `Request failed: ${response.status}`;
+            try {
+                const body = await response.json();
+                if (body && body.error) serverMessage = body.error;
+            } catch (parseError) {
+                // Non-JSON error response - fall back to the status line
+            }
+            throw new Error(serverMessage);
         }
 
         return await response.json();
@@ -43,7 +57,14 @@ async function apiGetAuth(endpoint) {
         });
 
         if (!response.ok) {
-            throw new Error(`Request failed: ${response.status}`);
+            let serverMessage = `Request failed: ${response.status}`;
+            try {
+                const body = await response.json();
+                if (body && body.error) serverMessage = body.error;
+            } catch (parseError) {
+                // Non-JSON error response - fall back to the status line
+            }
+            throw new Error(serverMessage);
         }
 
         return await response.json();
@@ -66,7 +87,14 @@ async function apiPostAuth(endpoint, data) {
         });
 
         if (!response.ok) {
-            throw new Error(`Request failed: ${response.status}`);
+            let serverMessage = `Request failed: ${response.status}`;
+            try {
+                const body = await response.json();
+                if (body && body.error) serverMessage = body.error;
+            } catch (parseError) {
+                // Non-JSON error response - fall back to the status line
+            }
+            throw new Error(serverMessage);
         }
 
         return await response.json();

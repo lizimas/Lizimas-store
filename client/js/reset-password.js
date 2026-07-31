@@ -41,6 +41,6 @@ async function submitNewPassword() {
 
     } catch (error) {
         console.error(error);
-        statusEl.textContent = "This reset link has expired or is invalid. Please request a new one.";
+        statusEl.textContent = error.message || "This reset link has expired or is invalid. Please request a new one.";
     }
 }
