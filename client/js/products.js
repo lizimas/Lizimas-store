@@ -8,7 +8,7 @@ async function loadProducts() {
         const response = await fetch(`${API_URL}/api/products`);
         allProducts = await response.json();
         console.log("Lizimas Products Loaded:", allProducts);
-        displayProducts(allProducts);
+        renderCatalogue();
         displayFeaturedProducts(allProducts);
     } catch (error) {
         console.error("Product loading error:", error);
@@ -64,6 +64,51 @@ function buildPriceHtml(product) {
     return `<p class="product-price">UGX ${priceFormatted}</p>`;
 }
 
+// Builds one product card. Extracted so grouped sections and search results
+// render identical markup - editing one used to leave the other behind.
+function buildProductCard(product) {
+    const card = document.createElement("div");
+    card.className = "product-card";
+    card.style.cursor = "pointer";
+    card.onclick = (event) => {
+        if (event.target.closest(".add-to-cart-btn")) {
+            return;
+        }
+        window.location.href = `product-detail.html?id=${product.id}`;
+    };
+
+    const outOfStock = product.stock !== undefined && Number(product.stock) <= 0;
+
+    card.innerHTML = `
+        <div class="product-image-wrapper">
+            ${buildBadge(product)}
+            <img
+                src="${product.card_image || product.image}"
+                alt="${product.name}"
+                class="product-image"
+                loading="lazy"
+            >
+        </div>
+
+        <h3 class="product-name">${product.name}</h3>
+
+        ${buildRatingStars(product.rating)}
+
+        ${buildPriceHtml(product)}
+
+        <button
+            class="add-to-cart-btn"
+            onclick="handleAddToCart(${product.id})"
+            ${outOfStock ? "disabled" : ""}
+        >
+            ${outOfStock ? "Unavailable" : "Add To Cart 🛒"}
+        </button>
+    `;
+
+    return card;
+}
+
+// Flat grid. Used for search results and for a single selected category.
 function displayProducts(products) {
     const container = document.getElementById("products-container");
 
@@ -79,48 +124,126 @@ function displayProducts(products) {
         return;
     }
 
+    const grid = document.createElement("div");
+    grid.className = "product-grid";
+    products.forEach(product => grid.appendChild(buildProductCard(product)));
+    container.appendChild(grid);
+}
+
+// ---------------------------------------------------------------------------
+// Catalogue grouping
+// ---------------------------------------------------------------------------
+
+const ALL_CATEGORIES = "All";
+let activeCategory = ALL_CATEGORIES;
+
+function categoryNameOf(product) {
+    return (product.category || "Uncategorised").trim() || "Uncategorised";
+}
+
+// Categories ordered by how much stock sits in them, so the fullest sections
+// lead and single-product ones trail instead of interrupting the page.
+function groupByCategory(products) {
+    const groups = new Map();
+
     products.forEach(product => {
-        const card = document.createElement("div");
-        card.className = "product-card";
-        card.style.cursor = "pointer";
-        card.onclick = (event) => {
-            if (event.target.closest(".add-to-cart-btn")) {
-                return;
-            }
-            window.location.href = `product-detail.html?id=${product.id}`;
-        };
+        const name = categoryNameOf(product);
+        if (!groups.has(name)) groups.set(name, []);
+        groups.get(name).push(product);
+    });
 
-        const outOfStock = product.stock !== undefined && Number(product.stock) <= 0;
+    return Array.from(groups.entries())
+        .map(([name, items]) => ({ name, items }))
+        .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name));
+}
 
-        card.innerHTML = `
-            <div class="product-image-wrapper">
-                ${buildBadge(product)}
-                <img
-                    src="${product.card_image || product.image}"
-                    alt="${product.name}"
-                    class="product-image"
-                    loading="lazy"
-                >
-            </div>
+function renderCategoryChips(products) {
+    const row = document.getElementById("category-chips");
+    if (!row) return;
 
-            <h3 class="product-name">${product.name}</h3>
+    const groups = groupByCategory(products);
+    const names = [ALL_CATEGORIES, ...groups.map(g => g.name)];
 
-            ${buildRatingStars(product.rating)}
+    row.innerHTML = names.map(name => `
+        <button
+            type="button"
+            class="category-chip"
+            data-category="${name}"
+            aria-pressed="${name === activeCategory}"
+        >${name}</button>
+    `).join("");
+}
 
-            ${buildPriceHtml(product)}
+function renderGroupedCatalogue(products) {
+    const container = document.getElementById("products-container");
+    if (!container) return;
 
-            <button
-                class="add-to-cart-btn"
-                onclick="handleAddToCart(${product.id})"
-                ${outOfStock ? "disabled" : ""}
-            >
-                ${outOfStock ? "Unavailable" : "Add To Cart 🛒"}
-            </button>
+    container.innerHTML = "";
+
+    if (!products || products.length === 0) {
+        container.innerHTML = `<p class="no-products-message">No products found.</p>`;
+        return;
+    }
+
+    groupByCategory(products).forEach(group => {
+        const section = document.createElement("section");
+        section.className = "category-section";
+
+        const head = document.createElement("div");
+        head.className = "category-section-head";
+        head.innerHTML = `
+            <h2 class="category-section-title">${group.name}</h2>
+            <span class="category-section-count">${group.items.length} item${group.items.length === 1 ? "" : "s"}</span>
         `;
+        section.appendChild(head);
 
-        container.appendChild(card);
+        const grid = document.createElement("div");
+        grid.className = "product-grid";
+        group.items.forEach(product => grid.appendChild(buildProductCard(product)));
+        section.appendChild(grid);
+
+        container.appendChild(section);
     });
 }
+
+// Single entry point for the catalogue view. Search is handled separately
+// because it has its own empty state.
+function renderCatalogue() {
+    renderCategoryChips(allProducts);
+
+    if (activeCategory === ALL_CATEGORIES) {
+        renderGroupedCatalogue(allProducts);
+    } else {
+        displayProducts(allProducts.filter(p => categoryNameOf(p) === activeCategory));
+    }
+}
+
+function setActiveCategory(name) {
+    activeCategory = name;
+
+    const searchInput = document.getElementById("search-input");
+    if (searchInput && searchInput.value.trim() !== "") {
+        // A chip change while searching re-runs the search in the new scope.
+        searchProducts();
+        renderCategoryChips(allProducts);
+        return;
+    }
+
+    renderCatalogue();
+}
+
+document.addEventListener("click", event => {
+    const chip = event.target.closest(".category-chip");
+    if (chip) {
+        setActiveCategory(chip.dataset.category);
+        return;
+    }
+
+    const widen = event.target.closest("#widen-search-btn");
+    if (widen) {
+        setActiveCategory(ALL_CATEGORIES);
+    }
+});
 
 function handleAddToCart(productId, variant = null) {
     const product = allProducts.find(p => p.id === productId);
@@ -184,11 +307,11 @@ function searchProducts() {
         .trim();
 
     if (searchValue === "") {
-        displayProducts(allProducts);
+        renderCatalogue();
         return;
     }
 
-    const filteredProducts = allProducts.filter(product => {
+    const matches = product => {
         const name = (product.name || "").toLowerCase();
         const category = (product.category || "").toLowerCase();
         const description = (product.description || "").toLowerCase();
@@ -198,9 +321,33 @@ function searchProducts() {
             category.includes(searchValue) ||
             description.includes(searchValue)
         );
-    });
+    };
 
-    displayProducts(filteredProducts);
+    const allMatches = allProducts.filter(matches);
+    const scopedMatches = activeCategory === ALL_CATEGORIES
+        ? allMatches
+        : allMatches.filter(p => categoryNameOf(p) === activeCategory);
+
+    // A scoped search that finds nothing looks like "we don't stock this".
+    // If the item exists in another category, say so and offer a way through.
+    if (scopedMatches.length === 0 && allMatches.length > 0) {
+        const container = document.getElementById("products-container");
+        if (container) {
+            container.innerHTML = `
+                <div class="search-widen">
+                    <p class="no-products-message">
+                        Nothing matching "${searchValue}" in ${activeCategory}.
+                        ${allMatches.length} result${allMatches.length === 1 ? "" : "s"} in other categories.
+                    </p>
+                    <button type="button" id="widen-search-btn" class="widen-search-btn">
+                        Search all categories
+                    </button>
+                </div>
+            `;
+        }
+    } else {
+        displayProducts(scopedMatches);
+    }
 
     clearTimeout(searchLogTimeout);
     searchLogTimeout = setTimeout(() => {

@@ -2567,3 +2567,122 @@ width:90%;
 .pd-sheet-head { display: flex; justify-content: space-between; align-items: center; }
 .pd-sheet-head h3 { margin: 0; font-size: 18px; }
 .pd-sheet-close { background: none; border: none; font-size: 26px; line-height: 1; }
+
+
+/* ============================================================
+   Catalogue grouping - category chips and sections
+   ============================================================ */
+
+.category-chips {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 14px 0 18px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.category-chips::-webkit-scrollbar {
+    display: none;
+}
+
+.category-chip {
+    flex: 0 0 auto;
+    border: 1px solid #d9d9d9;
+    background: #fff;
+    color: #555;
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.category-chip:hover {
+    border-color: #FF6600;
+    color: #FF6600;
+}
+
+.category-chip[aria-pressed="true"] {
+    background: #FF6600;
+    border-color: #FF6600;
+    color: #fff;
+}
+
+.category-chip:focus-visible {
+    outline: 2px solid #FF6600;
+    outline-offset: 2px;
+}
+
+.category-section {
+    margin-bottom: 38px;
+}
+
+.category-section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ececec;
+}
+
+.category-section-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.category-section-count {
+    font-size: 13px;
+    color: #888;
+    white-space: nowrap;
+}
+
+/* Scoped-search empty state */
+.search-widen {
+    text-align: center;
+    padding: 30px 16px 40px;
+}
+
+.widen-search-btn {
+    margin-top: 14px;
+    background: #FF6600;
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: 11px 22px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.widen-search-btn:hover {
+    background: #e65c00;
+}
+
+.widen-search-btn:focus-visible {
+    outline: 2px solid #FF6600;
+    outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+    .category-section-title {
+        font-size: 17px;
+    }
+
+    .category-chip {
+        font-size: 13px;
+        padding: 7px 14px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .category-chip {
+        transition: none;
+    }
+}
