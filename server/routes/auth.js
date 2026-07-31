@@ -26,17 +26,18 @@ const {
     removeProfilePhoto
 } = require("./../controllers/authController");
 
+const { loginLimiter, otpLimiter } = require("../middleware/rateLimiter");
 const { requireAuth } = require("../middleware/authMiddleware");
 const upload = require("../middleware/upload");
 
 router.post("/register", registerUser);
-router.post("/login", loginUser);
-router.post("/admin-login", adminLogin);
-router.post("/login/2fa", verifyLogin2FA);
-router.post("/login/2fa/email", requestEmail2FACode);
+router.post("/login", loginLimiter, loginUser);
+router.post("/admin-login", loginLimiter, adminLogin);
+router.post("/login/2fa", otpLimiter, verifyLogin2FA);
+router.post("/login/2fa/email", otpLimiter, requestEmail2FACode);
 router.post("/complete-forced-reset", completeForcedPasswordReset);
-router.post("/forgot-password", forgotPassword);
-router.post("/reset-password", resetPassword);
+router.post("/forgot-password", otpLimiter, forgotPassword);
+router.post("/reset-password", otpLimiter, resetPassword);
 router.get("/me", requireAuth, getCurrentUser);
 
 router.patch("/password", requireAuth, changePassword);
