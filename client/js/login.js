@@ -59,3 +59,63 @@ async function verifyTwoFactor() {
         statusEl.textContent = "Invalid code. Please try again.";
     }
 }
+
+
+let emailCodeCooldown = null;
+
+async function requestEmailLoginCode() {
+    const btn = document.getElementById("twofa-email-btn");
+    const statusEl = document.getElementById("twofa-status");
+
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = "Sending...";
+
+    try {
+        const response = await fetch("/api/auth/login/2fa/email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pendingToken: pendingLoginToken })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            statusEl.textContent = data.error || "Could not send the code.";
+            btn.disabled = false;
+            btn.textContent = "Email me a code instead";
+            return;
+        }
+
+        statusEl.textContent = "A code has been sent to your email. It expires in 10 minutes.";
+        startEmailCodeCooldown(60);
+
+    } catch (error) {
+        console.error("Request email login code error:", error);
+        statusEl.textContent = "Could not connect to server.";
+        btn.disabled = false;
+        btn.textContent = "Email me a code instead";
+    }
+}
+
+function startEmailCodeCooldown(seconds) {
+    const btn = document.getElementById("twofa-email-btn");
+    let remaining = seconds;
+
+    if (emailCodeCooldown) clearInterval(emailCodeCooldown);
+
+    btn.disabled = true;
+    btn.textContent = `Resend in ${remaining}s`;
+
+    emailCodeCooldown = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+            clearInterval(emailCodeCooldown);
+            emailCodeCooldown = null;
+            btn.disabled = false;
+            btn.textContent = "Email me a code instead";
+        } else {
+            btn.textContent = `Resend in ${remaining}s`;
+        }
+    }, 1000);
+}

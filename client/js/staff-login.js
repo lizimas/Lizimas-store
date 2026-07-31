@@ -63,6 +63,7 @@ async function handleStaffLogin() {
             document.getElementById("login-2fa-code").classList.remove("hidden");
             document.getElementById("login-btn").classList.add("hidden");
             document.getElementById("login-2fa-btn").classList.remove("hidden");
+            document.getElementById("login-2fa-email-btn").classList.remove("hidden");
             document.getElementById("login-error").textContent = "Enter the 6-digit code from your authenticator app.";
             return;
         }
@@ -147,4 +148,64 @@ async function submitStaffForcedReset() {
         console.error("Complete forced reset error:", error);
         document.getElementById("login-error").textContent = "Could not connect to server.";
     }
+}
+
+
+let emailCodeCooldown = null;
+
+async function requestEmailLoginCode() {
+    const btn = document.getElementById("login-2fa-email-btn");
+    const errorEl = document.getElementById("login-error");
+
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = "Sending...";
+
+    try {
+        const response = await fetch(`${API_URL}/api/auth/login/2fa/email`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pendingToken: pendingLoginToken })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            errorEl.textContent = data.error || "Could not send the code.";
+            btn.disabled = false;
+            btn.textContent = "Email me a code instead";
+            return;
+        }
+
+        errorEl.textContent = "A code has been sent to your email. It expires in 10 minutes.";
+        startEmailCodeCooldown(60);
+
+    } catch (error) {
+        console.error("Request email login code error:", error);
+        errorEl.textContent = "Could not connect to server.";
+        btn.disabled = false;
+        btn.textContent = "Email me a code instead";
+    }
+}
+
+function startEmailCodeCooldown(seconds) {
+    const btn = document.getElementById("login-2fa-email-btn");
+    let remaining = seconds;
+
+    if (emailCodeCooldown) clearInterval(emailCodeCooldown);
+
+    btn.disabled = true;
+    btn.textContent = `Resend in ${remaining}s`;
+
+    emailCodeCooldown = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+            clearInterval(emailCodeCooldown);
+            emailCodeCooldown = null;
+            btn.disabled = false;
+            btn.textContent = "Email me a code instead";
+        } else {
+            btn.textContent = `Resend in ${remaining}s`;
+        }
+    }, 1000);
 }

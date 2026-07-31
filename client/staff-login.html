@@ -18,6 +18,7 @@
 
             <input type="text" id="login-2fa-code" class="hidden" placeholder="Enter 6-digit code">
             <button id="login-2fa-btn" class="hidden" onclick="submitStaffLogin2FA()">Verify Code</button>
+            <button id="login-2fa-email-btn" class="hidden" onclick="requestEmailLoginCode()" style="background:none; border:none; color:#C9A227; text-decoration:underline; cursor:pointer; font-size:14px; padding:8px 0;">Email me a code instead</button>
 
             <input type="password" id="login-reset-password" class="hidden" placeholder="New password">
             <input type="password" id="login-reset-password-confirm" class="hidden" placeholder="Confirm new password">
@@ -27,6 +28,6 @@
         </div>
     </div>
 
-    <script src="js/staff-login.js"></script>
+    <script src="js/staff-login.js?v=2"></script>
 </body>
 </html>
