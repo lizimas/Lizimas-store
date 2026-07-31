@@ -9,6 +9,11 @@ const logVisitor = require("./middleware/visitorLogger");
 
 const app = express();
 
+// Render places exactly one proxy hop in front of the app.
+// Trusting one hop makes req.ip the real client address for rate limiting,
+// without allowing a spoofed X-Forwarded-For to bypass the limiters.
+app.set("trust proxy", 1);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
