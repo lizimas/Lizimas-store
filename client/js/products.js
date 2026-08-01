@@ -8,6 +8,15 @@ async function loadProducts() {
         const response = await fetch(`${API_URL}/api/products`);
         allProducts = await response.json();
         console.log("Lizimas Products Loaded:", allProducts);
+
+        // A category tile on the homepage links here with ?category=Name.
+        // Applied before the first render so the filtered view is what paints.
+        const requestedCategory = new URLSearchParams(window.location.search).get("category");
+        if (requestedCategory) {
+            const match = allProducts.find(p => categoryNameOf(p) === requestedCategory);
+            if (match) activeCategory = requestedCategory;
+        }
+
         renderCatalogue();
         displayFeaturedProducts(allProducts);
     } catch (error) {
