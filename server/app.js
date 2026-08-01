@@ -32,6 +32,23 @@ app.use("/api", routes);
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use(express.static(path.join(__dirname, "../client")));
 
+// Upload and multipart errors must return JSON, not an HTML crash page,
+// or the admin panel shows a raw stack trace to the user.
+app.use((err, req, res, next) => {
+    if (err && err.code === "INVALID_FILE_TYPE") {
+        return res.status(400).json({ message: err.message });
+    }
+    if (err && err.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({ message: "That image is larger than the 5MB limit." });
+    }
+    if (err && err.name === "MulterError") {
+        return res.status(400).json({ message: `Upload failed: ${err.message}` });
+    }
+
+    console.error("Unhandled error:", err);
+    res.status(500).json({ message: "Something went wrong on the server." });
+});
+
 // Test route
 app.get("/", (req, res) => {
     res.json({

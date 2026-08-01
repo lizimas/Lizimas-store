@@ -4,13 +4,20 @@ const path = require("path");
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|webp/;
-    const isValid = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    // Accept on either signal: some pickers (and some desktop browsers) hand us
+    // a file with a stripped or unusual extension but a correct mime type.
+    const allowedExt = /jpeg|jpg|png|webp/;
+    const allowedMime = /^image\/(jpeg|jpg|png|webp)$/;
 
-    if (isValid) {
+    const extOk = allowedExt.test(path.extname(file.originalname).toLowerCase());
+    const mimeOk = allowedMime.test((file.mimetype || "").toLowerCase());
+
+    if (extOk || mimeOk) {
         cb(null, true);
     } else {
-        cb(new Error("Only .jpeg, .jpg, .png, and .webp image files are allowed."));
+        const err = new Error("Only .jpeg, .jpg, .png, and .webp image files are allowed.");
+        err.code = "INVALID_FILE_TYPE";
+        cb(err);
     }
 };
 
