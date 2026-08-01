@@ -1050,3 +1050,41 @@ select.status-select {
     background: #f4b400;
     color: #1a1a2e;
 }
+
+/* ---------- Category management ---------- */
+
+.category-thumb {
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+    border-radius: 8px;
+    display: block;
+    border: 1px solid #e5e7eb;
+}
+
+.category-thumb-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f3f4f6;
+    color: #9ca3af;
+    font-size: 18px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.badge-active {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.badge-hidden {
+    background: #f3f4f6;
+    color: #6b7280;
+}

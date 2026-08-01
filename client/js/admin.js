@@ -2701,16 +2701,18 @@ function setupCategoryImagePicker() {
         errorEl.textContent = "";
         preview.innerHTML = "Preparing image…";
 
-        try {
-            const prepared = await preparePickedFile(file);
-            categoryPickedFile = prepared;
-            const url = URL.createObjectURL(prepared);
-            preview.innerHTML = `<img src="${url}" class="drag-drop-preview">`;
-        } catch (err) {
+        const result = await preparePickedFile(file);
+
+        if (!result.ok) {
             categoryPickedFile = null;
             preview.innerHTML = "";
-            errorEl.textContent = `Could not read that image (${file.name}). Try picking it from Files rather than Google Photos.`;
+            errorEl.textContent = `Could not read ${result.name} (${result.reason}). Re-select it, or pick from Files rather than a cloud gallery.`;
+            return;
         }
+
+        categoryPickedFile = result.file;
+        const url = URL.createObjectURL(result.file);
+        preview.innerHTML = `<img src="${url}" class="drag-drop-preview" style="max-width:160px; border-radius:8px;">`;
     });
 }
 
