@@ -1117,6 +1117,10 @@ function setupTabs() {
             button.classList.add("active");
             document.getElementById(`tab-${button.dataset.tab}`).classList.remove("hidden");
 
+            if (button.dataset.tab === "categories") {
+                loadAdminCategories();
+            }
+
             if (button.dataset.tab === "account") {
                 loadAccount2FAStatus();
                 loadAccountSessions();
@@ -1136,6 +1140,7 @@ function setupTabs() {
 
 document.addEventListener("DOMContentLoaded", () => {
     setupTabs();
+    setupCategoryImagePicker();
 
     if (getToken()) {
         showDashboard();
@@ -2598,5 +2603,166 @@ async function savePhotoOrder() {
         if (status) status.textContent = (res && res.success) ? "Order saved." : "Unexpected response.";
     } catch (e) {
         if (status) status.textContent = "Failed: " + e.message;
+    }
+}
+
+// ---------- Category management (admin only) ----------
+
+let adminCategories = [];
+let categoryPickedFile = null;
+
+async function loadAdminCategories() {
+    try {
+        adminCategories = await authorizedFetch("/api/categories/manage");
+        renderCategoriesTable();
+    } catch (error) {
+        console.error("Load categories error:", error);
+    }
+}
+
+function renderCategoriesTable() {
+    const tbody = document.getElementById("categories-table-body");
+    if (!tbody) return;
+
+    tbody.innerHTML = adminCategories.map(c => {
+        const thumb = c.image_url
+            ? `<img src="${c.image_url}" alt="${c.name}" class="category-thumb">`
+            : `<div class="category-thumb category-thumb-empty">—</div>`;
+        const status = c.is_active
+            ? `<span class="badge badge-active">Active</span>`
+            : `<span class="badge badge-hidden">Hidden</span>`;
+        const toggle = c.is_active
+            ? `<button onclick="setCategoryActive(${c.id}, false)">Hide</button>`
+            : `<button onclick="setCategoryActive(${c.id}, true)">Restore</button>`;
+
+        return `<tr>
+            <td data-label="Image">${thumb}</td>
+            <td data-label="Name">${c.name}</td>
+            <td data-label="Products">${c.product_count}</td>
+            <td data-label="Order">${c.display_order}</td>
+            <td data-label="Status">${status}</td>
+            <td data-label="Actions">
+                <button onclick="editCategory(${c.id})">Edit</button>
+                ${toggle}
+            </td>
+        </tr>`;
+    }).join("");
+}
+
+function openCategoryForm() {
+    document.getElementById("category-form-title").textContent = "Add Category";
+    document.getElementById("category-id").value = "";
+    document.getElementById("category-name").value = "";
+    document.getElementById("category-description").value = "";
+    document.getElementById("category-order").value = "";
+    document.getElementById("category-image-preview").innerHTML = "";
+    document.getElementById("category-form-error").textContent = "";
+    categoryPickedFile = null;
+    document.getElementById("category-form-container").classList.remove("hidden");
+}
+
+function editCategory(id) {
+    const c = adminCategories.find(x => x.id === id);
+    if (!c) return;
+
+    document.getElementById("category-form-title").textContent = "Edit Category";
+    document.getElementById("category-id").value = c.id;
+    document.getElementById("category-name").value = c.name;
+    document.getElementById("category-description").value = c.description || "";
+    document.getElementById("category-order").value = c.display_order;
+    document.getElementById("category-form-error").textContent = "";
+    categoryPickedFile = null;
+
+    document.getElementById("category-image-preview").innerHTML = c.image_url
+        ? `<img src="${c.image_url}" class="drag-drop-preview">`
+        : "";
+
+    document.getElementById("category-form-container").classList.remove("hidden");
+}
+
+function closeCategoryForm() {
+    document.getElementById("category-form-container").classList.add("hidden");
+    categoryPickedFile = null;
+}
+
+function setupCategoryImagePicker() {
+    const zone = document.getElementById("category-image-dropzone");
+    const input = document.getElementById("category-image");
+    if (!zone || !input) return;
+
+    zone.addEventListener("click", () => input.click());
+
+    input.addEventListener("change", async () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+
+        const preview = document.getElementById("category-image-preview");
+        const errorEl = document.getElementById("category-form-error");
+        errorEl.textContent = "";
+        preview.innerHTML = "Preparing image…";
+
+        try {
+            const prepared = await preparePickedFile(file);
+            categoryPickedFile = prepared;
+            const url = URL.createObjectURL(prepared);
+            preview.innerHTML = `<img src="${url}" class="drag-drop-preview">`;
+        } catch (err) {
+            categoryPickedFile = null;
+            preview.innerHTML = "";
+            errorEl.textContent = `Could not read that image (${file.name}). Try picking it from Files rather than Google Photos.`;
+        }
+    });
+}
+
+async function saveCategory() {
+    const errorEl = document.getElementById("category-form-error");
+    errorEl.textContent = "";
+
+    const id = document.getElementById("category-id").value;
+    const name = document.getElementById("category-name").value.trim();
+    const description = document.getElementById("category-description").value.trim();
+    const order = document.getElementById("category-order").value;
+
+    if (!name) {
+        errorEl.textContent = "Category name is required.";
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("description", description);
+    formData.append("display_order", order || 0);
+    if (categoryPickedFile) formData.append("image", categoryPickedFile);
+
+    try {
+        await authorizedFetch(
+            id ? `/api/categories/${id}` : "/api/categories",
+            { method: id ? "PUT" : "POST", body: formData }
+        );
+
+        closeCategoryForm();
+        await loadAdminCategories();
+    } catch (error) {
+        console.error("Save category error:", error);
+        errorEl.textContent = error.message || "Save failed. Check your connection and try again.";
+    }
+}
+
+async function setCategoryActive(id, isActive) {
+    const c = adminCategories.find(x => x.id === id);
+    if (!isActive && c && !confirm(`Hide "${c.name}" from the storefront? Its ${c.product_count} product(s) stay linked and it can be restored later.`)) {
+        return;
+    }
+
+    try {
+        await authorizedFetch(`/api/categories/${id}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ is_active: isActive })
+        });
+        await loadAdminCategories();
+    } catch (error) {
+        console.error("Set category status error:", error);
+        alert("Could not update category status.");
     }
 }

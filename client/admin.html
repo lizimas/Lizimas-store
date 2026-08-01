@@ -57,6 +57,9 @@
                     <button class="tab-btn" data-tab="products">
                         <span class="sidebar-icon">&#128230;</span> Products
                     </button>
+                    <button class="tab-btn" data-tab="categories">
+                        Categories
+                    </button>
                     <button class="tab-btn" data-tab="orders">
                         <span class="sidebar-icon">&#128203;</span> Orders
                     </button>
@@ -223,6 +226,59 @@
                     <div id="products-table">Loading...</div>
                 </section>
 
+                <section id="tab-categories" class="tab-content hidden">
+                    <h2 class="admin-page-title">Categories</h2>
+
+                    <button class="add-btn" onclick="openCategoryForm()">+ Add Category</button>
+
+                    <div id="category-form-container" class="hidden panel">
+                        <h3 id="category-form-title">Add Category</h3>
+                        <input type="hidden" id="category-id">
+
+                        <div class="product-form-sections">
+                            <div class="product-form-section">
+                                <h4>Details</h4>
+                                <div class="field-row">
+                                    <input type="text" id="category-name" placeholder="Category name">
+                                    <textarea id="category-description" placeholder="Description"></textarea>
+                                    <input type="number" id="category-order" placeholder="Display order (lower shows first)">
+                                </div>
+                            </div>
+
+                            <div class="product-form-section">
+                                <h4>Tile Image</h4>
+                                <div class="drag-drop-zone" id="category-image-dropzone">
+                                    Tap to choose a tile photo
+                                </div>
+                                <input type="file" id="category-image" accept="image/*" class="hidden">
+                                <div class="drag-drop-preview-grid" id="category-image-preview"></div>
+                            </div>
+                        </div>
+
+                        <p id="category-form-error" class="form-error"></p>
+                        <div class="form-actions">
+                            <button class="save-btn" onclick="saveCategory()">Save Category</button>
+                            <button class="cancel-btn" onclick="closeCategoryForm()">Cancel</button>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Image</th>
+                                    <th>Name</th>
+                                    <th>Products</th>
+                                    <th>Order</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="categories-table-body"></tbody>
+                        </table>
+                    </div>
+                </section>
+
                 <section id="tab-staff" class="tab-content hidden">
                     <h2 class="admin-page-title">Staff & Approvals</h2>
                     <p class="admin-page-subtitle">Manage staff accounts and review pending changes.</p>
@@ -349,7 +405,7 @@
     </div>
 
 <script src="js/prepare-picked-file.js?v=9"></script>
-    <script src="js/admin.js?v=15"></script>
+    <script src="js/admin.js?v=17"></script>
 <script src="js/photo-crop.js"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

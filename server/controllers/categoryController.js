@@ -20,10 +20,11 @@ function uploadBufferToCloudinary(fileBuffer) {
 exports.listCategories = async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT c.id, c.name, c.description, c.image_url, c.display_order,
+            `SELECT c.id, c.name, c.description, c.image_url, c.display_order, c.is_active,
                     COUNT(p.id)::int AS product_count
              FROM categories c
              LEFT JOIN products p ON p.category_id = c.id
+             WHERE c.is_active = true
              GROUP BY c.id
              ORDER BY c.display_order ASC, c.id ASC`
         );
@@ -53,7 +54,7 @@ exports.createCategory = async (req, res) => {
         const result = await pool.query(
             `INSERT INTO categories (name, description, image_url, display_order)
              VALUES ($1, $2, $3, $4)
-             RETURNING id, name, description, image_url, display_order`,
+             RETURNING id, name, description, image_url, display_order, is_active`,
             [name, description, imageUrl, displayOrder]
         );
 
@@ -100,7 +101,7 @@ exports.updateCategory = async (req, res) => {
             `UPDATE categories
              SET name = $1, description = $2, image_url = $3, display_order = $4
              WHERE id = $5
-             RETURNING id, name, description, image_url, display_order`,
+             RETURNING id, name, description, image_url, display_order, is_active`,
             [name, description, imageUrl, displayOrder, id]
         );
 
@@ -141,5 +142,52 @@ exports.deleteCategory = async (req, res) => {
     } catch (error) {
         console.error("Delete category error:", error);
         res.status(500).json({ message: "Failed to delete category" });
+    }
+};
+
+// Admin: full list including hidden categories
+exports.listAllCategories = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT c.id, c.name, c.description, c.image_url, c.display_order, c.is_active,
+                    COUNT(p.id)::int AS product_count
+             FROM categories c
+             LEFT JOIN products p ON p.category_id = c.id
+             GROUP BY c.id
+             ORDER BY c.display_order ASC, c.id ASC`
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error("List all categories error:", error);
+        res.status(500).json({ message: "Failed to load categories" });
+    }
+};
+
+// Admin: hide or restore a category without losing product links
+exports.setCategoryStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const isActive = req.body.is_active === true || req.body.is_active === "true";
+
+        const result = await pool.query(
+            `UPDATE categories SET is_active = $1 WHERE id = $2
+             RETURNING id, name, is_active`,
+            [isActive, id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "Category not found" });
+        }
+
+        const row = result.rows[0];
+        await logActivity(
+            req.user.id,
+            isActive ? "restore_category" : "hide_category",
+            "category", id,
+            `${isActive ? "Restored" : "Hid"} category "${row.name}"`
+        );
+        res.json(row);
+    } catch (error) {
+        console.error("Set category status error:", error);
+        res.status(500).json({ message: "Failed to update category status" });
     }
 };
