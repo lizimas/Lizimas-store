@@ -183,3 +183,10 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 
     .pd-gallery-col .pd-gallery { position: static; }
 }
+
+/* Descriptions are pasted with their own line breaks. textContent keeps the
+   characters but HTML collapses the whitespace, so preserve it here. */
+#pd-description {
+    white-space: pre-line;
+    line-height: 1.65;
+}
