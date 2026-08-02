@@ -8,7 +8,7 @@
 
 <title>Products - Lizimas & Talent Enterprise</title>
 
-<link rel="stylesheet" href="css/style.css?v=3">
+<link rel="stylesheet" href="css/style.css?v=17">
 
 </head>
 
@@ -16,38 +16,63 @@
 
 <!-- Header -->
 
-<header class="site-header">
+<header class="ls-header">
 
-<div class="container header-container">
+  <div class="ls-header-top">
 
-<a href="index.html" class="brand">
+    <a href="index.html" class="ls-brand">
+      <svg class="ls-mark" viewBox="0 0 512 512" aria-hidden="true">
+        <rect width="512" height="512" rx="123" fill="#1a1a2e"/>
+        <path d="M182 253 A74 74 0 0 1 330 253" fill="none" stroke="#F5C518" stroke-width="26"/>
+        <rect x="123" y="195" width="266" height="215" rx="31" fill="#F5C518"/>
+        <text x="256" y="335" font-family="Poppins, Segoe UI, sans-serif" font-size="133"
+              font-weight="700" fill="#1a1a2e" text-anchor="middle">LS</text>
+      </svg>
+      <span class="ls-wordmark">Lizimas-store</span>
+    </a>
 
-<img src="images/logo/logo.png" alt="Lizimas Logo">
+    <div class="ls-header-actions">
+      <a href="login.html" class="ls-action" title="Account">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="ls-action-label">Account</span>
+      </a>
 
-<div>
-<h1>Lizimas</h1>
-<span>& Talent Enterprise</span>
-</div>
+      <a href="cart.html" class="ls-action" title="Cart">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 4h2.2l2.6 12h9.6l2.2-8H7" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+          <circle cx="10" cy="20" r="1.6" fill="currentColor"/>
+          <circle cx="17" cy="20" r="1.6" fill="currentColor"/>
+        </svg>
+        <span class="ls-cart-count" id="cart-count">0</span>
+      </a>
+    </div>
 
-</a>
+  </div>
 
-<nav class="main-nav">
+  <div class="ls-nav-row">
+    <button class="ls-nav-all" id="ls-nav-all" type="button">
+      <span class="ls-burger"><span></span><span></span><span></span></span>
+      <span class="ls-nav-all-label">All Categories</span>
+    </button>
 
-<a href="index.html">Home</a>
-<a href="products.html">Shop</a>
-<a href="#">Supermarket</a>
-<a href="#">Boutique</a>
+    <form class="ls-search" onsubmit="return false;">
+      <svg viewBox="0 0 24 24" class="ls-search-icon" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
+        <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round"/>
+      </svg>
+      <input type="search" id="header-search" placeholder="Search for anything" autocomplete="off">
+    </form>
+  </div>
 
-<a href="cart.html" class="cart-link">
-🛒 Cart
-<span id="cart-count">0</span>
-</a>
-
-<a href="login.html">Login</a>
-
-</nav>
-
-</div>
+  <nav class="ls-nav" id="ls-nav">
+    <div class="ls-nav-parents" id="ls-nav-parents"></div>
+  </nav>
 
 </header>
 
@@ -68,12 +93,30 @@
 
 <script src="js/api.js"></script>
 <script src="js/cart.js?v=2"></script>
+<script src="js/categories.js?v=9"></script>
 <script src="js/products.js?v=4"></script>
 
 
 <a href="https://wa.me/256792363104" target="_blank" rel="noopener" class="whatsapp-float" aria-label="Chat with us on WhatsApp">
     <svg viewBox="0 0 24 24" width="28" height="28" fill="#FFFFFF"><path d="M17.6 6.32A8.86 8.86 0 0 0 12.02 3a8.94 8.94 0 0 0-7.75 13.4L3 21l4.72-1.24a8.9 8.9 0 0 0 4.29 1.1h.01c4.94 0 8.95-4 8.95-8.94a8.9 8.9 0 0 0-2.37-6.1ZM12.02 19.4a7.4 7.4 0 0 1-3.78-1.04l-.27-.16-2.8.74.75-2.73-.18-.28a7.43 7.43 0 0 1 11.62-9.2 7.36 7.36 0 0 1 2.18 5.25c0 4.1-3.34 7.42-7.52 7.42Zm4.08-5.56c-.22-.11-1.32-.65-1.53-.72-.2-.08-.35-.11-.5.11-.15.22-.58.72-.71.87-.13.15-.26.16-.48.06-.22-.11-.94-.35-1.79-1.11-.66-.59-1.11-1.32-1.24-1.54-.13-.22-.01-.34.1-.45.1-.1.22-.26.33-.39.11-.13.15-.22.22-.37.07-.15.04-.28-.02-.39-.06-.11-.5-1.21-.69-1.66-.18-.44-.37-.38-.5-.39h-.43c-.15 0-.39.06-.6.28-.2.22-.79.77-.79 1.87s.81 2.17.92 2.32c.11.15 1.6 2.44 3.87 3.42.54.23.96.37 1.29.48.54.17 1.03.15 1.42.09.43-.06 1.32-.54 1.51-1.06.19-.52.19-.96.13-1.06-.06-.09-.2-.15-.42-.26Z"/></svg>
 </a>
+
+
+<!-- Category drawer: level 1 in the rail, level 2 in the panel,
+     level 3 revealed by the arrow on each level-2 row. -->
+<div class="ls-drawer-backdrop" id="ls-drawer-backdrop" hidden></div>
+
+<aside class="ls-drawer" id="ls-drawer" hidden aria-label="All categories">
+  <div class="ls-drawer-head">
+    <span class="ls-drawer-title">All Categories</span>
+    <button class="ls-drawer-close" id="ls-drawer-close" aria-label="Close">&times;</button>
+  </div>
+
+  <div class="ls-drawer-body">
+    <nav class="ls-drawer-rail" id="ls-drawer-rail"></nav>
+    <div class="ls-drawer-panel" id="ls-drawer-panel"></div>
+  </div>
+</aside>
 
 </body>
 
