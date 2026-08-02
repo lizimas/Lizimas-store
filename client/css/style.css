@@ -3370,18 +3370,250 @@ body.sheet-open {
 }
 
 .ls-promo-dot {
-    width: 22px;
+    position: relative;
+    width: 30px;
     height: 4px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.55);
     border: none;
     padding: 0;
     cursor: pointer;
+    overflow: hidden;
 }
 
-.ls-promo-dot.active { background: #F5C518; }
+/* The active dot fills over the same interval as the slide timer,
+   so the bar doubles as a countdown. */
+.ls-promo-dot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: #F5C518;
+    border-radius: 999px;
+    transform: scaleX(0);
+    transform-origin: left;
+}
+
+.ls-promo-dot.active::after {
+    animation: ls-dot-fill 5s linear forwards;
+}
+
+@keyframes ls-dot-fill {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ls-promo-dot.active::after { animation: none; transform: scaleX(1); }
+}
 
 @media (max-width: 720px) {
     .ls-promo { aspect-ratio: 16 / 9; }
     .ls-promos { padding: 12px 12px 0; gap: 12px; }
+}
+
+/* Explore Categories: level-2 tiles in two rows, paged horizontally.
+   Columns per page: 10 desktop, 6 phone. Two rows means 20 or 12 per page. */
+.ls-explore {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 28px 18px 8px;
+}
+
+.ls-explore-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.ls-explore-title {
+    font-size: 26px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+}
+
+.ls-explore-sub {
+    font-size: 14px;
+    color: #6b7280;
+    margin: 4px 0 0;
+}
+
+.ls-explore-arrows { display: flex; gap: 8px; flex-shrink: 0; }
+
+.ls-explore-arrow {
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    color: #374151;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.ls-explore-arrow:hover { background: #f3f4f6; }
+
+.ls-explore-viewport { overflow: hidden; }
+
+.ls-explore-track {
+    display: flex;
+    transition: transform 0.6s ease;
+}
+
+/* One page = a grid of 2 rows; pages sit side by side in the track */
+.ls-explore-page {
+    min-width: 100%;
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    grid-template-rows: repeat(2, auto);
+    grid-auto-flow: row;
+    gap: 18px 12px;
+}
+
+.ls-explore-tile {
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.ls-explore-thumb {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #f3f4f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ls-explore-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.ls-explore-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+    text-align: center;
+    line-height: 1.25;
+}
+
+@media (max-width: 900px) {
+    .ls-explore-page { grid-template-columns: repeat(6, 1fr); gap: 14px 10px; }
+    .ls-explore-title { font-size: 21px; }
+    .ls-explore { padding: 22px 12px 8px; }
+    .ls-explore-name { font-size: 11px; }
+}
+
+/* Mobile: 4 across, filling the width, Lulu-sized tiles.
+   The page must stay exactly one viewport wide or the paging breaks. */
+@media (max-width: 900px) {
+    .ls-explore-page { grid-template-columns: repeat(4, 1fr); gap: 20px 12px; }
+    .ls-explore-name { font-size: 13px; }
+    .ls-explore-thumb { border-radius: 14px; }
+}
+
+/* Names wrap to two lines and are clipped beyond that, so a long name
+   cannot shove the tiles beside it out of alignment. */
+.ls-explore-name {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    width: 100%;
+}
+
+.ls-explore-tile { min-width: 0; }
+
+/* View all sits below the arrows, right-aligned */
+.ls-explore-arrows {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.ls-explore-viewall {
+    flex-basis: 100%;
+    text-align: right;
+    margin-top: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a2e;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.ls-explore-viewall:hover { color: #F5C518; }
+
+/* First promo slot sits shorter than the second, so the eye lands on the
+   larger one below it. */
+#ls-promo-1 { aspect-ratio: 16 / 5.5; }
+
+@media (max-width: 720px) {
+    #ls-promo-1 { aspect-ratio: 16 / 7; }
+}
+
+/* Product rows: one horizontal carousel per level-2 category */
+.ls-row {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 26px 18px 6px;
+}
+
+.ls-row-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+
+.ls-row-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+}
+
+.ls-row-controls { display: flex; align-items: center; gap: 10px; }
+
+.ls-row-viewall {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a2e;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.ls-row-viewall:hover { color: #F5C518; }
+
+.ls-row-scroll {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    padding-bottom: 6px;
+}
+
+.ls-row-scroll::-webkit-scrollbar { display: none; }
+
+.ls-row-scroll > * {
+    flex: 0 0 190px;
+    max-width: 190px;
+}
+
+@media (max-width: 720px) {
+    .ls-row { padding: 20px 12px 4px; }
+    .ls-row-title { font-size: 18px; }
+    .ls-row-scroll > * { flex-basis: 152px; max-width: 152px; }
 }

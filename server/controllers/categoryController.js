@@ -39,12 +39,13 @@ async function categoryDepth(id) {
 exports.listCategories = async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT c.id, c.name, c.description, c.image_url, c.display_order, c.is_active, c.parent_id,
+            `SELECT c.id, c.name, c.description, c.image_url, COALESCE(c.image_url, pa.image_url) AS effective_image, c.display_order, c.is_active, c.parent_id,
                     COUNT(p.id)::int AS product_count
              FROM categories c
+             LEFT JOIN categories pa ON pa.id = c.parent_id
              LEFT JOIN products p ON p.category_id = c.id AND p.deleted_at IS NULL
              WHERE c.is_active = true
-             GROUP BY c.id
+             GROUP BY c.id, pa.image_url
              ORDER BY c.display_order ASC, c.id ASC`
         );
         res.json(result.rows);
@@ -225,11 +226,12 @@ exports.deleteCategory = async (req, res) => {
 exports.listAllCategories = async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT c.id, c.name, c.description, c.image_url, c.display_order, c.is_active, c.parent_id,
+            `SELECT c.id, c.name, c.description, c.image_url, COALESCE(c.image_url, pa.image_url) AS effective_image, c.display_order, c.is_active, c.parent_id,
                     COUNT(p.id)::int AS product_count
              FROM categories c
+             LEFT JOIN categories pa ON pa.id = c.parent_id
              LEFT JOIN products p ON p.category_id = c.id AND p.deleted_at IS NULL
-             GROUP BY c.id
+             GROUP BY c.id, pa.image_url
              ORDER BY c.display_order ASC, c.id ASC`
         );
         res.json(result.rows);

@@ -1,37 +1,101 @@
-// Homepage category tile grid. Renders from /api/categories (active only).
+// Homepage category strip and promotional slots.
 
-async function loadCategoryTiles() {
-    const grid = document.getElementById("category-grid");
-    if (!grid) return;
+// Explore Categories: level-2 tiles laid out 2 rows deep, paged sideways.
+// Children with no image of their own fall back to the parent's tile image,
+// which the API supplies as effective_image.
+let explorePages = 0;
+let exploreIndex = 0;
+let exploreTimer = null;
+
+// Must match the grid-template-columns in the CSS, or the page overflows
+// into a third row.
+function exploreColumns() {
+    return window.matchMedia("(max-width: 900px)").matches ? 4 : 10;
+}
+
+async function loadExploreCategories() {
+    const track = document.getElementById("ls-explore-track");
+    if (!track) return;
 
     try {
         const response = await fetch("/api/categories");
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const categories = await response.json();
+        const all = await response.json();
 
-        if (!categories.length) {
-            grid.innerHTML = "";
+        const topIds = new Set(all.filter(c => !c.parent_id).map(c => c.id));
+        const level2 = all
+            .filter(c => topIds.has(c.parent_id))
+            .sort((a, b) => (b.product_count || 0) - (a.product_count || 0));
+
+        if (level2.length === 0) {
+            document.querySelector(".ls-explore").style.display = "none";
             return;
         }
 
-        grid.innerHTML = categories.map(c => {
-            const href = `products.html?category=${encodeURIComponent(c.name)}`;
-            const img = c.image_url
-                ? `<img src="${c.image_url}" alt="${c.name}" loading="lazy" width="400" height="180">`
-                : `<div class="category-card-placeholder">${c.name.charAt(0)}</div>`;
-
-            return `<a class="category-card" href="${href}">
-                ${img}
-                <h3>${c.name}</h3>
-            </a>`;
-        }).join("");
+        renderExplorePages(track, level2);
+        window.addEventListener("resize", debounce(() => {
+            renderExplorePages(track, level2);
+        }, 250));
     } catch (error) {
-        console.error("Load category tiles error:", error);
-        grid.innerHTML = `<p class="category-grid-loading">Categories unavailable right now.</p>`;
+        console.error("Load explore categories error:", error);
+        const section = document.querySelector(".ls-explore");
+        if (section) section.style.display = "none";
     }
 }
 
-document.addEventListener("DOMContentLoaded", loadCategoryTiles);
+function renderExplorePages(track, items) {
+    const perPage = exploreColumns() * 2;
+    explorePages = Math.ceil(items.length / perPage);
+    exploreIndex = 0;
+
+    const tile = c => {
+        const img = c.effective_image
+            ? `<img src="${c.effective_image}" alt="${c.name}" loading="lazy">`
+            : "";
+        return `<a class="ls-explore-tile" href="products.html?category=${encodeURIComponent(c.name)}">
+            <span class="ls-explore-thumb">${img}</span>
+            <span class="ls-explore-name">${c.name}</span>
+        </a>`;
+    };
+
+    let html = "";
+    for (let i = 0; i < explorePages; i++) {
+        const slice = items.slice(i * perPage, (i + 1) * perPage);
+        html += `<div class="ls-explore-page">${slice.map(tile).join("")}</div>`;
+    }
+    track.innerHTML = html;
+    track.style.transform = "translateX(0)";
+
+    setupExploreControls(track);
+}
+
+function setupExploreControls(track) {
+    const prev = document.getElementById("ls-explore-prev");
+    const next = document.getElementById("ls-explore-next");
+
+    const show = i => {
+        exploreIndex = (i + explorePages) % explorePages;
+        track.style.transform = `translateX(-${exploreIndex * 100}%)`;
+    };
+
+    // Arrows only: the category strip stays put unless the customer moves it.
+    prev.onclick = () => show(exploreIndex - 1);
+    next.onclick = () => show(exploreIndex + 1);
+
+    const arrows = document.querySelector(".ls-explore-arrows");
+    if (arrows) arrows.style.display = explorePages > 1 ? "flex" : "none";
+}
+
+function debounce(fn, ms) {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+document.addEventListener("DOMContentLoaded", loadExploreCategories);
+
+// Homepage category tile grid. Renders from /api/categories (active only).
+
+
 
 // Two promotional slots. Until promo artwork exists they show product images,
 // split between the slots so the same product does not appear in both.

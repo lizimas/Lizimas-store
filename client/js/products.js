@@ -552,26 +552,62 @@ function searchProducts() {
     }, 800);
 }
 
-function displayFeaturedProducts(products, limit = 8) {
-    const container = document.getElementById("featured-products");
+// Homepage product rows: one horizontal carousel per level-2 category that
+// has stock. Replaces the old single "Featured Products" grid.
+async function displayFeaturedProducts(products) {
+    const host = document.getElementById("ls-product-rows");
+    if (!host) return;
 
-    if (!container) {
+    let categories;
+    try {
+        const response = await fetch("/api/categories");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        categories = await response.json();
+    } catch (error) {
+        console.error("Load categories for product rows:", error);
         return;
     }
 
-    container.innerHTML = "";
+    const byId = new Map(categories.map(c => [c.id, c]));
+    const topIds = new Set(categories.filter(c => !c.parent_id).map(c => c.id));
 
-    const featured = products.slice(0, limit);
+    // A product sits on level 3; walk up one step to find its level-2 group.
+    const level2Of = product => {
+        const own = byId.get(product.category_id);
+        if (!own) return null;
+        if (topIds.has(own.parent_id)) return own;          // already level 2
+        const parent = byId.get(own.parent_id);
+        return parent && topIds.has(parent.parent_id) ? parent : null;
+    };
 
-    if (featured.length === 0) {
-        container.innerHTML = `<p class="no-products-message">No products found.</p>`;
-        return;
+    const groups = new Map();
+    for (const product of products) {
+        const group = level2Of(product);
+        if (!group) continue;
+        if (!groups.has(group.id)) groups.set(group.id, { category: group, items: [] });
+        groups.get(group.id).items.push(product);
     }
 
-    // Shares buildProductCard with the catalogue. This used to be a second copy
-    // of the markup, which is how index.html kept the old button after the
-    // products page was restyled.
-    featured.forEach(product => container.appendChild(buildProductCard(product)));
+    const ordered = [...groups.values()].sort((a, b) => b.items.length - a.items.length);
+
+    host.innerHTML = "";
+    for (const { category, items } of ordered) {
+        const section = document.createElement("section");
+        section.className = "ls-row";
+        section.innerHTML = `
+            <div class="ls-row-head">
+                <h2 class="ls-row-title">${category.name}</h2>
+                <div class="ls-row-controls">
+                    <a class="ls-row-viewall"
+                       href="products.html?category=${encodeURIComponent(category.name)}">View all &#8594;</a>
+                </div>
+            </div>
+            <div class="ls-row-scroll"></div>`;
+
+        const scroll = section.querySelector(".ls-row-scroll");
+        items.forEach(product => scroll.appendChild(buildProductCard(product)));
+        host.appendChild(section);
+    }
 }
 
 let cameFromCart = false;
