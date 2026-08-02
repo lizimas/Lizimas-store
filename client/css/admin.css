@@ -1088,3 +1088,8 @@ select.status-select {
     background: #f3f4f6;
     color: #6b7280;
 }
+
+.category-child-name {
+    padding-left: 22px;
+    color: #4b5563;
+}

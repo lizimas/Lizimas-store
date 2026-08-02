@@ -2634,7 +2634,21 @@ function renderCategoriesTable() {
     const tbody = document.getElementById("categories-table-body");
     if (!tbody) return;
 
-    tbody.innerHTML = adminCategories.map(c => {
+    // Render as a tree: each parent in display order, followed by its children.
+    const parents = adminCategories
+        .filter(c => !c.parent_id)
+        .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+
+    const ordered = [];
+    for (const parent of parents) {
+        ordered.push(parent);
+        adminCategories
+            .filter(c => c.parent_id === parent.id)
+            .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+            .forEach(child => ordered.push(child));
+    }
+
+    tbody.innerHTML = ordered.map(c => {
         const thumb = c.image_url
             ? `<img src="${c.image_url}" alt="${c.name}" class="category-thumb">`
             : `<div class="category-thumb category-thumb-empty">—</div>`;
@@ -2647,7 +2661,9 @@ function renderCategoriesTable() {
 
         return `<tr>
             <td data-label="Image">${thumb}</td>
-            <td data-label="Name">${c.name}</td>
+            <td data-label="Name">${c.parent_id
+                ? `<span class="category-child-name">${c.name}</span>`
+                : `<strong>${c.name}</strong>`}</td>
             <td data-label="Products">${c.product_count}</td>
             <td data-label="Order">${c.display_order}</td>
             <td data-label="Status">${status}</td>
@@ -2659,8 +2675,25 @@ function renderCategoriesTable() {
     }).join("");
 }
 
+function renderCategoryParentSelect(selectedParentId) {
+    const select = document.getElementById("category-parent");
+    if (!select) return;
+
+    const parents = adminCategories
+        .filter(c => !c.parent_id)
+        .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+
+    const selected = selectedParentId != null ? String(selectedParentId) : "";
+    select.innerHTML = `<option value="">Top level (a parent category)</option>`
+        + parents.map(p => {
+            const isSel = String(p.id) === selected ? " selected" : "";
+            return `<option value="${p.id}"${isSel}>Under ${p.name}</option>`;
+        }).join("");
+}
+
 function openCategoryForm() {
     document.getElementById("category-form-title").textContent = "Add Category";
+    renderCategoryParentSelect();
     document.getElementById("category-id").value = "";
     document.getElementById("category-name").value = "";
     document.getElementById("category-description").value = "";
@@ -2680,6 +2713,7 @@ function editCategory(id) {
     document.getElementById("category-name").value = c.name;
     document.getElementById("category-description").value = c.description || "";
     document.getElementById("category-order").value = c.display_order;
+    renderCategoryParentSelect(c.parent_id);
     document.getElementById("category-form-error").textContent = "";
     categoryPickedFile = null;
 
@@ -2744,6 +2778,7 @@ async function saveCategory() {
     formData.append("name", name);
     formData.append("description", description);
     formData.append("display_order", order || 0);
+    formData.append("parent_id", document.getElementById("category-parent").value || "");
     if (categoryPickedFile) formData.append("image", categoryPickedFile);
 
     try {

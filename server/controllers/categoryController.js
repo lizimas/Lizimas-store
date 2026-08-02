@@ -20,7 +20,7 @@ function uploadBufferToCloudinary(fileBuffer) {
 exports.listCategories = async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT c.id, c.name, c.description, c.image_url, c.display_order, c.is_active,
+            `SELECT c.id, c.name, c.description, c.image_url, c.display_order, c.is_active, c.parent_id,
                     COUNT(p.id)::int AS product_count
              FROM categories c
              LEFT JOIN products p ON p.category_id = c.id
@@ -41,9 +41,21 @@ exports.createCategory = async (req, res) => {
         const name = (req.body.name || "").trim();
         const description = (req.body.description || "").trim() || null;
         const displayOrder = parseInt(req.body.display_order, 10) || 0;
+        const parentId = req.body.parent_id ? parseInt(req.body.parent_id, 10) : null;
 
         if (!name) {
             return res.status(400).json({ message: "Category name is required" });
+        }
+
+        // Only two levels: a child cannot itself be a parent.
+        if (parentId) {
+            const parent = await pool.query("SELECT parent_id FROM categories WHERE id = $1", [parentId]);
+            if (parent.rows.length === 0) {
+                return res.status(400).json({ message: "That parent category does not exist" });
+            }
+            if (parent.rows[0].parent_id !== null) {
+                return res.status(400).json({ message: "Categories only nest two levels deep. Pick a top-level parent." });
+            }
         }
 
         let imageUrl = null;
@@ -52,10 +64,10 @@ exports.createCategory = async (req, res) => {
         }
 
         const result = await pool.query(
-            `INSERT INTO categories (name, description, image_url, display_order)
-             VALUES ($1, $2, $3, $4)
-             RETURNING id, name, description, image_url, display_order, is_active`,
-            [name, description, imageUrl, displayOrder]
+            `INSERT INTO categories (name, description, image_url, display_order, parent_id)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING id, name, description, image_url, display_order, is_active, parent_id`,
+            [name, description, imageUrl, displayOrder, parentId]
         );
 
         await logActivity(req.user.id, "create_category", "category", result.rows[0].id, `Created category "${name}"`);
@@ -87,9 +99,36 @@ exports.updateCategory = async (req, res) => {
         const displayOrder = req.body.display_order !== undefined
             ? (parseInt(req.body.display_order, 10) || 0)
             : current.display_order;
+        const parentId = req.body.parent_id !== undefined
+            ? (req.body.parent_id ? parseInt(req.body.parent_id, 10) : null)
+            : current.parent_id;
 
         if (!name) {
             return res.status(400).json({ message: "Category name is required" });
+        }
+
+        if (parentId !== null) {
+            if (parentId === parseInt(id, 10)) {
+                return res.status(400).json({ message: "A category cannot be its own parent" });
+            }
+
+            const parent = await pool.query("SELECT parent_id FROM categories WHERE id = $1", [parentId]);
+            if (parent.rows.length === 0) {
+                return res.status(400).json({ message: "That parent category does not exist" });
+            }
+            if (parent.rows[0].parent_id !== null) {
+                return res.status(400).json({ message: "Categories only nest two levels deep. Pick a top-level parent." });
+            }
+
+            // Demoting a parent that already has children would create a third level.
+            const kids = await pool.query(
+                "SELECT COUNT(*)::int AS count FROM categories WHERE parent_id = $1", [id]
+            );
+            if (kids.rows[0].count > 0) {
+                return res.status(400).json({
+                    message: `Cannot move this under another category: it has ${kids.rows[0].count} subcategor${kids.rows[0].count === 1 ? "y" : "ies"} of its own.`
+                });
+            }
         }
 
         let imageUrl = current.image_url;
@@ -99,10 +138,10 @@ exports.updateCategory = async (req, res) => {
 
         const result = await pool.query(
             `UPDATE categories
-             SET name = $1, description = $2, image_url = $3, display_order = $4
-             WHERE id = $5
-             RETURNING id, name, description, image_url, display_order, is_active`,
-            [name, description, imageUrl, displayOrder, id]
+             SET name = $1, description = $2, image_url = $3, display_order = $4, parent_id = $5
+             WHERE id = $6
+             RETURNING id, name, description, image_url, display_order, is_active, parent_id`,
+            [name, description, imageUrl, displayOrder, parentId, id]
         );
 
         await logActivity(req.user.id, "update_category", "category", id, `Updated category "${name}"`);
@@ -149,7 +188,7 @@ exports.deleteCategory = async (req, res) => {
 exports.listAllCategories = async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT c.id, c.name, c.description, c.image_url, c.display_order, c.is_active,
+            `SELECT c.id, c.name, c.description, c.image_url, c.display_order, c.is_active, c.parent_id,
                     COUNT(p.id)::int AS product_count
              FROM categories c
              LEFT JOIN products p ON p.category_id = c.id
