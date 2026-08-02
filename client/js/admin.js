@@ -746,12 +746,19 @@ async function loadCategories() {
         const response = await fetch(`${API_URL}/api/products/categories`);
         allCategories = await response.json();
 
-        const select = document.getElementById("product-category");
-        select.innerHTML = allCategories.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+        renderCategorySelect();
 
     } catch (error) {
         console.error("Load categories error:", error);
     }
+}
+
+// Rebuilds the product form's category dropdown, grouped parent > children.
+// Call with a category id to preselect it when editing.
+function renderCategorySelect(selectedId) {
+    const select = document.getElementById("product-category");
+    if (!select || !allCategories) return;
+    select.innerHTML = buildGroupedCategoryOptions(allCategories, selectedId);
 }
 
 let adminProducts = [];
@@ -975,6 +982,7 @@ function openProductForm() {
     document.querySelectorAll("#size-checkbox-list input[type=checkbox]").forEach(cb => cb.checked = false);
     document.querySelectorAll("#color-checkbox-list input[type=checkbox]").forEach(cb => cb.checked = false);
     document.querySelectorAll(".pd-color-thumb-picker").forEach(picker => { picker.style.display = "none"; picker.innerHTML = ""; });
+    renderCategorySelect();
     document.getElementById("product-form-container").classList.remove("hidden");
 }
 
@@ -987,7 +995,9 @@ function editProduct(id) {
     document.getElementById("product-form-title").textContent = "Edit Product";
     document.getElementById("product-id").value = product.id;
     document.getElementById("product-name").value = product.name;
-    document.getElementById("product-category").value = product.category_id;
+    // Rebuild rather than assign: a product still on a parent category has no
+    // matching option, and a plain assignment would silently leave this blank.
+    renderCategorySelect(product.category_id);
     document.getElementById("product-description").value = product.description || "";
     document.getElementById("product-price").value = product.price;
     document.getElementById("product-stock").value = product.stock;
