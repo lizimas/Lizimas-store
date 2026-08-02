@@ -60,6 +60,9 @@
                     <button class="tab-btn" data-tab="categories">
                         Categories
                     </button>
+                    <button class="tab-btn" data-tab="promotions">
+                        Promotions
+                    </button>
                     <button class="tab-btn" data-tab="orders">
                         <span class="sidebar-icon">&#128203;</span> Orders
                     </button>
@@ -280,6 +283,65 @@
                     </div>
                 </section>
 
+                <section id="tab-promotions" class="tab-content hidden">
+                    <h2 class="admin-page-title">Homepage Promotions</h2>
+                    <p class="promo-hint">Slot 1 is the shorter banner, slot 2 the taller one.
+                       When a slot is empty the homepage falls back to random product images.</p>
+
+                    <button class="add-btn" onclick="openPromoForm()">+ Add Promotion</button>
+
+                    <div id="promo-form-container" class="hidden panel">
+                        <h3 id="promo-form-title">Add Promotion</h3>
+                        <input type="hidden" id="promo-id">
+
+                        <div class="product-form-sections">
+                            <div class="product-form-section">
+                                <h4>Details</h4>
+                                <div class="field-row">
+                                    <input type="text" id="promo-title" placeholder="Title (optional, for your reference)">
+                                    <select id="promo-slot">
+                                        <option value="1">Slot 1 &mdash; top banner</option>
+                                        <option value="2">Slot 2 &mdash; lower banner</option>
+                                    </select>
+                                    <input type="text" id="promo-link" placeholder="Link, e.g. product-detail.html?id=68">
+                                    <input type="number" id="promo-order" placeholder="Display order (lower shows first)">
+                                </div>
+                            </div>
+
+                            <div class="product-form-section">
+                                <h4>Image</h4>
+                                <div class="drag-drop-zone" id="promo-image-dropzone">
+                                    Tap to choose a promotional image
+                                </div>
+                                <input type="file" id="promo-image" accept="image/*" class="hidden">
+                                <div class="drag-drop-preview-grid" id="promo-image-preview"></div>
+                            </div>
+                        </div>
+
+                        <p id="promo-form-error" class="form-error"></p>
+                        <div class="form-actions">
+                            <button class="save-btn" onclick="savePromo()">Save Promotion</button>
+                            <button class="cancel-btn" onclick="closePromoForm()">Cancel</button>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Image</th>
+                                    <th>Title</th>
+                                    <th>Slot</th>
+                                    <th>Order</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="promotions-table-body"></tbody>
+                        </table>
+                    </div>
+                </section>
+
                 <section id="tab-staff" class="tab-content hidden">
                     <h2 class="admin-page-title">Staff & Approvals</h2>
                     <p class="admin-page-subtitle">Manage staff accounts and review pending changes.</p>
@@ -407,7 +469,7 @@
 
 <script src="js/prepare-picked-file.js?v=9"></script>
 <script src="js/category-select.js?v=2"></script>
-    <script src="js/admin.js?v=22"></script>
+    <script src="js/admin.js?v=23"></script>
 <script src="js/photo-crop.js"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

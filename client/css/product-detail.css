@@ -49,3 +49,137 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 .pd-cell-value { font-size: 17px; font-weight: 700; color: #000; line-height: 1.3; }
 .pd-see-all { padding: 18px 0 16px; font-size: 16px; color: #888; }
 .pd-item-id { font-size: 12px; color: #aaa; margin: 2px 0 6px; }
+
+/* ---- Desktop layout ----
+   Below 900px this file's mobile design is untouched. Above it, the gallery
+   and the buying panel sit side by side, and the sticky bar becomes a normal
+   button inside the panel. */
+
+@media (min-width: 900px) {
+    body { padding-bottom: 0; background: #fff; }
+
+    .pd-topbar {
+        box-shadow: none;
+        border-bottom: 1px solid #eee;
+        padding: 14px 40px;
+    }
+
+    .pd-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 440px;
+        gap: 48px;
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 32px 40px 60px;
+        align-items: start;
+    }
+
+    .pd-gallery {
+        position: sticky;
+        top: 90px;
+        border: 1px solid #f0f0f0;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .pd-gallery-scroll img {
+        object-fit: contain;
+        background: #fff;
+        max-height: 560px;
+    }
+
+    .pd-info { padding: 0; }
+    .pd-info h1 { font-size: 26px; line-height: 1.3; margin: 6px 0 14px; }
+    .pd-price { font-size: 30px; margin: 14px 0 20px; }
+
+    /* The mobile sticky bar has no place on desktop; the panel gets its own
+       button so the call to action sits with the price and options. */
+    .pd-sticky-bar {
+        position: static;
+        box-shadow: none;
+        padding: 0;
+        max-width: 1280px;
+        margin: -40px auto 0;
+    }
+
+    .pd-sticky-bar .pd-add-to-cart-btn {
+        max-width: 440px;
+        margin-left: auto;
+        margin-right: 40px;
+        display: block;
+        border-radius: 999px;
+        padding: 16px;
+    }
+
+    .pd-size-btn { padding: 10px 20px; }
+    .pd-color-swatch { width: 64px; height: 64px; }
+}
+
+@media (min-width: 1200px) {
+    .pd-layout { grid-template-columns: minmax(0, 1fr) 480px; }
+}
+
+/* Breadcrumbs and thumbnail rail: desktop only. On a phone the swipe gallery
+   and the back button already do this job. */
+.pd-breadcrumbs { display: none; }
+.pd-thumbs { display: none; }
+
+@media (min-width: 900px) {
+    .pd-breadcrumbs {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 20px 40px 0;
+        font-size: 13.5px;
+        color: #6b7280;
+    }
+
+    .pd-breadcrumbs a { color: #6b7280; text-decoration: none; }
+    .pd-breadcrumbs a:hover { color: #1a1a2e; text-decoration: underline; }
+    .pd-breadcrumbs .pd-crumb-sep { color: #d1d5db; }
+    .pd-breadcrumbs .pd-crumb-current { color: #111827; font-weight: 600; }
+
+    .pd-gallery-col {
+        display: grid;
+        grid-template-columns: 78px minmax(0, 1fr);
+        gap: 14px;
+        align-items: start;
+    }
+
+    .pd-thumbs {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-height: 560px;
+        overflow-y: auto;
+        scrollbar-width: none;
+    }
+
+    .pd-thumbs::-webkit-scrollbar { display: none; }
+
+    .pd-thumb {
+        width: 78px;
+        height: 78px;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 2px solid #e5e7eb;
+        background: #fff;
+        padding: 0;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    .pd-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .pd-thumb.selected { border-color: #1a1a2e; }
+
+    .pd-gallery-col .pd-gallery { position: static; }
+}

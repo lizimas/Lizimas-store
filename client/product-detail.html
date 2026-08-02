@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Product Details | Lizimas Store</title>
 <link rel="stylesheet" href="css/style.css?v=3">
-<link rel="stylesheet" href="css/product-detail.css?v=6">
+<link rel="stylesheet" href="css/product-detail.css?v=8">
 </head>
 <body>
 
@@ -16,9 +16,15 @@
     </a>
 </div>
 
+<nav class="pd-breadcrumbs" id="pd-breadcrumbs" aria-label="Breadcrumb"></nav>
+
+<div class="pd-layout">
+<div class="pd-gallery-col">
+<div class="pd-thumbs" id="pd-thumbs"></div>
 <div class="pd-gallery">
     <div id="pd-gallery-scroll" class="pd-gallery-scroll"></div>
     <div id="pd-gallery-counter" class="pd-gallery-counter">1/1</div>
+</div>
 </div>
 
 <div id="pd-fullscreen-viewer" class="pd-fullscreen-viewer hidden">
@@ -43,6 +49,7 @@
 
     <div id="pd-details-card" class="pd-card"></div>
 </div>
+</div>
 
 <div class="pd-sticky-bar">
     <button id="pd-add-to-cart-btn" class="pd-add-to-cart-btn">Add To Cart 🛒</button>
@@ -63,7 +70,7 @@
 
 <script src="js/api.js"></script>
 <script src="js/cart.js?v=2"></script>
-<script src="js/product-detail.js?v=13"></script>
+<script src="js/product-detail.js?v=14"></script>
 
 </body>
 </html>

@@ -1127,6 +1127,10 @@ function setupTabs() {
             button.classList.add("active");
             document.getElementById(`tab-${button.dataset.tab}`).classList.remove("hidden");
 
+            if (button.dataset.tab === "promotions") {
+                loadAdminPromos();
+            }
+
             if (button.dataset.tab === "categories") {
                 loadAdminCategories();
             }
@@ -1151,6 +1155,7 @@ function setupTabs() {
 document.addEventListener("DOMContentLoaded", () => {
     setupTabs();
     setupCategoryImagePicker();
+    setupPromoImagePicker();
 
     if (getToken()) {
         showDashboard();
@@ -2825,5 +2830,171 @@ async function setCategoryActive(id, isActive) {
     } catch (error) {
         console.error("Set category status error:", error);
         alert("Could not update category status.");
+    }
+}
+
+// ---------- Homepage promotions (admin only) ----------
+
+let adminPromos = [];
+let promoPickedFile = null;
+
+async function loadAdminPromos() {
+    try {
+        adminPromos = await authorizedFetch("/api/promotions/manage");
+        renderPromosTable();
+    } catch (error) {
+        console.error("Load promotions error:", error);
+    }
+}
+
+function renderPromosTable() {
+    const tbody = document.getElementById("promotions-table-body");
+    if (!tbody) return;
+
+    if (adminPromos.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="padding:18px; color:#6b7280">
+            No promotions yet. The homepage is showing random product images.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = adminPromos.map(p => {
+        const status = p.is_active
+            ? `<span class="badge badge-active">Live</span>`
+            : `<span class="badge badge-hidden">Hidden</span>`;
+        const toggle = p.is_active
+            ? `<button onclick="setPromoActive(${p.id}, false)">Hide</button>`
+            : `<button onclick="setPromoActive(${p.id}, true)">Show</button>`;
+
+        return `<tr>
+            <td data-label="Image"><img src="${p.image_url}" class="promo-thumb" alt=""></td>
+            <td data-label="Title">${p.title || "<em style='color:#9ca3af'>Untitled</em>"}</td>
+            <td data-label="Slot">${p.slot}</td>
+            <td data-label="Order">${p.display_order}</td>
+            <td data-label="Status">${status}</td>
+            <td data-label="Actions">
+                <button onclick="editPromo(${p.id})">Edit</button>
+                ${toggle}
+                <button onclick="deletePromo(${p.id})">Delete</button>
+            </td>
+        </tr>`;
+    }).join("");
+}
+
+function openPromoForm() {
+    document.getElementById("promo-form-title").textContent = "Add Promotion";
+    document.getElementById("promo-id").value = "";
+    document.getElementById("promo-title").value = "";
+    document.getElementById("promo-slot").value = "1";
+    document.getElementById("promo-link").value = "";
+    document.getElementById("promo-order").value = "";
+    document.getElementById("promo-image-preview").innerHTML = "";
+    document.getElementById("promo-form-error").textContent = "";
+    promoPickedFile = null;
+    document.getElementById("promo-form-container").classList.remove("hidden");
+}
+
+function editPromo(id) {
+    const p = adminPromos.find(x => x.id === id);
+    if (!p) return;
+
+    document.getElementById("promo-form-title").textContent = "Edit Promotion";
+    document.getElementById("promo-id").value = p.id;
+    document.getElementById("promo-title").value = p.title || "";
+    document.getElementById("promo-slot").value = String(p.slot);
+    document.getElementById("promo-link").value = p.link_url || "";
+    document.getElementById("promo-order").value = p.display_order;
+    document.getElementById("promo-form-error").textContent = "";
+    promoPickedFile = null;
+
+    document.getElementById("promo-image-preview").innerHTML =
+        `<img src="${p.image_url}" class="drag-drop-preview" style="max-width:220px; border-radius:8px;">`;
+
+    document.getElementById("promo-form-container").classList.remove("hidden");
+}
+
+function closePromoForm() {
+    document.getElementById("promo-form-container").classList.add("hidden");
+    promoPickedFile = null;
+}
+
+function setupPromoImagePicker() {
+    const zone = document.getElementById("promo-image-dropzone");
+    const input = document.getElementById("promo-image");
+    if (!zone || !input) return;
+
+    zone.addEventListener("click", () => input.click());
+
+    input.addEventListener("change", async () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+
+        const preview = document.getElementById("promo-image-preview");
+        const errorEl = document.getElementById("promo-form-error");
+        errorEl.textContent = "";
+        preview.innerHTML = "Preparing image…";
+
+        const result = await preparePickedFile(file);
+        if (!result.ok) {
+            promoPickedFile = null;
+            preview.innerHTML = "";
+            errorEl.textContent = `Could not read ${result.name} (${result.reason}). Re-select it, or pick from Files rather than a cloud gallery.`;
+            return;
+        }
+
+        promoPickedFile = result.file;
+        preview.innerHTML = `<img src="${URL.createObjectURL(result.file)}" class="drag-drop-preview" style="max-width:220px; border-radius:8px;">`;
+    });
+}
+
+async function savePromo() {
+    const errorEl = document.getElementById("promo-form-error");
+    errorEl.textContent = "";
+
+    const id = document.getElementById("promo-id").value;
+    if (!id && !promoPickedFile) {
+        errorEl.textContent = "An image is required.";
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("title", document.getElementById("promo-title").value.trim());
+    formData.append("slot", document.getElementById("promo-slot").value);
+    formData.append("link_url", document.getElementById("promo-link").value.trim());
+    formData.append("display_order", document.getElementById("promo-order").value || 0);
+    if (promoPickedFile) formData.append("image", promoPickedFile);
+
+    try {
+        await authorizedFetch(id ? `/api/promotions/${id}` : "/api/promotions",
+            { method: id ? "PUT" : "POST", body: formData });
+        closePromoForm();
+        await loadAdminPromos();
+    } catch (error) {
+        console.error("Save promotion error:", error);
+        errorEl.textContent = error.message || "Save failed.";
+    }
+}
+
+async function setPromoActive(id, isActive) {
+    try {
+        await authorizedFetch(`/api/promotions/${id}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ is_active: isActive })
+        });
+        await loadAdminPromos();
+    } catch (error) {
+        console.error("Set promotion status error:", error);
+        alert("Could not update status.");
+    }
+}
+
+async function deletePromo(id) {
+    if (!confirm("Delete this promotion permanently?")) return;
+    try {
+        await authorizedFetch(`/api/promotions/${id}`, { method: "DELETE" });
+        await loadAdminPromos();
+    } catch (error) {
+        console.error("Delete promotion error:", error);
+        alert("Could not delete.");
     }
 }

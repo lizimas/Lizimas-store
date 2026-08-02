@@ -42,6 +42,8 @@ async function loadProductDetail() {
 
         document.getElementById("pd-fullscreen-share").onclick = () => sharePdProduct(product);
 
+        renderBreadcrumbs(product.category_id);
+
     } catch (err) {
         console.error(err);
         document.getElementById("pd-name").textContent = "Failed to load product";
@@ -102,6 +104,78 @@ function renderGallery() {
     if (pdGalleryCounter) {
         pdGalleryCounter.textContent = `1/${imagePaths.length}`;
     }
+
+    renderThumbnails(imagePaths, scrollContainer);
+}
+
+// Desktop thumbnail rail. Clicking scrolls the main gallery to that image,
+// so the two stay in step whichever the customer uses.
+function renderThumbnails(imagePaths, scrollContainer) {
+    const rail = document.getElementById("pd-thumbs");
+    if (!rail) return;
+
+    if (imagePaths.length < 2) {
+        rail.innerHTML = "";
+        return;
+    }
+
+    rail.innerHTML = imagePaths.map((src, i) =>
+        `<button class="pd-thumb${i === 0 ? " selected" : ""}" data-i="${i}" type="button">
+            <img src="${src || ""}" alt="" loading="lazy">
+         </button>`
+    ).join("");
+
+    const marks = i => rail.querySelectorAll(".pd-thumb").forEach((t, n) =>
+        t.classList.toggle("selected", n === i));
+
+    rail.onclick = e => {
+        const thumb = e.target.closest(".pd-thumb");
+        if (!thumb) return;
+        const i = Number(thumb.dataset.i);
+        scrollContainer.scrollTo({ left: i * scrollContainer.clientWidth, behavior: "smooth" });
+        marks(i);
+    };
+
+    scrollContainer.addEventListener("scroll", () => {
+        marks(Math.round(scrollContainer.scrollLeft / scrollContainer.clientWidth));
+    }, { passive: true });
+}
+
+// Breadcrumbs from the product's category up to the top of the tree.
+async function renderBreadcrumbs(categoryId) {
+    const nav = document.getElementById("pd-breadcrumbs");
+    if (!nav || !categoryId) return;
+
+    let categories;
+    try {
+        const response = await fetch("/api/categories");
+        if (!response.ok) return;
+        categories = await response.json();
+    } catch (error) {
+        console.error("Breadcrumb categories error:", error);
+        return;
+    }
+
+    const byId = new Map(categories.map(c => [c.id, c]));
+    const trail = [];
+    let current = byId.get(categoryId);
+
+    while (current) {
+        trail.unshift(current);
+        current = current.parent_id ? byId.get(current.parent_id) : null;
+    }
+
+    const crumbs = [`<a href="index.html">Home</a>`].concat(
+        trail.map((c, i) => {
+            const last = i === trail.length - 1;
+            const href = `products.html?category=${encodeURIComponent(c.name)}`;
+            return last
+                ? `<span class="pd-crumb-current">${c.name}</span>`
+                : `<a href="${href}">${c.name}</a>`;
+        })
+    );
+
+    nav.innerHTML = crumbs.join(`<span class="pd-crumb-sep">/</span>`);
 }
 
 function getCurrentGalleryIndex() {

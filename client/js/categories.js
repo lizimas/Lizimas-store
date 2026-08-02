@@ -103,38 +103,71 @@ async function loadPromoSlots() {
     const tracks = document.querySelectorAll(".ls-promo-track");
     if (tracks.length === 0) return;
 
+    let promos = [];
     try {
-        const response = await fetch("/api/products");
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const products = (await response.json()).filter(p => p.image);
+        const response = await fetch("/api/promotions");
+        if (response.ok) promos = await response.json();
+    } catch (error) {
+        console.error("Load promotions error:", error);
+    }
 
-        if (products.length === 0) {
-            document.querySelector(".ls-promos").style.display = "none";
+    // Product images stand in for any slot with no promotions yet.
+    let fallback = [];
+    const needsFallback = [1, 2].some(slot => !promos.some(p => p.slot === slot));
+
+    if (needsFallback) {
+        try {
+            const response = await fetch("/api/products");
+            if (response.ok) {
+                fallback = (await response.json()).filter(p => p.image);
+                for (let i = fallback.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [fallback[i], fallback[j]] = [fallback[j], fallback[i]];
+                }
+            }
+        } catch (error) {
+            console.error("Load fallback products error:", error);
+        }
+    }
+
+    const half = Math.ceil(fallback.length / 2);
+    const fallbackFor = slot => slot === 1 ? fallback.slice(0, half) : fallback.slice(half);
+
+    let anyRendered = false;
+
+    tracks.forEach(track => {
+        const slot = Number(track.dataset.track);
+        const mine = promos.filter(p => p.slot === slot);
+
+        let slides;
+        if (mine.length) {
+            slides = mine.map(p => {
+                const img = `<img src="${p.image_url}" alt="${(p.title || "Promotion").replace(/"/g, "&quot;")}" loading="lazy">`;
+                return p.link_url
+                    ? `<a class="ls-promo-slide" href="${p.link_url}">${img}</a>`
+                    : `<span class="ls-promo-slide">${img}</span>`;
+            });
+        } else {
+            const items = fallbackFor(slot).length ? fallbackFor(slot) : fallback;
+            slides = items.map(p =>
+                `<a class="ls-promo-slide" href="product-detail.html?id=${p.id}">
+                    <img src="${p.image}" alt="${(p.name || "").replace(/"/g, "&quot;")}" loading="lazy">
+                 </a>`);
+        }
+
+        if (slides.length === 0) {
+            track.closest(".ls-promo").style.display = "none";
             return;
         }
 
-        for (let i = products.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [products[i], products[j]] = [products[j], products[i]];
-        }
+        anyRendered = true;
+        track.innerHTML = slides.join("");
+        startCarousel(track, slides.length);
+    });
 
-        const half = Math.ceil(products.length / 2);
-        const groups = [products.slice(0, half), products.slice(half)];
-
-        tracks.forEach((track, i) => {
-            const items = groups[i].length ? groups[i] : products;
-            track.innerHTML = items.map(p =>
-                `<a class="ls-promo-slide" href="product-detail.html?id=${p.id}">
-                    <img src="${p.image}" alt="${(p.name || "").replace(/"/g, "&quot;")}" loading="lazy">
-                 </a>`
-            ).join("");
-
-            startCarousel(track, items.length);
-        });
-    } catch (error) {
-        console.error("Load promo slots error:", error);
-        const promos = document.querySelector(".ls-promos");
-        if (promos) promos.style.display = "none";
+    if (!anyRendered) {
+        const promosSection = document.querySelector(".ls-promos");
+        if (promosSection) promosSection.style.display = "none";
     }
 }
 
@@ -209,9 +242,31 @@ async function loadCategoryNav() {
         }));
 
         if (navParents) {
-            navParents.innerHTML = drawerTree.map(p =>
-                `<a class="ls-nav-parent" href="products.html?category=${encodeURIComponent(p.name)}">${p.name}</a>`
-            ).join("");
+            navParents.innerHTML = drawerTree.map((p, i) => {
+                const menu = p.children.length
+                    ? `<div class="ls-nav-menu">${p.children.map(second => {
+                        const leaves = second.children.length
+                            ? `<div class="ls-nav-submenu">${second.children.map(third =>
+                                `<a href="products.html?category=${encodeURIComponent(third.name)}">${third.name}</a>`
+                              ).join("")}</div>`
+                            : "";
+                        return `<div class="ls-nav-menu-item">
+                            <a class="ls-nav-menu-link"
+                               href="products.html?category=${encodeURIComponent(second.name)}">
+                                <span>${second.name}</span>
+                                ${second.children.length ? '<span class="ls-nav-arrow">&#8250;</span>' : ""}
+                            </a>
+                            ${leaves}
+                        </div>`;
+                      }).join("")}</div>`
+                    : "";
+
+                return `<div class="ls-nav-item">
+                    <a class="ls-nav-parent"
+                       href="products.html?category=${encodeURIComponent(p.name)}">${p.name}</a>
+                    ${menu}
+                </div>`;
+            }).join("");
         }
 
         if (rail) buildDrawer(rail);
