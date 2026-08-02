@@ -23,7 +23,7 @@ exports.listCategories = async (req, res) => {
             `SELECT c.id, c.name, c.description, c.image_url, c.display_order, c.is_active, c.parent_id,
                     COUNT(p.id)::int AS product_count
              FROM categories c
-             LEFT JOIN products p ON p.category_id = c.id
+             LEFT JOIN products p ON p.category_id = c.id AND p.deleted_at IS NULL
              WHERE c.is_active = true
              GROUP BY c.id
              ORDER BY c.display_order ASC, c.id ASC`
@@ -191,7 +191,7 @@ exports.listAllCategories = async (req, res) => {
             `SELECT c.id, c.name, c.description, c.image_url, c.display_order, c.is_active, c.parent_id,
                     COUNT(p.id)::int AS product_count
              FROM categories c
-             LEFT JOIN products p ON p.category_id = c.id
+             LEFT JOIN products p ON p.category_id = c.id AND p.deleted_at IS NULL
              GROUP BY c.id
              ORDER BY c.display_order ASC, c.id ASC`
         );
