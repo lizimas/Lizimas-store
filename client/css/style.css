@@ -3048,3 +3048,229 @@ body.sheet-open {
 @media (prefers-reduced-motion: reduce) {
     .product-card .quick-add-btn { transition: none; }
 }
+
+/* ============================================================
+   Lizimas-store header
+   Navy matches the admin sidebar (#1a1a2e). Scoped with ls-*
+   because .site-header is defined twice earlier in this file.
+   ============================================================ */
+
+.ls-header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: #1a1a2e;
+    color: #fff;
+}
+
+.ls-header-top {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 12px 18px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.ls-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+.ls-mark {
+    width: 38px;
+    height: 38px;
+    display: block;
+}
+
+.ls-wordmark {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+}
+
+/* Search: the long bar is the centre of gravity, as on Lulu */
+.ls-search {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #fff;
+    border-radius: 999px;
+    padding: 0 18px;
+    height: 44px;
+    min-width: 0;
+}
+
+.ls-search-icon {
+    width: 20px;
+    height: 20px;
+    color: #6b7280;
+    flex-shrink: 0;
+}
+
+.ls-search input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: none;
+    font-size: 15px;
+    color: #111827;
+    min-width: 0;
+}
+
+.ls-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-shrink: 0;
+}
+
+.ls-action {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: #fff;
+    text-decoration: none;
+    position: relative;
+}
+
+.ls-action svg {
+    width: 26px;
+    height: 26px;
+}
+
+.ls-action-label {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.ls-cart-count {
+    position: absolute;
+    top: -6px;
+    right: -10px;
+    background: #F5C518;
+    color: #1a1a2e;
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+}
+
+/* Category nav row */
+.ls-nav {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+    padding: 0 18px 10px;
+    max-width: 1400px;
+    margin: 0 auto;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.ls-nav::-webkit-scrollbar { display: none; }
+
+.ls-nav-all {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #F5C518;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 15px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.ls-burger {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.ls-burger span {
+    display: block;
+    width: 16px;
+    height: 2px;
+    background: #F5C518;
+    border-radius: 2px;
+}
+
+.ls-nav-parents {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+}
+
+.ls-nav-parent {
+    display: flex;
+    align-items: center;
+    padding: 9px 14px;
+    color: #e5e7eb;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 8px;
+    white-space: nowrap;
+}
+
+.ls-nav-parent:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+@media (max-width: 720px) {
+    .ls-header-top { flex-wrap: wrap; gap: 12px; }
+    .ls-search { order: 3; flex-basis: 100%; }
+    .ls-action-label { display: none; }
+    .ls-wordmark { font-size: 18px; }
+}
+
+/* Burger sits inline with the search bar */
+.ls-header-top .ls-nav-all { height: 44px; }
+
+@media (max-width: 720px) {
+    .ls-nav-all-label { display: none; }
+    .ls-header-top .ls-nav-all { padding: 0 13px; }
+    .ls-search { order: 0; flex-basis: auto; }
+    .ls-header-top { flex-wrap: wrap; }
+    .ls-brand { flex-basis: 100%; }
+}
+
+/* Burger and search share the second row */
+.ls-nav-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 18px 10px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.ls-nav-row .ls-nav-all { height: 44px; }
+
+/* The v5 mobile overrides assumed search sat in the top row; it no longer does.
+   Brand left, account and cart right, on one line at every width. */
+@media (max-width: 720px) {
+    .ls-header-top { flex-wrap: nowrap; }
+    .ls-brand { flex-basis: auto; margin-right: auto; }
+    .ls-search { order: 0; flex-basis: auto; }
+}
+
+/* Push account and cart to the far right at every width */
+.ls-header-top .ls-header-actions { margin-left: auto; }

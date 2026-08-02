@@ -11,7 +11,7 @@
 Lizimas & Talent Enterprise | Online Shopping
 </title>
 
-<link rel="stylesheet" href="css/style.css?v=3">
+<link rel="stylesheet" href="css/style.css?v=8">
 
 </head>
 
@@ -21,62 +21,63 @@ Lizimas & Talent Enterprise | Online Shopping
 
 <!-- Header -->
 
-<header class="site-header">
+<header class="ls-header">
 
-<div class="container header-container">
+  <div class="ls-header-top">
 
+    <a href="index.html" class="ls-brand">
+      <svg class="ls-mark" viewBox="0 0 512 512" aria-hidden="true">
+        <rect width="512" height="512" rx="123" fill="#1a1a2e"/>
+        <path d="M182 253 A74 74 0 0 1 330 253" fill="none" stroke="#F5C518" stroke-width="26"/>
+        <rect x="123" y="195" width="266" height="215" rx="31" fill="#F5C518"/>
+        <text x="256" y="335" font-family="Poppins, Segoe UI, sans-serif" font-size="133"
+              font-weight="700" fill="#1a1a2e" text-anchor="middle">LS</text>
+      </svg>
+      <span class="ls-wordmark">Lizimas-store</span>
+    </a>
 
-<a href="index.html" class="brand">
+    <div class="ls-header-actions">
+      <a href="login.html" class="ls-action" title="Account">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="ls-action-label">Account</span>
+      </a>
 
-<img src="images/logo/logo.png"
-alt="Lizimas Logo">
+      <a href="cart.html" class="ls-action" title="Cart">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 4h2.2l2.6 12h9.6l2.2-8H7" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+          <circle cx="10" cy="20" r="1.6" fill="currentColor"/>
+          <circle cx="17" cy="20" r="1.6" fill="currentColor"/>
+        </svg>
+        <span class="ls-cart-count" id="cart-count">0</span>
+      </a>
+    </div>
 
-<div>
+  </div>
 
-<h1>Lizimas</h1>
+  <div class="ls-nav-row">
+    <button class="ls-nav-all" id="ls-nav-all" type="button">
+      <span class="ls-burger"><span></span><span></span><span></span></span>
+      <span class="ls-nav-all-label">All Categories</span>
+    </button>
 
-<span>
-& Talent Enterprise
-</span>
+    <form class="ls-search" onsubmit="return false;">
+      <svg viewBox="0 0 24 24" class="ls-search-icon" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
+        <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round"/>
+      </svg>
+      <input type="search" id="header-search" placeholder="Search for anything" autocomplete="off">
+    </form>
+  </div>
 
-</div>
-
-</a>
-
-
-
-<nav class="main-nav">
-
-<a href="index.html">
-Home
-</a>
-
-<a href="products.html">
-Shop
-</a>
-
-<a href="#">
-Supermarket
-</a>
-
-<a href="#">
-Boutique
-</a>
-
-<a href="cart.html" class="cart-link">
-🛒 Cart
-<span id="cart-count">0</span>
-</a>
-
-<a href="login.html">
-Login
-</a>
-
-</nav>
-
-
-
-</div>
+  <nav class="ls-nav" id="ls-nav">
+    <div class="ls-nav-parents" id="ls-nav-parents"></div>
+  </nav>
 
 </header>
 
