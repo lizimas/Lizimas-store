@@ -16,6 +16,25 @@ function uploadBufferToCloudinary(fileBuffer) {
     });
 }
 
+const MAX_DEPTH = 3;
+
+// Returns 1 for a top-level category, 2 for its child, 3 for a grandchild.
+// Null id means "no parent", i.e. a new top-level category.
+async function categoryDepth(id) {
+    let depth = 0;
+    let current = id;
+
+    while (current) {
+        const row = await pool.query("SELECT parent_id FROM categories WHERE id = $1", [current]);
+        if (row.rows.length === 0) return null;   // does not exist
+        depth += 1;
+        current = row.rows[0].parent_id;
+        if (depth > MAX_DEPTH) break;             // guard against a cycle
+    }
+
+    return depth;
+}
+
 // Public: list categories with image, ordered for the homepage tile grid
 exports.listCategories = async (req, res) => {
     try {
@@ -47,14 +66,15 @@ exports.createCategory = async (req, res) => {
             return res.status(400).json({ message: "Category name is required" });
         }
 
-        // Only two levels: a child cannot itself be a parent.
+        // Three levels maximum: grandparent > parent > child. Products live on
+        // the deepest level, so a new category under a level-3 parent is rejected.
         if (parentId) {
-            const parent = await pool.query("SELECT parent_id FROM categories WHERE id = $1", [parentId]);
-            if (parent.rows.length === 0) {
+            const parentDepth = await categoryDepth(parentId);
+            if (parentDepth === null) {
                 return res.status(400).json({ message: "That parent category does not exist" });
             }
-            if (parent.rows[0].parent_id !== null) {
-                return res.status(400).json({ message: "Categories only nest two levels deep. Pick a top-level parent." });
+            if (parentDepth >= MAX_DEPTH) {
+                return res.status(400).json({ message: `Categories only nest ${MAX_DEPTH} levels deep.` });
             }
         }
 
@@ -112,21 +132,38 @@ exports.updateCategory = async (req, res) => {
                 return res.status(400).json({ message: "A category cannot be its own parent" });
             }
 
-            const parent = await pool.query("SELECT parent_id FROM categories WHERE id = $1", [parentId]);
-            if (parent.rows.length === 0) {
+            const parentDepth = await categoryDepth(parentId);
+            if (parentDepth === null) {
                 return res.status(400).json({ message: "That parent category does not exist" });
             }
-            if (parent.rows[0].parent_id !== null) {
-                return res.status(400).json({ message: "Categories only nest two levels deep. Pick a top-level parent." });
+
+            // Moving into your own descendant would orphan the subtree in a cycle.
+            const descendants = await pool.query(
+                `WITH RECURSIVE tree AS (
+                     SELECT id FROM categories WHERE parent_id = $1
+                     UNION ALL
+                     SELECT c.id FROM categories c JOIN tree t ON c.parent_id = t.id
+                 ) SELECT id FROM tree`,
+                [id]
+            );
+            if (descendants.rows.some(r => r.id === parentId)) {
+                return res.status(400).json({ message: "Cannot move a category inside one of its own subcategories" });
             }
 
-            // Demoting a parent that already has children would create a third level.
-            const kids = await pool.query(
-                "SELECT COUNT(*)::int AS count FROM categories WHERE parent_id = $1", [id]
+            // Moving carries the subtree along, so check the deepest resulting level.
+            const subtreeDepth = await pool.query(
+                `WITH RECURSIVE tree AS (
+                     SELECT id, 1 AS depth FROM categories WHERE id = $1
+                     UNION ALL
+                     SELECT c.id, t.depth + 1 FROM categories c JOIN tree t ON c.parent_id = t.id
+                 ) SELECT MAX(depth)::int AS max_depth FROM tree`,
+                [id]
             );
-            if (kids.rows[0].count > 0) {
+            const ownDepth = subtreeDepth.rows[0].max_depth || 1;
+
+            if (parentDepth + ownDepth > MAX_DEPTH) {
                 return res.status(400).json({
-                    message: `Cannot move this under another category: it has ${kids.rows[0].count} subcategor${kids.rows[0].count === 1 ? "y" : "ies"} of its own.`
+                    message: `Cannot move this here: it would nest more than ${MAX_DEPTH} levels deep.`
                 });
             }
         }

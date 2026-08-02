@@ -2639,13 +2639,18 @@ function renderCategoriesTable() {
         .filter(c => !c.parent_id)
         .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
 
+    const byOrder = (a, b) => (a.display_order || 0) - (b.display_order || 0);
+    const kidsOf = id => adminCategories.filter(c => c.parent_id === id).sort(byOrder);
+
     const ordered = [];
-    for (const parent of parents) {
-        ordered.push(parent);
-        adminCategories
-            .filter(c => c.parent_id === parent.id)
-            .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
-            .forEach(child => ordered.push(child));
+    for (const top of parents) {
+        ordered.push({ ...top, depth: 1 });
+        for (const second of kidsOf(top.id)) {
+            ordered.push({ ...second, depth: 2 });
+            for (const third of kidsOf(second.id)) {
+                ordered.push({ ...third, depth: 3 });
+            }
+        }
     }
 
     tbody.innerHTML = ordered.map(c => {
@@ -2661,9 +2666,9 @@ function renderCategoriesTable() {
 
         return `<tr>
             <td data-label="Image">${thumb}</td>
-            <td data-label="Name">${c.parent_id
-                ? `<span class="category-child-name">${c.name}</span>`
-                : `<strong>${c.name}</strong>`}</td>
+            <td data-label="Name">${c.depth === 1
+                ? `<strong>${c.name}</strong>`
+                : `<span class="category-child-name" style="padding-left:${(c.depth - 1) * 22}px">${c.name}</span>`}</td>
             <td data-label="Products">${c.product_count}</td>
             <td data-label="Order">${c.display_order}</td>
             <td data-label="Status">${status}</td>
@@ -2679,15 +2684,24 @@ function renderCategoryParentSelect(selectedParentId) {
     const select = document.getElementById("category-parent");
     if (!select) return;
 
-    const parents = adminCategories
-        .filter(c => !c.parent_id)
-        .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+    const byOrder = (a, b) => (a.display_order || 0) - (b.display_order || 0);
+    const childrenOf = id => adminCategories.filter(c => c.parent_id === id).sort(byOrder);
+
+    // Offer levels 1 and 2 as possible parents. Level 3 holds products, not
+    // categories, so it is never offered.
+    const options = [];
+    for (const top of adminCategories.filter(c => !c.parent_id).sort(byOrder)) {
+        options.push({ id: top.id, label: top.name });
+        for (const second of childrenOf(top.id)) {
+            options.push({ id: second.id, label: `\u00A0\u00A0\u00A0${top.name} \u203A ${second.name}` });
+        }
+    }
 
     const selected = selectedParentId != null ? String(selectedParentId) : "";
-    select.innerHTML = `<option value="">Top level (a parent category)</option>`
-        + parents.map(p => {
-            const isSel = String(p.id) === selected ? " selected" : "";
-            return `<option value="${p.id}"${isSel}>Under ${p.name}</option>`;
+    select.innerHTML = `<option value="">Top level (a main category)</option>`
+        + options.map(o => {
+            const isSel = String(o.id) === selected ? " selected" : "";
+            return `<option value="${o.id}"${isSel}>Under ${o.label}</option>`;
         }).join("");
 }
 
