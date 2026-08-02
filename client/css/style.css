@@ -3274,3 +3274,114 @@ body.sheet-open {
 
 /* Push account and cart to the far right at every width */
 .ls-header-top .ls-header-actions { margin-left: auto; }
+
+/* Auto-scrolling product strip, right to left.
+   Swap the contents for promotional images when those exist. */
+.ls-strip {
+    overflow: hidden;
+    background: #f3f4f6;
+    padding: 14px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.ls-strip-track {
+    display: flex;
+    gap: 14px;
+    width: max-content;
+    animation: ls-scroll 40s linear infinite;
+}
+
+.ls-strip:hover .ls-strip-track { animation-play-state: paused; }
+
+.ls-strip-item {
+    width: 120px;
+    height: 120px;
+    border-radius: 12px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
+    flex-shrink: 0;
+    display: block;
+}
+
+.ls-strip-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* The track holds two copies of the list, so -50% is one seamless loop */
+@keyframes ls-scroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ls-strip-track { animation: none; }
+    .ls-strip { overflow-x: auto; }
+}
+
+/* Promotional slots. Product images for now, promo artwork later. */
+.ls-promos {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 16px 18px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.ls-promo {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #e5e7eb;
+    aspect-ratio: 16 / 7;
+}
+
+.ls-promo-track {
+    display: flex;
+    height: 100%;
+    transition: transform 0.6s ease;
+}
+
+.ls-promo-slide {
+    min-width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.ls-promo-slide img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.ls-promo-dots {
+    position: absolute;
+    bottom: 12px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+}
+
+.ls-promo-dot {
+    width: 22px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.55);
+    border: none;
+    padding: 0;
+    cursor: pointer;
+}
+
+.ls-promo-dot.active { background: #F5C518; }
+
+@media (max-width: 720px) {
+    .ls-promo { aspect-ratio: 16 / 9; }
+    .ls-promos { padding: 12px 12px 0; gap: 12px; }
+}

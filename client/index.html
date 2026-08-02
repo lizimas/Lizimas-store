@@ -11,7 +11,7 @@
 Lizimas & Talent Enterprise | Online Shopping
 </title>
 
-<link rel="stylesheet" href="css/style.css?v=8">
+<link rel="stylesheet" href="css/style.css?v=10">
 
 </head>
 
@@ -81,45 +81,18 @@ Lizimas & Talent Enterprise | Online Shopping
 
 </header>
 
-<img src="images/banners/promo-banner.png" alt="Lizimas & Talent Enterprise - Welcome" class="promo-banner-img">
+<!-- Two promotional slots. Filled with product images until promo artwork
+     exists; swap the contents of each track and the JS becomes unnecessary. -->
+<section class="ls-promos">
+  <div class="ls-promo" id="ls-promo-1">
+    <div class="ls-promo-track" data-track="1"></div>
+    <div class="ls-promo-dots" data-dots="1"></div>
+  </div>
 
-
-
-<!-- Hero Section -->
-
-
-<section class="hero-carousel">
-
-    <div class="hero-slide active" data-slide="0">
-        <div class="container hero-content">
-            <h2>Quality Products Delivered To Your Door</h2>
-            <p>Shop supermarket essentials, beverages, household items and boutique fashion from Lizimas &amp; Talent Enterprise.</p>
-            <a href="products.html" class="btn-primary">Start Shopping</a>
-        </div>
-    </div>
-
-    <div class="hero-slide" data-slide="1">
-        <div class="container hero-content">
-            <h2>Daily Essentials For Everyday Needs</h2>
-            <p>Groceries, household items, and everyday essentials all available today.</p>
-            <a href="products.html" class="btn-primary">Browse Products</a>
-        </div>
-    </div>
-
-    <div class="hero-slide" data-slide="2">
-        <div class="container hero-content">
-            <h2>Fast &amp; Reliable Delivery</h2>
-            <p>From our Bugolobi store to your doorstep, across Kampala and beyond.</p>
-            <a href="products.html" class="btn-primary">Shop Now</a>
-        </div>
-    </div>
-
-    <div class="hero-dots">
-        <button class="hero-dot active" onclick="goToHeroSlide(0)"></button>
-        <button class="hero-dot" onclick="goToHeroSlide(1)"></button>
-        <button class="hero-dot" onclick="goToHeroSlide(2)"></button>
-    </div>
-
+  <div class="ls-promo" id="ls-promo-2">
+    <div class="ls-promo-track" data-track="2"></div>
+    <div class="ls-promo-dots" data-dots="2"></div>
+  </div>
 </section>
 
 
@@ -285,7 +258,7 @@ Cash on Delivery
 
 <script src="js/api.js"></script>
 <script src="js/hero.js"></script>
-<script src="js/categories.js?v=2"></script>
+<script src="js/categories.js?v=5"></script>
 
 <script src="js/cart.js?v=2"></script>
 
