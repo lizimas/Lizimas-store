@@ -182,3 +182,121 @@ function startCarousel(track, count) {
 }
 
 document.addEventListener("DOMContentLoaded", loadPromoSlots);
+
+// ---------- Category drawer and header parent nav ----------
+
+let drawerTree = null;
+
+async function loadCategoryNav() {
+    const rail = document.getElementById("ls-drawer-rail");
+    const navParents = document.getElementById("ls-nav-parents");
+    if (!rail && !navParents) return;
+
+    try {
+        const response = await fetch("/api/categories");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const all = await response.json();
+
+        const byOrder = (a, b) => (a.display_order || 0) - (b.display_order || 0);
+        const kidsOf = id => all.filter(c => c.parent_id === id).sort(byOrder);
+
+        drawerTree = all.filter(c => !c.parent_id).sort(byOrder).map(top => ({
+            ...top,
+            children: kidsOf(top.id).map(second => ({
+                ...second,
+                children: kidsOf(second.id)
+            }))
+        }));
+
+        if (navParents) {
+            navParents.innerHTML = drawerTree.map(p =>
+                `<a class="ls-nav-parent" href="products.html?category=${encodeURIComponent(p.name)}">${p.name}</a>`
+            ).join("");
+        }
+
+        if (rail) buildDrawer(rail);
+    } catch (error) {
+        console.error("Load category nav error:", error);
+    }
+}
+
+function buildDrawer(rail) {
+    const panel = document.getElementById("ls-drawer-panel");
+
+    rail.innerHTML = drawerTree.map((p, i) =>
+        `<button class="ls-drawer-parent${i === 0 ? " active" : ""}" data-i="${i}">${p.name}</button>`
+    ).join("");
+
+    const showParent = i => {
+        rail.querySelectorAll(".ls-drawer-parent").forEach((b, n) =>
+            b.classList.toggle("active", n === i));
+
+        const parent = drawerTree[i];
+        if (!parent.children.length) {
+            panel.innerHTML = `<p class="ls-drawer-empty" style="padding:20px">Nothing here yet.</p>`;
+            return;
+        }
+
+        panel.innerHTML = parent.children.map(second => {
+            const leaves = second.children.length
+                ? second.children.map(third =>
+                    `<a class="ls-drawer-child"
+                        href="products.html?category=${encodeURIComponent(third.name)}">${third.name}</a>`
+                  ).join("")
+                : `<p class="ls-drawer-empty">Nothing here yet.</p>`;
+
+            return `<div class="ls-drawer-group">
+                <button class="ls-drawer-group-head" type="button">
+                    <span>${second.name}</span>
+                    <span class="ls-drawer-chevron">&#8250;</span>
+                </button>
+                <div class="ls-drawer-children">${leaves}</div>
+            </div>`;
+        }).join("");
+
+        panel.scrollTop = 0;
+    };
+
+    rail.addEventListener("click", e => {
+        const btn = e.target.closest(".ls-drawer-parent");
+        if (btn) showParent(Number(btn.dataset.i));
+    });
+
+    // One group open at a time, so a long list does not push the rest off-screen
+    panel.addEventListener("click", e => {
+        const head = e.target.closest(".ls-drawer-group-head");
+        if (!head) return;
+        const group = head.parentElement;
+        const wasOpen = group.classList.contains("open");
+        panel.querySelectorAll(".ls-drawer-group").forEach(g => g.classList.remove("open"));
+        if (!wasOpen) group.classList.add("open");
+    });
+
+    showParent(0);
+}
+
+function setupDrawerToggle() {
+    const openBtn = document.getElementById("ls-nav-all");
+    const drawer = document.getElementById("ls-drawer");
+    const backdrop = document.getElementById("ls-drawer-backdrop");
+    const closeBtn = document.getElementById("ls-drawer-close");
+    if (!openBtn || !drawer) return;
+
+    const setOpen = open => {
+        drawer.hidden = !open;
+        backdrop.hidden = !open;
+        document.body.style.overflow = open ? "hidden" : "";
+    };
+
+    openBtn.addEventListener("click", () => setOpen(true));
+    closeBtn.addEventListener("click", () => setOpen(false));
+    backdrop.addEventListener("click", () => setOpen(false));
+    document.addEventListener("keydown", e => {
+        if (e.key === "Escape") setOpen(false);
+    });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    loadCategoryNav();
+    setupDrawerToggle();
+});

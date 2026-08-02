@@ -607,7 +607,46 @@ async function displayFeaturedProducts(products) {
         const scroll = section.querySelector(".ls-row-scroll");
         items.forEach(product => scroll.appendChild(buildProductCard(product)));
         host.appendChild(section);
+
+        autoScrollRow(scroll);
     }
+}
+
+// Nudges a row one card to the right every 5 seconds, looping back at the end.
+// Pauses while the customer is touching it, and while the tab is hidden.
+function autoScrollRow(scroll) {
+    let timer = null;
+    let paused = false;
+
+    const step = () => {
+        if (paused) return;
+
+        const card = scroll.firstElementChild;
+        if (!card) return;
+
+        const stride = card.getBoundingClientRect().width + 14;   // card + gap
+        const atEnd = scroll.scrollLeft + scroll.clientWidth >= scroll.scrollWidth - 4;
+
+        scroll.scrollTo({ left: atEnd ? 0 : scroll.scrollLeft + stride, behavior: "smooth" });
+    };
+
+    const start = () => { clearInterval(timer); timer = setInterval(step, 5000); };
+
+    ["pointerdown", "touchstart", "mouseenter"].forEach(evt =>
+        scroll.addEventListener(evt, () => { paused = true; }, { passive: true }));
+
+    ["pointerup", "touchend", "mouseleave"].forEach(evt =>
+        scroll.addEventListener(evt, () => {
+            paused = false;
+            start();
+        }, { passive: true }));
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) clearInterval(timer);
+        else start();
+    });
+
+    start();
 }
 
 let cameFromCart = false;
