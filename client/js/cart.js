@@ -35,12 +35,29 @@ function addToCart(id, name, price, image, description, colorId, colorName, size
 }
 
 function updateCartCount() {
-    const count = document.getElementById("cart-count");
+    // Every header in the app rolled its own badge markup, so collect all of
+    // them: the canonical id, the product-detail id, and any element opted in
+    // with the class. Missing ones are simply skipped.
+    const badges = [
+        document.getElementById("cart-count"),
+        document.getElementById("pd-cart-count"),
+        ...document.querySelectorAll(".js-cart-count")
+    ].filter(Boolean);
+
+    const count = badges[0];
     if (!count) return;
 
     const cart = getCart();
     const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
     count.textContent = totalItems;
+
+    // mirror the first badge's result onto any others on the page
+    if (badges.length > 1 && badges[0]) {
+        badges.slice(1).forEach(b => {
+            b.textContent = badges[0].textContent;
+            b.style.display = badges[0].style.display;
+        });
+    }
 }
 
 function splitNameAndVariant(fullName) {
