@@ -3953,3 +3953,12 @@ body.sheet-open {
     .ls-mega-arrow:hover { color: #1a1a2e; }
     .ls-mega-row.open .ls-mega-arrow { color: #1a1a2e; }
 }
+
+/* ------------------------------------------------------------------
+   Touch widths: the panel above is desktop-only, so nothing styles it
+   here. Keep it out of the layout entirely — the drawer is the touch
+   interaction and it handles all three levels already.
+   ------------------------------------------------------------------ */
+@media (max-width: 900px) {
+    .ls-mega-panel { display: none !important; }
+}
