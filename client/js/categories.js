@@ -270,6 +270,7 @@ async function loadCategoryNav() {
         }
 
         if (rail) buildDrawer(rail);
+        buildMegaPanel();
     } catch (error) {
         console.error("Load category nav error:", error);
     }
@@ -355,3 +356,66 @@ document.addEventListener("DOMContentLoaded", () => {
     loadCategoryNav();
     setupDrawerToggle();
 });
+
+// ---------- All Categories hover panel (desktop) ----------
+// Same two panes as the drawer, reading the same drawerTree. The drawer
+// keeps its click behaviour; this only adds a hover surface above 901px.
+
+function buildMegaPanel() {
+    const rail = document.getElementById("ls-mega-rail");
+    const body = document.getElementById("ls-mega-body");
+    if (!rail || !body || !drawerTree) return;
+
+    rail.innerHTML = drawerTree.map((p, i) =>
+        `<button class="ls-mega-rail-item${i === 0 ? " active" : ""}"
+                 type="button" data-i="${i}">
+            <span>${p.name}</span>
+            <span class="ls-mega-chevron">&#8250;</span>
+        </button>`
+    ).join("");
+
+    const show = i => {
+        rail.querySelectorAll(".ls-mega-rail-item").forEach((b, n) =>
+            b.classList.toggle("active", n === i));
+
+        const parent = drawerTree[i];
+        if (!parent.children.length) {
+            body.innerHTML = '<p class="ls-mega-empty">Nothing here yet.</p>';
+            return;
+        }
+
+        // Level 2 as a column heading, its level 3 listed beneath it.
+        body.innerHTML = parent.children.map(second => {
+            const leaves = second.children.length
+                ? second.children.map(third =>
+                    `<a class="ls-mega-leaf"
+                        href="products.html?category=${encodeURIComponent(third.name)}">${third.name}</a>`
+                  ).join("")
+                : "";
+
+            return `<div class="ls-mega-group">
+                <a class="ls-mega-head"
+                   href="products.html?category=${encodeURIComponent(second.name)}">${second.name}</a>
+                ${leaves}
+            </div>`;
+        }).join("");
+
+        body.scrollTop = 0;
+    };
+
+    // Hover swaps the pane; click still follows through to the category page.
+    rail.addEventListener("mouseover", e => {
+        const btn = e.target.closest(".ls-mega-rail-item");
+        if (btn) show(Number(btn.dataset.i));
+    });
+
+    rail.addEventListener("click", e => {
+        const btn = e.target.closest(".ls-mega-rail-item");
+        if (!btn) return;
+        const name = drawerTree[Number(btn.dataset.i)].name;
+        window.location.href =
+            "products.html?category=" + encodeURIComponent(name);
+    });
+
+    show(0);
+}

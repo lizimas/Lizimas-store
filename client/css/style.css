@@ -1202,8 +1202,8 @@ width:90%;
 }
 
 .cart-checkout-btn {
-    background: #fbbf24;
-    color: #111827;
+    background: #F5C518;
+    color: #1a1a2e;
     border: none;
     border-radius: 30px;
     padding: 14px 40px;
@@ -1213,7 +1213,7 @@ width:90%;
 }
 
 .cart-checkout-btn:hover {
-    background: #f59e0b;
+    background: #e0b416;
 }
 
 /* Cart page v2 - checkboxes, bigger images, badge footer */
@@ -1524,7 +1524,7 @@ width:90%;
 .cart-checkout-btn {
     height: 56px;
     border-radius: 28px;
-    background: #000000;
+    background: #1a1a2e;
     color: #FFFFFF;
     border: none;
     padding: 0 24px;
@@ -1602,7 +1602,7 @@ width:90%;
 .checkout-logo-badge {
     width: 40px;
     height: 40px;
-    background: #FF6600;
+    background: #F5C518;
     border-radius: 10px;
     display: flex;
     align-items: center;
@@ -1623,7 +1623,7 @@ width:90%;
     align-items: center;
     gap: 5px;
     font-size: 12px;
-    color: #FF6600;
+    color: #0a8f3c;
     font-weight: 600;
     white-space: nowrap;
 }
@@ -1657,14 +1657,14 @@ width:90%;
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: #FFF3E9;
+    background: #FDF4D9;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .progress-step.active .progress-circle {
-    background: #FF6600;
+    background: #1a1a2e;
 }
 
 .progress-label {
@@ -1674,7 +1674,7 @@ width:90%;
 
 .progress-step.active .progress-label,
 .progress-step.completed .progress-label {
-    color: #FF6600;
+    color: #1a1a2e;
     font-weight: 600;
 }
 
@@ -1687,7 +1687,7 @@ width:90%;
 }
 
 .progress-line.completed {
-    background: #FF6600;
+    background: #F5C518;
 }
 
 .checkout-card {
@@ -1790,7 +1790,7 @@ width:90%;
 .order-summary-icon {
     width: 30px;
     height: 30px;
-    background: #FFF3E9;
+    background: #FDF4D9;
     border-radius: 8px;
     display: flex;
     align-items: center;
@@ -2336,7 +2336,7 @@ width:90%;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    background: #FFF3E9;
+    background: #FDF4D9;
     color: #FF6600;
     border: 1px solid #FFD8B8;
     border-radius: 14px;
@@ -2432,7 +2432,7 @@ width:90%;
 
 .district-result-item:hover,
 .district-result-item:active {
-    background: #FFF3E9;
+    background: #FDF4D9;
 }
 
 .district-result-empty {
@@ -3143,6 +3143,16 @@ body.sheet-open {
 
 .ls-nav::-webkit-scrollbar { display: none; }
 
+/* ------------------------------------------------------------------
+   PHASE 3 — overflow-x: auto above makes overflow-y auto too, which
+   clips the dropdown panels inside .ls-nav. At desktop widths the row
+   fits without scrolling, so the scroll container is pure cost: drop
+   it and let the menus escape.
+   ------------------------------------------------------------------ */
+@media (min-width: 901px) {
+    .ls-nav { overflow-x: visible; overflow-y: visible; }
+}
+
 .ls-nav-all {
     display: flex;
     align-items: center;
@@ -3851,4 +3861,119 @@ body.sheet-open {
 
 @media (hover: none) {
     .ls-nav-menu, .ls-nav-submenu { display: none !important; }
+}
+
+/* ============================================================
+   PHASE 4 — All Categories hover panel. Desktop only: below 901px
+   .ls-nav still scrolls horizontally and would clip this, and the
+   click-drawer is the better touch interaction regardless.
+   ============================================================ */
+@media (min-width: 901px) {
+    .ls-mega { position: relative; }
+
+    .ls-mega-panel {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        margin-top: 6px;
+        display: flex;
+        width: 780px;
+        max-width: calc(100vw - 40px);
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+        overflow: hidden;
+        z-index: 1200;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(6px);
+        transition: opacity .16s ease, transform .16s ease, visibility .16s;
+    }
+
+    /* bridges the gap so the panel survives the cursor crossing it */
+    .ls-mega-panel::before {
+        content: "";
+        position: absolute;
+        top: -8px;
+        left: 0;
+        right: 0;
+        height: 8px;
+    }
+
+    .ls-mega:hover .ls-mega-panel,
+    .ls-mega:focus-within .ls-mega-panel {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
+
+    .ls-mega-rail {
+        flex: 0 0 210px;
+        background: #f8f9fb;
+        border-right: 1px solid #e5e7eb;
+        padding: 8px 0;
+        max-height: 460px;
+        overflow-y: auto;
+    }
+
+    .ls-mega-rail-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        width: 100%;
+        padding: 11px 16px;
+        background: none;
+        border: 0;
+        font-family: inherit;
+        font-size: 14px;
+        color: #1a1a2e;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .ls-mega-rail-item.active {
+        background: #fff;
+        font-weight: 600;
+        box-shadow: inset 3px 0 0 #F5C518;
+    }
+
+    .ls-mega-chevron { color: #9ca3af; font-size: 15px; }
+
+    .ls-mega-body {
+        flex: 1;
+        padding: 16px 20px;
+        max-height: 460px;
+        overflow-y: auto;
+        column-count: 2;
+        column-gap: 28px;
+    }
+
+    .ls-mega-group {
+        break-inside: avoid;
+        margin-bottom: 18px;
+    }
+
+    .ls-mega-head {
+        display: block;
+        margin-bottom: 6px;
+        color: #1a1a2e;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .ls-mega-head:hover { color: #b8860b; }
+
+    .ls-mega-leaf {
+        display: block;
+        padding: 4px 0;
+        color: #6b7280;
+        font-size: 13px;
+        text-decoration: none;
+    }
+
+    .ls-mega-leaf:hover { color: #1a1a2e; }
+
+    .ls-mega-empty { padding: 20px; color: #9ca3af; font-size: 14px; }
 }
