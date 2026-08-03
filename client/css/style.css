@@ -3866,7 +3866,11 @@ body.sheet-open {
 /* ============================================================
    PHASE 4 — All Categories hover panel. Desktop only: below 901px
    .ls-nav still scrolls horizontally and would clip this, and the
-   click-drawer is the better touch interaction regardless.
+   click-drawer is the better touch interaction anyway.
+
+   The cascade is arrow-driven. Each column appears only when the
+   arrow on its parent row is hovered, so moving a cursor down the
+   list does not open everything at once.
    ============================================================ */
 @media (min-width: 901px) {
     .ls-mega { position: relative; }
@@ -3877,8 +3881,7 @@ body.sheet-open {
         left: 0;
         margin-top: 6px;
         display: flex;
-        width: 780px;
-        max-width: calc(100vw - 40px);
+        align-items: stretch;
         background: #fff;
         border-radius: 12px;
         box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
@@ -3890,7 +3893,6 @@ body.sheet-open {
         transition: opacity .16s ease, transform .16s ease, visibility .16s;
     }
 
-    /* bridges the gap so the panel survives the cursor crossing it */
     .ls-mega-panel::before {
         content: "";
         position: absolute;
@@ -3907,73 +3909,47 @@ body.sheet-open {
         transform: translateY(0);
     }
 
-    .ls-mega-rail {
-        flex: 0 0 210px;
-        background: #f8f9fb;
-        border-right: 1px solid #e5e7eb;
+    .ls-mega-rail,
+    .ls-mega-col {
+        flex: 0 0 248px;
         padding: 8px 0;
         max-height: 460px;
         overflow-y: auto;
     }
 
-    .ls-mega-rail-item {
+    .ls-mega-rail { background: #f8f9fb; }
+    .ls-mega-col { border-left: 1px solid #eceef2; background: #fff; }
+    .ls-mega-col[hidden] { display: none; }
+
+    .ls-mega-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 10px;
-        width: 100%;
-        padding: 11px 16px;
-        background: none;
-        border: 0;
-        font-family: inherit;
-        font-size: 14px;
-        color: #1a1a2e;
-        text-align: left;
-        cursor: pointer;
     }
 
-    .ls-mega-rail-item.active {
-        background: #fff;
-        font-weight: 600;
-        box-shadow: inset 3px 0 0 #F5C518;
-    }
+    .ls-mega-row.open { background: #fff; box-shadow: inset 3px 0 0 #F5C518; }
+    .ls-mega-col .ls-mega-row.open { background: #f8f9fb; }
 
-    .ls-mega-chevron { color: #9ca3af; font-size: 15px; }
-
-    .ls-mega-body {
+    .ls-mega-label {
         flex: 1;
-        padding: 16px 20px;
-        max-height: 460px;
-        overflow-y: auto;
-        column-count: 2;
-        column-gap: 28px;
-    }
-
-    .ls-mega-group {
-        break-inside: avoid;
-        margin-bottom: 18px;
-    }
-
-    .ls-mega-head {
-        display: block;
-        margin-bottom: 6px;
+        padding: 11px 4px 11px 18px;
         color: #1a1a2e;
         font-size: 14px;
-        font-weight: 600;
         text-decoration: none;
     }
 
-    .ls-mega-head:hover { color: #b8860b; }
+    .ls-mega-label:hover { color: #b8860b; }
 
-    .ls-mega-leaf {
-        display: block;
-        padding: 4px 0;
-        color: #6b7280;
-        font-size: 13px;
-        text-decoration: none;
+    /* the arrow is the trigger. It stays small, but the padding gives it
+       a ~40px hit area so it is not a pixel hunt. */
+    .ls-mega-arrow {
+        padding: 11px 16px;
+        color: #b6bcc8;
+        font-size: 16px;
+        line-height: 1;
+        cursor: default;
     }
 
-    .ls-mega-leaf:hover { color: #1a1a2e; }
-
-    .ls-mega-empty { padding: 20px; color: #9ca3af; font-size: 14px; }
+    .ls-mega-arrow:hover { color: #1a1a2e; }
+    .ls-mega-row.open .ls-mega-arrow { color: #1a1a2e; }
 }

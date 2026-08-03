@@ -358,64 +358,98 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ---------- All Categories hover panel (desktop) ----------
-// Same two panes as the drawer, reading the same drawerTree. The drawer
-// keeps its click behaviour; this only adds a hover surface above 901px.
+// Cascade, not a dump: level 1 shows on opening the panel; each deeper
+// level appears only when its parent's arrow is hovered. Hovering the row
+// label itself does nothing, so a cursor crossing the list on its way
+// somewhere else does not flood the panel.
 
 function buildMegaPanel() {
     const rail = document.getElementById("ls-mega-rail");
-    const body = document.getElementById("ls-mega-body");
-    if (!rail || !body || !drawerTree) return;
+    const col2 = document.getElementById("ls-mega-l2");
+    const col3 = document.getElementById("ls-mega-l3");
+    if (!rail || !col2 || !col3 || !drawerTree) return;
 
-    rail.innerHTML = drawerTree.map((p, i) =>
-        `<button class="ls-mega-rail-item${i === 0 ? " active" : ""}"
-                 type="button" data-i="${i}">
-            <span>${p.name}</span>
-            <span class="ls-mega-chevron">&#8250;</span>
-        </button>`
-    ).join("");
+    const href = name =>
+        "products.html?category=" + encodeURIComponent(name);
 
-    const show = i => {
-        rail.querySelectorAll(".ls-mega-rail-item").forEach((b, n) =>
-            b.classList.toggle("active", n === i));
-
-        const parent = drawerTree[i];
-        if (!parent.children.length) {
-            body.innerHTML = '<p class="ls-mega-empty">Nothing here yet.</p>';
-            return;
-        }
-
-        // Level 2 as a column heading, its level 3 listed beneath it.
-        body.innerHTML = parent.children.map(second => {
-            const leaves = second.children.length
-                ? second.children.map(third =>
-                    `<a class="ls-mega-leaf"
-                        href="products.html?category=${encodeURIComponent(third.name)}">${third.name}</a>`
-                  ).join("")
-                : "";
-
-            return `<div class="ls-mega-group">
-                <a class="ls-mega-head"
-                   href="products.html?category=${encodeURIComponent(second.name)}">${second.name}</a>
-                ${leaves}
-            </div>`;
-        }).join("");
-
-        body.scrollTop = 0;
+    const row = (item, cls) => {
+        const arrow = item.children && item.children.length
+            ? '<span class="ls-mega-arrow">&#8250;</span>'
+            : "";
+        return `<div class="${cls}">
+            <a class="ls-mega-label" href="${href(item.name)}">${item.name}</a>
+            ${arrow}
+        </div>`;
     };
 
-    // Hover swaps the pane; click still follows through to the category page.
+    // level 1
+    rail.innerHTML = drawerTree
+        .map((p, i) => row(p, "ls-mega-row").replace(
+            'class="ls-mega-row"', `class="ls-mega-row" data-i="${i}"`))
+        .join("");
+
+    const closeFrom2 = () => {
+        col2.hidden = true;
+        col3.hidden = true;
+        rail.querySelectorAll(".ls-mega-row").forEach(r =>
+            r.classList.remove("open"));
+    };
+
+    const closeFrom3 = () => {
+        col3.hidden = true;
+        col2.querySelectorAll(".ls-mega-row").forEach(r =>
+            r.classList.remove("open"));
+    };
+
+    // arrow on a level-1 row opens level 2
     rail.addEventListener("mouseover", e => {
-        const btn = e.target.closest(".ls-mega-rail-item");
-        if (btn) show(Number(btn.dataset.i));
+        const hit = e.target.closest(".ls-mega-arrow");
+        if (!hit) return;
+
+        const rowEl = hit.closest(".ls-mega-row");
+        const parent = drawerTree[Number(rowEl.dataset.i)];
+        if (!parent || !parent.children.length) return;
+
+        rail.querySelectorAll(".ls-mega-row").forEach(r =>
+            r.classList.remove("open"));
+        rowEl.classList.add("open");
+
+        col2.innerHTML = parent.children
+            .map((c, j) => row(c, "ls-mega-row").replace(
+                'class="ls-mega-row"', `class="ls-mega-row" data-i="${j}"`))
+            .join("");
+        col2.dataset.parent = rowEl.dataset.i;
+        col2.hidden = false;
+        col3.hidden = true;
+        col2.scrollTop = 0;
     });
 
-    rail.addEventListener("click", e => {
-        const btn = e.target.closest(".ls-mega-rail-item");
-        if (!btn) return;
-        const name = drawerTree[Number(btn.dataset.i)].name;
-        window.location.href =
-            "products.html?category=" + encodeURIComponent(name);
+    // arrow on a level-2 row opens level 3
+    col2.addEventListener("mouseover", e => {
+        const hit = e.target.closest(".ls-mega-arrow");
+        if (!hit) return;
+
+        const rowEl = hit.closest(".ls-mega-row");
+        const parent = drawerTree[Number(col2.dataset.parent)];
+        const second = parent && parent.children[Number(rowEl.dataset.i)];
+        if (!second || !second.children.length) return;
+
+        col2.querySelectorAll(".ls-mega-row").forEach(r =>
+            r.classList.remove("open"));
+        rowEl.classList.add("open");
+
+        col3.innerHTML = second.children
+            .map(c => row(c, "ls-mega-row"))
+            .join("");
+        col3.hidden = false;
+        col3.scrollTop = 0;
     });
 
-    show(0);
+    // leaving a column collapses everything to its right
+    col2.addEventListener("mouseleave", e => {
+        if (!e.relatedTarget || !e.relatedTarget.closest(".ls-mega-panel")) return;
+        if (!e.relatedTarget.closest("#ls-mega-l3")) closeFrom3();
+    });
+
+    document.getElementById("ls-mega").addEventListener("mouseleave", closeFrom2);
 }
