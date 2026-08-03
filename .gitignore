@@ -17,3 +17,4 @@ normalise.py
 gen_tree.py
 *.bak_*
 *.bak
+hide_mega_*.py
