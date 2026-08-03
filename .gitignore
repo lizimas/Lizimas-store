@@ -7,3 +7,13 @@ uploads/*
 *.bak*
 backups/
 __pycache__/
+
+# one-off patch scripts and timestamped backups
+patch_*.py
+phase*.py
+checkout_retheme*.py
+cart_badge_fix.py
+normalise.py
+gen_tree.py
+*.bak_*
+*.bak
