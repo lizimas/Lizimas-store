@@ -70,7 +70,6 @@ body {
 }
 
 
-
 .site-header nav {
 
     display:flex;
@@ -95,7 +94,6 @@ body {
     color:#fbbf24;
 
 }
-
 
 
 /* ================= HERO ================= */
@@ -172,13 +170,11 @@ body {
 }
 
 
-
 .hero button:hover {
 
     background:#f59e0b;
 
 }
-
 
 
 /* ================= CATEGORY ================= */
@@ -204,7 +200,6 @@ body {
 }
 
 
-
 .category-grid {
 
     display:grid;
@@ -215,7 +210,6 @@ body {
     gap:25px;
 
 }
-
 
 
 .category-card {
@@ -236,13 +230,11 @@ body {
 }
 
 
-
 .category-card:hover {
 
     transform:translateY(-8px);
 
 }
-
 
 
 .category-card img {
@@ -264,10 +256,7 @@ body {
 }
 
 
-
-
 /* ================= PRODUCTS ================= */
-
 
 
 .product-grid {
@@ -280,7 +269,6 @@ body {
     gap:25px;
 
 }
-
 
 
 .product-card {
@@ -303,14 +291,12 @@ body {
 }
 
 
-
 .product-card:hover {
 
 
     transform:translateY(-8px);
 
 }
-
 
 
 .product-card img {
@@ -322,7 +308,6 @@ body {
     object-fit:contain;
 
 }
-
 
 
 .product-card h3 {
@@ -344,7 +329,6 @@ body {
     font-weight:bold;
 
 }
-
 
 
 .product-card button {
@@ -377,7 +361,6 @@ body {
     color:black;
 
 }
-
 
 
 /* ================= TRUST SECTION ================= */
@@ -417,8 +400,6 @@ body {
 }
 
 
-
-
 /* ================= FOOTER ================= */
 
 
@@ -436,9 +417,7 @@ footer {
 }
 
 
-
 /* ================= MOBILE ================= */
-
 
 
 @media(max-width:768px){
@@ -484,7 +463,6 @@ footer {
 }
 
 
-
 .category-grid,
 .product-grid {
 
@@ -494,9 +472,7 @@ footer {
 }
 
 
-
 }
-
 
 
 @media(max-width:480px){
@@ -656,7 +632,6 @@ color:#111827;
 }
 
 
-
 .product-card:hover {
 
     transform: translateY(-8px);
@@ -665,7 +640,6 @@ color:#111827;
     0 15px 35px rgba(0,0,0,0.15);
 
 }
-
 
 
 .product-card img {
@@ -681,7 +655,6 @@ color:#111827;
 }
 
 
-
 .product-card h3 {
 
     font-size:18px;
@@ -691,7 +664,6 @@ color:#111827;
     min-height:45px;
 
 }
-
 
 
 .product-price {
@@ -705,7 +677,6 @@ color:#111827;
     margin:12px 0;
 
 }
-
 
 
 .product-card button {
@@ -744,7 +715,6 @@ color:#111827;
 }
 
 
-
 .product-card button:hover {
 
 
@@ -757,7 +727,6 @@ color:#111827;
 }
 
 
-
 /* Product grid spacing */
 
 .product-grid {
@@ -765,7 +734,6 @@ color:#111827;
     gap:30px;
 
 }
-
 
 
 /* Mobile product improvement */
@@ -811,7 +779,6 @@ width:320px;
 }
 
 
-
 .search-box input {
 
 border:none;
@@ -827,7 +794,6 @@ font-size:15px;
 }
 
 
-
 .search-box button {
 
 border:none;
@@ -841,7 +807,6 @@ cursor:pointer;
 }
 
 
-
 .site-header nav a {
 
 display:flex;
@@ -851,7 +816,6 @@ align-items:center;
 gap:5px;
 
 }
-
 
 
 #cart-count {
@@ -869,8 +833,6 @@ font-size:12px;
 font-weight:bold;
 
 }
-
-
 
 
 @media(max-width:768px){
@@ -3234,46 +3196,104 @@ body.sheet-open {
     color: #fff;
 }
 
-@media (max-width: 720px) {
-    .ls-header-top { flex-wrap: wrap; gap: 12px; }
-    .ls-search { order: 3; flex-basis: 100%; }
-    .ls-action-label { display: none; }
-    .ls-wordmark { font-size: 18px; }
-}
 
-/* Burger sits inline with the search bar */
-.ls-header-top .ls-nav-all { height: 44px; }
+/* ============================================================
+   PHASE 2 — two-row header. Replaces the four conflicting
+   720px blocks that accumulated across v5/v6 revisions.
+   Target height: 114px desktop (68 + 46).
+   ============================================================ */
 
-@media (max-width: 720px) {
-    .ls-nav-all-label { display: none; }
-    .ls-header-top .ls-nav-all { padding: 0 13px; }
-    .ls-search { order: 0; flex-basis: auto; }
-    .ls-header-top { flex-wrap: wrap; }
-    .ls-brand { flex-basis: 100%; }
-}
+.ls-header-top .ls-header-actions { margin-left: auto; }
 
-/* Burger and search share the second row */
-.ls-nav-row {
+/* All Categories now lives in the nav row */
+.ls-nav .ls-nav-all { margin-right: 8px; }
+
+/* --- Help / Account hover menus --- */
+.ls-menu { position: relative; }
+
+.ls-menu-trigger {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 0 18px 10px;
-    max-width: 1400px;
-    margin: 0 auto;
+    gap: 7px;
+    background: none;
+    border: 0;
+    padding: 4px 2px;
+    color: #fff;
+    text-decoration: none;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
 }
 
-.ls-nav-row .ls-nav-all { height: 44px; }
+.ls-menu-trigger svg { width: 26px; height: 26px; }
 
-/* The v5 mobile overrides assumed search sat in the top row; it no longer does.
-   Brand left, account and cart right, on one line at every width. */
+.ls-menu-panel {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 10px;
+    min-width: 220px;
+    padding: 6px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+    z-index: 1200;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(6px);
+    transition: opacity .16s ease, transform .16s ease, visibility .16s;
+}
+
+/* bridges the gap so the menu survives the cursor travelling down */
+.ls-menu-panel::before {
+    content: "";
+    position: absolute;
+    top: -10px;
+    left: 0;
+    right: 0;
+    height: 10px;
+}
+
+.ls-menu:hover .ls-menu-panel,
+.ls-menu:focus-within .ls-menu-panel {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.ls-menu-item {
+    display: block;
+    padding: 10px 12px;
+    color: #1a1a2e;
+    text-decoration: none;
+    font-size: 14px;
+    border-radius: 6px;
+}
+
+.ls-menu-item:hover { background: #f3f4f6; }
+.ls-menu-item-accent { color: #0a8f3c; font-weight: 600; }
+
+.ls-menu-sep {
+    height: 1px;
+    margin: 6px 8px;
+    background: #e5e7eb;
+}
+
+/* --- one consolidated mobile block --- */
 @media (max-width: 720px) {
-    .ls-header-top { flex-wrap: nowrap; }
+    .ls-header-top {
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 10px 14px;
+    }
     .ls-brand { flex-basis: auto; margin-right: auto; }
-    .ls-search { order: 0; flex-basis: auto; }
+    .ls-wordmark { font-size: 18px; }
+    .ls-action-label { display: none; }
+    .ls-search { order: 3; flex-basis: 100%; }
+    .ls-nav-all-label { display: none; }
+    .ls-menu-panel { right: -8px; }
 }
-
-/* Push account and cart to the far right at every width */
-.ls-header-top .ls-header-actions { margin-left: auto; }
 
 /* Auto-scrolling product strip, right to left.
    Swap the contents for promotional images when those exist. */
