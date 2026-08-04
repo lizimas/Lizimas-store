@@ -1395,11 +1395,11 @@ width:90%;
 }
 
 .cart-row-image {
-    width: 100px;
-    height: 100px;
-    border-radius: 12px;
-    object-fit: cover;
-    background: #F5F5F5;
+    width: 88px;
+    height: 88px;
+    border-radius: 10px;
+    object-fit: contain;
+    background: #FFFFFF;
     flex-shrink: 0;
 }
 
@@ -1446,10 +1446,10 @@ width:90%;
 }
 
 .cart-row-price {
-    font-size: 29px;
-    font-weight: bold;
-    color: #000000;
-    line-height: 1;
+    font-size: 17px;
+    font-weight: 700;
+    color: #0f1b3d;
+    line-height: 1.2;
     margin: 0;
 }
 

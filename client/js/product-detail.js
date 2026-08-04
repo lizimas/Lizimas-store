@@ -37,7 +37,17 @@ async function loadProductDetail() {
 
 
         document.getElementById("pd-add-to-cart-btn").onclick = () => {
-            addToCart(product.id, product.name, product.price, product.image, product.description, pdSelectedColorId, pdSelectedColorName, pdSelectedSizeId, pdSelectedSizeName);
+            // Use the image for the selected colour, not the product default.
+            let cartImage = product.image;
+            if (pdSelectedColorId !== null && Array.isArray(pdImageRecords)) {
+                const match = pdImageRecords.find(
+                    r => r && Number(r.color_id) === Number(pdSelectedColorId)
+                );
+                if (match && (match.image_path || match.url || match.src)) {
+                    cartImage = match.image_path || match.url || match.src;
+                }
+            }
+            addToCart(product.id, product.name, product.price, cartImage, product.description, pdSelectedColorId, pdSelectedColorName, pdSelectedSizeId, pdSelectedSizeName);
         };
 
         document.getElementById("pd-fullscreen-share").onclick = () => sharePdProduct(product);

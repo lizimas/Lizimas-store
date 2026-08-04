@@ -202,10 +202,12 @@ function loadCart() {
                     ${isChecked ? "checked" : ""}
                     onchange="toggleItemSelection(${index}, this.checked)"
                 >
-                <img src="${imageSrc}" class="cart-row-image" alt="${baseName}">
+                <a href="product-detail.html?id=${item.id}" class="cart-row-image-link">
+                    <img src="${imageSrc}" class="cart-row-image" alt="${baseName}">
+                </a>
                 <div class="cart-row-details">
                     <p class="cart-row-name">${baseName}</p>
-                    <span class="variant-pill" onclick="goToChangeVariant('${item.id}')">${(item.description || variantLabel || "View details").slice(0, 40)} <span class="variant-pill-arrow">›</span></span>
+                    <span class="variant-pill" onclick="goToChangeVariant('${item.id}')">${[item.colorName, item.sizeName].filter(Boolean).join(" / ") || (item.description || variantLabel || "View details").slice(0, 40)} <span class="variant-pill-arrow">›</span></span>
                     <div class="cart-row-price-row">
                         <p class="cart-row-price">UGX ${Number(item.price).toLocaleString()}</p>
                         <div class="cart-row-stepper">
