@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Help Centre | Lizimas Store</title>
+
+<link rel="stylesheet" href="css/style.css?v=26">
+
+</head>
+
+<body>
+
+<header class="ls-header">
+
+  <div class="ls-header-top">
+
+    <a href="index.html" class="ls-brand">
+      <svg class="ls-mark" viewBox="0 0 512 512" aria-hidden="true">
+        <rect width="512" height="512" rx="123" fill="#1a1a2e"/>
+        <path d="M182 253 A74 74 0 0 1 330 253" fill="none" stroke="#F5C518" stroke-width="26"/>
+        <rect x="123" y="195" width="266" height="215" rx="31" fill="#F5C518"/>
+        <text x="256" y="335" font-family="Poppins, Segoe UI, sans-serif" font-size="133"
+              font-weight="700" fill="#1a1a2e" text-anchor="middle">LS</text>
+      </svg>
+      <span class="ls-wordmark">Lizimas Store</span>
+    </a>
+
+    <form class="ls-search" onsubmit="return false;">
+      <svg viewBox="0 0 24 24" class="ls-search-icon" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
+        <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round"/>
+      </svg>
+      <input type="search" id="header-search" placeholder="Search for anything" autocomplete="off">
+    </form>
+
+    <div class="ls-header-actions">
+
+      <div class="ls-menu">
+        <button class="ls-menu-trigger" type="button" aria-haspopup="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="M9.2 9.3a2.9 2.9 0 015.6 1c0 1.9-2.8 2.2-2.8 4" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="12" cy="17.6" r="1.2" fill="currentColor"/>
+          </svg>
+          <span class="ls-action-label">Help</span>
+        </button>
+        <div class="ls-menu-panel">
+          <a class="ls-menu-item" href="help.html">Help Center</a>
+          <a class="ls-menu-item" href="help.html#ordering">Place an order</a>
+          <a class="ls-menu-item" href="help.html#payments">Payment options</a>
+          <a class="ls-menu-item" href="help.html#delivery">Delivery &amp; tracking</a>
+          <a class="ls-menu-item" href="help.html#returns">Returns &amp; refunds</a>
+          <div class="ls-menu-sep"></div>
+          <a class="ls-menu-item ls-menu-item-accent"
+             href="https://wa.me/256792363104" target="_blank" rel="noopener">Live chat</a>
+        </div>
+      </div>
+
+      <div class="ls-menu">
+        <a class="ls-menu-trigger" href="login.html" aria-haspopup="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span class="ls-action-label">Account</span>
+        </a>
+        <div class="ls-menu-panel">
+          <a class="ls-menu-item" href="login.html">My account</a>
+          <a class="ls-menu-item" href="orders.html">Orders</a>
+        </div>
+      </div>
+
+      <a href="cart.html" class="ls-action" title="Cart">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 4h2.2l2.6 12h9.6l2.2-8H7" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+          <circle cx="10" cy="20" r="1.6" fill="currentColor"/>
+          <circle cx="17" cy="20" r="1.6" fill="currentColor"/>
+        </svg>
+        <span class="ls-cart-count" id="cart-count">0</span>
+      </a>
+    </div>
+
+  </div>
+
+  <nav class="ls-nav" id="ls-nav">
+    <div class="ls-mega" id="ls-mega">
+      <button class="ls-nav-all" id="ls-nav-all" type="button">
+        <span class="ls-burger"><span></span><span></span><span></span></span>
+        <span class="ls-nav-all-label">All Categories</span>
+      </button>
+      <div class="ls-mega-panel">
+        <div class="ls-mega-rail" id="ls-mega-rail"></div>
+        <div class="ls-mega-col" id="ls-mega-l2" hidden></div>
+        <div class="ls-mega-col" id="ls-mega-l3" hidden></div>
+      </div>
+    </div>
+    <div class="ls-nav-parents" id="ls-nav-parents"></div>
+  </nav>
+
+</header>
+
+<main class="ls-help">
+
+  <div class="ls-help-hero">
+    <h1>Help Centre</h1>
+    <p>Answers to the questions we get asked most. Still stuck?
+       <a href="https://wa.me/256792363104" target="_blank" rel="noopener">Message us on WhatsApp</a>
+       and a person will reply.</p>
+  </div>
+
+  <nav class="ls-help-toc" aria-label="Help topics">
+    <a href="#ordering">Place an order</a>
+    <a href="#payments">Payment options</a>
+    <a href="#delivery">Delivery &amp; tracking</a>
+    <a href="#returns">Returns &amp; refunds</a>
+    <a href="#account">Your account</a>
+    <a href="#contact">Contact us</a>
+  </nav>
+
+  <section class="ls-help-section" id="ordering">
+    <h2>Place an order</h2>
+    <ol>
+      <li>Browse by category, or use the search bar at the top of any page.</li>
+      <li>Open a product to see its photos, colours, sizes and price.</li>
+      <li>Choose your options and tap <strong>Add to cart</strong>.</li>
+      <li>Open your cart, check the items, then tap <strong>Checkout</strong>.</li>
+      <li>Enter your delivery details and confirm. You will see an order number
+          on screen once the order is placed.</li>
+    </ol>
+    <p>You do not need an account to browse, but you will be asked to sign in or
+       register at checkout so we can attach the order to you and keep your
+       delivery details for next time.</p>
+  </section>
+
+  <section class="ls-help-section" id="payments">
+    <h2>Payment options</h2>
+    <p>We currently accept:</p>
+    <ul>
+      <li><strong>Cash on delivery</strong> &mdash; pay the rider when your order
+          reaches you. Please have the exact amount ready where possible.</li>
+      <li><strong>Mobile money</strong> &mdash; MTN Mobile Money. Card payment is
+          not available yet.</li>
+    </ul>
+    <p>Prices on the site are in Ugandan Shillings (UGX) and include VAT where it
+       applies. Delivery is charged separately and is shown before you confirm.</p>
+    <p>We will never ask you to send money to a personal number. If anyone
+       contacts you claiming to be from Lizimas Store and asks for a transfer
+       outside checkout, stop and
+       <a href="https://wa.me/256792363104" target="_blank" rel="noopener">contact us</a>.</p>
+  </section>
+
+  <section class="ls-help-section" id="delivery">
+    <h2>Delivery &amp; tracking</h2>
+    <p>Delivery cost is calculated from the distance between our store and your
+       delivery address, so you will see the exact amount at checkout before you
+       confirm anything.</p>
+    <p>We deliver between 8:00am and 6:00pm.</p>
+    <ul>
+      <li><strong>Within Kampala</strong> &mdash; usually same day or next day.</li>
+      <li><strong>Outside Kampala</strong> &mdash; typically 2 to 3 days,
+          depending on the route.</li>
+      <li><strong>Shipped items</strong> &mdash; some products are brought in
+          specially and take 10 to 14 days to arrive. If your item falls into
+          this group we will confirm the timeline with you after you order.</li>
+    </ul>
+    <p>To follow an order, sign in and open <a href="orders.html">My Orders</a>.
+       Each order shows its current status. Our rider will also call you on the
+       number you gave at checkout before arriving, so please make sure it is
+       reachable.</p>
+    <p>If nobody is available when the rider arrives, we will try again. Repeated
+       failed attempts may mean the order is returned to the store.</p>
+  </section>
+
+  <section class="ls-help-section" id="returns">
+    <h2>Returns &amp; refunds</h2>
+    <p>Check your item in front of the rider where you can. If something is
+       wrong, it is far easier to sort out immediately.</p>
+    <p>We accept returns within <strong>7 days</strong> of delivery when the item
+       is:</p>
+    <ul>
+      <li>damaged, faulty, or not working as it should</li>
+      <li>not what you ordered</li>
+      <li>unused and still in its original packaging</li>
+    </ul>
+    <p>For hygiene reasons we cannot accept returns on underwear, earrings, or
+       opened food and grocery items unless they arrived damaged or spoiled.</p>
+    <p>To start a return, message us on WhatsApp with your order number and a
+       photo of the item. Once we receive and check the item, a refund is sent
+       back the same way you paid, normally within a few working days.</p>
+  </section>
+
+  <section class="ls-help-section" id="account">
+    <h2>Your account</h2>
+    <p>Registering lets you track orders, save delivery details and check out
+       faster. You can <a href="register.html">create an account</a> or
+       <a href="login.html">sign in</a> at any time.</p>
+    <p>Forgotten your password? Use the
+       <a href="forgot-password.html">reset link</a> and we will email you a
+       link. The link expires after a short time and can only be used once, so
+       request a fresh one if it stops working.</p>
+  </section>
+
+  <section class="ls-help-section" id="contact">
+    <h2>Contact us</h2>
+    <p>Lizimas &amp; Talent Enterprise</p>
+    <ul>
+      <li>WhatsApp:
+        <a href="https://wa.me/256792363104" target="_blank" rel="noopener">+256 792 363104</a>
+        &mdash; fastest way to reach us</li>
+    </ul>
+    <p>When you write to us, please include your order number if you have one.
+       It saves a lot of back and forth.</p>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+
+
+<div class="container footer-container">
+
+
+<div>
+
+<h3>
+Lizimas Store
+</h3>
+
+
+<p>
+Your trusted online shopping partner.
+</p>
+
+
+</div>
+
+
+
+<div>
+
+<h4>
+Payments
+</h4>
+
+<p>
+Mobile Money:
++256792363104
+</p>
+
+<p>
+Cash on Delivery
+</p>
+
+
+</div>
+
+
+
+</div>
+
+
+
+<div class="copyright">
+
+© 2026 Lizimas Store <a href="admin.html" style="color: inherit; opacity: 0.3; text-decoration: none; font-size: 0.75em; margin-left: 10px;">•</a> 
+
+</div>
+
+
+
+</footer>
+
+
+
+
+
+
+<div id="product-modal" class="product-modal hidden">
+    <div class="product-modal-content">
+        <button class="product-modal-close" onclick="closeProductModal()">&times;</button>
+        <div class="product-modal-body">
+            <div class="product-modal-gallery">
+                <img id="modal-main-image" src="" alt="" class="product-modal-main-image">
+                <div id="modal-thumbnails" class="product-modal-thumbnails"></div>
+            </div>
+            <div class="product-modal-info">
+                <h2 id="modal-product-name"></h2>
+                <p id="modal-selected-variant" class="modal-variant-label"></p>
+                <div id="modal-product-rating"></div>
+                <div id="modal-product-price"></div>
+                <button id="modal-add-to-cart-btn" class="add-to-cart-btn">Add To Cart 🛒</button>
+                <div id="modal-reviews-section" class="modal-section"></div>
+                <div id="modal-description-section" class="modal-section">
+                  <h3 class="modal-section-title">Description</h3>
+                  <p id="modal-product-description"></p>
+                </div>
+                <div id="modal-specs-section" class="modal-section"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="pd-sheet" class="pd-sheet hidden">
+  <div class="pd-sheet-backdrop" onclick="closeAllDetails()"></div>
+  <div class="pd-sheet-panel">
+    <div class="pd-sheet-head">
+      <h3>Product details</h3>
+      <button type="button" class="pd-sheet-close" onclick="closeAllDetails()">&times;</button>
+    </div>
+    <div id="pd-sheet-body" class="pd-sheet-body"></div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/hero.js"></script>
+<script src="js/categories.js?v=13"></script>
+
+<script src="js/cart.js?v=3"></script>
+
+<script src="js/products.js?v=4"></script>
+
+
+<a href="https://wa.me/256792363104" target="_blank" rel="noopener" class="whatsapp-float" aria-label="Chat with us on WhatsApp">
+    <svg viewBox="0 0 24 24" width="28" height="28" fill="#FFFFFF"><path d="M17.6 6.32A8.86 8.86 0 0 0 12.02 3a8.94 8.94 0 0 0-7.75 13.4L3 21l4.72-1.24a8.9 8.9 0 0 0 4.29 1.1h.01c4.94 0 8.95-4 8.95-8.94a8.9 8.9 0 0 0-2.37-6.1ZM12.02 19.4a7.4 7.4 0 0 1-3.78-1.04l-.27-.16-2.8.74.75-2.73-.18-.28a7.43 7.43 0 0 1 11.62-9.2 7.36 7.36 0 0 1 2.18 5.25c0 4.1-3.34 7.42-7.52 7.42Zm4.08-5.56c-.22-.11-1.32-.65-1.53-.72-.2-.08-.35-.11-.5.11-.15.22-.58.72-.71.87-.13.15-.26.16-.48.06-.22-.11-.94-.35-1.79-1.11-.66-.59-1.11-1.32-1.24-1.54-.13-.22-.01-.34.1-.45.1-.1.22-.26.33-.39.11-.13.15-.22.22-.37.07-.15.04-.28-.02-.39-.06-.11-.5-1.21-.69-1.66-.18-.44-.37-.38-.5-.39h-.43c-.15 0-.39.06-.6.28-.2.22-.79.77-.79 1.87s.81 2.17.92 2.32c.11.15 1.6 2.44 3.87 3.42.54.23.96.37 1.29.48.54.17 1.03.15 1.42.09.43-.06 1.32-.54 1.51-1.06.19-.52.19-.96.13-1.06-.06-.09-.2-.15-.42-.26Z"/></svg>
+</a>
+
+
+
+
+<div id="fullscreen-viewer" class="fullscreen-viewer hidden">
+    <button id="fullscreen-close" class="fullscreen-close">&times;</button>
+    <img id="fullscreen-image" src="" alt="" class="fullscreen-image">
+</div>
+
+<!-- Category drawer: level 1 in the rail, level 2 in the panel,
+     level 3 revealed by the arrow on each level-2 row. -->
+<div class="ls-drawer-backdrop" id="ls-drawer-backdrop" hidden></div>
+
+<aside class="ls-drawer" id="ls-drawer" hidden aria-label="All categories">
+  <div class="ls-drawer-head">
+    <span class="ls-drawer-title">All Categories</span>
+    <button class="ls-drawer-close" id="ls-drawer-close" aria-label="Close">&times;</button>
+  </div>
+
+  <div class="ls-drawer-body">
+    <nav class="ls-drawer-rail" id="ls-drawer-rail"></nav>
+    <div class="ls-drawer-panel" id="ls-drawer-panel"></div>
+  </div>
+</aside>
+
+</body>
+
+</html>
