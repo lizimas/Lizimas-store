@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Chat | Lizimas Store</title>
+<link rel="stylesheet" href="../css/style.css?v=35">
+<link rel="stylesheet" href="../css/staff-chat.css?v=1">
+</head>
+
+<body class="sc-body">
+
+<header class="sc-topbar">
+    <div class="sc-topbar-left">
+        <span class="sc-logo">LS</span>
+        <span class="sc-topbar-title">Live Chat</span>
+        <span class="sc-conn" id="sc-conn" hidden>Offline</span>
+    </div>
+    <div class="sc-topbar-right">
+        <span class="sc-agent" id="sc-agent"></span>
+        <button class="sc-btn sc-btn-ghost" id="sc-logout">Log out</button>
+    </div>
+</header>
+
+<main class="sc-shell" id="sc-shell">
+
+    <!-- Panel 1: conversation list -->
+    <section class="sc-panel sc-list-panel" id="sc-list-panel">
+        <div class="sc-search-wrap">
+            <input type="search" id="sc-search" class="sc-search"
+                   placeholder="Search name, phone or subject" autocomplete="off">
+        </div>
+
+        <div class="sc-filters" id="sc-filters">
+            <button class="sc-chip is-active" data-filter="open">Open</button>
+            <button class="sc-chip" data-filter="mine">Mine</button>
+            <button class="sc-chip" data-filter="unassigned">Unassigned</button>
+            <button class="sc-chip" data-filter="pending">Pending</button>
+            <button class="sc-chip" data-filter="closed">Closed</button>
+            <button class="sc-chip" data-filter="all">All</button>
+        </div>
+
+        <div class="sc-list" id="sc-list">
+            <p class="sc-empty">Loading conversations…</p>
+        </div>
+    </section>
+
+    <!-- Panel 2: the thread -->
+    <section class="sc-panel sc-thread-panel" id="sc-thread-panel">
+        <div class="sc-thread-head">
+            <button class="sc-back" id="sc-back" aria-label="Back to list">‹</button>
+            <div class="sc-thread-who">
+                <span class="sc-thread-name" id="sc-thread-name">No conversation selected</span>
+                <span class="sc-thread-meta" id="sc-thread-meta"></span>
+            </div>
+            <button class="sc-info-btn" id="sc-info-btn" aria-label="Customer details">i</button>
+        </div>
+
+        <div class="sc-messages" id="sc-messages">
+            <p class="sc-empty">Pick a conversation from the list.</p>
+        </div>
+
+        <div class="sc-composer" id="sc-composer" hidden>
+            <textarea id="sc-input" class="sc-input" rows="1"
+                      placeholder="Type a reply…"></textarea>
+            <button class="sc-send" id="sc-send" aria-label="Send">Send</button>
+        </div>
+    </section>
+
+    <!-- Panel 3: customer details. A drawer on phones. -->
+    <aside class="sc-panel sc-detail-panel" id="sc-detail-panel">
+        <div class="sc-detail-head">
+            <span>Customer</span>
+            <button class="sc-drawer-close" id="sc-detail-close" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="sc-detail-body" id="sc-detail-body">
+            <p class="sc-empty">No conversation selected.</p>
+        </div>
+    </aside>
+
+</main>
+
+<div class="sc-scrim" id="sc-scrim" hidden></div>
+
+<script src="../js/staff-chat.js?v=1"></script>
+
+</body>
+
+</html>

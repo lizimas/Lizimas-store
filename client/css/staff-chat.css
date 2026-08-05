@@ -1,0 +1,431 @@
+/* ============================================================
+   Staff live chat inbox.
+
+   Deliberately a separate file rather than more lines in
+   style.css, which is already 4,100 lines with a duplicate
+   problem. Everything here is namespaced sc-* so it cannot
+   collide with the storefront.
+   ============================================================ */
+
+:root {
+    --sc-navy: #0f1b3d;
+    --sc-navy-soft: #1a1a2e;
+    --sc-gold: #f5c518;
+    --sc-ink: #111827;
+    --sc-muted: #6b7280;
+    --sc-line: #e5e7eb;
+    --sc-surface: #f7f8fa;
+    --sc-bubble-in: #ffffff;
+    --sc-bubble-out: #0f1b3d;
+}
+
+.sc-body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--sc-surface);
+    color: var(--sc-ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+}
+
+/* ---------------------------------------------------------- topbar */
+
+.sc-topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--sc-navy);
+    color: #fff;
+}
+
+.sc-topbar-left,
+.sc-topbar-right { display: flex; align-items: center; gap: 10px; }
+
+.sc-logo {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    background: var(--sc-gold);
+    color: var(--sc-navy);
+    font-weight: 800;
+    font-size: 13px;
+}
+
+.sc-topbar-title { font-weight: 700; font-size: 16px; }
+
+.sc-agent { font-size: 13px; opacity: .85; }
+
+.sc-conn {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #b91c1c;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* ----------------------------------------------------------- shell */
+
+.sc-shell {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: 320px 1fr 300px;
+    min-height: 0;
+}
+
+.sc-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: #fff;
+    border-right: 1px solid var(--sc-line);
+}
+
+.sc-detail-panel { border-right: none; border-left: 1px solid var(--sc-line); }
+
+/* ------------------------------------------------- conversation list */
+
+.sc-search-wrap { padding: 10px; border-bottom: 1px solid var(--sc-line); }
+
+.sc-search {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 9px 12px;
+    border: 1px solid var(--sc-line);
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.sc-search:focus { outline: 2px solid var(--sc-gold); outline-offset: -1px; }
+
+.sc-filters {
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--sc-line);
+}
+
+.sc-filters::-webkit-scrollbar { display: none; }
+
+.sc-chip {
+    flex: 0 0 auto;
+    padding: 6px 12px;
+    border: 1px solid var(--sc-line);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--sc-muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.sc-chip.is-active {
+    background: var(--sc-navy);
+    border-color: var(--sc-navy);
+    color: var(--sc-gold);
+}
+
+.sc-list { flex: 1 1 auto; overflow-y: auto; }
+
+.sc-card {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--sc-line);
+    cursor: pointer;
+}
+
+.sc-card:hover { background: var(--sc-surface); }
+.sc-card.is-active { background: #eef2ff; }
+
+.sc-card-name {
+    font-weight: 700;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sc-card-time { font-size: 11px; color: var(--sc-muted); white-space: nowrap; }
+
+.sc-card-preview {
+    grid-column: 1 / -1;
+    font-size: 13px;
+    color: var(--sc-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.sc-card-tags {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+.sc-tag {
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+}
+
+.sc-tag-open    { background: #dcfce7; color: #166534; }
+.sc-tag-pending { background: #fef3c7; color: #92400e; }
+.sc-tag-closed  { background: #e5e7eb; color: #4b5563; }
+.sc-tag-guest   { background: #ede9fe; color: #5b21b6; }
+.sc-tag-agent   { background: #e0f2fe; color: #075985; }
+
+.sc-badge {
+    display: grid;
+    place-items: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--sc-gold);
+    color: var(--sc-navy);
+    font-size: 11px;
+    font-weight: 800;
+}
+
+/* --------------------------------------------------------- thread */
+
+.sc-thread-panel { background: var(--sc-surface); }
+
+.sc-thread-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: #fff;
+    border-bottom: 1px solid var(--sc-line);
+}
+
+.sc-thread-who { flex: 1 1 auto; min-width: 0; }
+.sc-thread-name { display: block; font-weight: 700; font-size: 15px; }
+.sc-thread-meta { display: block; font-size: 12px; color: var(--sc-muted); }
+
+.sc-back,
+.sc-info-btn {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--sc-line);
+    border-radius: 8px;
+    background: #fff;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.sc-back { display: none; }
+
+.sc-messages {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sc-msg {
+    max-width: 72%;
+    padding: 9px 13px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.4;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+.sc-msg-customer {
+    align-self: flex-start;
+    background: var(--sc-bubble-in);
+    border: 1px solid var(--sc-line);
+    border-bottom-left-radius: 4px;
+}
+
+.sc-msg-staff {
+    align-self: flex-end;
+    background: var(--sc-bubble-out);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+}
+
+.sc-msg-system {
+    align-self: center;
+    background: transparent;
+    color: var(--sc-muted);
+    font-size: 12px;
+    font-style: italic;
+}
+
+.sc-msg-time {
+    display: block;
+    margin-top: 4px;
+    font-size: 10px;
+    opacity: .65;
+}
+
+.sc-composer {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 8px;
+    padding: 10px;
+    background: #fff;
+    border-top: 1px solid var(--sc-line);
+}
+
+.sc-input {
+    flex: 1 1 auto;
+    resize: none;
+    max-height: 120px;
+    padding: 10px 12px;
+    border: 1px solid var(--sc-line);
+    border-radius: 10px;
+    font: inherit;
+    font-size: 14px;
+}
+
+.sc-input:focus { outline: 2px solid var(--sc-gold); outline-offset: -1px; }
+
+.sc-send {
+    flex: 0 0 auto;
+    padding: 0 18px;
+    border: none;
+    border-radius: 10px;
+    background: var(--sc-gold);
+    color: var(--sc-navy);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.sc-send:disabled { opacity: .5; cursor: default; }
+
+/* -------------------------------------------------------- details */
+
+.sc-detail-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--sc-line);
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.sc-drawer-close {
+    display: none;
+    border: none;
+    background: none;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.sc-detail-body { flex: 1 1 auto; overflow-y: auto; padding: 14px; }
+
+.sc-field { margin-bottom: 12px; }
+.sc-field-label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: var(--sc-muted);
+    margin-bottom: 2px;
+}
+.sc-field-value { font-size: 14px; font-weight: 600; word-break: break-word; }
+
+.sc-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+
+.sc-btn {
+    padding: 9px 12px;
+    border: 1px solid var(--sc-line);
+    border-radius: 8px;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+}
+
+.sc-btn-primary { background: var(--sc-navy); border-color: var(--sc-navy); color: var(--sc-gold); }
+.sc-btn-ghost { background: transparent; border-color: rgba(255,255,255,.3); color: #fff; }
+.sc-btn:disabled { opacity: .5; cursor: default; }
+
+.sc-note {
+    margin-top: 16px;
+    padding: 10px;
+    border: 1px dashed var(--sc-line);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--sc-muted);
+    line-height: 1.5;
+}
+
+.sc-empty { padding: 24px 16px; color: var(--sc-muted); font-size: 14px; text-align: center; }
+
+.sc-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.4);
+    z-index: 40;
+}
+
+/* ---------------------------------------------------------- mobile */
+
+@media (max-width: 1100px) {
+    .sc-shell { grid-template-columns: 300px 1fr; }
+    .sc-detail-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(320px, 88vw);
+        z-index: 50;
+        transform: translateX(100%);
+        transition: transform .25s ease;
+        box-shadow: -8px 0 24px rgba(0,0,0,.12);
+    }
+    .sc-detail-panel.is-open { transform: translateX(0); }
+    .sc-drawer-close { display: block; }
+}
+
+@media (max-width: 760px) {
+    .sc-shell { grid-template-columns: 1fr; }
+
+    /* One panel at a time. The list is the default view; opening a
+       conversation slides the thread over it. */
+    .sc-thread-panel {
+        position: fixed;
+        inset: 0;
+        top: 50px;
+        z-index: 30;
+        transform: translateX(100%);
+        transition: transform .22s ease;
+    }
+    .sc-thread-panel.is-open { transform: translateX(0); }
+    .sc-back { display: block; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sc-detail-panel,
+    .sc-thread-panel { transition: none; }
+}

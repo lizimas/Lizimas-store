@@ -15,6 +15,8 @@ function redirectByRole(role) {
         window.location.href = "staff/product.html";
     } else if (role === "store_manager") {
         window.location.href = "staff/manager.html";
+    } else if (role === "customer_support") {
+        window.location.href = "staff/chat.html";
     } else {
         localStorage.removeItem("staffToken");
         document.getElementById("login-error").textContent = "This login is for staff accounts only.";

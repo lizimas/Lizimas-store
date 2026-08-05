@@ -13,6 +13,13 @@ function chatToken(req) {
     return req.get("X-Chat-Token") || req.query.token || null;
 }
 
+// The JWT payload uses userId. Accept id too, so this survives any future
+// normalisation of the token shape.
+function currentUserId(req) {
+    if (!req.user) return null;
+    return req.user.userId != null ? req.user.userId : req.user.id;
+}
+
 // Resolves a conversation the caller is actually entitled to see. Logged-in
 // customers match on customer_id; guests match on the token. Returns null
 // rather than throwing so callers can decide between 403 and 404.
@@ -24,7 +31,7 @@ async function loadOwnedConversation(conversationId, req) {
     const conv = result.rows[0];
     if (!conv) return null;
 
-    if (req.user && conv.customer_id === req.user.id) return conv;
+    if (req.user && conv.customer_id === currentUserId(req)) return conv;
 
     const token = chatToken(req);
     if (token && conv.guest_token && conv.guest_token === token) return conv;
@@ -57,7 +64,7 @@ exports.startConversation = async (req, res) => {
              VALUES ($1, $2, $3, $4, $5, 'open', 1, CURRENT_TIMESTAMP)
              RETURNING id, status, created_at`,
             [
-                req.user ? req.user.id : null,
+                req.user ? currentUserId(req) : null,
                 token,
                 isGuest ? String(name).trim() : null,
                 isGuest && phone ? String(phone).trim() : null,
@@ -187,6 +194,8 @@ exports.listConversations = async (req, res) => {
     try {
         const status = req.query.status || "open";
         const mine = req.query.mine === "true";
+        const unassigned = req.query.unassigned === "true";
+        const search = (req.query.search || "").trim();
 
         const params = [];
         const where = [];
@@ -196,8 +205,20 @@ exports.listConversations = async (req, res) => {
             where.push(`c.status = $${params.length}`);
         }
         if (mine) {
-            params.push(req.user.id);
+            params.push(currentUserId(req));
             where.push(`c.assigned_staff_id = $${params.length}`);
+        }
+        if (unassigned) {
+            where.push("c.assigned_staff_id IS NULL");
+        }
+        if (search) {
+            // One parameter reused across four columns, so an agent can paste
+            // a phone number or type a partial name and get the same result.
+            params.push(`%${search}%`);
+            const p = `$${params.length}`;
+            where.push(`(u.name ILIKE ${p} OR c.guest_name ILIKE ${p}
+                      OR u.phone ILIKE ${p} OR c.guest_phone ILIKE ${p}
+                      OR c.subject ILIKE ${p})`);
         }
 
         const result = await pool.query(
@@ -206,11 +227,13 @@ exports.listConversations = async (req, res) => {
                     COALESCE(u.name, c.guest_name) AS display_name,
                     COALESCE(u.phone, c.guest_phone) AS display_phone,
                     (c.customer_id IS NULL) AS is_guest,
+                    s.name AS assigned_staff_name,
                     (SELECT body FROM chat_messages m
                       WHERE m.conversation_id = c.id
                       ORDER BY m.id DESC LIMIT 1) AS last_message
              FROM chat_conversations c
              LEFT JOIN users u ON u.id = c.customer_id
+             LEFT JOIN users s ON s.id = c.assigned_staff_id
              ${where.length ? "WHERE " + where.join(" AND ") : ""}
              ORDER BY c.last_message_at DESC NULLS LAST, c.id DESC
              LIMIT 100`,
@@ -281,7 +304,7 @@ exports.postStaffMessage = async (req, res) => {
                  (conversation_id, sender_type, sender_staff_id, body)
              VALUES ($1, 'staff', $2, $3)
              RETURNING id, sender_type, sender_staff_id, body, created_at`,
-            [req.params.id, req.user.id, String(body).trim()]
+            [req.params.id, currentUserId(req), String(body).trim()]
         );
 
         // Claim the thread on first reply if nobody owns it yet.
@@ -293,7 +316,7 @@ exports.postStaffMessage = async (req, res) => {
                  assigned_staff_id = COALESCE(assigned_staff_id, $2),
                  status = CASE WHEN status = 'closed' THEN 'open' ELSE status END
              WHERE id = $1`,
-            [req.params.id, req.user.id]
+            [req.params.id, currentUserId(req)]
         );
 
         await client.query("COMMIT");
