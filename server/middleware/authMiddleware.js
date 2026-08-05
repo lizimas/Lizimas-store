@@ -79,4 +79,15 @@ function requireStaffOrAdmin(req, res, next) {
     next();
 }
 
-module.exports = { requireAuth, requireAdmin, requireStaffOrAdmin, optionalAuth };
+// Live chat is answered by dedicated support agents and by admins. Product
+// staff and store managers are deliberately excluded - they have no reason
+// to see customer conversations.
+function requireSupportOrAdmin(req, res, next) {
+    const allowedRoles = ["admin", "customer_support"];
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+        return res.status(403).json({ error: "Support or admin access required." });
+    }
+    next();
+}
+
+module.exports = { requireAuth, requireAdmin, requireStaffOrAdmin, requireSupportOrAdmin, optionalAuth };
