@@ -74,6 +74,10 @@
 
 .sc-shell {
     flex: 1 1 auto;
+    /* The thread panel parks off-screen at translateX(100%) on phones,
+       which otherwise creates horizontal overflow and a white strip
+       beside the topbar. */
+    overflow-x: hidden;
     display: grid;
     grid-template-columns: 320px 1fr 300px;
     min-height: 0;
