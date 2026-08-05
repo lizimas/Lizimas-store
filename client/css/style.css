@@ -1,3 +1,19 @@
+/* ============================================================
+   Lizimas palette. Two navies and two golds exist in this file
+   from the rebrand; these are the canonical ones. Migrate other
+   hardcoded values onto these variables incrementally.
+   ============================================================ */
+:root {
+    --lz-navy: #0f1b3d;
+    --lz-navy-alt: #1a1a2e;
+    --lz-gold: #f5c518;
+    --lz-gold-alt: #fbbf24;
+    --lz-ink: #111827;
+    --lz-line: #e5e7eb;
+    --lz-surface: #f3f4f6;
+    --lz-white: #ffffff;
+}
+
 @import "../src/styles/products.css";
 
 @import "../src/styles/variables.css";
@@ -2658,8 +2674,8 @@ width:90%;
     height: 34px;
     border: none;
     border-radius: 8px;
-    background: #C0392B;
-    color: #fff;
+    background: var(--lz-gold);
+    color: var(--lz-navy);
     font-size: 22px;
     line-height: 1;
     font-weight: 400;
@@ -2908,8 +2924,8 @@ body.sheet-open {
     padding: 0;
     border: none;
     border-radius: 8px;
-    background: #C0392B;
-    color: #fff;
+    background: var(--lz-gold);
+    color: var(--lz-navy);
     font-size: 22px;
     font-weight: 400;
     line-height: 1;
