@@ -271,24 +271,6 @@ body {
 }
 
 
-.product-card {
-
-
-    background:white;
-
-    border-radius:18px;
-
-    padding:20px;
-
-    box-shadow:
-
-    0 8px 25px rgba(0,0,0,.08);
-
-    transition:.3s;
-
-    position:relative;
-
-}
 
 
 .product-card:hover {
@@ -519,11 +501,6 @@ footer {
 }
 
 
-.product-card{
-
-    position:relative;
-
-}
 /* PREMIUM PRODUCT CARD */
 
 .badge {
@@ -1097,15 +1074,6 @@ width:90%;
     gap: 16px;
 }
 
-.cart-row {
-    display: flex;
-    gap: 14px;
-    background: white;
-    border-radius: 18px;
-    padding: 14px;
-    box-shadow: 0 8px 25px rgba(0,0,0,.08);
-    align-items: flex-start;
-}
 
 .cart-row-image {
     width: 140px;
@@ -1121,17 +1089,7 @@ width:90%;
     min-width: 0;
 }
 
-.cart-row-name {
-    margin: 0 0 6px;
-    color: #111827;
-    font-size: 1rem;
-}
 
-.cart-row-price {
-    color: #16a34a;
-    font-weight: bold;
-    margin: 0 0 10px;
-}
 
 .cart-row-controls {
     display: flex;
@@ -1240,15 +1198,6 @@ width:90%;
     cursor: pointer;
 }
 
-.cart-row {
-    display: flex;
-    gap: 14px;
-    background: white;
-    border-radius: 18px;
-    padding: 16px;
-    box-shadow: 0 8px 25px rgba(0,0,0,.08);
-    align-items: center;
-}
 
 .cart-row-checkbox {
     width: 22px;
@@ -1266,19 +1215,7 @@ width:90%;
     gap: 6px;
 }
 
-.cart-row-name {
-    margin: 0;
-    color: #111827;
-    font-size: 1.05rem;
-    line-height: 1.3;
-}
 
-.cart-row-price {
-    color: #16a34a;
-    font-weight: bold;
-    font-size: 1.2rem;
-    margin: 0;
-}
 
 .cart-row-controls {
     display: flex;
@@ -1383,11 +1320,14 @@ width:90%;
 }
 
 .cart-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px 0;
-    border-bottom: 1px solid #ECECEC;
+  display: flex;
+  gap: 12px;
+  background: white;
+  border-radius: 18px;
+  padding: 16px 0;
+  box-shadow: 0 8px 25px rgba(0,0,0,.08);
+  align-items: center;
+  border-bottom: 1px solid #ECECEC;
 }
 
 .cart-row:last-child {
@@ -1412,16 +1352,16 @@ width:90%;
 }
 
 .cart-row-name {
-    margin: 0;
-    font-size: 16px;
-    font-weight: 500;
-    color: #000000;
-    line-height: 1.3;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  margin: 0;
+  color: #000000;
+  font-size: 16px;
+  line-height: 1.3;
+  font-weight: 500;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .variant-pill {
@@ -1446,11 +1386,11 @@ width:90%;
 }
 
 .cart-row-price {
-    font-size: 17px;
-    font-weight: 700;
-    color: #0f1b3d;
-    line-height: 1.2;
-    margin: 0;
+  color: #0f1b3d;
+  font-weight: 700;
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.2;
 }
 
 .cart-row-qty {
@@ -2662,11 +2602,15 @@ width:90%;
 }
 
 .product-card {
-    display: flex;
-    flex-direction: column;
-    padding: 0;
-    overflow: hidden;
-    border-radius: 12px;
+  background: white;
+  border-radius: 12px;
+  padding: 0;
+  box-shadow: 0 8px 25px rgba(0,0,0,.08);
+  transition: .3s;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .product-image-wrapper {
