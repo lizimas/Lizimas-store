@@ -49,11 +49,17 @@ function renderExplorePages(track, items) {
     exploreIndex = 0;
 
     const tile = c => {
-        const img = c.effective_image
-            ? `<img src="${c.effective_image}" alt="${c.name}" loading="lazy">`
-            : "";
+        const hasLZ = typeof LZImage !== "undefined";
+        const src = c.effective_image;
+        const img = src
+            ? `<img src="${hasLZ ? LZImage.url(src, "tileRaw") : src}"${
+                hasLZ ? ` srcset="${LZImage.srcset(src, "tileRaw")}"` : ""
+              } alt="${c.name}" width="600" height="600" loading="lazy" decoding="async">`
+            : (hasLZ
+                ? `<img src="${LZImage.placeholder(c.name, "square")}" alt="${c.name}" width="600" height="600" loading="lazy" decoding="async">`
+                : "");
         return `<a class="ls-explore-tile" href="products.html?category=${encodeURIComponent(c.name)}">
-            <span class="ls-explore-thumb">${img}</span>
+            <span class="ls-explore-thumb${src ? "" : " is-empty"}">${img}</span>
             <span class="ls-explore-name">${c.name}</span>
         </a>`;
     };
