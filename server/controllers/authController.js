@@ -205,7 +205,7 @@ async function createStaffAccount(req, res) {
     try {
         const { name, email, password, role } = req.body;
 
-        const allowedStaffRoles = ["product_staff", "store_manager"];
+        const allowedStaffRoles = ["product_staff", "store_manager", "customer_support"];
 
         if (!name || !email || !password || !role) {
             return res.status(400).json({ error: "Name, email, password, and role are required." });

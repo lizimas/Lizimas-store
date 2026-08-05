@@ -376,7 +376,7 @@ exports.getStaffSessions = async (req, res) => {
                     u.id AS user_id, u.name, u.role
              FROM sessions s
              JOIN users u ON u.id = s.user_id
-             WHERE u.role IN ('product_staff', 'store_manager')
+             WHERE u.role IN ('product_staff', 'store_manager', 'customer_support')
              ORDER BY s.created_at DESC
              LIMIT 200`
         );

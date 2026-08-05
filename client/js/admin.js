@@ -1977,7 +1977,7 @@ window.addEventListener("scroll", closeStaffMenus, true);
 async function loadStaffAccounts() {
     try {
         const customers = await authorizedFetch("/api/admin/customers");
-        const staff = (customers || []).filter(c => c.role === "product_staff" || c.role === "store_manager");
+        const staff = (customers || []).filter(c => c.role === "product_staff" || c.role === "store_manager" || c.role === "customer_support");
         window._staffListCache = staff;
         const container = document.getElementById("staff-accounts-list");
 
@@ -2002,7 +2002,9 @@ async function loadStaffAccounts() {
                             statusBadge = `<span class="status-badge status-paid">Active</span>`;
                         }
 
-                        const roleLabel = s.role === "product_staff" ? "Product Staff" : "Store Manager";
+                        const roleLabel = s.role === "product_staff" ? "Product Staff"
+                            : s.role === "customer_support" ? "Customer Support"
+                            : "Store Manager";
 
                         let actions = "";
                         if (!s.deleted_at) {
