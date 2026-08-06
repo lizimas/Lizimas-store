@@ -9,7 +9,10 @@ const {
     listConversations,
     getConversationForStaff,
     postStaffMessage,
-    updateConversation
+    updateConversation,
+    setAvailability,
+    heartbeat,
+    getAvailability
 } = require("../controllers/chatController");
 
 const {
@@ -42,5 +45,11 @@ router.get("/conversations", requireAuth, requireSupportOrAdmin, listConversatio
 router.get("/conversations/:id", requireAuth, requireSupportOrAdmin, getConversationForStaff);
 router.post("/conversations/:id/messages", requireAuth, requireSupportOrAdmin, postStaffMessage);
 router.patch("/conversations/:id", requireAuth, requireSupportOrAdmin, updateConversation);
+
+// Presence. Distinct single-segment paths, so none of these collide with the
+// public "/:id" routes above.
+router.get("/availability", requireAuth, requireSupportOrAdmin, getAvailability);
+router.post("/availability", requireAuth, requireSupportOrAdmin, setAvailability);
+router.post("/heartbeat", requireAuth, requireSupportOrAdmin, heartbeat);
 
 module.exports = router;

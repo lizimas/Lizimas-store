@@ -40,8 +40,26 @@ async function loadOwnedConversation(conversationId, req) {
 }
 
 // Public: open a thread and post the first message in one transaction.
+const {
+    assignWaiting,
+    logEvent,
+    ESCALATION_REASONS
+} = require("../services/chatRouting");
+
 exports.startConversation = async (req, res) => {
     const { name, phone, email, subject, message } = req.body;
+
+    // The widget's FAQ tier runs client-side, so everything the customer was
+    // already shown is lost at handoff unless it travels with the escalation.
+    // Without it the agent's first move is to repeat an answer the customer
+    // has read and rejected.
+    const trail = Array.isArray(req.body.faq_trail)
+        ? req.body.faq_trail.slice(0, 12)
+        : [];
+
+    const reason = ESCALATION_REASONS.includes(req.body.escalation_reason)
+        ? req.body.escalation_reason
+        : "asked_for_agent";
 
     if (!message || !String(message).trim()) {
         return res.status(400).json({ message: "A first message is required" });
@@ -60,8 +78,10 @@ exports.startConversation = async (req, res) => {
         const conv = await client.query(
             `INSERT INTO chat_conversations
                  (customer_id, guest_token, guest_name, guest_phone, guest_email,
-                  subject, status, staff_unread, last_message_at)
-             VALUES ($1, $2, $3, $4, $5, $6, 'open', 1, CURRENT_TIMESTAMP)
+                  subject, status, staff_unread, last_message_at,
+                  escalated_at, escalation_reason, last_customer_message_at)
+             VALUES ($1, $2, $3, $4, $5, $6, 'waiting', 1, CURRENT_TIMESTAMP,
+                     CURRENT_TIMESTAMP, $7, CURRENT_TIMESTAMP)
              RETURNING id, status, created_at`,
             [
                 req.user ? currentUserId(req) : null,
@@ -69,11 +89,55 @@ exports.startConversation = async (req, res) => {
                 isGuest ? String(name).trim() : null,
                 isGuest && phone ? String(phone).trim() : null,
                 isGuest && email ? String(email).trim().slice(0, 255) : null,
-                subject ? String(subject).trim().slice(0, 160) : null
+                subject ? String(subject).trim().slice(0, 160) : null,
+                reason
             ]
         );
 
         const conversationId = conv.rows[0].id;
+
+        // Replay the FAQ exchange into the transcript first, so message ids
+        // stay in true chronological order ahead of the customer's message.
+        for (const step of trail) {
+            const question = step && step.question
+                ? String(step.question).trim().slice(0, 300)
+                : null;
+            const answer = step && step.answer
+                ? String(step.answer).trim().slice(0, 2000)
+                : null;
+
+            if (question) {
+                await client.query(
+                    `INSERT INTO chat_messages (conversation_id, sender_type, body)
+                     VALUES ($1, 'customer', $2)`,
+                    [conversationId, question]
+                );
+            }
+            if (answer) {
+                await client.query(
+                    `INSERT INTO chat_messages (conversation_id, sender_type, body)
+                     VALUES ($1, 'ai', $2)`,
+                    [conversationId, answer]
+                );
+            }
+
+            await logEvent(client, {
+                conversationId,
+                eventType: "faq_answer_shown",
+                actorType: "ai",
+                meta: {
+                    topic: step && step.topic ? String(step.topic).slice(0, 60) : null,
+                    helpful: step && step.helpful === true
+                }
+            });
+        }
+
+        await logEvent(client, {
+            conversationId,
+            eventType: "escalated",
+            actorType: "customer",
+            meta: { reason, faq_steps: trail.length }
+        });
 
         const msg = await client.query(
             `INSERT INTO chat_messages (conversation_id, sender_type, body)
@@ -83,6 +147,12 @@ exports.startConversation = async (req, res) => {
         );
 
         await client.query("COMMIT");
+
+        try {
+            await assignWaiting(pool, { conversationId });
+        } catch (routingError) {
+            console.error("Assign on escalation failed:", routingError);
+        }
 
         res.status(201).json({
             conversation_id: conversationId,
@@ -157,7 +227,8 @@ exports.postMessage = async (req, res) => {
         await client.query(
             `UPDATE chat_conversations
              SET staff_unread = staff_unread + 1,
-                 last_message_at = CURRENT_TIMESTAMP
+                 last_message_at = CURRENT_TIMESTAMP,
+                 last_customer_message_at = CURRENT_TIMESTAMP
              WHERE id = $1`,
             [conv.id]
         );
@@ -193,7 +264,7 @@ exports.markCustomerRead = async (req, res) => {
 // Support/admin: the inbox. Defaults to threads that still need a reply.
 exports.listConversations = async (req, res) => {
     try {
-        const status = req.query.status || "open";
+        const status = req.query.status || "active";
         const mine = req.query.mine === "true";
         const unassigned = req.query.unassigned === "true";
         const search = (req.query.search || "").trim();
@@ -201,7 +272,9 @@ exports.listConversations = async (req, res) => {
         const params = [];
         const where = [];
 
-        if (status !== "all") {
+        if (status === "active") {
+            where.push("c.status IN ('waiting', 'open', 'pending')");
+        } else if (status !== "all") {
             params.push(status);
             where.push(`c.status = $${params.length}`);
         }
@@ -225,6 +298,7 @@ exports.listConversations = async (req, res) => {
         const result = await pool.query(
             `SELECT c.id, c.subject, c.status, c.staff_unread, c.last_message_at,
                     c.created_at, c.assigned_staff_id,
+                    c.escalated_at, c.assigned_at, c.first_response_at,
                     COALESCE(u.name, c.guest_name) AS display_name,
                     COALESCE(u.phone, c.guest_phone) AS display_phone,
                     (c.customer_id IS NULL) AS is_guest,
@@ -300,6 +374,23 @@ exports.postStaffMessage = async (req, res) => {
     try {
         await client.query("BEGIN");
 
+        // Read the prior state under lock so first_response_at can be
+        // recorded exactly once, and only for a genuine first human reply.
+        const prior = await client.query(
+            `SELECT status, first_response_at
+             FROM chat_conversations
+             WHERE id = $1
+             FOR UPDATE`,
+            [req.params.id]
+        );
+
+        if (!prior.rows[0]) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ message: "Conversation not found" });
+        }
+
+        const isFirstResponse = !prior.rows[0].first_response_at;
+
         const msg = await client.query(
             `INSERT INTO chat_messages
                  (conversation_id, sender_type, sender_staff_id, body)
@@ -308,17 +399,30 @@ exports.postStaffMessage = async (req, res) => {
             [req.params.id, currentUserId(req), String(body).trim()]
         );
 
-        // Claim the thread on first reply if nobody owns it yet.
+        // Claim the thread on first reply if nobody owns it yet. A reply to a
+        // queued chat is itself an assignment, so 'waiting' resolves here too.
         await client.query(
             `UPDATE chat_conversations
              SET customer_unread = customer_unread + 1,
                  staff_unread = 0,
                  last_message_at = CURRENT_TIMESTAMP,
                  assigned_staff_id = COALESCE(assigned_staff_id, $2),
-                 status = CASE WHEN status = 'closed' THEN 'open' ELSE status END
+                 assigned_at = COALESCE(assigned_at, CURRENT_TIMESTAMP),
+                 first_response_at = COALESCE(first_response_at, CURRENT_TIMESTAMP),
+                 status = CASE WHEN status IN ('closed', 'waiting') THEN 'open'
+                               ELSE status END
              WHERE id = $1`,
             [req.params.id, currentUserId(req)]
         );
+
+        if (isFirstResponse) {
+            await logEvent(client, {
+                conversationId: Number(req.params.id),
+                eventType: "first_response",
+                actorType: "staff",
+                actorStaffId: currentUserId(req)
+            });
+        }
 
         await client.query("COMMIT");
         res.status(201).json(msg.rows[0]);
@@ -333,31 +437,222 @@ exports.postStaffMessage = async (req, res) => {
 
 // Support/admin: change status or reassign.
 exports.updateConversation = async (req, res) => {
-    const { status, assigned_staff_id } = req.body;
-    const allowed = ["open", "pending", "closed"];
+    const { status, assigned_staff_id, resolved } = req.body;
+    const allowed = ["waiting", "open", "pending", "closed"];
 
     if (status && !allowed.includes(status)) {
         return res.status(400).json({ message: "Invalid status" });
     }
 
+    const staffId = currentUserId(req);
+    const client = await pool.connect();
+    let freedCapacity = false;
+
     try {
-        const result = await pool.query(
-            `UPDATE chat_conversations
-             SET status = COALESCE($2, status),
-                 assigned_staff_id = COALESCE($3, assigned_staff_id),
-                 closed_at = CASE WHEN $2 = 'closed' THEN CURRENT_TIMESTAMP
-                                  ELSE closed_at END
-             WHERE id = $1
-             RETURNING id, status, assigned_staff_id, closed_at`,
-            [req.params.id, status || null, assigned_staff_id || null]
+        await client.query("BEGIN");
+
+        const current = await client.query(
+            `SELECT status FROM chat_conversations WHERE id = $1 FOR UPDATE`,
+            [req.params.id]
         );
 
-        if (!result.rows[0]) {
+        if (!current.rows[0]) {
+            await client.query("ROLLBACK");
             return res.status(404).json({ message: "Conversation not found" });
         }
+
+        const before = current.rows[0].status;
+        const next = status || before;
+        const closing = next === "closed" && before !== "closed";
+        const reopening = before === "closed" && next !== "closed";
+
+        // Closed and resolved are not the same thing. An agent closing a chat
+        // the customer abandoned should be able to say so, or the resolution
+        // rate flatters itself.
+        const markResolved = closing && resolved !== false;
+        freedCapacity = closing;
+
+        const result = await client.query(
+            `UPDATE chat_conversations
+             SET status = $2,
+                 assigned_staff_id = COALESCE($3, assigned_staff_id),
+                 assigned_at = CASE WHEN $3 IS NOT NULL THEN CURRENT_TIMESTAMP
+                                    ELSE assigned_at END,
+                 closed_at = CASE WHEN $4 THEN CURRENT_TIMESTAMP
+                                  WHEN $5 THEN NULL
+                                  ELSE closed_at END,
+                 closed_by_type = CASE WHEN $4 THEN 'agent'
+                                       WHEN $5 THEN NULL
+                                       ELSE closed_by_type END,
+                 closed_by_staff_id = CASE WHEN $4 THEN $6
+                                           WHEN $5 THEN NULL
+                                           ELSE closed_by_staff_id END,
+                 resolved_at = CASE WHEN $7 THEN COALESCE(resolved_at, CURRENT_TIMESTAMP)
+                                    WHEN $5 THEN NULL
+                                    ELSE resolved_at END,
+                 reopened_count = CASE WHEN $5 THEN reopened_count + 1
+                                       ELSE reopened_count END
+             WHERE id = $1
+             RETURNING id, status, assigned_staff_id, assigned_at, closed_at,
+                       closed_by_type, resolved_at, reopened_count`,
+            [
+                req.params.id,
+                next,
+                assigned_staff_id || null,
+                closing,
+                reopening,
+                staffId,
+                markResolved
+            ]
+        );
+
+        let eventType = null;
+        if (closing) eventType = "closed";
+        else if (reopening) eventType = "reopened";
+        else if (assigned_staff_id) eventType = "reassigned";
+        else if (next !== before) eventType = "status_changed";
+
+        if (eventType) {
+            await logEvent(client, {
+                conversationId: Number(req.params.id),
+                eventType,
+                actorType: "staff",
+                actorStaffId: staffId,
+                meta: { from: before, to: next, resolved: markResolved }
+            });
+        }
+
+        await client.query("COMMIT");
+
+        // Closing frees a slot, so the queue gets a chance to drain into it.
+        if (freedCapacity) {
+            try {
+                await assignWaiting(pool, {});
+            } catch (routingError) {
+                console.error("Queue drain after close failed:", routingError);
+            }
+        }
+
         res.json(result.rows[0]);
     } catch (error) {
+        await client.query("ROLLBACK");
         console.error("Update conversation error:", error);
         res.status(500).json({ message: "Failed to update the conversation" });
+    } finally {
+        client.release();
+    }
+};
+
+// Support/admin: availability toggle. Going available drains the queue
+// immediately - a background sweeper would not run reliably on Render, and a
+// customer should not wait for a timer that may never fire.
+exports.setAvailability = async (req, res) => {
+    const raw = req.body.is_available !== undefined
+        ? req.body.is_available
+        : req.query.is_available;
+    const isAvailable = raw === true || raw === "true";
+    const staffId = currentUserId(req);
+
+    try {
+        await pool.query(
+            `INSERT INTO staff_availability
+                 (staff_id, is_available, last_heartbeat, went_available_at, updated_at)
+             VALUES ($1, $2, CURRENT_TIMESTAMP,
+                     CASE WHEN $2 THEN CURRENT_TIMESTAMP ELSE NULL END,
+                     CURRENT_TIMESTAMP)
+             ON CONFLICT (staff_id) DO UPDATE
+                SET is_available = EXCLUDED.is_available,
+                    last_heartbeat = CURRENT_TIMESTAMP,
+                    went_available_at =
+                        CASE WHEN EXCLUDED.is_available
+                                  AND staff_availability.is_available = FALSE
+                             THEN CURRENT_TIMESTAMP
+                             WHEN EXCLUDED.is_available
+                             THEN staff_availability.went_available_at
+                             ELSE NULL END,
+                    updated_at = CURRENT_TIMESTAMP`,
+            [staffId, isAvailable]
+        );
+
+        try {
+            await logEvent(pool, {
+                eventType: isAvailable ? "agent_available" : "agent_unavailable",
+                actorType: "staff",
+                actorStaffId: staffId
+            });
+        } catch (logError) {
+            console.error("Availability event log failed:", logError);
+        }
+
+        const assigned = isAvailable ? await assignWaiting(pool, {}) : [];
+
+        res.json({ is_available: isAvailable, assigned });
+    } catch (error) {
+        console.error("Set availability error:", error);
+        res.status(500).json({ message: "Failed to update availability" });
+    }
+};
+
+// Support/admin: keep-alive. is_available alone lies once a tab is closed,
+// so presence is availability plus a fresh heartbeat.
+exports.heartbeat = async (req, res) => {
+    const staffId = currentUserId(req);
+
+    try {
+        const beat = await pool.query(
+            `UPDATE staff_availability
+             SET last_heartbeat = CURRENT_TIMESTAMP,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE staff_id = $1
+             RETURNING is_available`,
+            [staffId]
+        );
+
+        const counts = await pool.query(
+            `SELECT
+                 COUNT(*) FILTER (WHERE status = 'waiting')::int AS waiting,
+                 COUNT(*) FILTER (WHERE status IN ('open', 'pending')
+                                    AND assigned_staff_id = $1)::int AS mine
+             FROM chat_conversations`,
+            [staffId]
+        );
+
+        res.json({
+            is_available: beat.rows[0] ? beat.rows[0].is_available : false,
+            waiting: counts.rows[0].waiting,
+            mine: counts.rows[0].mine
+        });
+    } catch (error) {
+        console.error("Heartbeat error:", error);
+        res.status(500).json({ message: "Heartbeat failed" });
+    }
+};
+
+// Support/admin: who is actually on duty right now.
+exports.getAvailability = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT sa.staff_id,
+                    sa.is_available,
+                    sa.max_concurrent,
+                    sa.last_heartbeat,
+                    sa.went_available_at,
+                    (sa.last_heartbeat IS NOT NULL
+                     AND sa.last_heartbeat >
+                         CURRENT_TIMESTAMP - INTERVAL '90 seconds') AS is_online,
+                    COUNT(c.id)::int AS active_chats
+               FROM staff_availability sa
+               LEFT JOIN chat_conversations c
+                 ON c.assigned_staff_id = sa.staff_id
+                AND c.status IN ('open', 'pending')
+              GROUP BY sa.staff_id, sa.is_available, sa.max_concurrent,
+                       sa.last_heartbeat, sa.went_available_at
+              ORDER BY sa.staff_id`
+        );
+
+        res.json({ agents: result.rows });
+    } catch (error) {
+        console.error("Get availability error:", error);
+        res.status(500).json({ message: "Failed to load availability" });
     }
 };

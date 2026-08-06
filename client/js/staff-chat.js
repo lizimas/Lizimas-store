@@ -19,7 +19,7 @@
     var me = null;
 
     var state = {
-        filter: "open",
+        filter: "active",
         search: "",
         conversations: [],
         activeId: null,
@@ -83,12 +83,19 @@
 
     /* -------------------------------------------- conversation list */
 
+    function waitLabel(since) {
+        var mins = Math.floor((Date.now() - new Date(since).getTime()) / 60000);
+        if (isNaN(mins) || mins < 1) return "just now";
+        if (mins < 60) return mins + "m waiting";
+        return Math.floor(mins / 60) + "h " + (mins % 60) + "m waiting";
+    }
+
     function filterParams() {
         var p = new URLSearchParams();
         var f = state.filter;
 
         if (f === "mine") { p.set("status", "all"); p.set("mine", "true"); }
-        else if (f === "unassigned") { p.set("status", "open"); p.set("unassigned", "true"); }
+        else if (f === "unassigned") { p.set("status", "active"); p.set("unassigned", "true"); }
         else { p.set("status", f); }
 
         if (state.search) p.set("search", state.search);
@@ -116,9 +123,26 @@
             return;
         }
 
-        wrap.innerHTML = state.conversations.map(function (c) {
+        // A queue read newest-first buries the person who has waited
+        // longest. Waiting chats sort oldest-first and sit above everything.
+        var ordered = state.conversations.slice().sort(function (a, b) {
+            var aw = a.status === "waiting";
+            var bw = b.status === "waiting";
+            if (aw && !bw) return -1;
+            if (bw && !aw) return 1;
+            if (aw && bw) {
+                return new Date(a.escalated_at || 0) - new Date(b.escalated_at || 0);
+            }
+            return new Date(b.last_message_at || 0) - new Date(a.last_message_at || 0);
+        });
+
+        wrap.innerHTML = ordered.map(function (c) {
             var tags = '<span class="sc-tag sc-tag-' + esc(c.status) + '">'
                      + esc(c.status) + "</span>";
+            if (c.status === "waiting" && c.escalated_at) {
+                tags += '<span class="sc-tag sc-tag-wait">'
+                      + esc(waitLabel(c.escalated_at)) + "</span>";
+            }
             if (c.is_guest) tags += '<span class="sc-tag sc-tag-guest">Guest</span>';
             if (c.assigned_staff_name) {
                 tags += '<span class="sc-tag sc-tag-agent">'
@@ -325,7 +349,60 @@
             if (card) openConversation(Number(card.dataset.id));
         });
 
-        $("sc-filters").addEventListener("click", function (e) {
+        var bar = $("sc-filters");
+        bar.insertAdjacentHTML("beforebegin",
+            '<div class="sc-avail" id="sc-avail">'
+          + '<button type="button" class="sc-avail-btn" id="sc-avail-btn">'
+          + "Go available</button>"
+          + '<span class="sc-avail-note" id="sc-avail-note"></span>'
+          + "</div>");
+
+        function paintAvailability(isOn, waiting) {
+            var btn = $("sc-avail-btn");
+            var note = $("sc-avail-note");
+            btn.textContent = isOn ? "Available" : "Go available";
+            btn.className = "sc-avail-btn" + (isOn ? " is-on" : "");
+            if (!note) return;
+            if (!isOn) {
+                note.textContent = "Off duty - no chats will route to you";
+            } else if (waiting) {
+                note.textContent = waiting + " waiting in queue";
+            } else {
+                note.textContent = "On duty";
+            }
+        }
+
+        var availOn = false;
+
+        async function beat() {
+            try {
+                var data = await api("/api/chat/heartbeat", { method: "POST" });
+                availOn = !!data.is_available;
+                paintAvailability(availOn, data.waiting);
+            } catch (error) {
+                console.error("Heartbeat failed:", error);
+            }
+        }
+
+        $("sc-avail-btn").addEventListener("click", async function () {
+            try {
+                var data = await api(
+                    "/api/chat/availability?is_available=" + (!availOn),
+                    { method: "POST" }
+                );
+                availOn = !!data.is_available;
+                paintAvailability(availOn, null);
+                await loadConversations();
+            } catch (error) {
+                console.error("Availability toggle failed:", error);
+            }
+        });
+
+        paintAvailability(false, null);
+        beat();
+        setInterval(beat, 30000);
+
+        bar.addEventListener("click", function (e) {
             var chip = e.target.closest(".sc-chip");
             if (!chip) return;
             document.querySelectorAll(".sc-chip").forEach(function (c) {
