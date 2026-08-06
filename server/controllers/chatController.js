@@ -148,8 +148,9 @@ exports.startConversation = async (req, res) => {
 
         await client.query("COMMIT");
 
+        let assigned = [];
         try {
-            await assignWaiting(pool, { conversationId });
+            assigned = await assignWaiting(pool, { conversationId });
         } catch (routingError) {
             console.error("Assign on escalation failed:", routingError);
         }
@@ -157,7 +158,8 @@ exports.startConversation = async (req, res) => {
         res.status(201).json({
             conversation_id: conversationId,
             guest_token: token,
-            status: conv.rows[0].status,
+            status: assigned.length ? "open" : "waiting",
+            assigned: assigned.length > 0,
             messages: msg.rows
         });
     } catch (error) {
@@ -187,9 +189,22 @@ exports.getMessages = async (req, res) => {
             [conv.id, after]
         );
 
+        // Primary-key lookup plus a primary-key join, so this stays
+        // cheap enough to sit on the poll path.
+        const owner = await pool.query(
+            `SELECT c.status, u.name AS assigned_staff_name
+             FROM chat_conversations c
+             LEFT JOIN users u ON u.id = c.assigned_staff_id
+             WHERE c.id = $1`,
+            [conv.id]
+        );
+
         res.json({
-            status: conv.status,
+            status: owner.rows[0] ? owner.rows[0].status : conv.status,
             customer_unread: conv.customer_unread,
+            assigned_staff_name: owner.rows[0]
+                ? owner.rows[0].assigned_staff_name
+                : null,
             messages: result.rows
         });
     } catch (error) {

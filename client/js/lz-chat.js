@@ -538,11 +538,21 @@
   function answerTopic(topic) {
     // The customer's choice goes into the thread as their own message, so the
     // transcript reads as a conversation and staff can see what was asked.
+    // Travels with the escalation so the agent opens the chat already
+    // knowing what was asked and what the customer was told.
+    state.faqTrail = (state.faqTrail || []).concat({
+      topic: topic.key || topic.label,
+      question: topic.label,
+      answer: topic.answer,
+      helpful: null
+    });
+
     state.messages.push({
       id: -Date.now(),
       sender_type: "customer",
       body: topic.label,
       local: true,
+      faqLocal: true,
       created_at: new Date().toISOString()
     });
     state.messages.push({
@@ -550,6 +560,7 @@
       sender_type: "ai",
       body: topic.answer,
       local: true,
+      faqLocal: true,
       created_at: new Date().toISOString()
     });
     renderThread();
@@ -575,10 +586,16 @@
       b.addEventListener("click", function () {
         var key = b.getAttribute("data-ok");
         card.remove();
+        var trail = state.faqTrail || [];
+        if (trail.length) trail[trail.length - 1].helpful = (key === "yes");
+
         if (key === "yes") {
           state.escalating = false;
           note("Glad that helped. Type below any time if something else comes up.");
         } else {
+          // The distinction the dashboard needs: an answer that failed is not
+          // the same as a customer who never wanted the FAQ.
+          state.escalationReason = "said_no";
           el.body.appendChild(nextStep());
           toBottom();
         }
@@ -734,7 +751,9 @@
     var body = {
       message: text,
       name: c.name || "Website visitor",
-      subject: "Website chat"
+      subject: "Website chat",
+      faq_trail: state.faqTrail || [],
+      escalation_reason: state.escalationReason || "asked_for_agent"
     };
     if (c.phone) body.phone = c.phone;
     if (c.email) body.email = c.email;
@@ -753,6 +772,16 @@
         state.lastActivity = Date.now();
         state.starting = false;
         el.send.disabled = false;
+        state.status = data.assigned ? "open" : "waiting";
+
+        // The escalation just persisted the FAQ exchange, so drop the local
+        // copies or every line shows twice when the poll brings them back.
+        // The offline notice is no longer raised here at all - poll() derives
+        // it from the conversation status, which survives a reload.
+        state.messages = state.messages.filter(function (m) {
+          return !m.faqLocal;
+        });
+
         setSubtitle();
         return poll();
       })
@@ -779,16 +808,48 @@
     return api("/" + state.conversationId + "/messages?after=" + state.lastId)
       .then(function (data) {
         var incoming = pickMessages(data);
-        var conv = data.conversation || {};
+        // The messages endpoint returns these flat, not wrapped in a
+        // conversation object. Reading only data.conversation meant status
+        // and the agent name never synced at all.
+        var conv = data.conversation || data || {};
 
+        var prevStatus = state.status;
         if (conv.status) state.status = conv.status;
+
+        var pending = [];
+
+        var hasOffline = state.messages.some(function (m) {
+          return m.notice === "offline";
+        });
+        var hasAvailable = state.messages.some(function (m) {
+          return m.notice === "available";
+        });
+
+        // Derived from status, not from a variable that dies with the tab.
+        // A reloaded thread still sitting in the queue says so again rather
+        // than showing the customer nothing.
+        if (state.status === "waiting" && !hasOffline) {
+          pending.push({
+            notice: "offline",
+            body: "No agent is available at this time. We have saved your "
+                + "message and will contact you on your phone or email."
+          });
+        }
+
+        // Only worth saying to someone who was told nobody was there.
+        if (hasOffline && !hasAvailable && prevStatus === "waiting"
+            && state.status === "open") {
+          pending.push({
+            notice: "available",
+            body: "An agent is now available and will reply here shortly."
+          });
+        }
+
         var agent = conv.assigned_staff_name || conv.staff_name;
         if (agent && agent !== state.agentName) {
           state.agentName = agent;
-          state.messages.push({
-            sender_type: "system",
-            body: String(agent).split(" ")[0] + " has joined the conversation",
-            created_at: new Date().toISOString()
+          pending.push({
+            body: String(agent).split(" ")[0] + " has joined the conversation"
           });
         }
 
@@ -814,6 +875,21 @@
           });
           if (fromStaff && !state.open) setBadge(incoming.length);
           if (fromStaff && state.open) markRead();
+        }
+
+        // Appended last, after any incoming messages have been merged, so a
+        // system line always sits below what it is about.
+        if (pending.length) {
+          pending.forEach(function (n) {
+            state.messages.push({
+              sender_type: "system",
+              body: n.body,
+              notice: n.notice || null,
+              created_at: new Date().toISOString(),
+              local: true
+            });
+          });
+          renderThread();
         }
 
         setSubtitle();
