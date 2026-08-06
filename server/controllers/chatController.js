@@ -41,7 +41,7 @@ async function loadOwnedConversation(conversationId, req) {
 
 // Public: open a thread and post the first message in one transaction.
 exports.startConversation = async (req, res) => {
-    const { name, phone, subject, message } = req.body;
+    const { name, phone, email, subject, message } = req.body;
 
     if (!message || !String(message).trim()) {
         return res.status(400).json({ message: "A first message is required" });
@@ -59,15 +59,16 @@ exports.startConversation = async (req, res) => {
 
         const conv = await client.query(
             `INSERT INTO chat_conversations
-                 (customer_id, guest_token, guest_name, guest_phone, subject,
-                  status, staff_unread, last_message_at)
-             VALUES ($1, $2, $3, $4, $5, 'open', 1, CURRENT_TIMESTAMP)
+                 (customer_id, guest_token, guest_name, guest_phone, guest_email,
+                  subject, status, staff_unread, last_message_at)
+             VALUES ($1, $2, $3, $4, $5, $6, 'open', 1, CURRENT_TIMESTAMP)
              RETURNING id, status, created_at`,
             [
                 req.user ? currentUserId(req) : null,
                 token,
                 isGuest ? String(name).trim() : null,
                 isGuest && phone ? String(phone).trim() : null,
+                isGuest && email ? String(email).trim().slice(0, 255) : null,
                 subject ? String(subject).trim().slice(0, 160) : null
             ]
         );

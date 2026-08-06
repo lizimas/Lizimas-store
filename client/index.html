@@ -64,8 +64,9 @@ Lizimas Store | Online Shopping in Uganda
           <a class="ls-menu-item" href="help.html#delivery">Delivery &amp; tracking</a>
           <a class="ls-menu-item" href="help.html#returns">Returns &amp; refunds</a>
           <div class="ls-menu-sep"></div>
-          <a class="ls-menu-item ls-menu-item-accent"
-             href="https://wa.me/256792363104" target="_blank" rel="noopener">Live chat</a>
+          <a class="ls-menu-item ls-menu-item-accent" id="lsLiveChat"
+             href="https://wa.me/256792363104" target="_blank" rel="noopener"
+             onclick="if(window.LzChat){event.preventDefault();window.LzChat.open();}">Live chat</a>
         </div>
       </div>
 
@@ -276,6 +277,8 @@ Cash on Delivery
 <script src="js/cart.js?v=5"></script>
 
 <script src="js/products.js?v=4"></script>
+
+<script src="js/lz-chat.js?v=11"></script>
 
 
 <a href="https://wa.me/256792363104" target="_blank" rel="noopener" class="whatsapp-float" aria-label="Chat with us on WhatsApp">

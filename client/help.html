@@ -57,8 +57,9 @@
           <a class="ls-menu-item" href="help.html#delivery">Delivery &amp; tracking</a>
           <a class="ls-menu-item" href="help.html#returns">Returns &amp; refunds</a>
           <div class="ls-menu-sep"></div>
-          <a class="ls-menu-item ls-menu-item-accent"
-             href="https://wa.me/256792363104" target="_blank" rel="noopener">Live chat</a>
+          <a class="ls-menu-item ls-menu-item-accent" id="lsLiveChat"
+             href="https://wa.me/256792363104" target="_blank" rel="noopener"
+             onclick="if(window.LzChat){event.preventDefault();window.LzChat.open();}">Live chat</a>
         </div>
       </div>
 
@@ -356,6 +357,7 @@ Cash on Delivery
   </div>
 </aside>
 
+<script src="js/lz-chat.js?v=11"></script>
 </body>
 
 </html>
