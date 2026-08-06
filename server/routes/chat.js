@@ -18,15 +18,23 @@ const {
     requireSupportOrAdmin
 } = require("../middleware/authMiddleware");
 
+const {
+    chatStartLimiter,
+    chatMessageLimiter,
+    chatPollLimiter
+} = require("../middleware/rateLimiter");
+
 // Public / guest. optionalAuth attaches req.user when a token is present and
 // carries on when it is not, so the same handlers serve guests and customers.
 //
-// TODO: apply the PostgresStore rate limiter to the two write routes below.
-// They are open endpoints and a guest needs no credentials to reach them.
-router.post("/start", optionalAuth, startConversation);
-router.get("/:id/messages", optionalAuth, getMessages);
-router.post("/:id/messages", optionalAuth, postMessage);
-router.post("/:id/read", optionalAuth, markCustomerRead);
+// The two write routes are open endpoints - a guest needs no credentials to
+// reach them - so both carry PostgresStore-backed limiters. The poll route
+// uses a memory-backed limiter instead: it fires every few seconds per open
+// widget, and a DB write per poll would cost more than the protection is worth.
+router.post("/start", chatStartLimiter, optionalAuth, startConversation);
+router.get("/:id/messages", chatPollLimiter, optionalAuth, getMessages);
+router.post("/:id/messages", chatMessageLimiter, optionalAuth, postMessage);
+router.post("/:id/read", chatPollLimiter, optionalAuth, markCustomerRead);
 
 // Staff inbox. Declared after the public routes but on distinct paths, so
 // "/conversations" can never be swallowed by "/:id".

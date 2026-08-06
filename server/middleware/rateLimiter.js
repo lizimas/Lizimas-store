@@ -51,13 +51,57 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// General limiter for the rest of the API - prevents scraping/hammering
-const generalLimiter = rateLimit({
+// Guest chat: conversation creation. Unauthenticated write, so this is the
+// tightest of the chat buckets - a legitimate visitor opens one conversation
+// and reuses its guest_token thereafter.
+const chatStartLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 300,
+  max: 5,
+  store: new PostgresStore("chat_start"),
+  keyGenerator: (req, res) => clientIp(req),
+  message: { error: "Too many chat requests. Please try again shortly." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Guest chat: message posting. Keyed on IP only so creating extra
+// conversations does not multiply the allowance. 40 per 5 minutes is well
+// above human typing speed and well below a flood script.
+const chatMessageLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 40,
+  store: new PostgresStore("chat_msg"),
+  keyGenerator: (req, res) => clientIp(req),
+  message: { error: "You are sending messages too quickly. Please slow down." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Guest chat: polling reads. Memory-backed on purpose - a store write per
+// poll would be heavier than the endpoint it protects. Generous ceiling that
+// only a runaway client or a scraper would reach.
+const chatPollLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 200,
+  keyGenerator: (req, res) => clientIp(req),
   message: { error: "Too many requests. Please slow down." },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-module.exports = { loginLimiter, otpLimiter, authLimiter, generalLimiter };
+// General limiter for the rest of the API - prevents scraping/hammering
+const CHAT_POLL_PATH = /^\/api\/chat\/\d+\/(messages|read)$/;
+
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  // Chat polling would exhaust this bucket on its own - an open widget makes
+  // ~300 requests in 15 minutes - locking the customer out of checkout. Those
+  // routes carry chatPollLimiter instead.
+  skip: (req) => CHAT_POLL_PATH.test(String(req.originalUrl || "").split("?")[0]),
+  message: { error: "Too many requests. Please slow down." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+module.exports = { loginLimiter, otpLimiter, authLimiter, generalLimiter, chatStartLimiter, chatMessageLimiter, chatPollLimiter };
