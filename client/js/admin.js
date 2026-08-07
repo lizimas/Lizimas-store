@@ -3308,3 +3308,34 @@ async function setConvStatus(id, status, resolved) {
         alert("Something went wrong.");
     }
 }
+
+
+async function sendMonitorReply() {
+    if (!monitorConvId) return;
+    const input = document.getElementById("monitor-input");
+    const body = input.value.trim();
+    if (!body) return;
+
+    try {
+        const response = await fetch(`${API_URL}/api/chat/conversations/${monitorConvId}/messages`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${getToken()}`
+            },
+            body: JSON.stringify({ body })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.message || "Could not send.");
+            return;
+        }
+        input.value = "";
+        loadMonitor();
+        loadSupportQueue();
+        loadSupportOverview();
+    } catch (error) {
+        console.error("Monitor reply error:", error);
+        alert("Something went wrong.");
+    }
+}

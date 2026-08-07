@@ -1176,3 +1176,9 @@ select.status-select {
 .m-btn:hover { background: #f9fafb; }
 .m-btn-primary { background: #0f1b3d; color: #fff; border-color: #0f1b3d; }
 .m-btn-primary:hover { background: #1a2a52; }
+
+/* Monitor compose */
+.monitor-compose { display: flex; gap: 8px; align-items: flex-end;
+  margin-top: 14px; padding-top: 14px; border-top: 1px solid #e6e8ef; }
+.monitor-compose textarea { flex: 1; padding: 10px 12px; border: 1px solid #d4d7e0;
+  border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical; }
