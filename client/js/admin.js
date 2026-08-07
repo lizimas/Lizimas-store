@@ -3097,7 +3097,7 @@ async function loadSupportQueue() {
 
             rows += `
                 <tr>
-                    <td>${c.display_name || "Guest"}<br><small>${c.display_phone || ""}</small></td>
+                    <td class="q-open" onclick="openMonitor(${c.id})">${c.display_name || "Guest"}<br><small>${c.display_phone || ""}</small></td>
                     <td>${tag}</td>
                     <td><strong>${wait}</strong></td>
                     <td>${who}</td>
@@ -3175,6 +3175,7 @@ function startSupportPolling() {
     supportPollTimer = setInterval(() => {
         loadSupportOverview();
         loadSupportQueue();
+        loadMonitor();
     }, 15000);
 }
 
@@ -3182,5 +3183,85 @@ function stopSupportPolling() {
     if (supportPollTimer) {
         clearInterval(supportPollTimer);
         supportPollTimer = null;
+    }
+}
+
+let monitorConvId = null;
+
+const EVENT_LABELS = {
+    faq_answer_shown: "FAQ answer shown",
+    escalated: "Escalated to an agent",
+    assigned: "Assigned",
+    reassigned: "Reassigned",
+    first_response: "First reply sent",
+    resolved: "Marked resolved",
+    closed: "Closed",
+    reopened: "Reopened"
+};
+
+function fmtTime(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return d.toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+async function openMonitor(id) {
+    monitorConvId = id;
+    document.getElementById("support-monitor-panel").style.display = "";
+    document.getElementById("monitor-thread").innerHTML = "Loading...";
+    await loadMonitor();
+}
+
+function closeMonitor() {
+    monitorConvId = null;
+    document.getElementById("support-monitor-panel").style.display = "none";
+}
+
+async function loadMonitor() {
+    if (!monitorConvId) return;
+    try {
+        const response = await fetch(`${API_URL}/api/chat/conversations/${monitorConvId}?peek=true`, {
+            headers: { "Authorization": `Bearer ${getToken()}` }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            document.getElementById("monitor-thread").innerHTML =
+                `<p class="no-data">${data.message || "Could not load."}</p>`;
+            return;
+        }
+
+        const c = data.conversation || {};
+        document.getElementById("monitor-title").textContent =
+            (c.display_name || "Guest") + " - #" + c.id;
+
+        let meta = `<span class="m-pill">${c.status}</span>`;
+        if (c.display_phone) meta += `<span class="m-pill">${c.display_phone}</span>`;
+        if (c.guest_email) meta += `<span class="m-pill">${c.guest_email}</span>`;
+        if (c.escalation_reason) meta += `<span class="m-pill">${c.escalation_reason}</span>`;
+        if (c.order_id) meta += `<span class="m-pill">Order #${c.order_id}</span>`;
+        document.getElementById("monitor-meta").innerHTML = meta;
+
+        const events = data.events || [];
+        document.getElementById("monitor-timeline").innerHTML = events.length
+            ? events.map(e => `<div class="m-event">
+                   <span class="m-event-dot"></span>
+                   <span class="m-event-label">${EVENT_LABELS[e.event_type] || e.event_type}</span>
+                   ${e.actor_name ? `<span class="m-event-who">${e.actor_name}</span>` : ""}
+                   <span class="m-event-time">${fmtTime(e.created_at)}</span>
+               </div>`).join("")
+            : `<p class="no-data">No events recorded.</p>`;
+
+        const msgs = data.messages || [];
+        document.getElementById("monitor-thread").innerHTML = msgs.length
+            ? msgs.map(m => `<div class="m-msg m-${m.sender_type}">
+                   <div class="m-msg-body">${(m.body || "").replace(/</g, "&lt;")}</div>
+                   <div class="m-msg-time">${fmtTime(m.created_at)}</div>
+               </div>`).join("")
+            : `<p class="no-data">No messages yet.</p>`;
+
+    } catch (error) {
+        console.error("Monitor error:", error);
+        document.getElementById("monitor-thread").innerHTML =
+            `<p class="no-data">Could not connect to server.</p>`;
     }
 }

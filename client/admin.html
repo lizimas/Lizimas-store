@@ -356,6 +356,16 @@
                         <p class="admin-page-sub">Waiting customers and assigned chats with no reply yet, longest first.</p>
                         <div id="support-queue-list">Loading...</div>
                     </div>
+
+                    <div class="panel" id="support-monitor-panel" style="display:none;">
+                        <div class="monitor-head">
+                            <h2 id="monitor-title">Conversation</h2>
+                            <button class="monitor-close" onclick="closeMonitor()">&times;</button>
+                        </div>
+                        <div id="monitor-meta" class="monitor-meta"></div>
+                        <div id="monitor-timeline" class="monitor-timeline"></div>
+                        <div id="monitor-thread" class="monitor-thread">Loading...</div>
+                    </div>
                 </section>
 
                 <section id="tab-staff" class="tab-content hidden">
@@ -486,7 +496,7 @@
 
 <script src="js/prepare-picked-file.js?v=9"></script>
 <script src="js/category-select.js?v=2"></script>
-    <script src="js/admin.js?v=23"></script>
+    <script src="js/admin.js?v=24"></script>
 <script src="js/photo-crop.js"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

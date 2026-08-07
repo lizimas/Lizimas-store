@@ -1140,3 +1140,30 @@ select.status-select {
 .q-noreply { background: #fdeee9; color: #c02b2b; }
 #support-queue-list select { padding: 6px 8px; border: 1px solid #d4d7e0;
   border-radius: 6px; font-size: 13px; max-width: 180px; }
+
+/* Conversation monitor */
+.q-open { cursor: pointer; color: #0f1b3d; font-weight: 600; }
+.q-open:hover { text-decoration: underline; }
+.monitor-head { display: flex; align-items: center; justify-content: space-between; }
+.monitor-close { background: none; border: none; font-size: 26px; line-height: 1;
+  color: #6b7280; cursor: pointer; padding: 0 4px; }
+.monitor-meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 14px; }
+.m-pill { background: #f3f4f8; color: #374151; padding: 3px 9px;
+  border-radius: 999px; font-size: 12px; }
+.monitor-timeline { border-left: 2px solid #e6e8ef; padding-left: 14px;
+  margin-bottom: 18px; }
+.m-event { position: relative; font-size: 13px; color: #4b5563; padding: 5px 0; }
+.m-event-dot { position: absolute; left: -20px; top: 11px; width: 8px; height: 8px;
+  border-radius: 50%; background: #C9A227; }
+.m-event-label { font-weight: 600; color: #1a1a2e; }
+.m-event-who { color: #6b7280; margin-left: 6px; }
+.m-event-time { color: #9ca3af; margin-left: 8px; font-size: 12px; }
+.monitor-thread { max-height: 420px; overflow-y: auto; padding-right: 4px; }
+.m-msg { max-width: 78%; margin-bottom: 10px; padding: 9px 12px; border-radius: 12px;
+  font-size: 14px; line-height: 1.45; }
+.m-msg-time { font-size: 11px; color: #9ca3af; margin-top: 4px; }
+.m-customer { background: #f3f4f8; color: #1a1a2e; }
+.m-staff { background: #0f1b3d; color: #fff; margin-left: auto; }
+.m-staff .m-msg-time { color: #cbd5e1; }
+.m-system, .m-ai { background: #fef3e2; color: #92400e; margin: 10px auto;
+  text-align: center; font-size: 13px; }

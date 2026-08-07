@@ -363,14 +363,34 @@ exports.getConversationForStaff = async (req, res) => {
             [req.params.id, after]
         );
 
-        if (after === 0) {
+        // Admin monitoring passes peek=true: observing a thread must not clear
+        // the assigned agent's unread badge on their behalf.
+        const peek = req.query.peek === "true";
+
+        if (after === 0 && !peek) {
             await pool.query(
                 `UPDATE chat_conversations SET staff_unread = 0 WHERE id = $1`,
                 [req.params.id]
             );
         }
 
-        res.json({ conversation: conv.rows[0], messages: messages.rows });
+        const events = await pool.query(
+            `SELECT e.id, e.event_type, e.created_at, e.actor_staff_id,
+                    e.actor_type, e.meta,
+                    s.name AS actor_name
+             FROM chat_events e
+             LEFT JOIN users s ON s.id = e.actor_staff_id
+             WHERE e.conversation_id = $1
+             ORDER BY e.id ASC
+             LIMIT 100`,
+            [req.params.id]
+        );
+
+        res.json({
+            conversation: conv.rows[0],
+            messages: messages.rows,
+            events: events.rows
+        });
     } catch (error) {
         console.error("Get conversation error:", error);
         res.status(500).json({ message: "Failed to load the conversation" });
