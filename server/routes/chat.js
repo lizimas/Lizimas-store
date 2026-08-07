@@ -12,7 +12,8 @@ const {
     updateConversation,
     setAvailability,
     heartbeat,
-    getAvailability
+    getAvailability,
+    getLiveOverview
 } = require("../controllers/chatController");
 
 const {
@@ -51,5 +52,8 @@ router.patch("/conversations/:id", requireAuth, requireSupportOrAdmin, updateCon
 router.get("/availability", requireAuth, requireSupportOrAdmin, getAvailability);
 router.post("/availability", requireAuth, requireSupportOrAdmin, setAvailability);
 router.post("/heartbeat", requireAuth, requireSupportOrAdmin, heartbeat);
+
+// Admin live operations dashboard.
+router.get("/overview", requireAuth, requireSupportOrAdmin, getLiveOverview);
 
 module.exports = router;

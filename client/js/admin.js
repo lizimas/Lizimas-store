@@ -1140,6 +1140,13 @@ function setupTabs() {
                 loadAccountSessions();
             }
 
+            if (button.dataset.tab === "support") {
+                loadSupportOverview();
+                startSupportPolling();
+            } else {
+                stopSupportPolling();
+            }
+
             if (button.dataset.tab === "staff") {
                 loadStaffAccounts();
                 loadPendingProducts();
@@ -3019,5 +3026,48 @@ async function deletePromo(id) {
     } catch (error) {
         console.error("Delete promotion error:", error);
         alert("Could not delete.");
+    }
+}
+
+
+let supportPollTimer = null;
+
+async function loadSupportOverview() {
+    const msg = document.getElementById("support-overview-msg");
+    try {
+        const response = await fetch(`${API_URL}/api/chat/overview`, {
+            headers: { "Authorization": `Bearer ${getToken()}` }
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+            msg.textContent = data.error || "Could not load overview.";
+            return;
+        }
+
+        const o = data.overview || {};
+        document.getElementById("ov-waiting").textContent = o.customers_waiting ?? 0;
+        document.getElementById("ov-active").textContent = o.active_agent_chats ?? 0;
+        document.getElementById("ov-unassigned").textContent = o.unassigned_open ?? 0;
+        document.getElementById("ov-online").textContent = o.agents_online ?? 0;
+        document.getElementById("ov-nofirst").textContent = o.awaiting_first_reply ?? 0;
+        document.getElementById("ov-today").textContent = o.chats_today ?? 0;
+        document.getElementById("ov-resolved").textContent = o.resolved_today ?? 0;
+        msg.textContent = "";
+    } catch (error) {
+        console.error("Support overview error:", error);
+        msg.textContent = "Could not connect to server.";
+    }
+}
+
+function startSupportPolling() {
+    stopSupportPolling();
+    supportPollTimer = setInterval(loadSupportOverview, 15000);
+}
+
+function stopSupportPolling() {
+    if (supportPollTimer) {
+        clearInterval(supportPollTimer);
+        supportPollTimer = null;
     }
 }

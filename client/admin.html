@@ -69,6 +69,9 @@
                     <button class="tab-btn" data-tab="customers">
                         <span class="sidebar-icon">&#128101;</span> Customers
                     </button>
+                    <button class="tab-btn" data-tab="support">
+                        <span class="sidebar-icon">&#128172;</span> Live Support
+                    </button>
                     <button class="tab-btn" data-tab="staff">
                         <span class="sidebar-icon">&#128100;</span> Staff & Approvals
                     </button>
@@ -330,6 +333,23 @@
                             <tbody id="promotions-table-body"></tbody>
                         </table>
                     </div>
+                </section>
+
+                <section id="tab-support" class="tab-content hidden">
+                    <h2 class="admin-page-title">Live Support Operations</h2>
+                    <p class="admin-page-sub">Real-time view of the support queue and agents.</p>
+
+                    <div class="stats-grid" id="support-overview-grid">
+                        <div class="stat-card"><div class="label">Customers Waiting</div><div class="value" id="ov-waiting">-</div></div>
+                        <div class="stat-card"><div class="label">Active Agent Chats</div><div class="value" id="ov-active">-</div></div>
+                        <div class="stat-card"><div class="label">Unassigned Open</div><div class="value" id="ov-unassigned">-</div></div>
+                        <div class="stat-card"><div class="label">Agents Online</div><div class="value" id="ov-online">-</div></div>
+                        <div class="stat-card warning"><div class="label">Awaiting First Reply</div><div class="value" id="ov-nofirst">-</div></div>
+                        <div class="stat-card"><div class="label">Chats Today</div><div class="value" id="ov-today">-</div></div>
+                        <div class="stat-card"><div class="label">Resolved Today</div><div class="value" id="ov-resolved">-</div></div>
+                    </div>
+
+                    <p id="support-overview-msg" class="no-data"></p>
                 </section>
 
                 <section id="tab-staff" class="tab-content hidden">

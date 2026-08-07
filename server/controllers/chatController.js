@@ -561,6 +561,47 @@ exports.updateConversation = async (req, res) => {
 // Support/admin: availability toggle. Going available drains the queue
 // immediately - a background sweeper would not run reliably on Render, and a
 // customer should not wait for a timer that may never fire.
+// Admin: aggregate counts for the live operations dashboard.
+// Single round trip - this endpoint is polled, so eight separate
+// queries would multiply load for no benefit.
+exports.getLiveOverview = async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT
+                (SELECT COUNT(*) FROM chat_conversations
+                   WHERE status = 'waiting') AS customers_waiting,
+
+                (SELECT COUNT(*) FROM chat_conversations
+                   WHERE status = 'open' AND assigned_staff_id IS NOT NULL) AS active_agent_chats,
+
+                (SELECT COUNT(*) FROM chat_conversations
+                   WHERE status = 'open' AND assigned_staff_id IS NULL) AS unassigned_open,
+
+                (SELECT COUNT(*) FROM staff_availability
+                   WHERE is_available = true
+                     AND last_heartbeat > NOW() - INTERVAL '2 minutes') AS agents_online,
+
+                (SELECT COUNT(*) FROM chat_conversations
+                   WHERE created_at >= CURRENT_DATE) AS chats_today,
+
+                (SELECT COUNT(*) FROM chat_conversations
+                   WHERE resolved_at IS NOT NULL
+                     AND resolved_at >= CURRENT_DATE) AS resolved_today,
+
+                (SELECT COUNT(*) FROM chat_conversations
+                   WHERE status = 'open'
+                     AND assigned_staff_id IS NOT NULL
+                     AND first_response_at IS NULL) AS awaiting_first_reply
+        `);
+
+        res.json({ overview: result.rows[0] });
+
+    } catch (error) {
+        console.error("Live overview error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+};
+
 exports.setAvailability = async (req, res) => {
     const raw = req.body.is_available !== undefined
         ? req.body.is_available
