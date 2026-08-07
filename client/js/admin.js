@@ -3251,6 +3251,15 @@ async function loadMonitor() {
                </div>`).join("")
             : `<p class="no-data">No events recorded.</p>`;
 
+        const actions = document.getElementById("monitor-actions");
+        if (c.status === "closed") {
+            actions.innerHTML = `<button class="m-btn" onclick="setConvStatus(${c.id}, 'open')">Reopen</button>`;
+        } else {
+            actions.innerHTML =
+                `<button class="m-btn m-btn-primary" onclick="setConvStatus(${c.id}, 'closed', true)">Close as resolved</button>
+                 <button class="m-btn" onclick="setConvStatus(${c.id}, 'closed', false)">Close unresolved</button>`;
+        }
+
         const msgs = data.messages || [];
         document.getElementById("monitor-thread").innerHTML = msgs.length
             ? msgs.map(m => `<div class="m-msg m-${m.sender_type}">
@@ -3263,5 +3272,39 @@ async function loadMonitor() {
         console.error("Monitor error:", error);
         document.getElementById("monitor-thread").innerHTML =
             `<p class="no-data">Could not connect to server.</p>`;
+    }
+}
+
+
+async function setConvStatus(id, status, resolved) {
+    const label = status === "closed"
+        ? (resolved ? "Close this conversation as resolved?" : "Close this conversation as unresolved?")
+        : "Reopen this conversation?";
+    if (!confirm(label)) return;
+
+    const body = { status };
+    if (status === "closed") body.resolved = !!resolved;
+
+    try {
+        const response = await fetch(`${API_URL}/api/chat/conversations/${id}`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${getToken()}`
+            },
+            body: JSON.stringify(body)
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.message || "Could not update.");
+            return;
+        }
+        showToast(status === "closed" ? "Conversation closed." : "Conversation reopened.");
+        loadMonitor();
+        loadSupportQueue();
+        loadSupportOverview();
+    } catch (error) {
+        console.error("Status change error:", error);
+        alert("Something went wrong.");
     }
 }
