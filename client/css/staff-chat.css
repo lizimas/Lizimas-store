@@ -523,3 +523,4 @@
 .account-msg { margin-top: 12px; font-size: 14px; }
 .account-msg.success { color: #1a7f37; }
 .account-msg.error { color: #c02b2b; }
+#account-2fa-setup.hidden { display: none; }
