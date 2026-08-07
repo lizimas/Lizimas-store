@@ -171,6 +171,21 @@ async function loginUser(req, res) {
             });
         }
 
+        const enforcedRoles = ["admin", "store_manager", "product_staff", "customer_support"];
+        if (enforcedRoles.includes(user.role)) {
+            const setupToken = jwt.sign(
+                { userId: user.id, email: user.email, role: user.role, pendingSetup: true },
+                JWT_SECRET,
+                { expiresIn: "15m" }
+            );
+
+            return res.json({
+                message: "Two-factor authentication setup is required before continuing.",
+                requires2FASetup: true,
+                pendingToken: setupToken
+            });
+        }
+
         const sessionToken = await createSession(user.id, req);
         const token = jwt.sign(
             { userId: user.id, email: user.email, role: user.role, sessionToken },
@@ -347,6 +362,21 @@ async function adminLogin(req, res) {
                 message: "Password verified. Two-factor code required.",
                 requires2FA: true,
                 pendingToken
+            });
+        }
+
+        const enforced2FARoles = ["admin", "store_manager", "product_staff", "customer_support"];
+        if (enforced2FARoles.includes(user.role)) {
+            const setupToken = jwt.sign(
+                { userId: user.id, email: user.email, role: user.role, pendingSetup: true },
+                JWT_SECRET,
+                { expiresIn: "15m" }
+            );
+
+            return res.json({
+                message: "Two-factor authentication setup is required before continuing.",
+                requires2FASetup: true,
+                pendingToken: setupToken
             });
         }
 
@@ -924,6 +954,22 @@ exports.verify2FA = async (req, res) => {
         const verified = speakeasy.totp.verify({ secret: secret, encoding: "base32", token: token, window: 1 });
         if (!verified) return res.status(400).json({ error: "Invalid code. Please try again." });
         await pool.query("UPDATE users SET two_factor_enabled = true WHERE id = $1", [userId]);
+
+        if (req.isSetupToken) {
+            const sessionToken = await createSession(userId, req);
+            const authToken = jwt.sign(
+                { userId: userId, email: req.user.email, role: req.user.role, sessionToken },
+                JWT_SECRET,
+                { expiresIn: TOKEN_EXPIRY }
+            );
+            await logLoginAttempt(userId, req, true);
+            return res.json({
+                message: "Two-factor authentication enabled successfully.",
+                token: authToken,
+                role: req.user.role
+            });
+        }
+
         res.json({ message: "Two-factor authentication enabled successfully." });
     } catch (error) {
         res.status(500).json({ error: error.message });

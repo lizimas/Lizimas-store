@@ -27,7 +27,7 @@ const {
 } = require("./../controllers/authController");
 
 const { loginLimiter, otpLimiter } = require("../middleware/rateLimiter");
-const { requireAuth } = require("../middleware/authMiddleware");
+const { requireAuth, requireAuthOrSetup } = require("../middleware/authMiddleware");
 const upload = require("../middleware/upload");
 
 router.post("/register", registerUser);
@@ -44,8 +44,8 @@ router.patch("/password", requireAuth, changePassword);
 router.patch("/username", requireAuth, changeUsername);
 router.patch("/email", requireAuth, changeEmail);
 
-router.post("/2fa/setup", requireAuth, setup2FA);
-router.post("/2fa/verify", requireAuth, verify2FA);
+router.post("/2fa/setup", requireAuthOrSetup, setup2FA);
+router.post("/2fa/verify", requireAuthOrSetup, verify2FA);
 router.post("/2fa/disable", requireAuth, disable2FA);
 
 router.get("/sessions", requireAuth, listSessions);

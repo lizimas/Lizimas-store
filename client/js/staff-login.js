@@ -70,6 +70,17 @@ async function handleStaffLogin() {
             return;
         }
 
+        if (data.requires2FASetup) {
+            pendingLoginToken = data.pendingToken;
+            document.getElementById("login-email").classList.add("hidden");
+            document.getElementById("login-password").classList.add("hidden");
+            document.getElementById("login-btn").classList.add("hidden");
+            document.getElementById("login-error").textContent =
+                "Two-factor authentication is required. Set it up to continue.";
+            await startStaff2FASetup();
+            return;
+        }
+
         setStaffToken(data.token);
         redirectByRole(data.user.role);
 
@@ -210,4 +221,61 @@ function startEmailCodeCooldown(seconds) {
             btn.textContent = `Resend in ${remaining}s`;
         }
     }, 1000);
+}
+
+async function startStaff2FASetup() {
+    const errorEl = document.getElementById("login-error");
+    try {
+        const response = await fetch(`${API_URL}/api/auth/2fa/setup`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${pendingLoginToken}` }
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+            errorEl.textContent = data.error || "Could not start 2FA setup.";
+            return;
+        }
+
+        document.getElementById("login-setup-qr").src = data.qrCode;
+        document.getElementById("login-setup-key").textContent = data.manualEntryKey;
+        document.getElementById("login-setup-block").classList.remove("hidden");
+    } catch (error) {
+        console.error("2FA setup error:", error);
+        errorEl.textContent = "Could not connect to server.";
+    }
+}
+
+async function submitStaff2FASetup() {
+    const errorEl = document.getElementById("login-error");
+    const codeInput = document.getElementById("login-setup-code");
+    const code = codeInput.value.trim();
+
+    if (!code) {
+        errorEl.textContent = "Please enter the 6-digit code.";
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/auth/2fa/verify`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${pendingLoginToken}`
+            },
+            body: JSON.stringify({ token: code })
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+            errorEl.textContent = data.error || "Invalid code.";
+            return;
+        }
+
+        setStaffToken(data.token);
+        redirectByRole(data.role);
+    } catch (error) {
+        console.error("2FA verify error:", error);
+        errorEl.textContent = "Could not connect to server.";
+    }
 }

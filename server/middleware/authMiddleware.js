@@ -34,7 +34,37 @@ async function requireAuth(req, res, next) {
             ).catch(err => console.error("Session update error:", err));
         }
 
+        if (decoded.pending2FA || decoded.pendingSetup) {
+            return res.status(401).json({ error: "Incomplete login. Please finish signing in." });
+        }
+
         req.user = decoded;
+        next();
+    } catch (error) {
+        return res.status(401).json({ error: "Invalid or expired token. Please log in again." });
+    }
+}
+
+// Accepts a pendingSetup token OR a full session token.
+// Used only for the 2FA enrolment endpoints.
+async function requireAuthOrSetup(req, res, next) {
+    const authHeader = req.headers["authorization"];
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ error: "No token provided. Please log in." });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+
+        if (decoded.pending2FA) {
+            return res.status(401).json({ error: "Incomplete login. Please finish signing in." });
+        }
+
+        req.user = decoded;
+        req.isSetupToken = !!decoded.pendingSetup;
         next();
     } catch (error) {
         return res.status(401).json({ error: "Invalid or expired token. Please log in again." });
@@ -90,4 +120,4 @@ function requireSupportOrAdmin(req, res, next) {
     next();
 }
 
-module.exports = { requireAuth, requireAdmin, requireStaffOrAdmin, requireSupportOrAdmin, optionalAuth };
+module.exports = { requireAuth, requireAuthOrSetup, requireAdmin, requireStaffOrAdmin, requireSupportOrAdmin, optionalAuth };

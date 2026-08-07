@@ -24,10 +24,18 @@
             <input type="password" id="login-reset-password-confirm" class="hidden" placeholder="Confirm new password">
             <button id="login-reset-btn" class="hidden" onclick="submitStaffForcedReset()">Set New Password</button>
 
+            <div id="login-setup-block" class="hidden">
+                <p class="setup-note">Scan this with your authenticator app, then enter the code below.</p>
+                <img id="login-setup-qr" alt="2FA QR Code" style="max-width:200px; display:block; margin:12px auto;">
+                <p style="font-size:13px; word-break:break-all;">Manual key: <code id="login-setup-key"></code></p>
+                <input type="text" id="login-setup-code" placeholder="Enter 6-digit code" inputmode="numeric">
+                <button id="login-setup-btn" onclick="submitStaff2FASetup()">Verify &amp; Continue</button>
+            </div>
+
             <p id="login-error" class="error-text"></p>
         </div>
     </div>
 
-    <script src="js/staff-login.js?v=2"></script>
+    <script src="js/staff-login.js?v=3"></script>
 </body>
 </html>
