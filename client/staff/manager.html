@@ -21,6 +21,7 @@
                     Store Manager
                     <div style="color:#f4b400; font-size:12px; margin-top:4px;">Tap to edit profile &rarr;</div>
                 </div>
+                <button onclick="StaffAccount.open()" style="margin:16px 16px 0; background:#0f1b3d; color:#fff; border:none; border-radius:8px; padding:10px; cursor:pointer; width:calc(100% - 32px);">Account Security</button>
                 <button onclick="staffLogout()" style="margin:16px; background:#DC2626; color:#fff; border:none; border-radius:8px; padding:10px; cursor:pointer; width:calc(100% - 32px);">Log Out</button>
             </aside>
 
@@ -107,6 +108,30 @@
         </div>
     </div>
 
+
+<div class="sc-acct-modal hidden" id="sc-acct-modal">
+  <div class="sc-acct-backdrop" onclick="StaffAccount.close()"></div>
+  <div class="sc-acct-panel">
+    <div class="sc-acct-head">
+      <h3>Account security</h3>
+      <button type="button" class="sc-acct-close" onclick="StaffAccount.close()">&times;</button>
+    </div>
+    <div class="sc-acct-body">
+      <p id="account-2fa-status">Checking status...</p>
+      <button id="account-2fa-toggle-btn" onclick="StaffAccount.toggle()">Enable 2FA</button>
+      <div id="account-2fa-setup" class="hidden">
+        <p>Scan this with your authenticator app:</p>
+        <img id="account-2fa-qr" alt="2FA QR Code" style="max-width:200px;">
+        <p>Manual entry key: <code id="account-2fa-key"></code></p>
+        <input type="text" id="account-2fa-code" placeholder="Enter 6-digit code" inputmode="numeric">
+        <button onclick="StaffAccount.verify()">Verify &amp; Enable</button>
+      </div>
+      <p id="account-2fa-msg" class="account-msg"></p>
+    </div>
+  </div>
+</div>
+
+    <script src="../js/staff-account.js?v=2"></script>
     <script src="../js/prepare-picked-file.js?v=1"></script>
     <script src="../js/staff-manager.js?v=2"></script>
     <script src="../js/photo-crop.js?v=1"></script>
