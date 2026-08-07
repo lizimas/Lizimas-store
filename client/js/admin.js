@@ -1142,6 +1142,7 @@ function setupTabs() {
 
             if (button.dataset.tab === "support") {
                 loadSupportOverview();
+                loadSupportQueue();
                 startSupportPolling();
             } else {
                 stopSupportPolling();
@@ -3032,6 +3033,115 @@ async function deletePromo(id) {
 
 let supportPollTimer = null;
 
+let supportAgents = [];
+
+function waitLabel(iso) {
+    if (!iso) return "";
+    const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    if (mins < 60) return mins + "m";
+    const h = Math.floor(mins / 60);
+    return h + "h " + (mins % 60) + "m";
+}
+
+function queueAnchor(c) {
+    if (c.status === "waiting") return c.escalated_at || c.created_at;
+    return c.assigned_at || c.created_at;
+}
+
+async function loadSupportQueue() {
+    const box = document.getElementById("support-queue-list");
+    try {
+        const [convRes, agentRes] = await Promise.all([
+            fetch(`${API_URL}/api/chat/conversations?status=active`, {
+                headers: { "Authorization": `Bearer ${getToken()}` }
+            }),
+            fetch(`${API_URL}/api/chat/availability`, {
+                headers: { "Authorization": `Bearer ${getToken()}` }
+            })
+        ]);
+
+        const convs = await convRes.json();
+        const agentData = await agentRes.json();
+        supportAgents = (agentData && agentData.agents) || [];
+
+        if (!convRes.ok) {
+            box.innerHTML = `<p class="no-data">Could not load the queue.</p>`;
+            return;
+        }
+
+        const queue = (convs || []).filter(c =>
+            c.status === "waiting" || (c.status === "open" && !c.first_response_at)
+        );
+
+        queue.sort((a, b) => new Date(queueAnchor(a)) - new Date(queueAnchor(b)));
+
+        if (queue.length === 0) {
+            box.innerHTML = `<p class="no-data">Nothing waiting. All chats have had a reply.</p>`;
+            return;
+        }
+
+        let rows = "";
+        queue.forEach(c => {
+            const wait = waitLabel(queueAnchor(c));
+            const tag = c.status === "waiting"
+                ? `<span class="q-tag q-waiting">WAITING</span>`
+                : `<span class="q-tag q-noreply">NO REPLY</span>`;
+            const who = c.assigned_staff_name || "Unassigned";
+
+            let options = `<option value="">Assign to...</option>`;
+            supportAgents.forEach(a => {
+                const sel = a.staff_id === c.assigned_staff_id ? " selected" : "";
+                const dot = a.is_online ? "\u25CF " : "\u25CB ";
+                options += `<option value="${a.staff_id}"${sel}>${dot}${a.staff_name || ("Agent " + a.staff_id)} (${a.active_chats})</option>`;
+            });
+
+            rows += `
+                <tr>
+                    <td>${c.display_name || "Guest"}<br><small>${c.display_phone || ""}</small></td>
+                    <td>${tag}</td>
+                    <td><strong>${wait}</strong></td>
+                    <td>${who}</td>
+                    <td><select onchange="assignConversation(${c.id}, this.value)">${options}</select></td>
+                </tr>`;
+        });
+
+        box.innerHTML = `
+            <table class="admin-table">
+                <thead><tr><th>Customer</th><th>Status</th><th>Waiting</th><th>Agent</th><th>Assign</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+
+    } catch (error) {
+        console.error("Support queue error:", error);
+        box.innerHTML = `<p class="no-data">Could not connect to server.</p>`;
+    }
+}
+
+async function assignConversation(id, staffId) {
+    if (!staffId) return;
+    try {
+        const response = await fetch(`${API_URL}/api/chat/conversations/${id}`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${getToken()}`
+            },
+            body: JSON.stringify({ assigned_staff_id: Number(staffId), status: "open" })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.message || "Could not assign.");
+            return;
+        }
+        showToast("Conversation assigned.");
+        loadSupportQueue();
+        loadSupportOverview();
+    } catch (error) {
+        console.error("Assign error:", error);
+        alert("Something went wrong.");
+    }
+}
+
 async function loadSupportOverview() {
     const msg = document.getElementById("support-overview-msg");
     try {
@@ -3062,7 +3172,10 @@ async function loadSupportOverview() {
 
 function startSupportPolling() {
     stopSupportPolling();
-    supportPollTimer = setInterval(loadSupportOverview, 15000);
+    supportPollTimer = setInterval(() => {
+        loadSupportOverview();
+        loadSupportQueue();
+    }, 15000);
 }
 
 function stopSupportPolling() {

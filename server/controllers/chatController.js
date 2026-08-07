@@ -689,6 +689,7 @@ exports.getAvailability = async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT sa.staff_id,
+                    u.name AS staff_name,
                     sa.is_available,
                     sa.max_concurrent,
                     sa.last_heartbeat,
@@ -698,10 +699,11 @@ exports.getAvailability = async (req, res) => {
                          CURRENT_TIMESTAMP - INTERVAL '90 seconds') AS is_online,
                     COUNT(c.id)::int AS active_chats
                FROM staff_availability sa
+               LEFT JOIN users u ON u.id = sa.staff_id
                LEFT JOIN chat_conversations c
                  ON c.assigned_staff_id = sa.staff_id
                 AND c.status IN ('open', 'pending')
-              GROUP BY sa.staff_id, sa.is_available, sa.max_concurrent,
+              GROUP BY sa.staff_id, u.name, sa.is_available, sa.max_concurrent,
                        sa.last_heartbeat, sa.went_available_at
               ORDER BY sa.staff_id`
         );

@@ -1132,3 +1132,11 @@ select.status-select {
 .account-msg { margin-top: 12px; font-size: 14px; }
 .account-msg.success { color: #1a7f37; }
 .account-msg.error { color: #c02b2b; }
+
+/* Live queue tags */
+.q-tag { display: inline-block; padding: 3px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; letter-spacing: .3px; }
+.q-waiting { background: #fef3e2; color: #b45309; }
+.q-noreply { background: #fdeee9; color: #c02b2b; }
+#support-queue-list select { padding: 6px 8px; border: 1px solid #d4d7e0;
+  border-radius: 6px; font-size: 13px; max-width: 180px; }
