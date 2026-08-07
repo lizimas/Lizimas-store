@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Live Chat | Lizimas Store</title>
 <link rel="stylesheet" href="../css/style.css?v=35">
-<link rel="stylesheet" href="../css/staff-chat.css?v=6">
+<link rel="stylesheet" href="../css/staff-chat.css?v=7">
 </head>
 
 <body class="sc-body">
@@ -19,6 +19,7 @@
     </div>
     <div class="sc-topbar-right">
         <span class="sc-agent" id="sc-agent"></span>
+        <button class="sc-btn sc-btn-ghost" id="sc-account-btn" onclick="StaffAccount.open()">Account</button>
         <button class="sc-btn sc-btn-ghost" id="sc-logout">Log out</button>
     </div>
 </header>
@@ -86,7 +87,30 @@
 
 <div class="sc-scrim" id="sc-scrim" hidden></div>
 
-<script src="../js/staff-chat.js?v=1"></script>
+<div class="sc-acct-modal hidden" id="sc-acct-modal">
+  <div class="sc-acct-backdrop" onclick="StaffAccount.close()"></div>
+  <div class="sc-acct-panel">
+    <div class="sc-acct-head">
+      <h3>Account security</h3>
+      <button type="button" class="sc-acct-close" onclick="StaffAccount.close()">&times;</button>
+    </div>
+    <div class="sc-acct-body">
+      <p id="account-2fa-status">Checking status...</p>
+      <button id="account-2fa-toggle-btn" class="sc-btn" onclick="StaffAccount.toggle()">Enable 2FA</button>
+      <div id="account-2fa-setup" class="hidden">
+        <p>Scan this with your authenticator app:</p>
+        <img id="account-2fa-qr" alt="2FA QR Code" style="max-width:200px;">
+        <p>Manual entry key: <code id="account-2fa-key"></code></p>
+        <input type="text" id="account-2fa-code" placeholder="Enter 6-digit code" inputmode="numeric">
+        <button class="sc-btn" onclick="StaffAccount.verify()">Verify &amp; Enable</button>
+      </div>
+      <p id="account-2fa-msg" class="account-msg"></p>
+    </div>
+  </div>
+</div>
+
+<script src="../js/staff-account.js?v=2"></script>
+<script src="../js/staff-chat.js?v=2"></script>
 
 </body>
 
