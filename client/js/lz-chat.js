@@ -129,10 +129,12 @@
     ".lzc-launcher{position:fixed;right:20px;bottom:88px;width:56px;height:56px;",
     "border-radius:50%;background:" + NAVY + ";border:none;cursor:pointer;z-index:2147483000;",
     "display:flex;align-items:center;justify-content:center;",
-    "box-shadow:0 4px 12px rgba(0,0,0,.25);transition:transform .15s ease}",
+    "box-shadow:0 4px 12px rgba(0,0,0,.25);transition:transform .2s ease,opacity .2s ease}",
     ".lzc-launcher:hover{transform:scale(1.06)}",
     ".lzc-launcher:focus-visible{outline:3px solid " + GOLD + ";outline-offset:3px}",
     ".lzc-launcher.lzc-hidden{display:none}",
+    // Out of the way while the customer is scrolling; back when they settle.
+    ".lzc-launcher.lzc-idle{opacity:0;transform:translateY(12px);pointer-events:none}",
     ".lzc-badge{position:absolute;top:-2px;right:-2px;min-width:20px;height:20px;",
     "border-radius:10px;background:#d7263d;color:#fff;font:700 12px/20px system-ui,sans-serif;",
     "text-align:center;padding:0 5px;display:none}",
@@ -296,6 +298,21 @@
     el.typing = el.panel.querySelector("#lzc-typing");
 
     el.launcher.addEventListener("click", openPanel);
+
+    // Hide the launcher while the page is moving, restore it once the customer
+    // has stopped for a moment - scrolling means browsing, stopping means
+    // they may have found something they want to ask about.
+    var scrollIdleTimer = null;
+    window.addEventListener("scroll", function () {
+        if (!el.launcher) return;
+        if (el.panel && el.panel.classList.contains("lzc-on")) return;
+
+        el.launcher.classList.add("lzc-idle");
+        if (scrollIdleTimer) clearTimeout(scrollIdleTimer);
+        scrollIdleTimer = setTimeout(function () {
+            el.launcher.classList.remove("lzc-idle");
+        }, 600);
+    }, { passive: true });
     el.close.addEventListener("click", closePanel);
     el.send.addEventListener("click", onSend);
 
