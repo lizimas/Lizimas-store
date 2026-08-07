@@ -17,6 +17,7 @@
 
     var token = localStorage.getItem("staffToken");
     var me = null;
+    var agentList = [];
 
     var state = {
         filter: "active",
@@ -191,6 +192,7 @@
             if (state.cursor === 0) {
                 $("sc-messages").innerHTML = "";
                 renderHeader(data.conversation);
+                await loadAgents();
                 renderDetail(data.conversation);
             }
 
@@ -232,6 +234,18 @@
 
     /* --------------------------------------------------- detail panel */
 
+    // Colleagues available for transfer. Refreshed when a thread is opened so
+    // the online dots and chat counts are current rather than page-load stale.
+    async function loadAgents() {
+        try {
+            var data = await api("/api/chat/availability");
+            agentList = (data && data.agents) || [];
+        } catch (error) {
+            console.error("Load agents error:", error);
+            agentList = [];
+        }
+    }
+
     function renderDetail(c) {
         var isGuest = c.customer_id === null;
 
@@ -254,6 +268,26 @@
             html += '<button class="sc-btn" data-action="close">Close conversation</button>';
         }
         html += "</div>";
+
+        // Transfer: hand the thread to a named colleague, or put it back in the
+        // queue when the right owner is not obvious.
+        if (c.status !== "closed") {
+            html += '<div class="sc-transfer">';
+            html += "<strong>Transfer this chat</strong>";
+            html += '<select id="sc-transfer-select">';
+            html += '<option value="">Choose a colleague...</option>';
+            agentList.forEach(function (a) {
+                if (me && a.staff_id === me.id) return;
+                var dot = a.is_online ? "\u25CF " : "\u25CB ";
+                var nm = a.staff_name || ("Agent #" + a.staff_id);
+                html += '<option value="' + a.staff_id + '">' + esc(dot + nm)
+                      + " (" + a.active_chats + ")</option>";
+            });
+            html += "</select>";
+            html += '<button class="sc-btn" data-action="transfer">Transfer</button>';
+            html += '<button class="sc-btn" data-action="requeue">Return to queue</button>';
+            html += "</div>";
+        }
 
         // Honest placeholder rather than fabricated data: there is no endpoint
         // yet that returns a customer's orders, spend, or delivery address.
@@ -278,6 +312,20 @@
         var body = {};
 
         if (action === "assign") body.assigned_staff_id = me ? me.id : null;
+
+        if (action === "transfer") {
+            var sel = $("sc-transfer-select");
+            var target = sel ? sel.value : "";
+            if (!target) return;
+            body.assigned_staff_id = Number(target);
+            body.status = "open";
+        }
+
+        // Back to the queue: routing picks it up again when an agent is on duty.
+        if (action === "requeue") {
+            body.assigned_staff_id = null;
+            body.status = "waiting";
+        }
         if (action === "close") body.status = "closed";
         if (action === "reopen") body.status = "open";
         if (action === "pending") body.status = "pending";

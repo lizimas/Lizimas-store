@@ -524,3 +524,10 @@
 .account-msg.success { color: #1a7f37; }
 .account-msg.error { color: #c02b2b; }
 #account-2fa-setup.hidden { display: none; }
+
+/* Transfer control */
+.sc-transfer { padding: 14px; border-top: 1px solid #e6e8ef; }
+.sc-transfer strong { display: block; margin-bottom: 8px; font-size: 14px; color: #0f1b3d; }
+.sc-transfer select { width: 100%; padding: 9px 10px; margin-bottom: 8px;
+  border: 1px solid #d4d7e0; border-radius: 8px; font-size: 14px; }
+.sc-transfer .sc-btn { margin-right: 6px; }
