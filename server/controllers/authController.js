@@ -773,6 +773,35 @@ async function logoutAllDevices(req, res) {
     }
 }
 
+// Admin action: clear a staff member's 2FA so they re-enrol at next login
+async function resetStaff2FA(req, res) {
+    try {
+        const { id } = req.params;
+
+        const target = await pool.query("SELECT id, name, role FROM users WHERE id = $1", [id]);
+        if (target.rows.length === 0) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        const staffRoles = ["store_manager", "product_staff", "customer_support"];
+        if (!staffRoles.includes(target.rows[0].role)) {
+            return res.status(403).json({ error: "Only staff accounts can be reset this way." });
+        }
+
+        await pool.query(
+            "UPDATE users SET two_factor_secret = NULL, two_factor_enabled = false WHERE id = $1",
+            [id]
+        );
+        await pool.query("DELETE FROM sessions WHERE user_id = $1", [id]);
+
+        res.json({ message: "Two-factor authentication has been reset. They will set it up again at next login." });
+
+    } catch (error) {
+        console.error("Reset staff 2FA error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+}
+
 // Admin view: login history (date, time, IP, device, success/fail) for a given user
 async function getLoginHistory(req, res) {
     try {
@@ -1000,6 +1029,7 @@ module.exports = {
     forcePasswordReset,
     completeForcedPasswordReset,
     logoutAllDevices,
+    resetStaff2FA,
     getLoginHistory,
     createStaffAccount,
     adminLogin,

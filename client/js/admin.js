@@ -1924,6 +1924,7 @@ function buildStaffMenuItems(s) {
     }
     menuItems += `<div class="staff-menu-item" onclick="closeStaffMenus(); forceResetStaff(${s.id}, '${safeName}')">🔑 Force Reset</div>`;
     menuItems += `<div class="staff-menu-item" onclick="closeStaffMenus(); logoutAllStaffDevices(${s.id}, '${safeName}')">🚪 Logout All</div>`;
+    menuItems += `<div class="staff-menu-item" onclick="closeStaffMenus(); resetStaff2FA(${s.id}, '${safeName}')">🛡️ Reset 2FA</div>`;
     menuItems += `<div class="staff-menu-item" onclick="closeStaffMenus(); viewStaffLoginHistory(${s.id}, '${safeName}')">📜 Login History</div>`;
     menuItems += `<div class="staff-menu-item" style="color:#DC2626;" onclick="closeStaffMenus(); deleteCustomerAccount(${s.id}, '${safeName}')">🗑 Delete</div>`;
 
@@ -2266,6 +2267,26 @@ async function logoutAllStaffDevices(id, name) {
         showToast(`${name} has been logged out of all devices.`);
     } catch (error) {
         console.error("Logout all devices error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function resetStaff2FA(id, name) {
+    if (!confirm(`Reset two-factor authentication for ${name}? They will be logged out and must set it up again at next login.`)) return;
+    try {
+        const token = getToken();
+        const response = await fetch(`${API_URL}/api/admin/staff/${id}/reset-2fa`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.error || "Could not reset 2FA.");
+            return;
+        }
+        showToast(`2FA reset for ${name}. They will re-enrol at next login.`);
+    } catch (error) {
+        console.error("Reset 2FA error:", error);
         alert("Something went wrong.");
     }
 }

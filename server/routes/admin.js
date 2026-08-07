@@ -25,7 +25,7 @@ const {
     permanentlyDeleteProduct
 } = require("../controllers/productController");
 
-const { createStaffAccount, activateStaffAccount, blockStaffAccount, forcePasswordReset, logoutAllDevices, getLoginHistory } = require("../controllers/authController");
+const { createStaffAccount, activateStaffAccount, blockStaffAccount, forcePasswordReset, logoutAllDevices, resetStaff2FA, getLoginHistory } = require("../controllers/authController");
 
 const { requireAuth, requireAdmin } = require("./../middleware/authMiddleware");
 const csvUpload = require("../middleware/csvUpload");
@@ -45,6 +45,7 @@ router.patch("/staff/:id/activate", activateStaffAccount);
 router.patch("/staff/:id/block", blockStaffAccount);
 router.patch("/staff/:id/force-reset", forcePasswordReset);
 router.post("/staff/:id/logout-all", logoutAllDevices);
+router.post("/staff/:id/reset-2fa", resetStaff2FA);
 router.get("/staff/:id/login-history", getLoginHistory);
 
 // Product approval workflow
