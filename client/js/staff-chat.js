@@ -274,17 +274,25 @@
         if (c.status !== "closed") {
             html += '<div class="sc-transfer">';
             html += "<strong>Transfer this chat</strong>";
-            html += '<select id="sc-transfer-select">';
-            html += '<option value="">Choose a colleague...</option>';
-            agentList.forEach(function (a) {
-                if (me && a.staff_id === me.id) return;
-                var dot = a.is_online ? "\u25CF " : "\u25CB ";
-                var nm = a.staff_name || ("Agent #" + a.staff_id);
-                html += '<option value="' + a.staff_id + '">' + esc(dot + nm)
-                      + " (" + a.active_chats + ")</option>";
+            var others = agentList.filter(function (a) {
+                return !(me && a.staff_id === me.id);
             });
-            html += "</select>";
-            html += '<button class="sc-btn" data-action="transfer">Transfer</button>';
+
+            if (others.length === 0) {
+                html += '<p class="sc-transfer-empty">No other agents on the team yet. '
+                      + "Return it to the queue instead.</p>";
+            } else {
+                html += '<select id="sc-transfer-select">';
+                html += '<option value="">Choose a colleague...</option>';
+                others.forEach(function (a) {
+                    var dot = a.is_online ? "\u25CF " : "\u25CB ";
+                    var nm = a.staff_name || ("Agent #" + a.staff_id);
+                    html += '<option value="' + a.staff_id + '">' + esc(dot + nm)
+                          + " (" + a.active_chats + ")</option>";
+                });
+                html += "</select>";
+                html += '<button class="sc-btn" data-action="transfer">Transfer</button>';
+            }
             html += '<button class="sc-btn" data-action="requeue">Return to queue</button>';
             html += "</div>";
         }

@@ -531,3 +531,4 @@
 .sc-transfer select { width: 100%; padding: 9px 10px; margin-bottom: 8px;
   border: 1px solid #d4d7e0; border-radius: 8px; font-size: 14px; }
 .sc-transfer .sc-btn { margin-right: 6px; }
+.sc-transfer-empty { font-size: 13px; color: #6b7280; margin: 0 0 8px; }
