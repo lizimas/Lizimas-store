@@ -1004,6 +1004,7 @@ function editProduct(id) {
     document.getElementById("variants-section").classList.remove("hidden");
     loadVariants(product.id);
     loadProductOptionsIntoForm(product.id);
+    LzBlockEditor.mount(document.getElementById("desc-blocks-editor"), product.id, { tokenKey: "adminToken" });
     document.getElementById("product-image").value = "";
     pdPickedFiles = [];
     document.getElementById("product-image-preview").innerHTML = "";
@@ -1080,6 +1081,17 @@ async function saveProduct() {
                 });
             } catch (optionsError) {
                 console.error("Save options error:", optionsError);
+            }
+        }
+
+        // Description blocks: only on edit, where the editor was mounted with
+        // a real product id. A failure here must not lose the product save.
+        if (id && window.LzBlockEditor) {
+            const blockRes = await LzBlockEditor.save(id);
+            if (!blockRes.ok) {
+                errorEl.textContent = "Product saved, but description blocks failed: " + blockRes.message;
+                loadProducts();
+                return;
             }
         }
 

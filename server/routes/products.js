@@ -23,7 +23,8 @@ const {
 
 const {
     getDescriptionBlocks,
-    saveDescriptionBlocks
+    saveDescriptionBlocks,
+    uploadBlockImage
 } = require("../controllers/descriptionBlockController");
 
 const { requireAuth, requireAdmin, requireStaffOrAdmin } = require("../middleware/authMiddleware");
@@ -37,6 +38,7 @@ router.get("/:id/images", getProductImages);
 router.get("/:id/options", getProductOptions);
 router.get("/:id/description-blocks", getDescriptionBlocks);
 router.put("/:id/description-blocks", requireAuth, requireStaffOrAdmin, saveDescriptionBlocks);
+router.post("/:id/description-blocks/image", requireAuth, requireStaffOrAdmin, upload.single("image"), uploadBlockImage);
 router.get("/catalog/sizes", getSizeCatalog);
 router.get("/catalog/colors", getColorCatalog);
 router.post("/:id/options", requireAuth, requireStaffOrAdmin, saveProductOptions);

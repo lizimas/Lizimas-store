@@ -1,4 +1,5 @@
 const pool = require("../config/database");
+const { uploadBuffer } = require("../utils/cloudinaryUpload");
 
 // Public: ordered blocks for one product. Empty array is a valid answer —
 // the storefront falls back to products.description when nothing is here.
@@ -88,4 +89,20 @@ const saveDescriptionBlocks = async (req, res) => {
     }
 };
 
-module.exports = { getDescriptionBlocks, saveDescriptionBlocks };
+
+// Immediate upload: one image in, URL and true dimensions out. The editor
+// calls this on file selection so blocks always carry correct dimensions.
+const uploadBlockImage = async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+    }
+    try {
+        const r = await uploadBuffer(req.file.buffer, "lizimas-store/description-blocks");
+        res.json({ image_url: r.url, image_width: r.width, image_height: r.height });
+    } catch (err) {
+        console.error("uploadBlockImage:", err);
+        res.status(500).json({ message: "Upload failed" });
+    }
+};
+
+module.exports = { getDescriptionBlocks, saveDescriptionBlocks, uploadBlockImage };

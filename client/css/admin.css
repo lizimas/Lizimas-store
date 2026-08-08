@@ -1182,3 +1182,18 @@ select.status-select {
   margin-top: 14px; padding-top: 14px; border-top: 1px solid #e6e8ef; }
 .monitor-compose textarea { flex: 1; padding: 10px 12px; border: 1px solid #d4d7e0;
   border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical; }
+
+/* ---- Description block editor ---- */
+.lzbe { border: 1px solid #dcdfe6; border-radius: 6px; padding: 10px; margin: 8px 0 14px; }
+.lzbe-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.lzbe-bar button { margin-left: 6px; padding: 5px 10px; border: 1px solid #0d1b3e; background: #fff; color: #0d1b3e; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+.lzbe-bar button:hover { background: #0d1b3e; color: #fff; }
+.lzbe-busy { color: #b8860b; font-size: 0.85rem; min-height: 18px; }
+.lzbe-row { border: 1px solid #eee; border-radius: 5px; padding: 8px; margin-bottom: 8px; background: #fafafa; }
+.lzbe-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.lzbe-type { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; font-weight: 700; }
+.lzbe-ctrl button { margin-left: 4px; width: 28px; height: 26px; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; }
+.lzbe-row textarea, .lzbe-row input[type="text"] { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
+.lzbe-thumb { max-width: 120px; height: auto; display: block; margin-bottom: 6px; border-radius: 4px; }
+.lzbe-dim { font-size: 0.75rem; color: #888; margin-top: 4px; }
+.lzbe-empty { color: #888; font-size: 0.88rem; margin: 4px 0; }
