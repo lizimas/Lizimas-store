@@ -12,6 +12,7 @@ router.use("/chat", require("./chat"));
 router.use("/products", require("./products"));
 router.use("/variants", require("./variants"));
 router.use("/delivery", require("./delivery"));
+router.use("/locations", require("./locations"));
 router.use("/search", require("./search"));
 router.use("/reviews", require("./reviews"));
 
