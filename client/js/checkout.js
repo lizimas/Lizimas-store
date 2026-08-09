@@ -61,11 +61,15 @@ function onDeliveryMethodChange() {
 async function calculateDeliveryFee() {
     if (currentDeliveryMethod === "pickup") return;
 
-    const district = document.getElementById("district-select").value;
+    const locationId = document.getElementById("location-id").value;
     const statusEl = document.getElementById("delivery-fee-status");
 
-    if (!district) {
+    if (!locationId) {
         currentDeliveryFee = null;
+        lastKnownZone = null;
+        const zoneEl = document.getElementById("zone-display");
+        if (zoneEl) zoneEl.textContent = "";
+        statusEl.textContent = "";
         renderOrderSummary();
         return;
     }
@@ -83,7 +87,7 @@ async function calculateDeliveryFee() {
     statusEl.textContent = "Calculating delivery fee...";
 
     try {
-        const result = await apiGet(`/delivery/fee?district=${encodeURIComponent(district)}&product_ids=${productIds.join(",")}&method=delivery`);
+        const result = await apiGet(`/delivery/fee?location_id=${encodeURIComponent(locationId)}&product_ids=${productIds.join(",")}&method=delivery`);
 
         if (result.quoteRequired) {
             currentDeliveryFee = null;
@@ -101,7 +105,7 @@ async function calculateDeliveryFee() {
     } catch (error) {
         console.error(error);
         currentDeliveryFee = null;
-        statusEl.textContent = "Could not calculate fee for that district. Please try again.";
+        statusEl.textContent = "Could not calculate fee for that area. Please try again.";
         renderOrderSummary();
     }
 }
@@ -181,8 +185,9 @@ function placeOrder() {
     const phone = phoneDigits ? `+256${phoneDigits}` : "";
     const altPhone = altPhoneDigits ? `+256${altPhoneDigits}` : "";
 
-    const district = document.getElementById("district-select").value;
-    const region = document.getElementById("region-select").value;
+    const loc = locationPicker ? locationPicker.value() : {};
+    const district = loc.district || "";
+    const region = loc.region || "";
     const street = document.getElementById("street").value.trim();
     const landmark = document.getElementById("landmark").value.trim();
     const payment = document.getElementById("payment").value;
@@ -198,8 +203,13 @@ function placeOrder() {
         return;
     }
 
-    if (deliveryMethod === "delivery" && !district) {
-        alert("Please select a delivery district.");
+    if (deliveryMethod === "delivery" && !loc.locationId) {
+        alert("Please select your delivery area.");
+        return;
+    }
+
+    if (deliveryMethod === "delivery" && locationPicker && !locationPicker.isValid()) {
+        alert("Please tell us which area you are in so the rider can find you.");
         return;
     }
 
@@ -235,6 +245,9 @@ function placeOrder() {
         const addressParts = [];
         if (region) addressParts.push(`${region} Region`);
         addressParts.push(`${district} District`);
+        if (loc.division) addressParts.push(`${loc.division}`);
+        const areaLabel = loc.area || loc.areaText;
+        if (areaLabel) addressParts.push(`Area: ${areaLabel}`);
         addressParts.push(`Zone: ${lastKnownZone || "N/A"}`);
         if (street) addressParts.push(`Street/Road: ${street}`);
         if (landmark) addressParts.push(`Plot/Landmark: ${landmark}`);
@@ -246,6 +259,12 @@ function placeOrder() {
         phone: phone,
         alt_phone: altPhone || null,
         delivery_address: deliveryAddress,
+        location_id: deliveryMethod === "delivery" ? loc.locationId : null,
+        delivery_division: loc.division || null,
+        delivery_area: loc.area || null,
+        delivery_area_text: loc.areaText || null,
+        delivery_street: street || null,
+        delivery_landmark: landmark || null,
         delivery_method: deliveryMethod,
         delivery_fee: deliveryFee,
         payment_method: payment,
@@ -488,4 +507,28 @@ function confirmMapLocation() {
     document.getElementById("landmark").value = parts.slice(1, 3).join(", ") || "";
 
     document.getElementById("map-picker-container").style.display = "none";
+}
+
+
+// ---------------------------------------------------------------------
+// Location picker (Region -> District -> Division -> Area)
+// ---------------------------------------------------------------------
+let locationPicker = null;
+
+function initLocationPicker() {
+    const mount = document.getElementById("location-picker");
+    if (!mount || typeof LzLocationPicker === "undefined") return;
+
+    locationPicker = LzLocationPicker.init(mount, {
+        apiGet,
+        onChange() {
+            calculateDeliveryFee();
+        }
+    });
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initLocationPicker);
+} else {
+    initLocationPicker();
 }

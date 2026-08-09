@@ -18,14 +18,17 @@ function getOrderPackageSize(items) {
 // GET /api/delivery/fee?method=delivery&district=Kampala&product_ids=12,45,7
 exports.getDeliveryFee = async (req, res) => {
     try {
-        const { method, district, product_ids } = req.query;
+        const { method, district, location_id, product_ids } = req.query;
 
         if (method === "pickup") {
             return res.json({ fee: 0, method: "pickup" });
         }
 
-        if (!district) {
-            return res.status(400).json({ error: "Please select a delivery district." });
+        const locationId = Number.parseInt(location_id, 10);
+        const hasLocation = Number.isSafeInteger(locationId) && locationId > 0;
+
+        if (!hasLocation && !district) {
+            return res.status(400).json({ error: "Please select a delivery location." });
         }
         if (!product_ids) {
             return res.status(400).json({ error: "No items in cart to calculate delivery for." });
@@ -45,22 +48,33 @@ exports.getDeliveryFee = async (req, res) => {
             return res.status(404).json({ error: "Could not find cart items." });
         }
 
-        const zoneResult = await pool.query(
-            "SELECT zone, small_fee_ugx, medium_fee_ugx, large_fee_ugx, eta FROM delivery_zones WHERE district = $1",
-            [district]
-        );
+        // resolve_delivery_zone() walks up from any depth - parish, division
+        // or district - to the district that carries the pricing row.
+        const zoneResult = hasLocation
+            ? await pool.query(
+                "SELECT district, zone, small_fee_ugx, medium_fee_ugx, large_fee_ugx, eta FROM resolve_delivery_zone($1)",
+                [locationId]
+            )
+            : await pool.query(
+                "SELECT district, zone, small_fee_ugx, medium_fee_ugx, large_fee_ugx, eta FROM delivery_zones WHERE district = $1",
+                [district]
+            );
 
-        if (zoneResult.rows.length === 0) {
-            return res.status(404).json({ error: "Delivery is not yet available for that district." });
+        // A composite-returning function yields one all-NULL row on no match,
+        // so check the column rather than the row count.
+        if (zoneResult.rows.length === 0 || !zoneResult.rows[0].district) {
+            return res.status(404).json({ error: "Delivery is not yet available for that area." });
         }
 
         const zoneRow = zoneResult.rows[0];
+        const districtName = zoneRow.district;
         const packageSize = getOrderPackageSize(productsResult.rows);
 
         if (packageSize === "Extra Large") {
             return res.json({
                 method: "delivery",
-                district,
+                district: districtName,
+                locationId: hasLocation ? locationId : null,
                 zone: zoneRow.zone,
                 eta: zoneRow.eta,
                 packageSize,
@@ -78,7 +92,8 @@ exports.getDeliveryFee = async (req, res) => {
 
         return res.json({
             method: "delivery",
-            district,
+            district: districtName,
+            locationId: hasLocation ? locationId : null,
             zone: zoneRow.zone,
             eta: zoneRow.eta,
             packageSize,
@@ -96,7 +111,7 @@ exports.getDeliveryFee = async (req, res) => {
 exports.getDistricts = async (req, res) => {
     try {
         const result = await pool.query(
-            "SELECT district, zone, eta FROM delivery_zones ORDER BY zone, district"
+            "SELECT district, zone, eta, location_id FROM delivery_zones ORDER BY zone, district"
         );
         res.json({ districts: result.rows });
     } catch (error) {

@@ -116,23 +116,8 @@
 
             <p class="address-divider">Or enter address manually</p>
 
-            <div class="checkout-input-group">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#0f1b3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M12 2v20"/></svg>
-                <select id="region-select">
-                    <option value="">Select region...</option>
-                    <option value="Central">Central</option>
-                    <option value="Eastern">Eastern</option>
-                    <option value="Northern">Northern</option>
-                    <option value="Western">Western</option>
-                </select>
-            </div>
 
-            <div class="checkout-input-group district-search-group" style="position: relative;">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#0f1b3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-                <input id="district-search" type="text" placeholder="Search delivery district (City)..." autocomplete="off" oninput="filterDistrictResults()" onfocus="filterDistrictResults()">
-                <input type="hidden" id="district-select">
-            </div>
-            <div id="district-results-dropdown" class="district-results-dropdown"></div>
+            <div id="location-picker"></div>
 
             <p id="zone-display" class="delivery-fee-status"></p>
             <p id="delivery-fee-status" class="delivery-fee-status"></p>
@@ -258,7 +243,8 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/api.js"></script>
-<script src="js/checkout.js?v=2"></script>
+<script src="js/lz-location-picker.js?v=3"></script>
+<script src="js/checkout.js?v=4"></script>
 
 
 <a href="https://wa.me/256792363104" target="_blank" rel="noopener" class="whatsapp-float" aria-label="Chat with us on WhatsApp">
