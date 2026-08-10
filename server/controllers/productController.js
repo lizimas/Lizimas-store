@@ -16,11 +16,22 @@ function uploadBufferToCloudinary(fileBuffer) {
     });
 }
 
+const { SIZE_RANK } = require("../utils/deliveryPricing");
+
+// Only the four known tiers may reach the database: package_size is a
+// pricing input, so an unrecognised value would silently mis-charge
+// delivery rather than fail loudly.
+function safePackageSize(value) {
+    return SIZE_RANK[value] ? value : "Small";
+}
+
 // Add product (with optional multiple image uploads)
 exports.addProduct = async (req, res) => {
     try {
-        const { name, category_id, description, price, stock,
+        const { name, category_id, description, price, stock, package_size,
                 material, color, sleeve, style, length, fit, pattern, care_instructions, occasion } = req.body;
+
+        const packageSize = safePackageSize(package_size);
 
         const status = req.user.role === "product_staff" ? "pending" : "approved";
 
@@ -32,11 +43,12 @@ exports.addProduct = async (req, res) => {
 
         const product = await pool.query(
             `INSERT INTO products (name,category_id,description,price,stock,image,status,created_by,
-                material,color,sleeve,style,length,fit,pattern,care_instructions,occasion)
-             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
+                material,color,sleeve,style,length,fit,pattern,care_instructions,occasion,package_size)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
             [name, category_id, description, price, stock, mainImage, status, req.user.userId,
                 material || null, color || null, sleeve || null, style || null, length || null,
-                fit || null, pattern || null, care_instructions || null, occasion || null]
+                fit || null, pattern || null, care_instructions || null, occasion || null,
+                packageSize]
         );
 
         const newProduct = product.rows[0];
@@ -603,8 +615,10 @@ exports.updateProduct = async (req, res) => {
             return res.status(permission.status).json({ error: permission.error });
         }
 
-        const { name, category_id, description, price, stock,
+        const { name, category_id, description, price, stock, package_size,
                 material, color, sleeve, style, length, fit, pattern, care_instructions, occasion } = req.body;
+
+        const packageSize = safePackageSize(package_size);
 
         const uploadedFiles = req.files || [];
         const newImagePaths = await Promise.all(
@@ -614,16 +628,18 @@ exports.updateProduct = async (req, res) => {
         const statusClause = req.user.role === "product_staff" ? `, status='pending'` : "";
 
         let updateQuery = `UPDATE products SET name=$1, category_id=$2, description=$3, price=$4, stock=$5,
-            material=$6, color=$7, sleeve=$8, style=$9, length=$10, fit=$11, pattern=$12, care_instructions=$13, occasion=$14${statusClause}`;
+            material=$6, color=$7, sleeve=$8, style=$9, length=$10, fit=$11, pattern=$12, care_instructions=$13, occasion=$14,
+            package_size=$15${statusClause}`;
         let params = [name, category_id, description, price, stock,
             material || null, color || null, sleeve || null, style || null, length || null,
-            fit || null, pattern || null, care_instructions || null, occasion || null];
+            fit || null, pattern || null, care_instructions || null, occasion || null,
+            packageSize];
 
         if (newImagePaths.length > 0) {
-            updateQuery += `, image=$15 WHERE id=$16 RETURNING *`;
+            updateQuery += `, image=$16 WHERE id=$17 RETURNING *`;
             params.push(newImagePaths[0], id);
         } else {
-            updateQuery += ` WHERE id=$15 RETURNING *`;
+            updateQuery += ` WHERE id=$16 RETURNING *`;
             params.push(id);
         }
 

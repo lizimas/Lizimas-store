@@ -967,6 +967,7 @@ function openProductForm() {
     document.getElementById("product-description").value = "";
     document.getElementById("product-price").value = "";
     document.getElementById("product-stock").value = "";
+    document.getElementById("product-package-size").value = "Small";
     document.getElementById("product-image").value = "";
     pdPickedFiles = [];
     document.getElementById("product-image-preview").innerHTML = "";
@@ -1001,6 +1002,7 @@ function editProduct(id) {
     document.getElementById("product-description").value = product.description || "";
     document.getElementById("product-price").value = product.price;
     document.getElementById("product-stock").value = product.stock;
+    document.getElementById("product-package-size").value = product.package_size || "Small";
     document.getElementById("variants-section").classList.remove("hidden");
     loadVariants(product.id);
     loadProductOptionsIntoForm(product.id);
@@ -1023,6 +1025,7 @@ async function saveProduct() {
     const description = document.getElementById("product-description").value.trim();
     const price = document.getElementById("product-price").value;
     const stock = document.getElementById("product-stock").value;
+    const packageSize = document.getElementById("product-package-size").value;
     const files = pdPickedFiles;
 
     const errorEl = document.getElementById("product-form-error");
@@ -1038,6 +1041,7 @@ async function saveProduct() {
     formData.append("description", description);
     formData.append("price", price);
     formData.append("stock", stock);
+    formData.append("package_size", packageSize);
 
     for (let i = 0; i < files.length; i++) {
         formData.append("images", files[i]);
