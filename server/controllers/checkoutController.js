@@ -4,6 +4,15 @@ const { sendOrderStatusEmail } = require("../utils/mailer");
 
 exports.checkout = async (req, res) => {
     const { items, payment_method, delivery_address, customer_name, phone, alt_phone, delivery_fee, delivery_method } = req.body;
+
+    // Structured address parts. delivery_division / delivery_area are also
+    // sent by the client but are display strings only - the zone and the
+    // ancestry are both resolved from location_id server-side below.
+    const locationId = Number(req.body.location_id) > 0 ? Number(req.body.location_id) : null;
+    const deliveryVillage = (req.body.delivery_area_text || "").trim() || null;
+    const deliveryStreet = (req.body.delivery_street || "").trim() || null;
+    const deliveryBuilding = (req.body.delivery_building || "").trim() || null;
+    const deliveryLandmark = (req.body.delivery_landmark || "").trim() || null;
     const safeDeliveryFee = Number(delivery_fee) >= 0 ? Number(delivery_fee) : 0;
     const safeDeliveryMethod = delivery_method === "pickup" ? "pickup" : "delivery";
     const userId = req.user ? req.user.userId : null;
@@ -122,12 +131,81 @@ exports.checkout = async (req, res) => {
 
         const finalTotal = total + safeDeliveryFee;
 
+        // -------------------------------------------------------------
+        // Resolve the delivery location server-side.
+        // An unknown or inactive location_id degrades to NULL rather than
+        // failing the order: delivery_address still carries the full text,
+        // so a bad id costs reporting granularity, not a sale.
+        // -------------------------------------------------------------
+        let resolvedLocationId = null;
+        let locationPath = null;
+        let zoneId = null;
+        let zoneName = null;
+
+        if (locationId) {
+            const locCheck = await client.query(
+                "SELECT id FROM locations WHERE id = $1 AND is_active",
+                [locationId]
+            );
+
+            if (locCheck.rows.length) {
+                resolvedLocationId = locationId;
+
+                // resolve_delivery_zone() RETURNS delivery_zones, so the whole
+                // row comes back - id and zone name included.
+                const zoneRow = await client.query(
+                    "SELECT id, zone FROM resolve_delivery_zone($1)",
+                    [locationId]
+                );
+                if (zoneRow.rows.length && zoneRow.rows[0].id) {
+                    zoneId = zoneRow.rows[0].id;
+                    zoneName = zoneRow.rows[0].zone;
+                }
+
+                // locations.path stores ancestor ids as /1/62/263/1221/.
+                // Expand it to names and append the location itself. Level 3
+                // (county) is skipped so the snapshot reads the same way the
+                // customer-facing cascade did: Region / District / Division / Area.
+                const pathRow = await client.query(
+                    `WITH target AS (
+                         SELECT id, name, level, path FROM locations WHERE id = $1
+                     )
+                     SELECT string_agg(x.name, ' / ' ORDER BY x.level) AS label
+                       FROM (
+                            SELECT a.name, a.level
+                              FROM target t
+                              JOIN locations a
+                                ON a.id = ANY (
+                                     string_to_array(
+                                         NULLIF(trim(both '/' from COALESCE(t.path, '')), ''),
+                                         '/'
+                                     )::int[]
+                                   )
+                             WHERE a.level <> 3
+                            UNION ALL
+                            SELECT t.name, t.level FROM target t
+                       ) x`,
+                    [locationId]
+                );
+                locationPath = pathRow.rows.length ? pathRow.rows[0].label : null;
+            }
+        }
+
         const orderResult = await client.query(
             `INSERT INTO orders
-                (user_id, customer_name, phone, alt_phone, total, payment_method, delivery_address, status, delivery_fee, delivery_method)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9)
+                (user_id, customer_name, phone, alt_phone, total, payment_method, delivery_address, status, delivery_fee, delivery_method,
+                 delivery_location_id, delivery_location_path, delivery_zone_id, delivery_zone_name,
+                 delivery_village, delivery_street, delivery_building, delivery_landmark,
+                 delivery_recipient, delivery_phone, delivery_phone_alt)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9,
+                     $10, $11, $12, $13,
+                     $14, $15, $16, $17,
+                     $18, $19, $20)
              RETURNING *`,
-            [userId, customer_name, phone, alt_phone || null, finalTotal, payment_method, delivery_address, safeDeliveryFee, safeDeliveryMethod]
+            [userId, customer_name, phone, alt_phone || null, finalTotal, payment_method, delivery_address, safeDeliveryFee, safeDeliveryMethod,
+             resolvedLocationId, locationPath, zoneId, zoneName,
+             deliveryVillage, deliveryStreet, deliveryBuilding, deliveryLandmark,
+             customer_name, phone, alt_phone || null]
         );
 
         const order = orderResult.rows[0];
