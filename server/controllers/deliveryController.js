@@ -1,18 +1,5 @@
 const pool = require("../config/database");
-
-// Order of tiers, low to high — used to find the "largest" size across cart items
-const SIZE_RANK = { "Small": 1, "Medium": 2, "Large": 3, "Extra Large": 4 };
-
-function getOrderPackageSize(items) {
-    let maxSize = "Small";
-    for (const item of items) {
-        const size = item.package_size || "Small";
-        if ((SIZE_RANK[size] || 1) > SIZE_RANK[maxSize]) {
-            maxSize = size;
-        }
-    }
-    return maxSize;
-}
+const { getOrderPackageSize } = require("../utils/deliveryPricing");
 
 // GET /api/delivery/fee?method=pickup
 // GET /api/delivery/fee?method=delivery&district=Kampala&product_ids=12,45,7

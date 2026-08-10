@@ -1,6 +1,7 @@
 const pool = require("../config/database");
 const { sendOrderStatusSms } = require("../utils/sms");
 const { sendOrderStatusEmail } = require("../utils/mailer");
+const { priceOrder } = require("../utils/deliveryPricing");
 
 exports.checkout = async (req, res) => {
     const { items, payment_method, delivery_address, customer_name, phone, alt_phone, delivery_fee, delivery_method } = req.body;
@@ -129,7 +130,7 @@ exports.checkout = async (req, res) => {
             }
         }
 
-        const finalTotal = total + safeDeliveryFee;
+        let effectiveDeliveryFee = safeDeliveryFee;
 
         // -------------------------------------------------------------
         // Resolve the delivery location server-side.
@@ -191,6 +192,54 @@ exports.checkout = async (req, res) => {
             }
         }
 
+        // -------------------------------------------------------------
+        // Re-price delivery from the database. The posted delivery_fee is
+        // advisory only: package size comes from products.package_size and
+        // the zone from the resolved location, so the client decides
+        // neither input to the price.
+        // -------------------------------------------------------------
+        if (safeDeliveryMethod === "pickup") {
+            effectiveDeliveryFee = 0;
+        } else if (resolvedLocationId) {
+            const pricing = await priceOrder(client, {
+                locationId: resolvedLocationId,
+                productIds: validatedItems.map(item => item.productId)
+            });
+
+            if (pricing.error === "not_serviced") {
+                await client.query("ROLLBACK");
+                return res.status(404).json({
+                    error: "Delivery is not yet available for that area."
+                });
+            }
+
+            if (pricing.quoteRequired) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({
+                    error: "This order needs a custom delivery quote. Please contact us to arrange delivery.",
+                    quoteRequired: true,
+                    packageSize: pricing.packageSize
+                });
+            }
+
+            if (Number.isFinite(pricing.fee)) {
+                if (pricing.fee !== safeDeliveryFee) {
+                    // Almost always a stale checkout page. Use the server
+                    // figure and record the gap rather than failing the sale.
+                    console.warn(
+                        `Delivery fee mismatch: client sent ${safeDeliveryFee}, server priced ${pricing.fee} (location ${resolvedLocationId}, size ${pricing.packageSize})`
+                    );
+                }
+                effectiveDeliveryFee = pricing.fee;
+            }
+        } else {
+            // No usable location id - nothing to price against, so the
+            // client figure stands. Worth watching if it appears often.
+            console.warn(`Order priced without a location_id; trusting client fee ${safeDeliveryFee}`);
+        }
+
+        const finalTotal = total + effectiveDeliveryFee;
+
         const orderResult = await client.query(
             `INSERT INTO orders
                 (user_id, customer_name, phone, alt_phone, total, payment_method, delivery_address, status, delivery_fee, delivery_method,
@@ -202,7 +251,7 @@ exports.checkout = async (req, res) => {
                      $14, $15, $16, $17,
                      $18, $19, $20)
              RETURNING *`,
-            [userId, customer_name, phone, alt_phone || null, finalTotal, payment_method, delivery_address, safeDeliveryFee, safeDeliveryMethod,
+            [userId, customer_name, phone, alt_phone || null, finalTotal, payment_method, delivery_address, effectiveDeliveryFee, safeDeliveryMethod,
              resolvedLocationId, locationPath, zoneId, zoneName,
              deliveryVillage, deliveryStreet, deliveryBuilding, deliveryLandmark,
              customer_name, phone, alt_phone || null]
