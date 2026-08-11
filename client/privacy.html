@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Privacy Policy | Lizimas Store</title>
+
+<link rel="stylesheet" href="css/style.css?v=37">
+
+</head>
+
+<body>
+
+<header class="ls-header">
+
+  <div class="ls-header-top">
+
+    <a href="index.html" class="ls-brand">
+      <svg class="ls-mark" viewBox="0 0 512 512" aria-hidden="true">
+        <rect width="512" height="512" rx="123" fill="#1a1a2e"/>
+        <path d="M182 253 A74 74 0 0 1 330 253" fill="none" stroke="#F5C518" stroke-width="26"/>
+        <rect x="123" y="195" width="266" height="215" rx="31" fill="#F5C518"/>
+        <text x="256" y="335" font-family="Poppins, Segoe UI, sans-serif" font-size="133"
+              font-weight="700" fill="#1a1a2e" text-anchor="middle">LS</text>
+      </svg>
+      <span class="ls-wordmark">Lizimas Store</span>
+    </a>
+
+    <form class="ls-search" onsubmit="return false;">
+      <svg viewBox="0 0 24 24" class="ls-search-icon" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
+        <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round"/>
+      </svg>
+      <input type="search" id="header-search" placeholder="Search for anything" autocomplete="off">
+    </form>
+
+    <div class="ls-header-actions">
+
+      <div class="ls-menu">
+        <button class="ls-menu-trigger" type="button" aria-haspopup="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="M9.2 9.3a2.9 2.9 0 015.6 1c0 1.9-2.8 2.2-2.8 4" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="12" cy="17.6" r="1.2" fill="currentColor"/>
+          </svg>
+          <span class="ls-action-label">Help</span>
+        </button>
+        <div class="ls-menu-panel">
+          <a class="ls-menu-item" href="help.html">Help Center</a>
+          <a class="ls-menu-item" href="faq.html">FAQ</a>
+          <a class="ls-menu-item" href="help.html#delivery">Delivery &amp; tracking</a>
+          <a class="ls-menu-item" href="returns.html">Returns &amp; refunds</a>
+          <a class="ls-menu-item" href="contact.html">Contact us</a>
+          <div class="ls-menu-sep"></div>
+          <a class="ls-menu-item ls-menu-item-accent" id="lsLiveChat"
+             href="https://wa.me/256792363104" target="_blank" rel="noopener"
+             onclick="if(window.LzChat){event.preventDefault();window.LzChat.open();}">Live chat</a>
+        </div>
+      </div>
+
+      <div class="ls-menu">
+        <a class="ls-menu-trigger" href="login.html" aria-haspopup="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span class="ls-action-label">Account</span>
+        </a>
+        <div class="ls-menu-panel">
+          <a class="ls-menu-item" href="login.html">My account</a>
+          <a class="ls-menu-item" href="orders.html">Orders</a>
+        </div>
+      </div>
+
+      <a href="cart.html" class="ls-action" title="Cart">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 4h2.2l2.6 12h9.6l2.2-8H7" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+          <circle cx="10" cy="20" r="1.6" fill="currentColor"/>
+          <circle cx="17" cy="20" r="1.6" fill="currentColor"/>
+        </svg>
+        <span class="ls-cart-count" id="cart-count">0</span>
+      </a>
+    </div>
+
+  </div>
+
+  <nav class="ls-nav" id="ls-nav">
+    <div class="ls-mega" id="ls-mega">
+      <button class="ls-nav-all" id="ls-nav-all" type="button">
+        <span class="ls-burger"><span></span><span></span><span></span></span>
+        <span class="ls-nav-all-label">All Categories</span>
+      </button>
+      <div class="ls-mega-panel">
+        <div class="ls-mega-rail" id="ls-mega-rail"></div>
+        <div class="ls-mega-col" id="ls-mega-l2" hidden></div>
+        <div class="ls-mega-col" id="ls-mega-l3" hidden></div>
+      </div>
+    </div>
+    <div class="ls-nav-parents" id="ls-nav-parents"></div>
+  </nav>
+
+</header>
+
+<main class="ls-help">
+
+  <div class="ls-help-hero">
+    <h1>Privacy Policy</h1>
+    <p>How Lizimas Store collects, uses and protects your personal data, in accordance with the Data Protection and Privacy Act, 2019 of Uganda.</p>
+  </div>
+
+  <nav class="ls-help-toc" aria-label="Topics">
+    <a href="#who">Who we are</a>
+    <a href="#collect">What we collect</a>
+    <a href="#use">How we use it</a>
+    <a href="#basis">Legal basis</a>
+    <a href="#share">Who we share it with</a>
+    <a href="#transfers">International transfers</a>
+    <a href="#retention">How long we keep it</a>
+    <a href="#security">Security</a>
+    <a href="#rights">Your rights</a>
+    <a href="#social">Social media</a>
+    <a href="#contact">Contact us</a>
+  </nav>
+
+  <section class="ls-help-section" id="who">
+    <h2>Who we are</h2>
+
+    <p>Lizimas Store is an online retail store operating in Uganda at
+       lizimasstore.com. The business is a sole proprietorship. Registration
+       formalities are ongoing with the support of our legal advisers, and this
+       page will be updated once registration is complete.</p>
+    <p>We sell our own products directly to customers. We are not a marketplace
+       and we do not host third-party sellers. Lizimas Store is the data
+       controller for all personal data described on this page.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="collect">
+    <h2>What we collect</h2>
+
+    <h3>Information you give us</h3>
+    <ul>
+      <li>Your name, email address and phone number</li>
+      <li>Delivery address, including district, county, sub-county, parish and
+          village, plus any landmark or instruction you add</li>
+      <li>Your password &mdash; stored only in hashed form, never visible to our
+          staff, including administrators</li>
+      <li>Order details: products, quantities, sizes, colours and delivery method</li>
+      <li>Messages you send us through chat, WhatsApp, email or social media,
+          including any photographs you attach</li>
+      <li>Product reviews and ratings you submit</li>
+    </ul>
+
+    <h3>Information we collect automatically</h3>
+    <ul>
+      <li>Your IP address, browser, device type and operating system</li>
+      <li>Pages and products you view or search for, and when</li>
+      <li>Records of logins to your account, kept for account security</li>
+    </ul>
+
+    <h3>Payment information</h3>
+    <p>When you pay by mobile money, the payment is processed by the mobile money
+       provider. <strong>We never receive, store or see your mobile money PIN</strong>,
+       and we do not store card numbers. We keep only the transaction reference,
+       the amount, and whether the payment succeeded &mdash; so we can match your
+       payment to your order.</p>
+
+    <h3>Cookies and local storage</h3>
+    <p>We use only the storage strictly necessary to make the site work: your
+       shopping cart, keeping you signed in, and your support chat if one is open.
+       We do not use advertising cookies and we do not share your browsing
+       behaviour with advertising networks. If we introduce optional cookies later,
+       we will publish a separate Cookie Notice and ask your consent first.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="use">
+    <h2>How we use your data</h2>
+
+    <ul>
+      <li>Creating and managing your account</li>
+      <li>Processing, packing and delivering your orders</li>
+      <li>Calculating the delivery charge for your location</li>
+      <li>Contacting you about an order</li>
+      <li>Answering your questions through customer support</li>
+      <li>Verifying your phone number or email to secure your account</li>
+      <li>Handling returns, refunds and complaints</li>
+      <li>Protecting the store and our customers against fraud and abuse</li>
+      <li>Understanding which products and pages are popular, so we can improve</li>
+      <li>Complying with our legal obligations</li>
+    </ul>
+
+  </section>
+
+  <section class="ls-help-section" id="basis">
+    <h2>Legal basis for processing</h2>
+
+    <p>We process your data only where we have a lawful basis under the Data
+       Protection and Privacy Act, 2019:</p>
+    <ul>
+      <li><strong>Performance of a contract</strong> &mdash; where we need your
+          details to process and deliver an order</li>
+      <li><strong>Your consent</strong> &mdash; for example, promotional messages.
+          You can withdraw consent at any time</li>
+      <li><strong>Legal obligation</strong> &mdash; where the law requires us to
+          keep or disclose records</li>
+      <li><strong>Legitimate interests</strong> &mdash; keeping the store secure,
+          preventing fraud and improving our service, provided this does not
+          override your rights</li>
+    </ul>
+
+  </section>
+
+  <section class="ls-help-section" id="share">
+    <h2>Who we share it with</h2>
+
+    <p><strong>We do not sell your personal data.</strong> We share it only where
+       necessary to run the store:</p>
+    <ul>
+      <li>Our hosting provider, which runs the website and database servers</li>
+      <li>Our image hosting provider, which stores product images &mdash; no
+          customer data is held there</li>
+      <li>Our email provider, which sends order confirmations, password resets and
+          security codes</li>
+      <li>Mobile money and other payment providers, to process your payment</li>
+      <li>SMS providers, where we send a verification code or delivery notice</li>
+      <li>Our network and security provider, which protects the site against
+          attacks</li>
+      <li>Delivery personnel, who receive the name, phone number and address
+          needed to complete your delivery</li>
+      <li>Regulators, law enforcement or legal advisers, where required or
+          permitted by law</li>
+    </ul>
+    <p>Service providers may use your data only for the purpose we specify, never
+       for their own purposes.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="transfers">
+    <h2>International transfers</h2>
+
+    <p>Some providers we rely on operate servers outside Uganda. In particular,
+       the servers hosting our website and customer database are located in the
+       European Union, and our image hosting and email providers may process data
+       outside Uganda.</p>
+    <p>This means your data may be transferred outside Uganda during normal
+       operation of the store. We take reasonable steps to ensure it continues to
+       receive an appropriate level of protection, and your rights under Ugandan
+       law continue to apply.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="retention">
+    <h2>How long we keep it</h2>
+
+    <ul>
+      <li>Account information &mdash; while your account remains open</li>
+      <li>Order and payment records &mdash; as long as required for accounting,
+          tax and dispute resolution</li>
+      <li>Support conversations &mdash; so we can handle any follow-up about the
+          same order</li>
+      <li>Login and security records &mdash; for a limited period, for account
+          security</li>
+    </ul>
+    <p>When data is no longer needed we delete it securely, or anonymise it so it
+       can no longer be linked to you.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="security">
+    <h2>How we protect your data</h2>
+
+    <ul>
+      <li>Encrypted connections (HTTPS) across the entire site</li>
+      <li>Passwords stored only in hashed form, never in plain text</li>
+      <li>Mandatory two-factor authentication for all staff accounts</li>
+      <li>Role-based access, so staff reach only what their role requires</li>
+      <li>Rate limiting and protective filtering against automated attacks</li>
+    </ul>
+    <p>No system can be guaranteed completely secure. We have procedures for
+       dealing with any suspected data breach, and will notify you and the
+       Personal Data Protection Office where legally required.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="rights">
+    <h2>Your rights</h2>
+
+    <p>Under the Data Protection and Privacy Act, 2019 you have the right to:</p>
+    <ul>
+      <li>Be informed about how your data is used</li>
+      <li>Access the data we hold about you</li>
+      <li>Have inaccurate or incomplete data corrected</li>
+      <li>Request deletion, subject to records we must keep by law</li>
+      <li>Object to or restrict certain processing</li>
+      <li>Withdraw consent where processing is based on consent</li>
+      <li>Unsubscribe from marketing messages at any time</li>
+    </ul>
+    <p>To exercise any of these, contact us using the details below. We may ask for
+       information to confirm your identity first. We may decline a request that is
+       unreasonable or where we cannot verify who you are, and we will explain why.</p>
+    <p>If you are not satisfied with how we have handled your data, you may lodge a
+       complaint with the Personal Data Protection Office of Uganda.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="social">
+    <h2>Social media</h2>
+
+    <p>Lizimas Store maintains pages on Facebook, Instagram, WhatsApp, X and TikTok.
+       Where you contact us through one of them, we see the information your profile
+       makes visible to us and the content of your message. Anything you post
+       publicly there is governed by that platform's own terms and privacy policy,
+       not by this page.</p>
+    <p><strong>Never send your password, mobile money PIN, one-time codes or full
+       payment details through social media.</strong> Our staff will never ask you
+       for them.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="contact">
+    <h2>Contact us</h2>
+
+    <p>Questions about this policy, or to exercise any of your rights:</p>
+    <ul>
+      <li>Data protection and compliance: <a href="mailto:compliance.alert@lizimasstore.com">compliance.alert@lizimasstore.com</a></li>
+      <li>Legal enquiries: <a href="mailto:legal@lizimasstore.com">legal@lizimasstore.com</a></li>
+    </ul>
+    <p>We investigate every complaint about how we handle personal data and respond
+       within the timelines prescribed by law.</p>
+    <p class="ls-help-meta">Version 2 &mdash; August 2026</p>
+
+  </section>
+
+</main>
+
+<footer class="site-footer">
+
+<div class="container footer-container">
+
+<div>
+<h3>Lizimas Store</h3>
+<p>Your trusted online shopping partner.</p>
+</div>
+
+<div>
+<h4>Payments</h4>
+<p>Mobile Money: +256792363104</p>
+<p>Cash on Delivery</p>
+</div>
+
+<div>
+<h4>Help &amp; Support</h4>
+<p><a href="faq.html">FAQ</a></p>
+<p><a href="help.html">Help Centre</a></p>
+<p><a href="contact.html">Contact Us</a></p>
+<p><a href="returns.html">Returns &amp; Refunds</a></p>
+</div>
+
+<div>
+<h4>Legal &amp; Privacy</h4>
+<p><a href="privacy.html">Privacy Policy</a></p>
+</div>
+
+</div>
+
+<div class="copyright">
+&copy; 2026 Lizimas Store <a href="admin.html" style="color: inherit; opacity: 0.3; text-decoration: none; font-size: 0.75em; margin-left: 10px;">&bull;</a>
+</div>
+
+</footer>
+
+<a href="https://wa.me/256792363104" target="_blank" rel="noopener" class="whatsapp-float" aria-label="Chat with us on WhatsApp">
+    <svg viewBox="0 0 24 24" width="28" height="28" fill="#FFFFFF"><path d="M17.6 6.32A8.86 8.86 0 0 0 12.02 3a8.94 8.94 0 0 0-7.75 13.4L3 21l4.72-1.24a8.9 8.9 0 0 0 4.29 1.1h.01c4.94 0 8.95-4 8.95-8.94a8.9 8.9 0 0 0-2.37-6.1ZM12.02 19.4a7.4 7.4 0 0 1-3.78-1.04l-.27-.16-2.8.74.75-2.73-.18-.28a7.43 7.43 0 0 1 11.62-9.2 7.36 7.36 0 0 1 2.18 5.25c0 4.1-3.34 7.42-7.52 7.42Zm4.08-5.56c-.22-.11-1.32-.65-1.53-.72-.2-.08-.35-.11-.5.11-.15.22-.58.72-.71.87-.13.15-.26.16-.48.06-.22-.11-.94-.35-1.79-1.11-.66-.59-1.11-1.32-1.24-1.54-.13-.22-.01-.34.1-.45.1-.1.22-.26.33-.39.11-.13.15-.22.22-.37.07-.15.04-.28-.02-.39-.06-.11-.5-1.21-.69-1.66-.18-.44-.37-.38-.5-.39h-.43c-.15 0-.39.06-.6.28-.2.22-.79.77-.79 1.87s.81 2.17.92 2.32c.11.15 1.6 2.44 3.87 3.42.54.23.96.37 1.29.48.54.17 1.03.15 1.42.09.43-.06 1.32-.54 1.51-1.06.19-.52.19-.96.13-1.06-.06-.09-.2-.15-.42-.26Z"/></svg>
+</a>
+
+<script src="js/api.js"></script>
+<script src="js/categories.js?v=15"></script>
+<script src="js/cart.js?v=5"></script>
+<script src="js/lz-chat.js?v=14"></script>
+
+</body>
+</html>

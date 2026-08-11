@@ -15,6 +15,14 @@ async function registerAccount() {
         return;
     }
 
+    // Consent must be actively given, so the box starts unchecked and
+    // registration is blocked until the customer ticks it themselves.
+    const consentEl = document.getElementById("reg-privacy-consent");
+    if (consentEl && !consentEl.checked) {
+        statusEl.textContent = "Please read and agree to the Privacy Policy to continue.";
+        return;
+    }
+
     // The picker owns the country code now; getE164 returns null when
     // the number is not plausible for the country selected, so a typo
     // is caught here rather than becoming an unreachable contact.

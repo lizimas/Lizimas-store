@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Create Account - Lizimas Store</title>
-<link rel="stylesheet" href="css/style.css?v=35">
+<link rel="stylesheet" href="css/style.css?v=37">
 <link rel="stylesheet" href="css/auth.css?v=2">
 <link rel="preconnect" href="https://flagcdn.com">
 </head>
@@ -81,6 +81,14 @@
             <p class="auth-hint">Use 8+ characters with a mix of letters, numbers &amp; symbols.</p>
         </div>
 
+        <div class="auth-field auth-consent">
+            <label class="auth-consent-label">
+                <input type="checkbox" id="reg-privacy-consent">
+                <span>I have read and agree to the
+                    <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a></span>
+            </label>
+        </div>
+
         <p id="register-status" class="auth-error"></p>
 
         <button class="auth-submit" onclick="registerAccount()">
@@ -126,5 +134,41 @@
 <script src="js/password-toggle.js?v=2"></script>
 <script src="js/password-strength.js?v=1"></script>
 <script src="js/lz-phone-input.js?v=5"></script>
+<footer class="site-footer">
+
+<div class="container footer-container">
+
+<div>
+<h3>Lizimas Store</h3>
+<p>Your trusted online shopping partner.</p>
+</div>
+
+<div>
+<h4>Payments</h4>
+<p>Mobile Money: +256792363104</p>
+<p>Cash on Delivery</p>
+</div>
+
+<div>
+<h4>Help &amp; Support</h4>
+<p><a href="faq.html">FAQ</a></p>
+<p><a href="help.html">Help Centre</a></p>
+<p><a href="contact.html">Contact Us</a></p>
+<p><a href="returns.html">Returns &amp; Refunds</a></p>
+</div>
+
+<div>
+<h4>Legal &amp; Privacy</h4>
+<p><a href="privacy.html">Privacy Policy</a></p>
+</div>
+
+</div>
+
+<div class="copyright">
+&copy; 2026 Lizimas Store <a href="admin.html" style="color: inherit; opacity: 0.3; text-decoration: none; font-size: 0.75em; margin-left: 10px;">&bull;</a>
+</div>
+
+</footer>
+
 </body>
 </html>

@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -7,19 +6,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>
-Lizimas Store | Online Shopping in Uganda
-</title>
+<title>Contact Us | Lizimas Store</title>
 
 <link rel="stylesheet" href="css/style.css?v=37">
 
 </head>
 
-
 <body>
-
-
-<!-- Header -->
 
 <header class="ls-header">
 
@@ -59,10 +52,8 @@ Lizimas Store | Online Shopping in Uganda
         </button>
         <div class="ls-menu-panel">
           <a class="ls-menu-item" href="help.html">Help Center</a>
-          <a class="ls-menu-item" href="help.html#ordering">Place an order</a>
-          <a class="ls-menu-item" href="help.html#payments">Payment options</a>
-          <a class="ls-menu-item" href="help.html#delivery">Delivery &amp; tracking</a>
           <a class="ls-menu-item" href="faq.html">FAQ</a>
+          <a class="ls-menu-item" href="help.html#delivery">Delivery &amp; tracking</a>
           <a class="ls-menu-item" href="returns.html">Returns &amp; refunds</a>
           <a class="ls-menu-item" href="contact.html">Contact us</a>
           <div class="ls-menu-sep"></div>
@@ -117,62 +108,69 @@ Lizimas Store | Online Shopping in Uganda
 
 </header>
 
-<!-- Two promotional slots. Filled with product images until promo artwork
-     exists; swap the contents of each track and the JS becomes unnecessary. -->
-<section class="ls-promos">
-  <div class="ls-promo" id="ls-promo-1">
-    <div class="ls-promo-track" data-track="1"></div>
-    <div class="ls-promo-dots" data-dots="1"></div>
+<main class="ls-help">
+
+  <div class="ls-help-hero">
+    <h1>Contact Us</h1>
+    <p>We reply to most messages within a few minutes during working hours.</p>
   </div>
 
-  <div class="ls-promo" id="ls-promo-2">
-    <div class="ls-promo-track" data-track="2"></div>
-    <div class="ls-promo-dots" data-dots="2"></div>
-  </div>
-</section>
+  <section class="ls-help-section" id="channels">
+    <h2>How to reach us</h2>
 
+    <h3>Live chat</h3>
+    <p>Use the chat button at the bottom of any page. If an agent is available your
+       message goes straight to them. If not, we save your message and get back to
+       you by phone or email.</p>
 
+    <h3>WhatsApp</h3>
+    <p><a href="https://wa.me/256792363104" target="_blank" rel="noopener">+256 792 363104</a>
+       &mdash; the fastest way to reach a person.</p>
 
+    <h3>Email</h3>
+    <ul>
+      <li>General enquiries and orders: <a href="mailto:support@lizimasstore.com">support@lizimasstore.com</a></li>
+      <li>Data protection and privacy: <a href="mailto:compliance.alert@lizimasstore.com">compliance.alert@lizimasstore.com</a></li>
+      <li>Legal enquiries: <a href="mailto:legal@lizimasstore.com">legal@lizimasstore.com</a></li>
+    </ul>
 
+  </section>
 
+  <section class="ls-help-section" id="faster">
+    <h2>Getting a faster answer</h2>
 
-<!-- Categories -->
+    <p>When you message us about an existing order, include your
+       <strong>order number</strong> and a short description of the problem. If an
+       item arrived damaged or incorrect, a photo helps us resolve it in one
+       exchange rather than several.</p>
 
+  </section>
 
-<!-- Explore Categories: level-2 tiles, 2 rows, auto-advancing -->
-<section class="ls-explore">
-  <div class="ls-explore-head">
-    <div>
-      <h2 class="ls-explore-title">Explore Categories</h2>
-      <p class="ls-explore-sub">Curated collections for your daily needs</p>
-    </div>
-    <div class="ls-explore-arrows">
-      <button class="ls-explore-arrow" id="ls-explore-prev" aria-label="Previous">&#8249;</button>
-      <button class="ls-explore-arrow" id="ls-explore-next" aria-label="Next">&#8250;</button>
-      <a class="ls-explore-viewall" href="products.html">View all &#8594;</a>
-    </div>
-  </div>
+  <section class="ls-help-section" id="security">
+    <h2>Keeping your account safe</h2>
 
-  <div class="ls-explore-viewport">
-    <div class="ls-explore-track" id="ls-explore-track"></div>
-  </div>
-</section>
+    <p>Lizimas Store will <strong>never</strong> ask you for your password, your
+       mobile money PIN, or a one-time authentication code &mdash; not in chat, not
+       on WhatsApp, not by phone.</p>
+    <p>If someone claiming to represent Lizimas Store asks for any of these, do not
+       provide them, and report it to us on the channels above.</p>
 
+  </section>
 
+  <section class="ls-help-section" id="elsewhere">
+    <h2>Looking for something else?</h2>
 
+    <ul>
+      <li><a href="faq.html">Frequently asked questions</a></li>
+      <li><a href="help.html">Help Centre</a></li>
+      <li><a href="returns.html">Returns &amp; refunds policy</a></li>
+      <li><a href="privacy.html">Privacy policy</a></li>
+      <li><a href="orders.html">Track an order</a></li>
+    </ul>
 
+  </section>
 
-
-
-<!-- Product rows, one per level-2 category with stock -->
-<div id="ls-product-rows"></div>
-
-
-
-
-
-
-
+</main>
 
 <footer class="site-footer">
 
@@ -210,88 +208,14 @@ Lizimas Store | Online Shopping in Uganda
 
 </footer>
 
-
-
-
-
-
-
-<div id="product-modal" class="product-modal hidden">
-    <div class="product-modal-content">
-        <button class="product-modal-close" onclick="closeProductModal()">&times;</button>
-        <div class="product-modal-body">
-            <div class="product-modal-gallery">
-                <img id="modal-main-image" src="" alt="" class="product-modal-main-image">
-                <div id="modal-thumbnails" class="product-modal-thumbnails"></div>
-            </div>
-            <div class="product-modal-info">
-                <h2 id="modal-product-name"></h2>
-                <p id="modal-selected-variant" class="modal-variant-label"></p>
-                <div id="modal-product-rating"></div>
-                <div id="modal-product-price"></div>
-                <button id="modal-add-to-cart-btn" class="add-to-cart-btn">Add To Cart 🛒</button>
-                <div id="modal-reviews-section" class="modal-section"></div>
-                <div id="modal-description-section" class="modal-section">
-                  <h3 class="modal-section-title">Description</h3>
-                  <p id="modal-product-description"></p>
-                </div>
-                <div id="modal-specs-section" class="modal-section"></div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div id="pd-sheet" class="pd-sheet hidden">
-  <div class="pd-sheet-backdrop" onclick="closeAllDetails()"></div>
-  <div class="pd-sheet-panel">
-    <div class="pd-sheet-head">
-      <h3>Product details</h3>
-      <button type="button" class="pd-sheet-close" onclick="closeAllDetails()">&times;</button>
-    </div>
-    <div id="pd-sheet-body" class="pd-sheet-body"></div>
-  </div>
-</div>
-
-<script src="js/api.js"></script>
-<script src="js/hero.js"></script>
-<script src="js/lz-image.js?v=2"></script>
-<script src="js/categories.js?v=15"></script>
-
-<script src="js/cart.js?v=5"></script>
-
-<script src="js/products.js?v=4"></script>
-
-<script src="js/lz-chat.js?v=14"></script>
-
-
 <a href="https://wa.me/256792363104" target="_blank" rel="noopener" class="whatsapp-float" aria-label="Chat with us on WhatsApp">
     <svg viewBox="0 0 24 24" width="28" height="28" fill="#FFFFFF"><path d="M17.6 6.32A8.86 8.86 0 0 0 12.02 3a8.94 8.94 0 0 0-7.75 13.4L3 21l4.72-1.24a8.9 8.9 0 0 0 4.29 1.1h.01c4.94 0 8.95-4 8.95-8.94a8.9 8.9 0 0 0-2.37-6.1ZM12.02 19.4a7.4 7.4 0 0 1-3.78-1.04l-.27-.16-2.8.74.75-2.73-.18-.28a7.43 7.43 0 0 1 11.62-9.2 7.36 7.36 0 0 1 2.18 5.25c0 4.1-3.34 7.42-7.52 7.42Zm4.08-5.56c-.22-.11-1.32-.65-1.53-.72-.2-.08-.35-.11-.5.11-.15.22-.58.72-.71.87-.13.15-.26.16-.48.06-.22-.11-.94-.35-1.79-1.11-.66-.59-1.11-1.32-1.24-1.54-.13-.22-.01-.34.1-.45.1-.1.22-.26.33-.39.11-.13.15-.22.22-.37.07-.15.04-.28-.02-.39-.06-.11-.5-1.21-.69-1.66-.18-.44-.37-.38-.5-.39h-.43c-.15 0-.39.06-.6.28-.2.22-.79.77-.79 1.87s.81 2.17.92 2.32c.11.15 1.6 2.44 3.87 3.42.54.23.96.37 1.29.48.54.17 1.03.15 1.42.09.43-.06 1.32-.54 1.51-1.06.19-.52.19-.96.13-1.06-.06-.09-.2-.15-.42-.26Z"/></svg>
 </a>
 
-
-
-
-<div id="fullscreen-viewer" class="fullscreen-viewer hidden">
-    <button id="fullscreen-close" class="fullscreen-close">&times;</button>
-    <img id="fullscreen-image" src="" alt="" class="fullscreen-image">
-</div>
-
-<!-- Category drawer: level 1 in the rail, level 2 in the panel,
-     level 3 revealed by the arrow on each level-2 row. -->
-<div class="ls-drawer-backdrop" id="ls-drawer-backdrop" hidden></div>
-
-<aside class="ls-drawer" id="ls-drawer" hidden aria-label="All categories">
-  <div class="ls-drawer-head">
-    <span class="ls-drawer-title">All Categories</span>
-    <button class="ls-drawer-close" id="ls-drawer-close" aria-label="Close">&times;</button>
-  </div>
-
-  <div class="ls-drawer-body">
-    <nav class="ls-drawer-rail" id="ls-drawer-rail"></nav>
-    <div class="ls-drawer-panel" id="ls-drawer-panel"></div>
-  </div>
-</aside>
+<script src="js/api.js"></script>
+<script src="js/categories.js?v=15"></script>
+<script src="js/cart.js?v=5"></script>
+<script src="js/lz-chat.js?v=14"></script>
 
 </body>
-
 </html>

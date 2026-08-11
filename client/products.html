@@ -8,7 +8,7 @@
 
 <title>Products - Lizimas Store</title>
 
-<link rel="stylesheet" href="css/style.css?v=35">
+<link rel="stylesheet" href="css/style.css?v=37">
 
 </head>
 
@@ -31,15 +31,31 @@
       <span class="ls-wordmark">Lizimas Store</span>
     </a>
 
+    <form class="ls-search" onsubmit="return false;">
+      <svg viewBox="0 0 24 24" class="ls-search-icon" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
+        <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round"/>
+      </svg>
+      <input type="search" id="header-search" placeholder="Search for anything" autocomplete="off">
+    </form>
+
     <div class="ls-header-actions">
-      <a href="login.html" class="ls-action" title="Account">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/>
-          <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        <span class="ls-action-label">Account</span>
-      </a>
+
+      <div class="ls-menu">
+        <a class="ls-menu-trigger" href="login.html" aria-haspopup="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span class="ls-action-label">Account</span>
+        </a>
+        <div class="ls-menu-panel">
+          <a class="ls-menu-item" href="login.html">My account</a>
+          <a class="ls-menu-item" href="orders.html">Orders</a>
+        </div>
+      </div>
 
       <a href="cart.html" class="ls-action" title="Cart">
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -54,23 +70,18 @@
 
   </div>
 
-  <div class="ls-nav-row">
-    <button class="ls-nav-all" id="ls-nav-all" type="button">
-      <span class="ls-burger"><span></span><span></span><span></span></span>
-      <span class="ls-nav-all-label">All Categories</span>
-    </button>
-
-    <form class="ls-search" onsubmit="return false;">
-      <svg viewBox="0 0 24 24" class="ls-search-icon" aria-hidden="true">
-        <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
-        <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round"/>
-      </svg>
-      <input type="search" id="header-search" placeholder="Search for anything" autocomplete="off">
-    </form>
-  </div>
-
   <nav class="ls-nav" id="ls-nav">
+    <div class="ls-mega" id="ls-mega">
+      <button class="ls-nav-all" id="ls-nav-all" type="button">
+        <span class="ls-burger"><span></span><span></span><span></span></span>
+        <span class="ls-nav-all-label">All Categories</span>
+      </button>
+      <div class="ls-mega-panel">
+        <div class="ls-mega-rail" id="ls-mega-rail"></div>
+        <div class="ls-mega-col" id="ls-mega-l2" hidden></div>
+        <div class="ls-mega-col" id="ls-mega-l3" hidden></div>
+      </div>
+    </div>
     <div class="ls-nav-parents" id="ls-nav-parents"></div>
   </nav>
 
@@ -93,7 +104,7 @@
 
 <script src="js/api.js"></script>
 <script src="js/cart.js?v=5"></script>
-<script src="js/categories.js?v=11"></script>
+<script src="js/categories.js?v=15"></script>
 <script src="js/products.js?v=4"></script>
 
 
@@ -117,6 +128,42 @@
     <div class="ls-drawer-panel" id="ls-drawer-panel"></div>
   </div>
 </aside>
+
+<footer class="site-footer">
+
+<div class="container footer-container">
+
+<div>
+<h3>Lizimas Store</h3>
+<p>Your trusted online shopping partner.</p>
+</div>
+
+<div>
+<h4>Payments</h4>
+<p>Mobile Money: +256792363104</p>
+<p>Cash on Delivery</p>
+</div>
+
+<div>
+<h4>Help &amp; Support</h4>
+<p><a href="faq.html">FAQ</a></p>
+<p><a href="help.html">Help Centre</a></p>
+<p><a href="contact.html">Contact Us</a></p>
+<p><a href="returns.html">Returns &amp; Refunds</a></p>
+</div>
+
+<div>
+<h4>Legal &amp; Privacy</h4>
+<p><a href="privacy.html">Privacy Policy</a></p>
+</div>
+
+</div>
+
+<div class="copyright">
+&copy; 2026 Lizimas Store <a href="admin.html" style="color: inherit; opacity: 0.3; text-decoration: none; font-size: 0.75em; margin-left: 10px;">&bull;</a>
+</div>
+
+</footer>
 
 </body>
 

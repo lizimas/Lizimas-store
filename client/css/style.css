@@ -4160,3 +4160,44 @@ body.sheet-open {
   .ls-help-hero h1 { font-size: 1.45rem; }
   .ls-help-section { padding: 18px 15px; }
 }
+
+
+/* ---- Footer link + column styling (added with legal pages) ---- */
+.site-footer a {
+  color: #d8dce6;
+  text-decoration: none;
+}
+.site-footer a:hover,
+.site-footer a:focus {
+  color: #F5C518;
+  text-decoration: underline;
+}
+.site-footer .copyright a { color: inherit; }
+
+.footer-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 28px 24px;
+  text-align: left;
+  align-items: start;
+}
+.footer-container h3,
+.footer-container h4 {
+  color: #fff;
+  margin: 0 0 10px;
+}
+.footer-container p {
+  margin: 0 0 8px;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .footer-container {
+    grid-template-columns: 1fr 1fr;
+    gap: 24px 16px;
+  }
+  /* Clear the floating chat + WhatsApp buttons so footer links stay tappable */
+  .site-footer {
+    padding-bottom: 130px;
+  }
+}

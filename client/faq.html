@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>FAQ | Lizimas Store</title>
+
+<link rel="stylesheet" href="css/style.css?v=37">
+
+</head>
+
+<body>
+
+<header class="ls-header">
+
+  <div class="ls-header-top">
+
+    <a href="index.html" class="ls-brand">
+      <svg class="ls-mark" viewBox="0 0 512 512" aria-hidden="true">
+        <rect width="512" height="512" rx="123" fill="#1a1a2e"/>
+        <path d="M182 253 A74 74 0 0 1 330 253" fill="none" stroke="#F5C518" stroke-width="26"/>
+        <rect x="123" y="195" width="266" height="215" rx="31" fill="#F5C518"/>
+        <text x="256" y="335" font-family="Poppins, Segoe UI, sans-serif" font-size="133"
+              font-weight="700" fill="#1a1a2e" text-anchor="middle">LS</text>
+      </svg>
+      <span class="ls-wordmark">Lizimas Store</span>
+    </a>
+
+    <form class="ls-search" onsubmit="return false;">
+      <svg viewBox="0 0 24 24" class="ls-search-icon" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
+        <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round"/>
+      </svg>
+      <input type="search" id="header-search" placeholder="Search for anything" autocomplete="off">
+    </form>
+
+    <div class="ls-header-actions">
+
+      <div class="ls-menu">
+        <button class="ls-menu-trigger" type="button" aria-haspopup="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="M9.2 9.3a2.9 2.9 0 015.6 1c0 1.9-2.8 2.2-2.8 4" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="12" cy="17.6" r="1.2" fill="currentColor"/>
+          </svg>
+          <span class="ls-action-label">Help</span>
+        </button>
+        <div class="ls-menu-panel">
+          <a class="ls-menu-item" href="help.html">Help Center</a>
+          <a class="ls-menu-item" href="faq.html">FAQ</a>
+          <a class="ls-menu-item" href="help.html#delivery">Delivery &amp; tracking</a>
+          <a class="ls-menu-item" href="returns.html">Returns &amp; refunds</a>
+          <a class="ls-menu-item" href="contact.html">Contact us</a>
+          <div class="ls-menu-sep"></div>
+          <a class="ls-menu-item ls-menu-item-accent" id="lsLiveChat"
+             href="https://wa.me/256792363104" target="_blank" rel="noopener"
+             onclick="if(window.LzChat){event.preventDefault();window.LzChat.open();}">Live chat</a>
+        </div>
+      </div>
+
+      <div class="ls-menu">
+        <a class="ls-menu-trigger" href="login.html" aria-haspopup="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span class="ls-action-label">Account</span>
+        </a>
+        <div class="ls-menu-panel">
+          <a class="ls-menu-item" href="login.html">My account</a>
+          <a class="ls-menu-item" href="orders.html">Orders</a>
+        </div>
+      </div>
+
+      <a href="cart.html" class="ls-action" title="Cart">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 4h2.2l2.6 12h9.6l2.2-8H7" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+          <circle cx="10" cy="20" r="1.6" fill="currentColor"/>
+          <circle cx="17" cy="20" r="1.6" fill="currentColor"/>
+        </svg>
+        <span class="ls-cart-count" id="cart-count">0</span>
+      </a>
+    </div>
+
+  </div>
+
+  <nav class="ls-nav" id="ls-nav">
+    <div class="ls-mega" id="ls-mega">
+      <button class="ls-nav-all" id="ls-nav-all" type="button">
+        <span class="ls-burger"><span></span><span></span><span></span></span>
+        <span class="ls-nav-all-label">All Categories</span>
+      </button>
+      <div class="ls-mega-panel">
+        <div class="ls-mega-rail" id="ls-mega-rail"></div>
+        <div class="ls-mega-col" id="ls-mega-l2" hidden></div>
+        <div class="ls-mega-col" id="ls-mega-l3" hidden></div>
+      </div>
+    </div>
+    <div class="ls-nav-parents" id="ls-nav-parents"></div>
+  </nav>
+
+</header>
+
+<main class="ls-help">
+
+  <div class="ls-help-hero">
+    <h1>Frequently Asked Questions</h1>
+    <p>Still stuck? <a href="contact.html">Contact us</a> or <a href="https://wa.me/256792363104" target="_blank" rel="noopener">message us on WhatsApp</a>.</p>
+  </div>
+
+  <nav class="ls-help-toc" aria-label="Topics">
+    <a href="#ordering">Ordering</a>
+    <a href="#payments">Payments</a>
+    <a href="#delivery">Delivery</a>
+    <a href="#returns">Returns</a>
+    <a href="#refunds">Refunds</a>
+    <a href="#products">Products</a>
+    <a href="#accounts">Your account</a>
+    <a href="#support">Support</a>
+    <a href="#security">Security</a>
+    <a href="#address">Delivery address</a>
+    <a href="#problems">Order problems</a>
+    <a href="#privacy">Privacy</a>
+  </nav>
+
+  <section class="ls-help-section" id="ordering">
+    <h2>Ordering</h2>
+    <h3>How do I place an order?</h3>
+    <p>Browse the products, choose the product, colour, size and quantity you want, add it to your cart and go to checkout. Enter your delivery details and pick a payment method before confirming.</p>
+    <h3>Do I need an account to place an order?</h3>
+    <p>You can browse without an account. Account requirements are shown at checkout.</p>
+    <h3>How do I know my order went through?</h3>
+    <p>You receive an order confirmation with your order number and order details once checkout completes.</p>
+    <h3>Can I cancel my order?</h3>
+    <p>It depends on the order status. Orders already processed or dispatched may have different conditions &mdash; contact us as soon as you can.</p>
+    <h3>Can I change my order after placing it?</h3>
+    <p>Changes may be possible before the order is processed or dispatched. Contact us as soon as possible.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="payments">
+    <h2>Payments</h2>
+    <h3>What payment methods can I use?</h3>
+    <p>The methods available to you are shown at checkout, and may include mobile money and cash on delivery.</p>
+    <h3>Can I pay when my order is delivered?</h3>
+    <p>If cash on delivery is available for your location and order, you can select it during checkout.</p>
+    <h3>Is online payment secure?</h3>
+    <p>Payments are processed through approved providers. We never receive or store your mobile money PIN, and no one at Lizimas Store will ever ask you for it.</p>
+    <h3>My payment went through but my order is not confirmed. What now?</h3>
+    <p>Contact us with your order number and payment reference. We verify the payment against the provider before treating the order as paid.</p>
+    <h3>I was charged twice. What should I do?</h3>
+    <p>Contact us immediately with the payment references. We check the payment records before issuing any refund.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="delivery">
+    <h2>Delivery</h2>
+    <h3>Where do you deliver?</h3>
+    <p>Available delivery locations are shown during checkout.</p>
+    <h3>How long does delivery take?</h3>
+    <p>It depends on your location, product availability, processing time and the delivery method you choose.</p>
+    <h3>How much does delivery cost?</h3>
+    <p>The charge depends on your delivery location and the order. The exact amount is shown before you confirm checkout.</p>
+    <h3>Can I track my order?</h3>
+    <p>Yes &mdash; check the status in your account, or contact us with your order number.</p>
+    <h3>Can I change my delivery address?</h3>
+    <p>Address changes may be possible before dispatch. Contact us as soon as possible.</p>
+    <h3>What if I am not there when delivery arrives?</h3>
+    <p>The delivery team may contact you to arrange another attempt or an alternative collection arrangement.</p>
+    <h3>Can someone else receive my order?</h3>
+    <p>This depends on the verification required for your order. Make sure the person receiving it can provide the information needed to verify it.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="returns">
+    <h2>Returns</h2>
+    <h3>Can I return a product?</h3>
+    <p>Eligible products can be returned under our <a href="returns.html">Returns &amp; Refunds Policy</a>.</p>
+    <h3>How long do I have?</h3>
+    <p>7 days after delivery, subject to the conditions in the policy.</p>
+    <h3>What cannot be returned?</h3>
+    <p>Some categories are excluded for health and hygiene reasons. The full list is in the <a href="returns.html#excluded">returns policy</a> &mdash; worth checking before you buy.</p>
+    <h3>I received the wrong product.</h3>
+    <p>Contact us as soon as possible with your order number and details of the item you received.</p>
+    <h3>My product arrived damaged.</h3>
+    <p>Report it promptly and send a photo of the item and packaging.</p>
+    <h3>The product is defective.</h3>
+    <p>Contact us with the order details and a description of the fault. The item may need to be inspected before we resolve it.</p>
+    <h3>Can I exchange instead of returning?</h3>
+    <p>We do not offer exchanges. Return the unwanted item and place a new order for the size or colour you want.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="refunds">
+    <h2>Refunds</h2>
+    <h3>When will I get my refund?</h3>
+    <p>It depends on the reason for the refund, the verification process and the payment method used.</p>
+    <h3>How will I receive it?</h3>
+    <p>Normally through the same payment method you used for the order, unless we agree another method with you.</p>
+    <h3>Will my delivery charge be refunded?</h3>
+    <p>Yes, where the item was incorrect, defective or damaged.</p>
+    <h3>What if my return is rejected?</h3>
+    <p>We explain the reason and the applicable return conditions, and make two attempts to re-deliver the item to you.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="products">
+    <h2>Products</h2>
+    <h3>Are the products genuine?</h3>
+    <p>Products are supplied according to the information published on the store. Contact us if you believe a product is counterfeit or misrepresented.</p>
+    <h3>How do I know if something is in stock?</h3>
+    <p>Product pages show current availability. Unavailable items are marked out of stock.</p>
+    <h3>Can prices change?</h3>
+    <p>Yes &mdash; because of promotions, supplier pricing or stock levels. The price confirmed at checkout determines your order total.</p>
+    <h3>The product I want is out of stock.</h3>
+    <p>Contact us or check back later to see whether it has been restocked.</p>
+    <h3>Can I report a product?</h3>
+    <p>Yes. Report anything incorrect, misleading, damaged or suspicious to customer support.</p>
+    <h3>Can I leave a review?</h3>
+    <p>Yes. Reviews from verified purchases may be marked as such.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="accounts">
+    <h2>Your account</h2>
+    <h3>How do I create an account?</h3>
+    <p>Provide the required registration details and complete any verification steps.</p>
+    <h3>I forgot my password.</h3>
+    <p>Use the reset link on the login page. A reset link is emailed to your registered address and can only be used once.</p>
+    <h3>Can I change my phone number?</h3>
+    <p>Yes, through the account verification process.</p>
+    <h3>Why do I need to verify my phone number?</h3>
+    <p>It confirms the account belongs to you and gives us a reliable way to reach you about deliveries.</p>
+    <h3>Can I delete my account?</h3>
+    <p>You can request deletion, subject to records we are required to keep for legal, financial and operational reasons.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="support">
+    <h2>Customer support</h2>
+    <h3>How do I contact support?</h3>
+    <p>Through the chat on this site, WhatsApp, or the channels on our <a href="contact.html">contact page</a>.</p>
+    <h3>Can I chat with a real person?</h3>
+    <p>Yes. If an agent is available, your conversation is assigned to them. If not, we save your message and contact you by phone or email.</p>
+    <h3>What information should I provide?</h3>
+    <p>Your order number and a clear description of the issue. Never send your password, PIN or one-time codes.</p>
+    <h3>Can I send pictures?</h3>
+    <p>Yes, where the support channel allows attachments &mdash; photos of damaged or incorrect items help a lot.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="security">
+    <h2>Security</h2>
+    <h3>Will Lizimas Store ask for my password?</h3>
+    <p>No. Never share your password with anyone, including our staff.</p>
+    <h3>Should I share my mobile money PIN?</h3>
+    <p>No. Never share your PIN with our staff or with anyone claiming to represent us.</p>
+    <h3>Should I share a one-time code?</h3>
+    <p>No. Authentication codes are private and should never be shared.</p>
+    <h3>How is my information protected?</h3>
+    <p>Through encrypted connections, hashed password storage, staff two-factor authentication, restricted role-based access, and filtering against automated attacks.</p>
+    <h3>Who can access my information?</h3>
+    <p>Only authorised staff and service providers who need it to operate the store.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="address">
+    <h2>Delivery address</h2>
+    <h3>What address information do I need to give?</h3>
+    <p>Your name, phone number, district, county, sub-county, parish and village, plus any landmark or instruction that helps the delivery team find you.</p>
+    <h3>Why do you need such detailed location information?</h3>
+    <p>It helps the delivery team reach the right destination and lets us calculate the correct delivery charge.</p>
+    <h3>Can I use a different billing and delivery address?</h3>
+    <p>Where the checkout supports it, yes.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="problems">
+    <h2>Order problems</h2>
+    <h3>My order has not arrived.</h3>
+    <p>Check the order status first. If the expected delivery period has passed, contact us with your order number.</p>
+    <h3>It says delivered but I did not receive it.</h3>
+    <p>Contact us immediately so we can investigate the delivery record.</p>
+    <h3>I received fewer items than I ordered.</h3>
+    <p>Contact us with your order number and tell us which items are missing.</p>
+    <h3>I received an item I did not order.</h3>
+    <p>Contact us with your order number and details of the unexpected item.</p>
+
+  </section>
+
+  <section class="ls-help-section" id="privacy">
+    <h2>Privacy</h2>
+    <h3>What information do you collect?</h3>
+    <p>What we need to create accounts, process orders, deliver, support you and process payments. Full details are in our <a href="privacy.html">privacy policy</a>.</p>
+    <h3>Why do you collect it?</h3>
+    <p>For account management, order processing, delivery, customer support, security and payment processing.</p>
+    <h3>Do you share my information?</h3>
+    <p>Only with service providers involved in running the store &mdash; payment, delivery, email, hosting and communications providers &mdash; where necessary. We do not sell your data.</p>
+    <h3>Is my information kept in Uganda?</h3>
+    <p>Some providers operate servers outside Uganda, so your data may be transferred outside the country. This is explained in our <a href="privacy.html#transfers">privacy policy</a>.</p>
+    <h3>How long do you keep it?</h3>
+    <p>It depends on the purpose, legal requirements and business needs.</p>
+    <h3>Can I request access to my information?</h3>
+    <p>Yes, under the Data Protection and Privacy Act, 2019. Email <a href="mailto:compliance.alert@lizimasstore.com">compliance.alert@lizimasstore.com</a>.</p>
+
+  </section>
+
+</main>
+
+<footer class="site-footer">
+
+<div class="container footer-container">
+
+<div>
+<h3>Lizimas Store</h3>
+<p>Your trusted online shopping partner.</p>
+</div>
+
+<div>
+<h4>Payments</h4>
+<p>Mobile Money: +256792363104</p>
+<p>Cash on Delivery</p>
+</div>
+
+<div>
+<h4>Help &amp; Support</h4>
+<p><a href="faq.html">FAQ</a></p>
+<p><a href="help.html">Help Centre</a></p>
+<p><a href="contact.html">Contact Us</a></p>
+<p><a href="returns.html">Returns &amp; Refunds</a></p>
+</div>
+
+<div>
+<h4>Legal &amp; Privacy</h4>
+<p><a href="privacy.html">Privacy Policy</a></p>
+</div>
+
+</div>
+
+<div class="copyright">
+&copy; 2026 Lizimas Store <a href="admin.html" style="color: inherit; opacity: 0.3; text-decoration: none; font-size: 0.75em; margin-left: 10px;">&bull;</a>
+</div>
+
+</footer>
+
+<a href="https://wa.me/256792363104" target="_blank" rel="noopener" class="whatsapp-float" aria-label="Chat with us on WhatsApp">
+    <svg viewBox="0 0 24 24" width="28" height="28" fill="#FFFFFF"><path d="M17.6 6.32A8.86 8.86 0 0 0 12.02 3a8.94 8.94 0 0 0-7.75 13.4L3 21l4.72-1.24a8.9 8.9 0 0 0 4.29 1.1h.01c4.94 0 8.95-4 8.95-8.94a8.9 8.9 0 0 0-2.37-6.1ZM12.02 19.4a7.4 7.4 0 0 1-3.78-1.04l-.27-.16-2.8.74.75-2.73-.18-.28a7.43 7.43 0 0 1 11.62-9.2 7.36 7.36 0 0 1 2.18 5.25c0 4.1-3.34 7.42-7.52 7.42Zm4.08-5.56c-.22-.11-1.32-.65-1.53-.72-.2-.08-.35-.11-.5.11-.15.22-.58.72-.71.87-.13.15-.26.16-.48.06-.22-.11-.94-.35-1.79-1.11-.66-.59-1.11-1.32-1.24-1.54-.13-.22-.01-.34.1-.45.1-.1.22-.26.33-.39.11-.13.15-.22.22-.37.07-.15.04-.28-.02-.39-.06-.11-.5-1.21-.69-1.66-.18-.44-.37-.38-.5-.39h-.43c-.15 0-.39.06-.6.28-.2.22-.79.77-.79 1.87s.81 2.17.92 2.32c.11.15 1.6 2.44 3.87 3.42.54.23.96.37 1.29.48.54.17 1.03.15 1.42.09.43-.06 1.32-.54 1.51-1.06.19-.52.19-.96.13-1.06-.06-.09-.2-.15-.42-.26Z"/></svg>
+</a>
+
+<script src="js/api.js"></script>
+<script src="js/categories.js?v=15"></script>
+<script src="js/cart.js?v=5"></script>
+<script src="js/lz-chat.js?v=14"></script>
+
+</body>
+</html>
