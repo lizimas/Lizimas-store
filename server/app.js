@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
 const morgan = require("morgan");
 const path = require("path");
 require("dotenv").config();
@@ -15,7 +16,26 @@ const app = express();
 app.set("trust proxy", 1);
 
 // Middleware
-app.use(cors());
+const ALLOWED_ORIGINS = [
+    "https://lizimasstore.com",
+    "https://www.lizimasstore.com",
+    "http://localhost:5000",
+    "http://127.0.0.1:5000"
+];
+
+app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false
+}));
+
+app.use(cors({
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+        return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true
+}));
 app.use(express.json());
 app.use(morgan("dev"));
 app.use(generalLimiter);
@@ -34,6 +54,13 @@ app.use(express.static(path.join(__dirname, "../client")));
 
 // Upload and multipart errors must return JSON, not an HTML crash page,
 // or the admin panel shows a raw stack trace to the user.
+// Test route
+app.get("/", (req, res) => {
+    res.json({
+        message: "Lizimas Store API is running"
+    });
+});
+
 app.use((err, req, res, next) => {
     if (err && err.code === "INVALID_FILE_TYPE") {
         return res.status(400).json({ message: err.message });
@@ -45,15 +72,13 @@ app.use((err, req, res, next) => {
         return res.status(400).json({ message: `Upload failed: ${err.message}` });
     }
 
+    if (err && err.message === "Not allowed by CORS") {
+        return res.status(403).json({ message: "Forbidden." });
+    }
+
     console.error("Unhandled error:", err);
     res.status(500).json({ message: "Something went wrong on the server." });
 });
 
-// Test route
-app.get("/", (req, res) => {
-    res.json({
-        message: "Lizimas Store API is running"
-    });
-});
 
 module.exports = app;

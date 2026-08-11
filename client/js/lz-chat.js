@@ -704,6 +704,21 @@
     });
   }
 
+  // A stored conversation can vanish server-side: closed, purged, or the
+  // browser is holding an id from a different database. The server answers
+  // 404 forever and the widget would otherwise poll a dead id indefinitely
+  // and show a misleading connection error. Forget it and start clean.
+  function conversationGone(err) {
+    if (!err || err.status !== 404 || !state.conversationId) return false;
+    stopPoll();
+    store(CFG.convKey, null);
+    store(CFG.tokenKey, null);
+    state.conversationId = null;
+    state.token = null;
+    state.lastId = 0;
+    return true;
+  }
+
   // Response shapes differ slightly between handlers, so pull the pieces out
   // rather than assuming one envelope.
   function pickConversation(data) {
@@ -751,6 +766,11 @@
       .catch(function (err) {
         state.messages = state.messages.filter(function (m) { return m.id !== temp.id; });
         renderThread();
+        if (conversationGone(err)) {
+          state.sending = false;
+          el.send.disabled = false;
+          return startWith(text);
+        }
         showError(err);
       })
       .then(function () {
@@ -823,7 +843,12 @@
     if (!state.conversationId) return Promise.resolve();
 
     return api("/" + state.conversationId + "/messages?after=" + state.lastId)
+      .catch(function (err) {
+        if (conversationGone(err)) return null;
+        throw err;
+      })
       .then(function (data) {
+        if (data === null) return;
         var incoming = pickMessages(data);
         // The messages endpoint returns these flat, not wrapped in a
         // conversation object. Reading only data.conversation meant status
@@ -919,7 +944,7 @@
 
   function markRead() {
     if (!state.conversationId) return;
-    api("/" + state.conversationId + "/read", { method: "POST" }).catch(function () {});
+    api("/" + state.conversationId + "/read", { method: "POST" }).catch(conversationGone);
     setBadge(0);
   }
 
