@@ -4201,3 +4201,28 @@ body.sheet-open {
     padding-bottom: 130px;
   }
 }
+
+/* ---- Registration privacy consent ---- */
+.auth-consent { margin: 4px 0 2px; }
+.auth-consent-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.45;
+  cursor: pointer;
+  color: #33415c;
+}
+.auth-consent-label input {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: #0f1b3d;
+}
+.auth-consent-label a {
+  color: #0f1b3d;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
