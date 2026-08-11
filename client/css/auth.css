@@ -1,0 +1,409 @@
+/*
+ * client/css/auth.css
+ * Lizimas Store - login and registration.
+ *
+ * Loaded after style.css and scoped under .auth-page, so nothing here
+ * touches checkout or the storefront. The auth screens previously
+ * borrowed .checkout-* classes; sharing those meant a checkout tweak
+ * could silently reshape the login form.
+ *
+ * Navy #0f1b3d and gold #E8B33A follow the site retheme.
+ */
+
+.auth-page {
+    background: #f7f8fb;
+    min-height: 100vh;
+    padding-bottom: 40px;
+}
+
+/* ---------------------------------------------------------------- */
+/* Card                                                              */
+/* ---------------------------------------------------------------- */
+
+.auth-card {
+    background: #ffffff;
+    border: 1px solid #edeff5;
+    border-radius: 20px;
+    box-shadow: 0 4px 24px rgba(15, 27, 61, 0.06);
+    max-width: 520px;
+    margin: 22px auto 0;
+    padding: 30px 22px 26px;
+    position: relative;
+}
+
+.auth-card-head {
+    text-align: center;
+    margin-bottom: 26px;
+}
+
+.auth-icon-badge {
+    width: 62px;
+    height: 62px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    background: #fdf4e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.auth-title {
+    font-size: 26px;
+    font-weight: 700;
+    color: #0f1b3d;
+    margin: 0 0 8px;
+    letter-spacing: -0.4px;
+}
+
+.auth-subtitle {
+    font-size: 15px;
+    line-height: 1.5;
+    color: #6b7280;
+    margin: 0;
+}
+
+/* ---------------------------------------------------------------- */
+/* Fields                                                            */
+/* ---------------------------------------------------------------- */
+
+.auth-field {
+    margin-bottom: 18px;
+}
+
+.auth-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f1b3d;
+    margin-bottom: 7px;
+}
+
+.auth-label .auth-optional {
+    font-weight: 400;
+    color: #9aa1ae;
+}
+
+/*
+ * The icon sits inside the border rather than beside it, so the field
+ * reads as one control. Padding on the input leaves room for it.
+ */
+.auth-input-wrap {
+    position: relative;
+    display: block;
+}
+
+.auth-input-wrap > svg {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+
+.auth-input-wrap > input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 15px 15px 15px 46px;
+    font-size: 15px;
+    color: #0f1b3d;
+    background: #ffffff;
+    border: 1px solid #dfe3ec;
+    border-radius: 12px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.auth-input-wrap > input::placeholder { color: #a6acb8; }
+
+.auth-input-wrap > input:focus {
+    border-color: #0f1b3d;
+    box-shadow: 0 0 0 3px rgba(15, 27, 61, 0.08);
+}
+
+.auth-hint {
+    font-size: 13px;
+    color: #8b93a1;
+    margin: 7px 0 0;
+    line-height: 1.45;
+}
+
+.auth-error {
+    font-size: 14px;
+    color: #b42318;
+    margin: 0 0 14px;
+    min-height: 18px;
+}
+
+.auth-error.is-ok { color: #067647; }
+
+/* ---------------------------------------------------------------- */
+/* Phone row                                                         */
+/* ---------------------------------------------------------------- */
+
+/*
+ * Country box and number field are siblings, not nested. A prefix
+ * crammed inside the input gave the picker no real tap target.
+ */
+.auth-phone-row {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+}
+
+.auth-phone-row .auth-input-wrap { flex: 1 1 auto; min-width: 0; }
+
+.lz-phone-trigger {
+    display: flex !important;
+    align-items: center;
+    gap: 7px;
+    flex: 0 0 auto;
+    padding: 0 12px !important;
+    height: auto;
+    min-height: 50px;
+    background: #ffffff !important;
+    border: 1px solid #dfe3ec !important;
+    border-radius: 12px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    color: #0f1b3d !important;
+    cursor: pointer !important;
+    white-space: nowrap;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    width: auto !important;
+    margin: 0 !important;
+}
+
+.lz-phone-trigger:hover { border-color: #c3c9d6 !important; }
+
+.lz-phone-trigger:focus-visible {
+    outline: none;
+    border-color: #0f1b3d !important;
+    box-shadow: 0 0 0 3px rgba(15, 27, 61, 0.08);
+}
+
+.lz-phone-caret { font-size: 9px; opacity: 0.5; }
+
+/* ---------------------------------------------------------------- */
+/* Password strength                                                 */
+/* ---------------------------------------------------------------- */
+
+.auth-strength {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.auth-strength span {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: #e8eaf0;
+    transition: background 0.2s;
+}
+
+.auth-strength[data-score="1"] span:nth-child(-n+1),
+.auth-strength[data-score="2"] span:nth-child(-n+2) { background: #e5484d; }
+
+.auth-strength[data-score="3"] span:nth-child(-n+3) { background: #E8B33A; }
+
+.auth-strength[data-score="4"] span:nth-child(-n+4),
+.auth-strength[data-score="5"] span:nth-child(-n+5) { background: #30a46c; }
+
+/* ---------------------------------------------------------------- */
+/* Buttons and links                                                 */
+/* ---------------------------------------------------------------- */
+
+.auth-submit {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 16px;
+    margin-top: 4px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #ffffff;
+    background: #0f1b3d;
+    border: 0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.05s;
+}
+
+.auth-submit:hover { background: #16264f; }
+.auth-submit:active { transform: translateY(1px); }
+.auth-submit:disabled { opacity: 0.6; cursor: default; }
+
+.auth-alt-btn {
+    width: 100%;
+    padding: 14px;
+    margin-top: 10px;
+    font-size: 15px;
+    font-weight: 500;
+    color: #0f1b3d;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.auth-foot {
+    text-align: center;
+    font-size: 14px;
+    color: #6b7280;
+    margin: 20px 0 0;
+}
+
+.auth-foot a {
+    color: #0f1b3d;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.auth-forgot {
+    text-align: right;
+    margin: -6px 0 16px;
+}
+
+.auth-forgot a {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f1b3d;
+    text-decoration: none;
+}
+
+/* ---------------------------------------------------------------- */
+/* Trust row                                                         */
+/* ---------------------------------------------------------------- */
+
+.auth-trust {
+    display: flex;
+    gap: 14px;
+    max-width: 520px;
+    margin: 24px auto 0;
+    padding: 0 8px;
+}
+
+.auth-trust-item {
+    flex: 1;
+    text-align: center;
+}
+
+.auth-trust-icon {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 9px;
+    border-radius: 50%;
+    background: #fdf4e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.auth-trust-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f1b3d;
+    margin: 0 0 3px;
+}
+
+.auth-trust-note {
+    font-size: 12px;
+    line-height: 1.4;
+    color: #8b93a1;
+    margin: 0;
+}
+
+@media (max-width: 420px) {
+    .auth-card { margin: 14px 10px 0; padding: 26px 16px 22px; border-radius: 16px; }
+    .auth-title { font-size: 23px; }
+    .auth-trust { gap: 8px; }
+    .auth-trust-note { display: none; }
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Module override block                                               */
+/*                                                                     */
+/* password-toggle.js and lz-phone-input.js inject !important styles   */
+/* so they cannot be captured by container rules on other pages. Here  */
+/* that shielding has to be outranked, which is what the extra         */
+/* specificity below is for. Nothing in the modules changes.           */
+/* ------------------------------------------------------------------ */
+
+/* Country trigger: restore the bordered box beside the number field. */
+.auth-phone-row .lz-phone-trigger {
+    min-height: 52px !important;
+    padding: 0 12px !important;
+    gap: 7px !important;
+    background: #ffffff !important;
+    border: 1px solid #dfe3ec !important;
+    border-radius: 12px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    color: #0f1b3d !important;
+}
+
+.auth-phone-row .lz-phone-trigger:hover {
+    border-color: #c3c9d6 !important;
+}
+
+.auth-phone-row .lz-phone-trigger:focus-visible {
+    border-color: #0f1b3d !important;
+    box-shadow: 0 0 0 3px rgba(15, 27, 61, 0.08);
+    outline: none !important;
+}
+
+/*
+ * Descendant rather than child: the toggle inserts a wrapper span
+ * between .auth-input-wrap and the input, so `>` stops matching.
+ */
+.auth-input-wrap input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 15px 15px 15px 46px;
+    font-size: 15px;
+    color: #0f1b3d;
+    background: #ffffff;
+    border: 1px solid #dfe3ec;
+    border-radius: 12px;
+    outline: none;
+}
+
+.auth-input-wrap input:focus {
+    border-color: #0f1b3d;
+    box-shadow: 0 0 0 3px rgba(15, 27, 61, 0.08);
+}
+
+/* Keep the field icon above the input's own background. */
+.auth-input-wrap > svg {
+    z-index: 2;
+    pointer-events: none;
+}
+
+/*
+ * Flatten the toggle's wrapper so the eye positions against
+ * .auth-input-wrap instead, and the wrapper stops forming a stacking
+ * context over the icon.
+ */
+.auth-input-wrap .lz-pw-wrap {
+    position: static !important;
+}
+
+.auth-input-wrap .lz-pw-wrap > input {
+    padding: 15px 46px 15px 46px !important;
+    border: 1px solid #dfe3ec !important;
+    border-radius: 12px !important;
+    background: #ffffff !important;
+}
+
+.auth-input-wrap .lz-pw-wrap > .lz-pw-toggle {
+    right: 8px !important;
+}
+
+/* The strength meter reads better with a little air above it. */
+.auth-field .auth-strength {
+    margin-top: 12px;
+}

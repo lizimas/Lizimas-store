@@ -1,15 +1,18 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
 <title>Create Account - Lizimas Store</title>
 <link rel="stylesheet" href="css/style.css?v=35">
+<link rel="stylesheet" href="css/auth.css?v=2">
+<link rel="preconnect" href="https://flagcdn.com">
 </head>
 
 <body>
 
-<div class="checkout-page">
+<div class="checkout-page auth-page">
 
     <header class="checkout-header">
         <div class="checkout-logo-row">
@@ -19,7 +22,7 @@
             <h1 class="checkout-brand-name">Lizimas Store</h1>
         </div>
         <div class="checkout-secure-badge">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#0f1b3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#067647" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
             Secure Account
         </div>
     </header>
@@ -31,38 +34,88 @@
         <a href="login.html">Login</a>
     </nav>
 
-    <div class="checkout-card">
-        <h2 class="checkout-card-title">Create Your Account</h2>
-        <p class="checkout-card-subtitle">Sign up to track your orders and check out faster next time.</p>
+    <div class="auth-card">
 
-        <div class="checkout-input-group">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#0f1b3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            <input id="reg-name" type="text" placeholder="Full Name">
+        <div class="auth-card-head">
+            <div class="auth-icon-badge">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#E8B33A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <h2 class="auth-title">Create Your Account</h2>
+            <p class="auth-subtitle">Join Lizimas Store and enjoy a faster, easier shopping experience.</p>
         </div>
 
-        <div class="checkout-input-group">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#0f1b3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="m22 6-10 7L2 6"/></svg>
-            <input id="reg-email" type="email" placeholder="Email Address">
+        <div class="auth-field">
+            <label class="auth-label" for="reg-name">Full Name</label>
+            <span class="auth-input-wrap">
+                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#0f1b3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <input id="reg-name" type="text" placeholder="Enter your full name" autocomplete="name">
+            </span>
         </div>
 
-        <div class="checkout-input-group">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#0f1b3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-            <span class="phone-prefix">+256</span>
-            <input id="reg-phone" type="tel" placeholder="7XX XXX XXX (optional)" maxlength="9" inputmode="numeric">
+        <div class="auth-field">
+            <label class="auth-label" for="reg-email">Email Address</label>
+            <span class="auth-input-wrap">
+                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#0f1b3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="m22 6-10 7L2 6"/></svg>
+                <input id="reg-email" type="email" placeholder="Enter your email address" autocomplete="email">
+            </span>
         </div>
 
-        <div class="checkout-input-group">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#0f1b3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            <input id="reg-password" type="password" placeholder="Password">
+        <div class="auth-field">
+            <label class="auth-label" for="reg-phone">Phone Number <span class="auth-optional">(optional)</span></label>
+            <div class="auth-phone-row">
+                <span class="phone-prefix" data-lz-phone-for="reg-phone">+256</span>
+                <span class="auth-input-wrap">
+                    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#0f1b3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    <input id="reg-phone" type="tel" placeholder="7XX XXX XXX" inputmode="numeric" autocomplete="tel-national" data-lz-phone data-lz-phone-default="UG">
+                </span>
+            </div>
+            <p class="auth-hint">Add your phone number to track orders and recover your account.</p>
         </div>
 
-        <p id="register-status" class="delivery-fee-status"></p>
+        <div class="auth-field">
+            <label class="auth-label" for="reg-password">Password</label>
+            <span class="auth-input-wrap">
+                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#0f1b3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input id="reg-password" type="password" placeholder="Create a strong password" autocomplete="new-password" data-lz-strength>
+            </span>
+            <p class="auth-hint">Use 8+ characters with a mix of letters, numbers &amp; symbols.</p>
+        </div>
 
-        <button class="checkout-place-order-btn" onclick="registerAccount()">Create Account</button>
+        <p id="register-status" class="auth-error"></p>
 
-        <p class="checkout-safe-note">
-            Already have an account? <a href="login.html" style="color:#0f1b3d; font-weight:600; text-decoration:none;">Log in</a>
+        <button class="auth-submit" onclick="registerAccount()">
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>
+            Create Account
+        </button>
+
+        <p class="auth-foot">
+            Already have an account? <a href="login.html">Log in</a>
         </p>
+
+    </div>
+
+    <div class="auth-trust">
+        <div class="auth-trust-item">
+            <div class="auth-trust-icon">
+                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#E8B33A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
+            </div>
+            <p class="auth-trust-title">Secure &amp; Private</p>
+            <p class="auth-trust-note">Your data is always protected</p>
+        </div>
+        <div class="auth-trust-item">
+            <div class="auth-trust-icon">
+                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#E8B33A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8Z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            </div>
+            <p class="auth-trust-title">Faster Checkout</p>
+            <p class="auth-trust-note">Save time on your next order</p>
+        </div>
+        <div class="auth-trust-item">
+            <div class="auth-trust-icon">
+                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#E8B33A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+            </div>
+            <p class="auth-trust-title">Better Support</p>
+            <p class="auth-trust-note">Get help when you need it</p>
+        </div>
     </div>
 
 </div>
@@ -71,5 +124,7 @@
 <script src="js/register.js"></script>
 
 <script src="js/password-toggle.js?v=2"></script>
+<script src="js/password-strength.js?v=1"></script>
+<script src="js/lz-phone-input.js?v=5"></script>
 </body>
 </html>

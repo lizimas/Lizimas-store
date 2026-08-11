@@ -15,7 +15,21 @@ async function registerAccount() {
         return;
     }
 
-    const phone = phoneDigits ? `+256${phoneDigits}` : null;
+    // The picker owns the country code now; getE164 returns null when
+    // the number is not plausible for the country selected, so a typo
+    // is caught here rather than becoming an unreachable contact.
+    let phone = null;
+    if (phoneDigits) {
+        phone = window.LzPhone ? window.LzPhone.getE164("reg-phone") : `+256${phoneDigits}`;
+
+        if (!phone) {
+            const statusEl = document.getElementById("register-status");
+            if (statusEl) {
+                statusEl.textContent = "That phone number doesn't look right for the country selected.";
+            }
+            return;
+        }
+    }
 
     statusEl.textContent = "Creating your account...";
 
