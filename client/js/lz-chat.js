@@ -157,6 +157,16 @@
     ".lzc-x{background:none;border:none;color:#fff;font-size:26px;line-height:1;",
     "cursor:pointer;padding:0 4px;opacity:.85}",
     ".lzc-x:hover{opacity:1}",
+    ".lzc-min{background:none;border:none;color:#fff;font-size:26px;line-height:1;",
+    "cursor:pointer;padding:0 8px;opacity:.85}",
+    ".lzc-min:hover{opacity:1}",
+    ".lzc-confirm{background:" + NAVY + ";color:#fff;padding:14px 16px;",
+    "display:flex;align-items:center;gap:10px;flex-wrap:wrap}",
+    ".lzc-confirm-q{flex:1;min-width:120px;font-size:14px;font-weight:600}",
+    ".lzc-confirm button{border:none;border-radius:8px;padding:8px 12px;",
+    "font-size:13px;font-family:inherit;cursor:pointer}",
+    ".lzc-keep{background:rgba(255,255,255,.16);color:#fff}",
+    ".lzc-end{background:" + GOLD + ";color:" + NAVY + ";font-weight:700}",
 
     ".lzc-body{flex:1;overflow-y:auto;padding:16px;background:#f6f7f9;",
     "display:flex;flex-direction:column;gap:10px}",
@@ -214,6 +224,9 @@
     "cursor:pointer;padding:8px 0 0;font-family:inherit;text-decoration:underline}",
 
     ".lzc-foot{flex:0 0 auto;border-top:1px solid #e7e9ee;background:#fff;padding:10px 12px}",
+    ".lzc-links{display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:center;margin-top:8px}",
+    ".lzc-links a{font-size:12.5px;color:" + NAVY + ";text-decoration:none;opacity:.75}",
+    ".lzc-links a:hover{opacity:1;text-decoration:underline}",
     ".lzc-typing{font-size:12px;color:#6b7280;padding:0 2px 6px;display:none}",
     ".lzc-typing.lzc-on{display:block}",
     ".lzc-compose{display:flex;gap:8px;align-items:flex-end}",
@@ -274,7 +287,8 @@
       '<div class="lzc-title">' + CFG.storeName + "</div>" +
       '<div class="lzc-sub" id="lzc-sub">Ask us anything about your order</div>' +
       "</div>" +
-      '<button class="lzc-x" id="lzc-x" aria-label="Close chat">&times;</button>' +
+      '<button class="lzc-min" id="lzc-min" aria-label="Minimise chat">&minus;</button>' +
+      '<button class="lzc-x" id="lzc-x" aria-label="End chat">&times;</button>' +
       "</div>" +
       '<div class="lzc-body" id="lzc-body"></div>' +
       '<div class="lzc-foot">' +
@@ -282,6 +296,12 @@
       '<div class="lzc-compose">' +
       '<textarea class="lzc-input" id="lzc-input" rows="1" placeholder="Type your message..."></textarea>' +
       '<button class="lzc-send" id="lzc-send">Send</button>' +
+      "</div>" +
+      '<div class="lzc-links">' +
+      '<a href="help.html">Help Centre</a>' +
+      '<a href="faq.html">FAQ</a>' +
+      '<a href="returns.html">Returns</a>' +
+      '<a href="contact.html">Contact</a>' +
       "</div>" +
       '<div class="lzc-alt">' +
       'Prefer WhatsApp? <a href="' + CFG.whatsapp +
@@ -294,6 +314,7 @@
     el.input = el.panel.querySelector("#lzc-input");
     el.send = el.panel.querySelector("#lzc-send");
     el.close = el.panel.querySelector("#lzc-x");
+    el.min = el.panel.querySelector("#lzc-min");
     el.sub = el.panel.querySelector("#lzc-sub");
     el.typing = el.panel.querySelector("#lzc-typing");
 
@@ -313,7 +334,8 @@
             el.launcher.classList.remove("lzc-idle");
         }, 600);
     }, { passive: true });
-    el.close.addEventListener("click", closePanel);
+    el.close.addEventListener("click", askEndChat);
+    el.min.addEventListener("click", closePanel);
     el.send.addEventListener("click", onSend);
 
     el.input.addEventListener("keydown", function (e) {
@@ -408,12 +430,26 @@
     return d;
   }
 
+  function hasAgentReply() {
+    return state.messages.some(function (m) {
+      var t = String(m.sender_type || m.senderType || "").toLowerCase();
+      return t === "staff" || t === "ai";
+    });
+  }
+
   function renderThread() {
     var stick = atBottom();
     el.body.innerHTML = "";
     state.messages.forEach(function (m) {
       el.body.appendChild(renderMessage(m));
     });
+
+    // Nobody has answered yet, so keep the topic shortcuts reachable.
+    // A system notice is not an answer. They go once an agent replies.
+    if (state.messages.length && !hasAgentReply() && !state.sending) {
+      el.body.appendChild(topicMenu());
+    }
+
     if (stick) toBottom();
   }
 
@@ -992,11 +1028,56 @@
     setTimeout(function () { el.input.focus(); }, 60);
   }
 
+  // Minimise. The conversation is untouched - server side it stays waiting
+  // or open, so an agent can still pick it up and follow up.
   function closePanel() {
     state.open = false;
     el.panel.classList.remove("lzc-on");
     el.launcher.classList.remove("lzc-hidden");
+    dismissConfirm();
     stopPoll();
+  }
+
+  function dismissConfirm() {
+    var bar = el.panel.querySelector(".lzc-confirm");
+    if (bar) bar.remove();
+    var head = el.panel.querySelector(".lzc-head");
+    if (head) head.style.display = "";
+  }
+
+  // Ending is local only. The thread stays in the queue so nothing the
+  // customer already sent is lost, and the promise to follow up still holds.
+  function endChat() {
+    stopPoll();
+    store(CFG.convKey, null);
+    store(CFG.tokenKey, null);
+    state.conversationId = null;
+    state.token = null;
+    state.messages = [];
+    state.lastId = 0;
+    state.status = null;
+    closePanel();
+  }
+
+  function askEndChat() {
+    if (el.panel.querySelector(".lzc-confirm")) return;
+
+    // Nothing to end yet - no conversation means the x just minimises.
+    if (!state.conversationId) return closePanel();
+
+    var head = el.panel.querySelector(".lzc-head");
+    var bar = document.createElement("div");
+    bar.className = "lzc-confirm";
+    bar.innerHTML =
+      '<div class="lzc-confirm-q">End this chat?</div>' +
+      '<button class="lzc-keep" id="lzc-keep">Keep chatting</button>' +
+      '<button class="lzc-end" id="lzc-end">End chat</button>';
+
+    head.style.display = "none";
+    el.panel.insertBefore(bar, head.nextSibling);
+
+    bar.querySelector("#lzc-keep").addEventListener("click", dismissConfirm);
+    bar.querySelector("#lzc-end").addEventListener("click", endChat);
   }
 
   // ---------------------------------------------------------------------
