@@ -341,6 +341,14 @@ function loadProductIntoForm(product) {
     document.getElementById("product-form-title").textContent = `Edit Product: ${product.name}`;
     document.getElementById("product-submit-btn").textContent = "Update (will need re-approval)";
 
+    if (window.LzBlockEditor) {
+        LzBlockEditor.mount(
+            document.getElementById("desc-blocks-editor"),
+            product.id,
+            { tokenKey: "staffToken" }
+        );
+    }
+
     pdPickedFiles = [];
     pdLocalPreviews = [];
     pdAllImages = [];
@@ -432,6 +440,14 @@ async function submitProductForm() {
         }
 
         const savedProductId = data.product ? data.product.id : id;
+
+        if (savedProductId && window.LzBlockEditor) {
+            try {
+                await LzBlockEditor.save(savedProductId);
+            } catch (e) {
+                console.error("Description blocks save failed:", e);
+            }
+        }
         const returnedImages = data.images || [];
         const returnedRecords = data.image_records || [];
 
