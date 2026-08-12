@@ -19,6 +19,7 @@ app.set("trust proxy", 1);
 const ALLOWED_ORIGINS = [
     "https://lizimasstore.com",
     "https://www.lizimasstore.com",
+    "https://lizimas-store.onrender.com",
     "http://localhost:5000",
     "http://127.0.0.1:5000"
 ];
