@@ -4226,3 +4226,16 @@ body.sheet-open {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* ===== Promo row: two columns on desktop (Lulu-style 2:1) ===== */
+@media (min-width: 900px) {
+  .ls-promos {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    align-items: stretch;
+  }
+  .ls-promos > .ls-promo {
+    min-height: 0;
+    height: 100%;
+  }
+}
