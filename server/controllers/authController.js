@@ -18,20 +18,33 @@ function uploadProfilePhotoToCloudinary(fileBuffer) {
 }
 const { sendAdminLoginAlert, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail } = require("../utils/mailer");
 
+const { issueDeviceCookie } = require("../utils/deviceTrust");
+
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
     throw new Error("JWT_SECRET is not set. Refusing to start with an insecure default.");
 }
 const TOKEN_EXPIRY = "7d";
-async function createSession(userId, req) {
+// res is optional so that any call site missed here still works; it simply
+// enrols no device. Every current caller passes it.
+async function createSession(userId, req, res) {
     const sessionToken = crypto.randomBytes(32).toString("hex");
     const userAgent = (req.headers["user-agent"] || "Unknown device").slice(0, 255);
-    const ipAddress = req.ip || req.connection.remoteAddress || "Unknown";
+    // Behind Cloudflare req.ip is the edge address, so prefer the forwarded one.
+    const ipAddress = (
+        req.headers["cf-connecting-ip"] || req.ip || req.connection.remoteAddress || "Unknown"
+    ).toString().slice(0, 45);
 
     await pool.query(
         "INSERT INTO sessions (session_token, user_id, device_label, ip_address) VALUES ($1, $2, $3, $4)",
         [sessionToken, userId, userAgent, ipAddress]
     );
+
+    // Phase A: enrol this browser as a trusted device. Nothing is enforced
+    // yet, so a failure here is logged and ignored rather than blocking login.
+    if (res) {
+        await issueDeviceCookie(res, req, userId);
+    }
 
     return sessionToken;
 }
@@ -262,7 +275,7 @@ async function handleLogin(req, res, allowedRoles, surface) {
             });
         }
 
-        const sessionToken = await createSession(user.id, req);
+        const sessionToken = await createSession(user.id, req, res);
         const token = jwt.sign(
             { userId: user.id, email: user.email, role: user.role, sessionToken },
             JWT_SECRET,
@@ -489,7 +502,7 @@ async function adminLogin(req, res) {
             });
         }
 
-        const sessionToken = await createSession(user.id, req);
+        const sessionToken = await createSession(user.id, req, res);
         const token = jwt.sign(
             { userId: user.id, email: user.email, role: user.role, sessionToken },
             JWT_SECRET,
@@ -849,7 +862,7 @@ async function completeForcedPasswordReset(req, res) {
 
         const user = userResult.rows[0];
 
-        const sessionToken = await createSession(user.id, req);
+        const sessionToken = await createSession(user.id, req, res);
         const token = jwt.sign(
             { userId: user.id, email: user.email, role: user.role, sessionToken },
             JWT_SECRET,
@@ -1097,7 +1110,7 @@ exports.verify2FA = async (req, res) => {
         await pool.query("UPDATE users SET two_factor_enabled = true WHERE id = $1", [userId]);
 
         if (req.isSetupToken) {
-            const sessionToken = await createSession(userId, req);
+            const sessionToken = await createSession(userId, req, res);
             const authToken = jwt.sign(
                 { userId: userId, email: req.user.email, role: req.user.role, sessionToken },
                 JWT_SECRET,
@@ -1292,7 +1305,7 @@ async function verifyLogin2FA(req, res) {
             return res.status(401).json({ error: "Invalid code. Please try again." });
         }
 
-        const sessionToken = await createSession(user.id, req);
+        const sessionToken = await createSession(user.id, req, res);
         const token = jwt.sign(
             { userId: user.id, email: user.email, role: user.role, sessionToken },
             JWT_SECRET,

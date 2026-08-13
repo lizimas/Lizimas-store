@@ -29,6 +29,8 @@ app.use(helmet({
     crossOriginEmbedderPolicy: false
 }));
 
+app.use(require("cookie-parser")());
+
 app.use(cors({
     origin: function (origin, callback) {
         if (!origin) return callback(null, true);

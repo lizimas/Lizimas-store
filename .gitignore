@@ -19,3 +19,6 @@ gen_tree.py
 *.bak
 hide_mega_*.py
 *.bak*
+*.bak
+*.bak[0-9]
+*.[0-9]*.bak
