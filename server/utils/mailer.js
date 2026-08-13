@@ -120,4 +120,17 @@ async function sendAdminBlockAlert(details) {
     }
 }
 
-module.exports = { sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail };
+async function sendScopeViolationAlert(details) {
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: process.env.ADMIN_ALERT_EMAIL,
+            subject: "BLOCKED LOGIN - Wrong Portal - Lizimas Store",
+            text: `A login attempt with a CORRECT email and password was refused because it was made from the wrong login portal.\n\nNo session was created. No token was issued. No two-factor enrolment was allowed.\n\nAccount: ${details.email}\nRole: ${details.role}\nPortal used: ${details.surface}\nStatus: BLOCKED\nReason: Account not permitted on this login portal\nIP: ${details.ip}\nBrowser: ${details.userAgent}\nTime: ${details.time}\n\nIf this was not the account holder, treat the password as compromised and reset it immediately from the admin dashboard.`
+        });
+    } catch (error) {
+        console.error("Scope violation alert email error:", error);
+    }
+}
+
+module.exports = { sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert };

@@ -109,7 +109,20 @@ async function registerUser(req, res) {
     }
 }
 
+// Roles permitted on each login portal. A portal will not authenticate
+// any account outside its own list, regardless of password correctness.
+const CUSTOMER_LOGIN_ROLES = ["customer"];
+const STAFF_LOGIN_ROLES = ["product_staff", "store_manager", "customer_support"];
+
 async function loginUser(req, res) {
+    return handleLogin(req, res, CUSTOMER_LOGIN_ROLES, "customer");
+}
+
+async function staffLogin(req, res) {
+    return handleLogin(req, res, STAFF_LOGIN_ROLES, "staff");
+}
+
+async function handleLogin(req, res, allowedRoles, surface) {
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -131,6 +144,28 @@ async function loginUser(req, res) {
 
         if (!passwordMatches) {
             await logLoginAttempt(user.id, req, false);
+            return res.status(401).json({ error: "Invalid email or password." });
+        }
+
+        // Portal scope gate. Runs before blocked_at, before must_reset_password
+        // and before either 2FA branch, so a wrong-portal attempt can never mint
+        // a pendingToken, reach 2FA enrolment, or write a secret to the account.
+        if (!allowedRoles.includes(user.role)) {
+            await logLoginAttempt(user.id, req, false);
+
+            const { sendScopeViolationAlert } = require("../utils/mailer");
+            sendScopeViolationAlert({
+                email: user.email,
+                role: user.role,
+                surface: surface,
+                ip: req.headers["cf-connecting-ip"] || req.ip,
+                userAgent: req.headers["user-agent"] || "unknown",
+                time: new Date().toISOString()
+            }).catch(err => console.error("Scope violation alert failed:", err));
+
+            // Deliberately identical to a wrong-password response: same status,
+            // same wording. Reveals nothing about whether the account exists,
+            // whether the password was right, or which portal would work.
             return res.status(401).json({ error: "Invalid email or password." });
         }
 
@@ -1024,6 +1059,7 @@ exports.disable2FA = async (req, res) => {
 module.exports = {
     registerUser,
     loginUser,
+    staffLogin,
     forgotPassword,
     resetPassword,
     forcePasswordReset,

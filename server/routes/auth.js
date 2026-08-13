@@ -9,6 +9,7 @@ const {
     resetPassword,
     completeForcedPasswordReset,
     adminLogin,
+    staffLogin,
     getCurrentUser,
     changePassword,
     changeUsername,
@@ -33,6 +34,7 @@ const upload = require("../middleware/upload");
 router.post("/register", registerUser);
 router.post("/login", loginLimiter, loginUser);
 router.post("/admin-login", loginLimiter, adminLogin);
+router.post("/staff-login", loginLimiter, staffLogin);
 router.post("/login/2fa", otpLimiter, verifyLogin2FA);
 router.post("/login/2fa/email", otpLimiter, requestEmail2FACode);
 router.post("/complete-forced-reset", completeForcedPasswordReset);
