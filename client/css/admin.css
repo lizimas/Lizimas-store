@@ -1197,3 +1197,28 @@ select.status-select {
 .lzbe-thumb { max-width: 120px; height: auto; display: block; margin-bottom: 6px; border-radius: 4px; }
 .lzbe-dim { font-size: 0.75rem; color: #888; margin-top: 4px; }
 .lzbe-empty { color: #888; font-size: 0.88rem; margin: 4px 0; }
+
+
+/* Staff Account Security shown inline in the dashboard rather than as an
+   overlay. Scoped to the inline host so .sc-acct-panel keeps its modal
+   appearance anywhere it is still used that way. */
+#sc-acct-inline .sc-acct-panel {
+    position: static;
+    width: 100%;
+    max-width: 640px;
+    margin: 0;
+    transform: none;
+    box-shadow: none;
+    border: 1px solid #e5e5e5;
+    border-radius: 10px;
+    max-height: none;
+}
+
+#sc-acct-inline .sc-acct-head {
+    border-bottom: 1px solid #eee;
+}
+
+#sc-acct-inline .sc-acct-body {
+    max-height: none;
+    overflow: visible;
+}

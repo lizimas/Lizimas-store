@@ -1069,48 +1069,6 @@ async function getCurrentUser(req, res) {
 }
 
 
-async function changePassword(req, res) {
-    const { currentPassword, newPassword } = req.body;
-
-    if (!currentPassword || !newPassword) {
-        return res.status(400).json({ error: "Current and new password are required." });
-    }
-
-    if (newPassword.length < 6) {
-        return res.status(400).json({ error: "New password must be at least 6 characters." });
-    }
-
-    try {
-        const result = await pool.query(
-            "SELECT id, password FROM users WHERE id = $1",
-            [req.user.userId]
-        );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: "User not found." });
-        }
-
-        const user = result.rows[0];
-        const passwordMatches = await bcrypt.compare(currentPassword, user.password);
-
-        if (!passwordMatches) {
-            return res.status(401).json({ error: "Current password is incorrect." });
-        }
-
-        const newHashedPassword = await bcrypt.hash(newPassword, 10);
-
-        await pool.query(
-            "UPDATE users SET password = $1, password_changed_at = NOW() WHERE id = $2",
-            [newHashedPassword, user.id]
-        );
-
-        res.json({ message: "Password updated successfully." });
-
-    } catch (error) {
-        console.error("Change password error:", error);
-        res.status(500).json({ error: "Something went wrong while changing your password." });
-    }
-}
 
 const bcryptForAccount = require("bcryptjs");
 const speakeasy = require("speakeasy");
@@ -1181,7 +1139,12 @@ exports.changePassword = async (req, res) => {
         const validPassword = await bcryptForAccount.compare(currentPassword, userResult.rows[0].password);
         if (!validPassword) return res.status(401).json({ error: "Current password is incorrect." });
         const hashedPassword = await bcryptForAccount.hash(newPassword, 10);
-        await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hashedPassword, userId]);
+        // password_changed_at is what invalidates outstanding reset tokens.
+        // Without it a stale reset link still works after a voluntary change.
+        await pool.query(
+            "UPDATE users SET password = $1, password_changed_at = NOW() WHERE id = $2",
+            [hashedPassword, userId]
+        );
         res.json({ message: "Password updated successfully." });
     } catch (error) {
         res.status(500).json({ error: error.message });
