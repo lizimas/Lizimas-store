@@ -36,13 +36,35 @@ async function createSession(userId, req) {
     return sessionToken;
 }
 
-async function logLoginAttempt(userId, req, success) {
+// Records a login attempt. userId may be null for attempts against an
+// email that does not exist. The fourth argument is optional so that
+// existing call sites remain valid.
+//
+//   opts.surface        'admin' | 'staff' | 'customer'
+//   opts.failureReason  'wrong_password' | 'wrong_portal' | 'unknown_email'
+//                       | 'blocked' | 'inactive' | 'bad_2fa'
+//   opts.attemptedEmail  the address typed at the prompt
+async function logLoginAttempt(userId, req, success, opts = {}) {
     const userAgent = (req.headers["user-agent"] || "Unknown device").slice(0, 255);
-    const ipAddress = req.ip || req.connection.remoteAddress || "Unknown";
+    // Behind Cloudflare, req.ip is Cloudflare's edge address rather than the
+    // visitor's, so the forwarded header is preferred where present.
+    const ipAddress = (
+        req.headers["cf-connecting-ip"] ||
+        req.ip ||
+        req.connection.remoteAddress ||
+        "Unknown"
+    ).toString().slice(0, 45);
+
+    const surface = opts.surface || "unknown";
+    const failureReason = success ? null : (opts.failureReason || null);
+    const attemptedEmail = opts.attemptedEmail ? String(opts.attemptedEmail).slice(0, 255) : null;
+
     try {
         await pool.query(
-            "INSERT INTO login_history (user_id, ip_address, device_label, success) VALUES ($1, $2, $3, $4)",
-            [userId, ipAddress, userAgent, success]
+            `INSERT INTO login_history
+                (user_id, ip_address, device_label, success, surface, failure_reason, attempted_email)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [userId, ipAddress, userAgent, success, surface, failureReason, attemptedEmail]
         );
     } catch (err) {
         console.error("Failed to log login attempt:", err);
@@ -136,6 +158,13 @@ async function handleLogin(req, res, allowedRoles, surface) {
         );
 
         if (result.rows.length === 0) {
+            // No such account. Recorded against attempted_email so that
+            // guessing runs are visible in the Security tab.
+            await logLoginAttempt(null, req, false, {
+                surface: surface,
+                failureReason: "unknown_email",
+                attemptedEmail: email
+            });
             return res.status(401).json({ error: "Invalid email or password." });
         }
 
@@ -143,7 +172,11 @@ async function handleLogin(req, res, allowedRoles, surface) {
         const passwordMatches = await bcrypt.compare(password, user.password);
 
         if (!passwordMatches) {
-            await logLoginAttempt(user.id, req, false);
+            await logLoginAttempt(user.id, req, false, {
+                surface: surface,
+                failureReason: "wrong_password",
+                attemptedEmail: email
+            });
             return res.status(401).json({ error: "Invalid email or password." });
         }
 
@@ -151,7 +184,11 @@ async function handleLogin(req, res, allowedRoles, surface) {
         // and before either 2FA branch, so a wrong-portal attempt can never mint
         // a pendingToken, reach 2FA enrolment, or write a secret to the account.
         if (!allowedRoles.includes(user.role)) {
-            await logLoginAttempt(user.id, req, false);
+            await logLoginAttempt(user.id, req, false, {
+                surface: surface,
+                failureReason: "wrong_portal",
+                attemptedEmail: email
+            });
 
             const { sendScopeViolationAlert } = require("../utils/mailer");
             sendScopeViolationAlert({
@@ -170,7 +207,11 @@ async function handleLogin(req, res, allowedRoles, surface) {
         }
 
         if (user.blocked_at) {
-            await logLoginAttempt(user.id, req, false);
+            await logLoginAttempt(user.id, req, false, {
+                surface: surface,
+                failureReason: "blocked",
+                attemptedEmail: email
+            });
             return res.status(403).json({ error: "This account has been blocked. Please contact the administrator." });
         }
 
