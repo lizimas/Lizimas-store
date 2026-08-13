@@ -27,6 +27,61 @@ if (!JWT_SECRET) {
 const TOKEN_EXPIRY = "7d";
 // res is optional so that any call site missed here still works; it simply
 // enrols no device. Every current caller passes it.
+// Roles held to device recognition. Customers are deliberately excluded:
+// locking a shopper out of their own account over a new phone would cost far
+// more than it protects, and their approval-by-email flow is a separate step.
+const DEVICE_GATED_ROLES = ["admin", "product_staff", "store_manager", "customer_support"];
+
+// Returns an error message if the login should be refused, or null to proceed.
+//
+// Runs only when DEVICE_LOCK_ENFORCED is true, so this whole mechanism can be
+// switched on and off with an environment variable and a restart rather than a
+// deploy. Enrolment continues regardless.
+async function deviceGate(user, req, surface) {
+    const { isEnforced, findTrustedDevice, readDeviceToken } = require("../utils/deviceTrust");
+
+    if (!isEnforced()) return null;
+    if (!DEVICE_GATED_ROLES.includes(user.role)) return null;
+
+    // An unlock opens a short window in which a login may enrol a device.
+    // Without it, unlocking would be futile: the account has no trusted device
+    // by definition, so the next attempt would lock it again immediately.
+    if (user.device_grace_until && new Date(user.device_grace_until) > new Date()) {
+        return null;
+    }
+
+    const device = await findTrustedDevice(user.id, readDeviceToken(req));
+    if (device) return null;
+
+    // Lock, but never overwrite an existing lock time - the first refusal is
+    // the one worth keeping.
+    await pool.query(
+        `UPDATE users
+            SET security_locked_at = COALESCE(security_locked_at, NOW()),
+                security_locked_reason = 'unknown_device'
+          WHERE id = $1`,
+        [user.id]
+    );
+
+    await logLoginAttempt(user.id, req, false, {
+        surface: surface,
+        failureReason: "unknown_device",
+        attemptedEmail: user.email
+    });
+
+    const { sendSecurityLockAlert } = require("../utils/mailer");
+    sendSecurityLockAlert({
+        email: user.email,
+        role: user.role,
+        surface: surface,
+        ip: req.headers["cf-connecting-ip"] || req.ip,
+        userAgent: req.headers["user-agent"] || "unknown",
+        time: new Date().toISOString()
+    }).catch(err => console.error("Security lock alert failed:", err));
+
+    return "This account has been locked because the sign-in came from an unrecognised device. Please contact the administrator.";
+}
+
 async function createSession(userId, req, res) {
     const sessionToken = crypto.randomBytes(32).toString("hex");
     const userAgent = (req.headers["user-agent"] || "Unknown device").slice(0, 255);
@@ -40,10 +95,25 @@ async function createSession(userId, req, res) {
         [sessionToken, userId, userAgent, ipAddress]
     );
 
-    // Phase A: enrol this browser as a trusted device. Nothing is enforced
-    // yet, so a failure here is logged and ignored rather than blocking login.
+    // Enrol this browser as a trusted device.
     if (res) {
         await issueDeviceCookie(res, req, userId);
+
+        // Consume any unlock grace window. Deliberately here rather than in
+        // deviceGate: reaching this line means the login actually completed,
+        // second factor and all. Clearing it at the gate would let a mistyped
+        // 2FA code spend the window and lock the account straight back up.
+        //
+        // One unlock therefore restores exactly one device, rather than
+        // leaving the account open to every device for the full window.
+        try {
+            await pool.query(
+                "UPDATE users SET device_grace_until = NULL WHERE id = $1 AND device_grace_until IS NOT NULL",
+                [userId]
+            );
+        } catch (error) {
+            console.error("Failed to clear device grace window:", error);
+        }
     }
 
     return sessionToken;
@@ -166,7 +236,7 @@ async function handleLogin(req, res, allowedRoles, surface) {
 
     try {
         const result = await pool.query(
-            "SELECT id, name, email, password, phone, role, two_factor_enabled, is_active, blocked_at, must_reset_password FROM users WHERE email = $1",
+            "SELECT id, name, email, password, phone, role, two_factor_enabled, is_active, blocked_at, must_reset_password, security_locked_at, device_grace_until FROM users WHERE email = $1",
             [email]
         );
 
@@ -219,6 +289,15 @@ async function handleLogin(req, res, allowedRoles, surface) {
             return res.status(401).json({ error: "Invalid email or password." });
         }
 
+        if (user.security_locked_at) {
+            await logLoginAttempt(user.id, req, false, {
+                surface: surface,
+                failureReason: "security_locked",
+                attemptedEmail: email
+            });
+            return res.status(403).json({ error: "This account is locked pending security review. Please contact the administrator." });
+        }
+
         if (user.blocked_at) {
             await logLoginAttempt(user.id, req, false, {
                 surface: surface,
@@ -229,8 +308,19 @@ async function handleLogin(req, res, allowedRoles, surface) {
         }
 
         if (!user.is_active) {
-            await logLoginAttempt(user.id, req, false);
+            await logLoginAttempt(user.id, req, false, {
+                surface: surface,
+                failureReason: "inactive",
+                attemptedEmail: email
+            });
             return res.status(403).json({ error: "Your account is pending activation by the administrator." });
+        }
+
+        // Before must_reset_password and before either 2FA branch, so an
+        // unrecognised device cannot mint a pendingToken of any kind.
+        const deviceRefusal = await deviceGate(user, req, surface);
+        if (deviceRefusal) {
+            return res.status(403).json({ error: deviceRefusal });
         }
 
         if (user.must_reset_password) {
@@ -373,7 +463,7 @@ async function adminLogin(req, res) {
         }
 
         const result = await pool.query(
-            "SELECT id, name, email, password, role, two_factor_enabled, is_active, blocked_at, failed_admin_attempts, must_reset_password FROM users WHERE email = $1",
+            "SELECT id, name, email, password, role, two_factor_enabled, is_active, blocked_at, failed_admin_attempts, must_reset_password, security_locked_at, device_grace_until FROM users WHERE email = $1",
             [email]
         );
 
@@ -398,6 +488,15 @@ async function adminLogin(req, res) {
                 attemptedEmail: email
             });
             return res.status(401).json({ error: "Invalid email or password." });
+        }
+
+        if (user.security_locked_at) {
+            await logLoginAttempt(user.id, req, false, {
+                surface: "admin",
+                failureReason: "security_locked",
+                attemptedEmail: email
+            });
+            return res.status(403).json({ error: "This account is locked pending security review. Please contact the administrator." });
         }
 
         if (user.blocked_at) {
@@ -458,6 +557,11 @@ async function adminLogin(req, res) {
                 attemptedEmail: email
             });
             return res.status(403).json({ error: "Your account is pending activation." });
+        }
+
+        const deviceRefusal = await deviceGate(user, req, "admin");
+        if (deviceRefusal) {
+            return res.status(403).json({ error: deviceRefusal });
         }
 
         if (user.must_reset_password) {
@@ -1302,6 +1406,10 @@ async function verifyLogin2FA(req, res) {
         }
 
         if (!verified) {
+            await logLoginAttempt(user.id, req, false, {
+                failureReason: "bad_2fa",
+                attemptedEmail: user.email
+            });
             return res.status(401).json({ error: "Invalid code. Please try again." });
         }
 

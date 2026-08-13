@@ -133,4 +133,41 @@ async function sendScopeViolationAlert(details) {
     }
 }
 
-module.exports = { sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert };
+// Sent when an account is locked for signing in from an unrecognised device.
+// Goes to the account owner and to the alert mailbox: the owner needs to know
+// their account is locked, and the administrator needs to know why.
+async function sendSecurityLockAlert(details) {
+    const subject = "Lizimas Store: account locked - unrecognised device";
+    const body = [
+        "An attempt was made to sign in to a Lizimas Store account from a device that has not been used before.",
+        "",
+        "The sign-in was refused and the account has been locked pending review.",
+        "",
+        `Account:  ${details.email}`,
+        `Role:     ${details.role}`,
+        `Portal:   ${details.surface}`,
+        `IP:       ${details.ip}`,
+        `Device:   ${details.userAgent}`,
+        `Time:     ${details.time}`,
+        "",
+        "If this was you, contact the administrator to unlock the account.",
+        "If it was not, the password should be treated as compromised and changed once access is restored."
+    ].join("\n");
+
+    const recipients = [details.email, process.env.ADMIN_ALERT_EMAIL]
+        .filter(Boolean)
+        .join(",");
+
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+            to: recipients,
+            subject,
+            text: body
+        });
+    } catch (error) {
+        console.error("sendSecurityLockAlert failed:", error);
+    }
+}
+
+module.exports = { sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert };

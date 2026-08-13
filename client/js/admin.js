@@ -1137,6 +1137,8 @@ async function removeProduct(id) {
 let securityRecent = [];
 
 const SECURITY_REASON_LABELS = {
+    unknown_device: "Unrecognised device",
+    security_locked: "Locked",
     wrong_password: "Wrong password",
     wrong_portal: "Wrong portal",
     unknown_email: "No such account",
@@ -1262,6 +1264,68 @@ function toggleSecurityDetail(containerId, encodedKey) {
     row.classList.remove("hidden");
 }
 
+function renderSecurityLocked(rows) {
+    const panel = document.getElementById("security-locked-panel");
+    const box = document.getElementById("security-locked");
+    if (!panel || !box) return;
+
+    if (!rows.length) {
+        panel.classList.add("hidden");
+        box.innerHTML = "";
+        return;
+    }
+
+    let html = '<div class="table-wrapper"><table style="width:100%; border-collapse:collapse; font-size:14px;">';
+    html += '<thead><tr style="text-align:left; border-bottom:2px solid #eee;">' +
+        '<th style="padding:8px;">Account</th>' +
+        '<th style="padding:8px;">Locked</th>' +
+        '<th style="padding:8px;">Reason</th>' +
+        '<th style="padding:8px;"></th></tr></thead><tbody>';
+
+    rows.forEach(row => {
+        html += `<tr style="border-bottom:1px solid #f0f0f0; background:#fff5f5;">` +
+            `<td style="padding:8px; color:#b00020; font-weight:600;">${securityEscape(row.email)}` +
+            `<div style="font-size:12px; color:#888; font-weight:400;">${securityEscape(row.role)}</div></td>` +
+            `<td style="padding:8px; color:#555;">${securityTime(row.security_locked_at)}</td>` +
+            `<td style="padding:8px; color:#555;">${securityEscape(SECURITY_REASON_LABELS[row.security_locked_reason] || row.security_locked_reason || "")}</td>` +
+            `<td style="padding:8px;"><button onclick="unlockSecurityAccount(${row.id}, '${securityEscape(row.email)}')" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:6px 12px; cursor:pointer; font-size:13px;">Unlock</button></td>` +
+            `</tr>`;
+    });
+
+    html += "</tbody></table></div>";
+    box.innerHTML = html;
+    panel.classList.remove("hidden");
+}
+
+async function unlockSecurityAccount(id, email) {
+    if (!confirm(`Unlock ${email}? One sign-in within the next 15 minutes will register that device as trusted.`)) {
+        return;
+    }
+
+    const base = (typeof API_URL !== "undefined" && API_URL) ? API_URL : "";
+    const token = localStorage.getItem("adminToken");
+
+    try {
+        const res = await fetch(`${base}/api/admin/security/unlock/${id}`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            alert(data.error || "Could not unlock the account.");
+            return;
+        }
+
+        alert(data.message);
+        loadSecurityLogins();
+    } catch (err) {
+        console.error("unlockSecurityAccount error:", err);
+        alert("Could not connect to server.");
+    }
+}
+
 async function loadSecurityLogins() {
     const status = document.getElementById("security-status");
     const windowSel = document.getElementById("security-window");
@@ -1285,6 +1349,7 @@ async function loadSecurityLogins() {
 
         const data = await res.json();
         securityRecent = data.recent || [];
+        renderSecurityLocked(data.locked || []);
 
         const buckets = { admin: [], staff: [], customer: [], other: [] };
         (data.groups || []).forEach(row => buckets[securityBucket(row)].push(row));

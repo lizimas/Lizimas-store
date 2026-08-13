@@ -448,13 +448,56 @@ exports.getSecurityLogins = async (req, res) => {
             params
         );
 
+        const locked = await pool.query(
+            `SELECT id, name, email, role, security_locked_at, security_locked_reason
+               FROM users
+              WHERE security_locked_at IS NOT NULL
+              ORDER BY security_locked_at DESC`
+        );
+
         res.json({
             window: key,
             groups: grouped.rows,
-            recent: recent.rows
+            recent: recent.rows,
+            locked: locked.rows
         });
     } catch (error) {
         console.error("getSecurityLogins error:", error);
         res.status(500).json({ error: "Failed to load security log." });
+    }
+};
+
+
+// ---------------------------------------------------------------------------
+// Clears a security lock. Also opens a one-hour window in which that account
+// may enrol a device, without which the unlock would achieve nothing: the
+// account has no trusted device by definition, so the next sign-in would lock
+// it straight back up.
+// ---------------------------------------------------------------------------
+exports.unlockAccount = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query(
+            `UPDATE users
+                SET security_locked_at = NULL,
+                    security_locked_reason = NULL,
+                    device_grace_until = NOW() + INTERVAL '15 minutes'
+              WHERE id = $1
+              RETURNING id, email, role`,
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Account not found." });
+        }
+
+        res.json({
+            message: "Account unlocked. The next completed sign-in within 15 minutes will register that one device.",
+            account: result.rows[0]
+        });
+    } catch (error) {
+        console.error("unlockAccount error:", error);
+        res.status(500).json({ error: "Failed to unlock account." });
     }
 };
