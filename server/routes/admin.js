@@ -29,6 +29,7 @@ const { createStaffAccount, activateStaffAccount, blockStaffAccount, forcePasswo
 
 const { requireAuth, requireAdmin } = require("./../middleware/authMiddleware");
 const csvUpload = require("../middleware/csvUpload");
+const { getSecurityLogins } = require("../controllers/adminController");
 
 router.use(requireAuth, requireAdmin);
 
@@ -66,6 +67,7 @@ router.delete("/products/:id/permanent", permanentlyDeleteProduct);
 // Activity log
 router.get("/activity-log", getActivityLog);
 router.get("/staff-sessions", getStaffSessions);
+router.get("/security/logins", getSecurityLogins);
 router.patch("/orders/:id/status", updateOrderStatus);
 
 router.post("/products/import", csvUpload.single("file"), require("../controllers/adminController").importProducts);

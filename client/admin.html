@@ -75,6 +75,9 @@
                     <button class="tab-btn" data-tab="staff">
                         <span class="sidebar-icon">&#128100;</span> Staff & Approvals
                     </button>
+                    <button class="tab-btn" data-tab="security">
+                        <span class="sidebar-icon">&#128274;</span> Security
+                    </button>
                     <button class="tab-btn" data-tab="account">
                         <span class="sidebar-icon">&#9881;</span> Account
                     </button>
@@ -433,6 +436,46 @@
                     <div class="panel">
                         <h2>Activity Log</h2>
                         <div id="activity-log-list">Loading...</div>
+                    </div>
+                </section>
+
+                <section id="tab-security" class="tab-content hidden">
+                    <h2 class="admin-page-title">Security</h2>
+                    <p class="admin-page-subtitle">Login attempts grouped by the email used, split by which portal was tried. Red rows contain failures.</p>
+
+                    <div class="panel">
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <label for="security-window" style="font-size:14px; color:#444;">Period</label>
+                            <select id="security-window" onchange="loadSecurityLogins()" style="padding:8px; border:1px solid #ccc; border-radius:8px;">
+                                <option value="24h">Last 24 hours</option>
+                                <option value="7d" selected>Last 7 days</option>
+                                <option value="30d">Last 30 days</option>
+                                <option value="all">All time</option>
+                            </select>
+                            <button onclick="loadSecurityLogins()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:8px 14px; cursor:pointer;">Refresh</button>
+                            <span id="security-status" style="font-size:13px; color:#666;"></span>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Admin Panel</h2>
+                        <div id="security-admin">Loading...</div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Staff Accounts</h2>
+                        <div id="security-staff">Loading...</div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Customer Accounts</h2>
+                        <div id="security-customer">Loading...</div>
+                    </div>
+
+                    <div class="panel hidden" id="security-other-panel">
+                        <h2>Unclassified</h2>
+                        <p style="font-size:13px; color:#666;">Attempts recorded before portal tracking was added.</p>
+                        <div id="security-other"></div>
                     </div>
                 </section>
 

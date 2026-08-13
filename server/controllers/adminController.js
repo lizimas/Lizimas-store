@@ -387,3 +387,74 @@ exports.getStaffSessions = async (req, res) => {
         res.status(500).json({ error: "Something went wrong." });
     }
 };
+
+
+// ---------------------------------------------------------------------------
+// Security tab. Returns login attempts twice over: grouped by account for the
+// summary rows, and as a flat recent list for the expanded detail view. One
+// round trip rather than a second call per row.
+//
+//   GET /api/admin/security/logins?window=24h|7d|30d|all   (default 7d)
+// ---------------------------------------------------------------------------
+const SECURITY_WINDOWS = { "24h": "24 hours", "7d": "7 days", "30d": "30 days" };
+
+exports.getSecurityLogins = async (req, res) => {
+    try {
+        const key = String(req.query.window || "7d");
+        // Anything not in the map, including "all", means no time filter.
+        const interval = SECURITY_WINDOWS[key] || null;
+        const params = interval ? [interval] : [];
+        const where = interval ? "WHERE lh.logged_in_at >= NOW() - $1::interval" : "";
+
+        const grouped = await pool.query(
+            `SELECT
+                COALESCE(lh.attempted_email, u.email, 'unknown') AS email,
+                COALESCE(lh.surface, 'unknown') AS surface,
+                u.role,
+                MAX(lh.user_id) AS user_id,
+                COUNT(*)::int AS attempts,
+                COUNT(*) FILTER (WHERE lh.success = false)::int AS failures,
+                COUNT(*) FILTER (WHERE lh.success = true)::int AS successes,
+                COUNT(DISTINCT lh.ip_address)::int AS ip_count,
+                MAX(lh.logged_in_at) AS last_attempt,
+                ARRAY_AGG(DISTINCT lh.failure_reason)
+                    FILTER (WHERE lh.failure_reason IS NOT NULL) AS reasons
+             FROM login_history lh
+             LEFT JOIN users u ON u.id = lh.user_id
+             ${where}
+             GROUP BY 1, 2, 3
+             ORDER BY MAX(lh.logged_in_at) DESC
+             LIMIT 200`,
+            params
+        );
+
+        const recent = await pool.query(
+            `SELECT
+                lh.id,
+                lh.user_id,
+                COALESCE(lh.attempted_email, u.email, 'unknown') AS email,
+                COALESCE(lh.surface, 'unknown') AS surface,
+                u.role,
+                lh.success,
+                lh.failure_reason,
+                lh.ip_address,
+                lh.device_label,
+                lh.logged_in_at
+             FROM login_history lh
+             LEFT JOIN users u ON u.id = lh.user_id
+             ${where}
+             ORDER BY lh.logged_in_at DESC
+             LIMIT 300`,
+            params
+        );
+
+        res.json({
+            window: key,
+            groups: grouped.rows,
+            recent: recent.rows
+        });
+    } catch (error) {
+        console.error("getSecurityLogins error:", error);
+        res.status(500).json({ error: "Failed to load security log." });
+    }
+};

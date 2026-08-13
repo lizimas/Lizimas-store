@@ -365,6 +365,13 @@ async function adminLogin(req, res) {
         );
 
         if (result.rows.length === 0) {
+            // Previously unrecorded. An attacker guessing admin addresses left
+            // no trace at all on this endpoint.
+            await logLoginAttempt(null, req, false, {
+                surface: "admin",
+                failureReason: "unknown_email",
+                attemptedEmail: email
+            });
             return res.status(401).json({ error: "Invalid email or password." });
         }
 
@@ -372,12 +379,20 @@ async function adminLogin(req, res) {
         const passwordMatches = await bcrypt.compare(password, user.password);
 
         if (!passwordMatches) {
-            await logLoginAttempt(user.id, req, false);
+            await logLoginAttempt(user.id, req, false, {
+                surface: "admin",
+                failureReason: "wrong_password",
+                attemptedEmail: email
+            });
             return res.status(401).json({ error: "Invalid email or password." });
         }
 
         if (user.blocked_at) {
-            await logLoginAttempt(user.id, req, false);
+            await logLoginAttempt(user.id, req, false, {
+                surface: "admin",
+                failureReason: "blocked",
+                attemptedEmail: email
+            });
             return res.status(403).json({ error: "This account has been blocked due to repeated unauthorized admin access attempts." });
         }
 
@@ -389,6 +404,12 @@ async function adminLogin(req, res) {
                     "UPDATE users SET failed_admin_attempts = $1, blocked_at = NOW(), is_active = false WHERE id = $2",
                     [newAttempts, user.id]
                 );
+
+                await logLoginAttempt(user.id, req, false, {
+                    surface: "admin",
+                    failureReason: "wrong_portal",
+                    attemptedEmail: email
+                });
 
                 sendAccountBlockedEmail(user.email, user.name).catch(err => console.error("Blocked email failed:", err));
                 sendAdminBlockAlert({
@@ -405,12 +426,24 @@ async function adminLogin(req, res) {
                 [newAttempts, user.id]
             );
 
+            // A staff or customer account reaching the admin endpoint with a
+            // correct password is the strongest single signal in the system.
+            await logLoginAttempt(user.id, req, false, {
+                surface: "admin",
+                failureReason: "wrong_portal",
+                attemptedEmail: email
+            });
+
             const attemptsRemaining = 3 - newAttempts;
             return res.status(403).json({ error: `This account does not have admin access. ${attemptsRemaining} attempt(s) remaining before it is blocked.` });
         }
 
         if (!user.is_active) {
-            await logLoginAttempt(user.id, req, false);
+            await logLoginAttempt(user.id, req, false, {
+                surface: "admin",
+                failureReason: "inactive",
+                attemptedEmail: email
+            });
             return res.status(403).json({ error: "Your account is pending activation." });
         }
 
@@ -463,7 +496,10 @@ async function adminLogin(req, res) {
             { expiresIn: TOKEN_EXPIRY }
         );
 
-        await logLoginAttempt(user.id, req, true);
+        await logLoginAttempt(user.id, req, true, {
+                surface: "admin",
+                attemptedEmail: email
+            });
 
         sendAdminLoginAlert({
             name: user.name,

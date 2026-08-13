@@ -1131,6 +1131,188 @@ async function removeProduct(id) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Security tab
+// ---------------------------------------------------------------------------
+let securityRecent = [];
+
+const SECURITY_REASON_LABELS = {
+    wrong_password: "Wrong password",
+    wrong_portal: "Wrong portal",
+    unknown_email: "No such account",
+    blocked: "Blocked account",
+    inactive: "Inactive account",
+    bad_2fa: "Failed 2FA",
+    rate_limited: "Rate limited"
+};
+
+function securityBucket(row) {
+    // Portal panels show only attempts that actually recorded a portal. Guessing
+    // from users.role put an account's whole history under a panel it may never
+    // have touched, which made the counts read as activity that never happened.
+    if (row.surface === "admin" || row.surface === "staff" || row.surface === "customer") {
+        return row.surface;
+    }
+    return "other";
+}
+
+function securityEscape(value) {
+    const div = document.createElement("div");
+    div.textContent = value === null || value === undefined ? "" : String(value);
+    return div.innerHTML;
+}
+
+function securityTime(value) {
+    if (!value) return "";
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? String(value) : d.toLocaleString();
+}
+
+function securityGroupKey(row) {
+    return `${row.email}|${row.surface}`;
+}
+
+function renderSecurityGroups(containerId, rows) {
+    const box = document.getElementById(containerId);
+    if (!box) return;
+
+    if (!rows.length) {
+        box.innerHTML = '<p style="color:#666; font-size:14px;">No attempts in this period.</p>';
+        return;
+    }
+
+    let html = '<div class="table-wrapper"><table style="width:100%; border-collapse:collapse; font-size:14px;">';
+    html += '<thead><tr style="text-align:left; border-bottom:2px solid #eee;">' +
+        '<th style="padding:8px;">Account</th>' +
+        '<th style="padding:8px;">Attempts</th>' +
+        '<th style="padding:8px;">Failed</th>' +
+        '<th style="padding:8px;">Reasons</th>' +
+        '<th style="padding:8px;">IPs</th>' +
+        '<th style="padding:8px;">Last attempt</th>' +
+        '<th style="padding:8px;"></th></tr></thead><tbody>';
+
+    rows.forEach(row => {
+        const failed = row.failures > 0;
+        const key = securityGroupKey(row);
+        const reasons = (row.reasons || [])
+            .map(x => SECURITY_REASON_LABELS[x] || x)
+            .join(", ");
+
+        html += `<tr style="border-bottom:1px solid #f0f0f0; ${failed ? "background:#fff5f5;" : ""}">` +
+            `<td style="padding:8px; ${failed ? "color:#b00020; font-weight:600;" : ""}">${securityEscape(row.email)}` +
+            (row.role ? `<div style="font-size:12px; color:#888; font-weight:400;">${securityEscape(row.role)}</div>` : "") +
+            `</td>` +
+            `<td style="padding:8px;">${row.attempts}</td>` +
+            `<td style="padding:8px; ${failed ? "color:#b00020; font-weight:700;" : "color:#888;"}">${row.failures}</td>` +
+            `<td style="padding:8px; color:#555;">${securityEscape(reasons)}</td>` +
+            `<td style="padding:8px;">${row.ip_count}</td>` +
+            `<td style="padding:8px; color:#555;">${securityTime(row.last_attempt)}</td>` +
+            `<td style="padding:8px;"><button onclick="toggleSecurityDetail('${containerId}', '${encodeURIComponent(key)}')" style="background:none; border:1px solid #ccc; border-radius:6px; padding:4px 10px; cursor:pointer; font-size:12px;">Details</button></td>` +
+            `</tr>`;
+
+        html += `<tr class="security-detail hidden" data-key="${encodeURIComponent(key)}"><td colspan="7" style="padding:0 8px 12px 8px;"></td></tr>`;
+    });
+
+    html += "</tbody></table></div>";
+    box.innerHTML = html;
+}
+
+function toggleSecurityDetail(containerId, encodedKey) {
+    const box = document.getElementById(containerId);
+    if (!box) return;
+
+    const row = box.querySelector(`.security-detail[data-key="${encodedKey}"]`);
+    if (!row) return;
+
+    if (!row.classList.contains("hidden")) {
+        row.classList.add("hidden");
+        return;
+    }
+
+    const key = decodeURIComponent(encodedKey);
+    const entries = securityRecent.filter(r => `${r.email}|${r.surface}` === key);
+    const cell = row.querySelector("td");
+
+    if (!entries.length) {
+        cell.innerHTML = '<p style="color:#666; font-size:13px;">No individual attempts retained for this group.</p>';
+    } else {
+        let inner = '<table style="width:100%; border-collapse:collapse; font-size:13px; background:#fafafa;">';
+        inner += '<thead><tr style="text-align:left; color:#666;">' +
+            '<th style="padding:6px;">Time</th>' +
+            '<th style="padding:6px;">Result</th>' +
+            '<th style="padding:6px;">IP</th>' +
+            '<th style="padding:6px;">Device</th></tr></thead><tbody>';
+
+        entries.forEach(e => {
+            const label = e.success
+                ? '<span style="color:#0a7a3d;">Success</span>'
+                : `<span style="color:#b00020;">${securityEscape(SECURITY_REASON_LABELS[e.failure_reason] || e.failure_reason || "Failed")}</span>`;
+            inner += `<tr style="border-top:1px solid #eee;">` +
+                `<td style="padding:6px;">${securityTime(e.logged_in_at)}</td>` +
+                `<td style="padding:6px;">${label}</td>` +
+                `<td style="padding:6px;">${securityEscape(e.ip_address)}</td>` +
+                `<td style="padding:6px; color:#777;">${securityEscape((e.device_label || "").slice(0, 60))}</td>` +
+                `</tr>`;
+        });
+
+        inner += "</tbody></table>";
+        cell.innerHTML = inner;
+    }
+
+    row.classList.remove("hidden");
+}
+
+async function loadSecurityLogins() {
+    const status = document.getElementById("security-status");
+    const windowSel = document.getElementById("security-window");
+    const period = windowSel ? windowSel.value : "7d";
+
+    if (status) status.textContent = "Loading...";
+
+    // Same-origin, so an empty base is safe if API_URL is not in scope here.
+    const base = (typeof API_URL !== "undefined" && API_URL) ? API_URL : "";
+    const token = localStorage.getItem("adminToken");
+
+    try {
+        const res = await fetch(`${base}/api/admin/security/logins?window=${encodeURIComponent(period)}`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if (!res.ok) {
+            if (status) status.textContent = `Could not load (HTTP ${res.status}).`;
+            return;
+        }
+
+        const data = await res.json();
+        securityRecent = data.recent || [];
+
+        const buckets = { admin: [], staff: [], customer: [], other: [] };
+        (data.groups || []).forEach(row => buckets[securityBucket(row)].push(row));
+
+        renderSecurityGroups("security-admin", buckets.admin);
+        renderSecurityGroups("security-staff", buckets.staff);
+        renderSecurityGroups("security-customer", buckets.customer);
+
+        const otherPanel = document.getElementById("security-other-panel");
+        if (otherPanel) {
+            if (buckets.other.length) {
+                otherPanel.classList.remove("hidden");
+                renderSecurityGroups("security-other", buckets.other);
+            } else {
+                otherPanel.classList.add("hidden");
+            }
+        }
+
+        const totalFailures = (data.groups || []).reduce((sum, r) => sum + r.failures, 0);
+        if (status) {
+            status.textContent = `${(data.groups || []).length} accounts, ${totalFailures} failed attempts.`;
+        }
+    } catch (err) {
+        console.error("loadSecurityLogins error:", err);
+        if (status) status.textContent = "Could not connect to server.";
+    }
+}
+
 function setupTabs() {
     const tabButtons = document.querySelectorAll(".tab-btn");
     const tabContents = document.querySelectorAll(".tab-content");
@@ -1149,6 +1331,10 @@ function setupTabs() {
 
             if (button.dataset.tab === "categories") {
                 loadAdminCategories();
+            }
+
+            if (button.dataset.tab === "security") {
+                loadSecurityLogins();
             }
 
             if (button.dataset.tab === "account") {
