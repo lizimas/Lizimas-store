@@ -92,7 +92,7 @@
     // and drops them from the plain-text flavour entirely; Google Docs ships
     // real <ul>/<ol>. Both are normalised to real lists so numbering, bullets,
     // ticks and levels survive the paste.
-    const ALLOWED_TAGS = ["P","BR","STRONG","B","EM","I","U","UL","OL","LI"];
+    const ALLOWED_TAGS = ["P","BR","STRONG","B","EM","I","U","UL","OL","LI","SPAN"];
 
     function esc(s) {
         return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -122,7 +122,13 @@
                     walk(n, to);              // unwrap, keep the words
                     return;
                 }
+                // Only the tick span survives; every other span is unwrapped.
+                if (n.tagName === "SPAN" && !n.classList.contains("tick")) {
+                    walk(n, to);
+                    return;
+                }
                 const el = document.createElement(n.tagName.toLowerCase());
+                if (n.tagName === "SPAN") el.className = "tick";
                 if (n.tagName === "UL" && n.classList.contains("lzbe-check")) {
                     el.className = "lzbe-check";
                 }
@@ -230,6 +236,37 @@
         return out.innerHTML;
     }
 
+    // Ticks are real characters, not a CSS pseudo-element, so they survive
+    // the round trip through Postgres and copy back out to Word intact.
+    function toggleTicks(i, el) {
+        const lists = el.querySelectorAll("ul");
+        if (!lists.length) {
+            alert("This block has no bulleted list to tick.");
+            return;
+        }
+        const on = !lists[0].classList.contains("lzbe-check");
+        lists.forEach((ul) => {
+            ul.classList.toggle("lzbe-check", on);
+            Array.prototype.forEach.call(ul.children, (li) => {
+                if (li.tagName !== "LI") return;
+                const first = li.firstElementChild;
+                if (first && first.tagName === "SPAN" && first.classList.contains("tick")) {
+                    first.remove();
+                }
+                li.innerHTML = li.innerHTML.replace(/^(?:\s|&nbsp;)*[\u2713\u2714](?:\s|&nbsp;)*/, "");
+                if (on) {
+                    const s = document.createElement("span");
+                    s.className = "tick";
+                    s.textContent = "\u2713";
+                    li.insertBefore(document.createTextNode(" "), li.firstChild);
+                    li.insertBefore(s, li.firstChild);
+                }
+            });
+        });
+        blocks[i].body = sanitizeHtml(el.innerHTML);
+        el.innerHTML = blocks[i].body;
+    }
+
     function onPaste(e) {
         e.preventDefault();
         const dt = e.clipboardData || window.clipboardData;
@@ -313,6 +350,16 @@
                     ed.innerHTML = blocks[i].body;
                 });
                 row.appendChild(ed);
+
+                const tickBar = document.createElement("div");
+                tickBar.className = "lzbe-tickbar";
+                const tb = document.createElement("button");
+                tb.type = "button";
+                tb.textContent = "\u2713 Tick list";
+                tb.title = "Turn the bullets in this block into ticks";
+                tb.addEventListener("click", () => toggleTicks(i, ed));
+                tickBar.appendChild(tb);
+                row.appendChild(tickBar);
             }
 
             list.appendChild(row);

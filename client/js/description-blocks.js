@@ -36,7 +36,7 @@
         return wrap;
     }
 
-    const PDB_TAGS = ["P","BR","STRONG","B","EM","I","U","UL","OL","LI"];
+    const PDB_TAGS = ["P","BR","STRONG","B","EM","I","U","UL","OL","LI","SPAN"];
 
     // Bodies are staff-authored HTML, but re-sanitised on the way out too.
     function pdbSanitize(html) {
@@ -50,7 +50,9 @@
                 }
                 if (n.nodeType !== 1) return;
                 if (PDB_TAGS.indexOf(n.tagName) === -1) { walk(n, to); return; }
+                if (n.tagName === "SPAN" && !n.classList.contains("tick")) { walk(n, to); return; }
                 const el = document.createElement(n.tagName.toLowerCase());
+                if (n.tagName === "SPAN") el.className = "tick";
                 if (n.tagName === "UL" && n.classList.contains("lzbe-check")) {
                     el.className = "lzbe-check";
                 }

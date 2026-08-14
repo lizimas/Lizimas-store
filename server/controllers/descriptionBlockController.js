@@ -27,7 +27,7 @@ const getDescriptionBlocks = async (req, res) => {
 // Pasted paragraphs arrive as HTML so Word/Docs lists keep their numbering,
 // ticks and levels. Staff-authored, but never trusted: tags are allow-listed
 // and every attribute is dropped bar the tick-list marker class.
-const BLOCK_TAGS = ["p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li"];
+const BLOCK_TAGS = ["p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li", "span"];
 
 function stripTags(html) {
     return String(html || "")
@@ -46,6 +46,7 @@ function sanitizeBlockHtml(html) {
             if (close) return "</" + t + ">";
             if (t === "br") return "<br>";
             if (t === "ul" && /lzbe-check/.test(attrs)) return '<ul class="lzbe-check">';
+            if (t === "span") return /\btick\b/.test(attrs) ? '<span class="tick">' : "<span>";
             return "<" + t + ">";
         })
         .trim();

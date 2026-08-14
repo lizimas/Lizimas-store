@@ -231,4 +231,4 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 .pdb-text ul, .pdb-text ol { margin: 8px 0; padding-left: 24px; }
 .pdb-text li { margin: 4px 0; line-height: 1.6; }
 .pdb-text ul.lzbe-check { list-style: none; padding-left: 22px; }
-.pdb-text ul.lzbe-check > li:before { content: "\2713"; color: #b8860b; font-weight: 700; margin-left: -20px; margin-right: 8px; }
+.pdb-text .tick { color: #c0392b; font-weight: 700; }
