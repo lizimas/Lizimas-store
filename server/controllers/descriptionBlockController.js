@@ -24,6 +24,33 @@ const getDescriptionBlocks = async (req, res) => {
     }
 };
 
+// Pasted paragraphs arrive as HTML so Word/Docs lists keep their numbering,
+// ticks and levels. Staff-authored, but never trusted: tags are allow-listed
+// and every attribute is dropped bar the tick-list marker class.
+const BLOCK_TAGS = ["p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li"];
+
+function stripTags(html) {
+    return String(html || "")
+        .replace(/<[^>]*>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/\s+/g, " ");
+}
+
+function sanitizeBlockHtml(html) {
+    return String(html || "")
+        .replace(/<!--[\s\S]*?-->/g, "")
+        .replace(/<(script|style)[\s\S]*?<\/\1\s*>/gi, "")
+        .replace(/<\s*(\/?)\s*([a-zA-Z0-9]+)([^>]*)>/g, (m, close, tag, attrs) => {
+            const t = tag.toLowerCase();
+            if (BLOCK_TAGS.indexOf(t) === -1) return "";
+            if (close) return "</" + t + ">";
+            if (t === "br") return "<br>";
+            if (t === "ul" && /lzbe-check/.test(attrs)) return '<ul class="lzbe-check">';
+            return "<" + t + ">";
+        })
+        .trim();
+}
+
 // Staff/admin: replace the whole set in one transaction. Position is taken
 // from array order, so the client never has to renumber by hand.
 const saveDescriptionBlocks = async (req, res) => {
@@ -41,7 +68,9 @@ const saveDescriptionBlocks = async (req, res) => {
         if (b.type === "image" && !b.image_url) {
             return res.status(400).json({ message: `Block ${i}: image needs image_url` });
         }
-        if (b.type !== "image" && !b.body) {
+        if (b.type === "text") b.body = sanitizeBlockHtml(b.body || "");
+        if (b.type === "heading") b.body = stripTags(b.body || "").trim();
+        if (b.type !== "image" && !stripTags(b.body || "").trim()) {
             return res.status(400).json({ message: `Block ${i}: ${b.type} needs body` });
         }
     }

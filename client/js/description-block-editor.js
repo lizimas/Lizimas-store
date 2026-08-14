@@ -87,6 +87,166 @@
         }
     }
 
+    // ---- Rich paste -------------------------------------------------------
+    // Word ships list markers as Wingdings glyphs inside mso-list paragraphs
+    // and drops them from the plain-text flavour entirely; Google Docs ships
+    // real <ul>/<ol>. Both are normalised to real lists so numbering, bullets,
+    // ticks and levels survive the paste.
+    const ALLOWED_TAGS = ["P","BR","STRONG","B","EM","I","U","UL","OL","LI"];
+
+    function esc(s) {
+        return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function plainToHtml(s) {
+        return esc(s).replace(/\r\n|\r|\n/g, "<br>");
+    }
+
+    function textOf(html) {
+        const d = document.createElement("div");
+        d.innerHTML = html || "";
+        return (d.textContent || "").replace(/\u00a0/g, " ");
+    }
+
+    function sanitizeHtml(html) {
+        const doc = new DOMParser().parseFromString("<div>" + (html || "") + "</div>", "text/html");
+        const out = document.createElement("div");
+        (function walk(from, to) {
+            from.childNodes.forEach((n) => {
+                if (n.nodeType === 3) {
+                    to.appendChild(document.createTextNode(n.nodeValue));
+                    return;
+                }
+                if (n.nodeType !== 1) return;
+                if (ALLOWED_TAGS.indexOf(n.tagName) === -1) {
+                    walk(n, to);              // unwrap, keep the words
+                    return;
+                }
+                const el = document.createElement(n.tagName.toLowerCase());
+                if (n.tagName === "UL" && n.classList.contains("lzbe-check")) {
+                    el.className = "lzbe-check";
+                }
+                to.appendChild(el);
+                walk(n, el);
+            });
+        })(doc.body.firstChild, out);
+        return out.innerHTML;
+    }
+
+    function isMso(p) {
+        return p.tagName === "P" &&
+            (/mso-list/i.test(p.getAttribute("style") || "") ||
+             !!p.querySelector('span[style*="mso-list"]'));
+    }
+
+    function msoInfo(p) {
+        const marker = p.querySelector('span[style*="mso-list"]');
+        const probe = (p.getAttribute("style") || "") + " " +
+            (marker ? (marker.getAttribute("style") || "") + " " + marker.innerHTML : "");
+        const lvl = /level(\d+)/i.exec(probe);
+        const txt = marker ? (marker.textContent || "").replace(/\u00a0/g, " ").trim() : "";
+        let kind = "ul";
+        if (/Wingdings|Symbol/i.test(probe) && /^[\u00fc\u00fe\u0076]/.test(txt)) kind = "check";
+        else if (/^(\d+|[a-z]|[ivx]+)[.)]/i.test(txt)) kind = "ol";
+        return { level: lvl ? parseInt(lvl[1], 10) : 1, kind: kind, marker: marker };
+    }
+
+    function listOpen(kind) {
+        const list = document.createElement(kind === "ol" ? "ol" : "ul");
+        if (kind === "check") list.className = "lzbe-check";
+        return list;
+    }
+
+    function normalizeWordLists(root) {
+        const kids = Array.prototype.slice.call(root.children);
+        let i = 0;
+        while (i < kids.length) {
+            if (!isMso(kids[i])) { i++; continue; }
+
+            let j = i;
+            const run = [];
+            while (j < kids.length && isMso(kids[j])) { run.push(kids[j]); j++; }
+
+            const holder = document.createElement("div");
+            const stack = [];
+            run.forEach((q) => {
+                const info = msoInfo(q);
+                if (info.marker) info.marker.remove();
+                while (stack.length > info.level) stack.pop();
+                while (stack.length < info.level) {
+                    const list = listOpen(info.kind);
+                    const top = stack[stack.length - 1];
+                    (top ? (top.lastElementChild || top) : holder).appendChild(list);
+                    stack.push(list);
+                }
+                const li = document.createElement("li");
+                li.innerHTML = q.innerHTML;
+                stack[stack.length - 1].appendChild(li);
+            });
+
+            while (holder.firstChild) root.insertBefore(holder.firstChild, run[0]);
+            run.forEach((q) => q.remove());
+            i = j;
+        }
+    }
+
+    function plainToLists(text) {
+        const lines = String(text).replace(/\r\n|\r/g, "\n").split("\n");
+        const out = document.createElement("div");
+        const stack = [];
+        const RE = /^([ \t\u00a0]*)([-*\u2022\u2713\u2714]|\d+[.)]|[a-zA-Z][.)])[ \t]+(.*)$/;
+
+        lines.forEach((raw) => {
+            const m = RE.exec(raw);
+            if (!m) {
+                stack.length = 0;
+                const t = raw.trim();
+                if (!t) return;
+                const p = document.createElement("p");
+                p.textContent = t;
+                out.appendChild(p);
+                return;
+            }
+            const level = Math.floor(m[1].replace(/\t/g, "  ").length / 2) + 1;
+            const tok = m[2];
+            const kind = /^[\u2713\u2714]/.test(tok) ? "check"
+                : (/^(\d+|[a-zA-Z])[.)]/.test(tok) ? "ol" : "ul");
+            while (stack.length > level) stack.pop();
+            while (stack.length < level) {
+                const list = listOpen(kind);
+                const top = stack[stack.length - 1];
+                (top ? (top.lastElementChild || top) : out).appendChild(list);
+                stack.push(list);
+            }
+            const li = document.createElement("li");
+            li.textContent = m[3];
+            stack[stack.length - 1].appendChild(li);
+        });
+        return out.innerHTML;
+    }
+
+    function onPaste(e) {
+        e.preventDefault();
+        const dt = e.clipboardData || window.clipboardData;
+        if (!dt) return;
+        const html = dt.getData("text/html");
+        const plain = dt.getData("text/plain") || "";
+        let cleaned = "";
+        try {
+            if (html) {
+                const doc = new DOMParser().parseFromString(html, "text/html");
+                normalizeWordLists(doc.body);
+                cleaned = sanitizeHtml(doc.body.innerHTML);
+            } else {
+                cleaned = plainToLists(plain);
+            }
+        } catch (err) {
+            console.error("paste normalise:", err);
+        }
+        if (!textOf(cleaned).trim()) cleaned = plainToLists(plain);
+        document.execCommand("insertHTML", false, cleaned);
+    }
+
     function render() {
         const list = document.getElementById("lzbe-list");
         if (!list) return;
@@ -126,13 +286,28 @@
                 dim.className = "lzbe-dim";
                 dim.textContent = `${b.image_width} × ${b.image_height}`;
                 row.appendChild(dim);
-            } else {
+            } else if (b.type === "heading") {
                 const ta = document.createElement("textarea");
-                ta.rows = b.type === "heading" ? 1 : 4;
-                ta.placeholder = b.type === "heading" ? "Section heading" : "Paragraph text";
+                ta.rows = 1;
+                ta.placeholder = "Section heading";
                 ta.value = b.body || "";
                 ta.addEventListener("input", (e) => { blocks[i].body = e.target.value; });
                 row.appendChild(ta);
+            } else {
+                const ed = document.createElement("div");
+                ed.className = "lzbe-rich";
+                ed.contentEditable = "true";
+                ed.dataset.ph = "Paragraph text \u2014 paste from Word or Docs and lists, ticks and levels are kept";
+                ed.innerHTML = /<[a-z][\s\S]*>/i.test(b.body || "")
+                    ? sanitizeHtml(b.body)
+                    : plainToHtml(b.body || "");
+                ed.addEventListener("paste", onPaste);
+                ed.addEventListener("input", () => { blocks[i].body = ed.innerHTML; });
+                ed.addEventListener("blur", () => {
+                    blocks[i].body = sanitizeHtml(ed.innerHTML);
+                    ed.innerHTML = blocks[i].body;
+                });
+                row.appendChild(ed);
             }
 
             list.appendChild(row);
@@ -212,7 +387,8 @@
         if (!id) return { ok: false, message: "No product id" };
 
         for (const [i, b] of blocks.entries()) {
-            if (b.type !== "image" && !(b.body || "").trim()) {
+            if (b.type === "text") b.body = sanitizeHtml(b.body || "");
+            if (b.type !== "image" && !textOf(b.body).trim()) {
                 return { ok: false, message: `Block ${i + 1} (${b.type}) is empty` };
             }
         }

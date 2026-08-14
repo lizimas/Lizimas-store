@@ -1222,3 +1222,13 @@ select.status-select {
     max-height: none;
     overflow: visible;
 }
+
+
+/* Rich text block: pasted lists keep numbering, ticks and levels. */
+.lzbe-rich { min-height: 90px; border: 1px solid #ccd0d9; border-radius: 4px; padding: 8px 10px; font-size: 0.9rem; line-height: 1.5; background: #fff; overflow-wrap: break-word; }
+.lzbe-rich:focus { outline: none; border-color: #0d1b3e; }
+.lzbe-rich:empty:before { content: attr(data-ph); color: #9aa0ab; }
+.lzbe-rich ul, .lzbe-rich ol { margin: 6px 0; padding-left: 22px; }
+.lzbe-rich li { margin: 2px 0; }
+.lzbe-rich ul.lzbe-check { list-style: none; padding-left: 20px; }
+.lzbe-rich ul.lzbe-check > li:before { content: "\2713"; color: #b8860b; font-weight: 700; margin-left: -18px; margin-right: 8px; }

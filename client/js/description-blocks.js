@@ -36,6 +36,31 @@
         return wrap;
     }
 
+    const PDB_TAGS = ["P","BR","STRONG","B","EM","I","U","UL","OL","LI"];
+
+    // Bodies are staff-authored HTML, but re-sanitised on the way out too.
+    function pdbSanitize(html) {
+        const doc = new DOMParser().parseFromString("<div>" + (html || "") + "</div>", "text/html");
+        const out = document.createElement("div");
+        (function walk(from, to) {
+            from.childNodes.forEach((n) => {
+                if (n.nodeType === 3) {
+                    to.appendChild(document.createTextNode(n.nodeValue));
+                    return;
+                }
+                if (n.nodeType !== 1) return;
+                if (PDB_TAGS.indexOf(n.tagName) === -1) { walk(n, to); return; }
+                const el = document.createElement(n.tagName.toLowerCase());
+                if (n.tagName === "UL" && n.classList.contains("lzbe-check")) {
+                    el.className = "lzbe-check";
+                }
+                to.appendChild(el);
+                walk(n, el);
+            });
+        })(doc.body.firstChild, out);
+        return out.innerHTML;
+    }
+
     function render(blocks) {
         const frag = document.createDocumentFragment();
         blocks.forEach((b) => {
@@ -46,7 +71,13 @@
                 h.className = "pdb-heading";
                 h.textContent = b.body;
                 frag.appendChild(h);
+            } else if (/<(p|ul|ol|li|br|strong|em|b|i|u)\b/i.test(b.body || "")) {
+                const d = document.createElement("div");
+                d.className = "pdb-text";
+                d.innerHTML = pdbSanitize(b.body);
+                frag.appendChild(d);
             } else {
+                // Legacy plain-text blocks, authored before rich paste existed.
                 const p = document.createElement("p");
                 p.className = "pdb-text";
                 p.textContent = b.body;
