@@ -3340,7 +3340,7 @@ body.sheet-open {
     position: relative;
     border-radius: 16px;
     overflow: hidden;
-    background: #e5e7eb;
+    background: #ffffff;
     aspect-ratio: 16 / 7;
 }
 
@@ -3573,9 +3573,7 @@ body.sheet-open {
 #ls-promo-1 { aspect-ratio: 16 / 5.5; }
 #ls-promo-2 { aspect-ratio: 16 / 7.5; }
 
-@media (max-width: 720px) {
-    #ls-promo-1 { aspect-ratio: 16 / 7; }
-}
+
 
 /* Product rows: one horizontal carousel per level-2 category */
 .ls-row {
