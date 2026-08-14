@@ -19,6 +19,9 @@ const {
     disable2FA,
     verifyLogin2FA,
     requestEmail2FACode,
+    getDeviceRequestStatus,
+    getDeviceRequestDetails,
+    decideDeviceRequestHandler,
     listSessions,
     deleteSession,
     getProfile,
@@ -37,6 +40,11 @@ router.post("/admin-login", loginLimiter, adminLogin);
 router.post("/staff-login", loginLimiter, staffLogin);
 router.post("/login/2fa", otpLimiter, verifyLogin2FA);
 router.post("/login/2fa/email", otpLimiter, requestEmail2FACode);
+
+// Device approval (phase 4c). No auth: the tokens are the credential.
+router.get("/device-request/:ref/status", getDeviceRequestStatus);
+router.get("/device-request", getDeviceRequestDetails);
+router.post("/device-request/decide", otpLimiter, decideDeviceRequestHandler);
 router.post("/complete-forced-reset", completeForcedPasswordReset);
 router.post("/forgot-password", otpLimiter, forgotPassword);
 router.post("/reset-password", otpLimiter, resetPassword);

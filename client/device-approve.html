@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Approve sign-in - Lizimas Store</title>
+<style>
+  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:#f4f5f7; color:#0d1b3e; }
+  .wrap { max-width:520px; margin:0 auto; padding:32px 18px; }
+  .card { background:#fff; border-radius:10px; padding:24px; box-shadow:0 2px 14px rgba(13,27,62,.08); }
+  h1 { font-size:1.25rem; margin:0 0 6px; }
+  .lede { color:#555; font-size:.92rem; margin:0 0 20px; line-height:1.5; }
+  dl { display:grid; grid-template-columns:auto 1fr; gap:8px 14px; margin:0 0 22px; font-size:.9rem; }
+  dt { color:#777; }
+  dd { margin:0; word-break:break-word; }
+  button { width:100%; padding:13px; border:0; border-radius:6px; font-size:.95rem; font-weight:600; cursor:pointer; }
+  .ok { background:#0d1b3e; color:#fff; }
+  .no { background:#fff; color:#c0392b; border:1px solid #c0392b; margin-top:10px; }
+  button:disabled { opacity:.55; cursor:default; }
+  .msg { padding:14px; border-radius:6px; font-size:.92rem; line-height:1.5; }
+  .msg.good { background:#eaf6ee; color:#1e6b3a; }
+  .msg.bad { background:#fbeaea; color:#a5281b; }
+  .warn { font-size:.85rem; color:#a5281b; margin:16px 0 0; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card" id="card">
+  <p class="lede">Loading this request…</p>
+</div></div>
+
+<script>
+(function () {
+  var params = new URLSearchParams(location.search);
+  var token = params.get("t") || params.get("d");
+  var action = params.get("t") ? "approve" : "deny";
+  var card = document.getElementById("card");
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  function message(kind, text) {
+    card.innerHTML = '<div class="msg ' + kind + '">' + esc(text) + "</div>";
+  }
+
+  if (!token) { message("bad", "This link is incomplete. Open it again from your email."); return; }
+
+  fetch("/api/auth/device-request?" + (action === "approve" ? "t=" : "d=") + encodeURIComponent(token))
+    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+    .then(function (res) {
+      if (!res.ok) { message("bad", res.d.error || "This link is not valid."); return; }
+      var q = res.d;
+
+      if (q.status !== "pending") {
+        message(q.status === "approved" ? "good" : "bad", "This request was already " + q.status + ".");
+        return;
+      }
+
+      card.innerHTML =
+        "<h1>" + (action === "approve" ? "Approve this sign-in?" : "Refuse this sign-in?") + "</h1>" +
+        '<p class="lede">Someone signed in with the correct password on a device we do not recognise.</p>' +
+        "<dl>" +
+          "<dt>Account</dt><dd>" + esc(q.email) + "</dd>" +
+          "<dt>Portal</dt><dd>" + esc(q.surface || "unknown") + "</dd>" +
+          "<dt>IP address</dt><dd>" + esc(q.ip || "unknown") + "</dd>" +
+          "<dt>Device</dt><dd>" + esc(q.userAgent || "unknown") + "</dd>" +
+          "<dt>Requested</dt><dd>" + esc(new Date(q.requestedAt).toLocaleString()) + "</dd>" +
+        "</dl>" +
+        (action === "approve"
+          ? '<button class="ok" id="go">Yes, this was me</button>' +
+            '<p class="warn">Only approve if you are the one signing in right now. The sign-in still has to pass your authenticator afterwards.</p>'
+          : '<button class="no" id="go">No, this was not me</button>' +
+            '<p class="warn">This locks the account, signs out every device, and forces a password reset.</p>');
+
+      document.getElementById("go").addEventListener("click", function () {
+        var btn = this;
+        btn.disabled = true;
+        btn.textContent = "Working…";
+        fetch("/api/auth/device-request/decide", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: token, decision: action })
+        })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+          .then(function (res) {
+            if (!res.ok) { message("bad", res.d.error || "Could not record that."); return; }
+            message(res.d.denied ? "bad" : "good", res.d.message);
+          })
+          .catch(function () { message("bad", "Network error. Please try again."); });
+      });
+    })
+    .catch(function () { message("bad", "Could not load this request."); });
+})();
+</script>
+</body>
+</html>

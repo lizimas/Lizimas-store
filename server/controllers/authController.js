@@ -53,33 +53,32 @@ async function deviceGate(user, req, surface) {
     const device = await findTrustedDevice(user.id, readDeviceToken(req));
     if (device) return null;
 
-    // Lock, but never overwrite an existing lock time - the first refusal is
-    // the one worth keeping.
-    await pool.query(
-        `UPDATE users
-            SET security_locked_at = COALESCE(security_locked_at, NOW()),
-                security_locked_reason = 'unknown_device'
-          WHERE id = $1`,
-        [user.id]
-    );
+    // Phase 4c: raise a pending request rather than locking. The account is
+    // only locked if the owner actively denies it from the emailed link.
+    const { createDeviceRequest } = require("../utils/deviceTrust");
+    const request = await createDeviceRequest(user.id, req, surface);
 
     await logLoginAttempt(user.id, req, false, {
         surface: surface,
-        failureReason: "unknown_device",
+        failureReason: "device_pending",
         attemptedEmail: user.email
     });
 
-    const { sendSecurityLockAlert } = require("../utils/mailer");
-    sendSecurityLockAlert({
+    const base = `${req.protocol}://${req.get("host")}`;
+    const { sendDeviceApprovalRequest } = require("../utils/mailer");
+    sendDeviceApprovalRequest({
         email: user.email,
+        name: user.name,
         role: user.role,
         surface: surface,
         ip: req.headers["cf-connecting-ip"] || req.ip,
         userAgent: req.headers["user-agent"] || "unknown",
-        time: new Date().toISOString()
-    }).catch(err => console.error("Security lock alert failed:", err));
+        time: new Date().toISOString(),
+        approveUrl: `${base}/device-approve.html?t=${request.approveToken}`,
+        denyUrl: `${base}/device-approve.html?d=${request.denyToken}`
+    }).catch(err => console.error("Device approval email failed:", err));
 
-    return "This account has been locked because the sign-in came from an unrecognised device. Please contact the administrator.";
+    return { pending: true, ref: request.ref, expiresAt: request.expiresAt };
 }
 
 async function createSession(userId, req, res) {
@@ -318,9 +317,21 @@ async function handleLogin(req, res, allowedRoles, surface) {
 
         // Before must_reset_password and before either 2FA branch, so an
         // unrecognised device cannot mint a pendingToken of any kind.
-        const deviceRefusal = await deviceGate(user, req, surface);
-        if (deviceRefusal) {
-            return res.status(403).json({ error: deviceRefusal });
+        const deviceCheck = await deviceGate(user, req, surface);
+        if (deviceCheck && deviceCheck.pending) {
+            // The browser holds this ref and polls; the pendingToken carries it
+            // so an approval granted for this login cannot be spent by another.
+            const pendingToken = jwt.sign(
+                { userId: user.id, email: user.email, pending2FA: true, deviceRef: deviceCheck.ref },
+                JWT_SECRET,
+                { expiresIn: "15m" }
+            );
+            return res.status(202).json({
+                requiresDeviceApproval: true,
+                pendingToken,
+                expiresAt: deviceCheck.expiresAt,
+                message: "We have emailed you to confirm this sign-in. Approve it to continue."
+            });
         }
 
         if (user.must_reset_password) {
@@ -559,9 +570,21 @@ async function adminLogin(req, res) {
             return res.status(403).json({ error: "Your account is pending activation." });
         }
 
-        const deviceRefusal = await deviceGate(user, req, "admin");
-        if (deviceRefusal) {
-            return res.status(403).json({ error: deviceRefusal });
+        const deviceCheck = await deviceGate(user, req, "admin");
+        if (deviceCheck && deviceCheck.pending) {
+            // The browser holds this ref and polls; the pendingToken carries it
+            // so an approval granted for this login cannot be spent by another.
+            const pendingToken = jwt.sign(
+                { userId: user.id, email: user.email, pending2FA: true, deviceRef: deviceCheck.ref },
+                JWT_SECRET,
+                { expiresIn: "15m" }
+            );
+            return res.status(202).json({
+                requiresDeviceApproval: true,
+                pendingToken,
+                expiresAt: deviceCheck.expiresAt,
+                message: "We have emailed you to confirm this sign-in. Approve it to continue."
+            });
         }
 
         if (user.must_reset_password) {
@@ -1241,11 +1264,113 @@ module.exports = {
     disable2FA: exports.disable2FA,
     verifyLogin2FA,
     requestEmail2FACode,
+    getDeviceRequestStatus,
+    getDeviceRequestDetails,
+    decideDeviceRequestHandler,
     listSessions,
     deleteSession
 };
 
 // Send a one-time login code by email as a fallback to the authenticator app
+// ---- Device approval endpoints (phase 4c) --------------------------------
+
+// Polled by the waiting browser. Deliberately says nothing about the account:
+// holding the ref proves only that you started this login, not that you own it.
+async function getDeviceRequestStatus(req, res) {
+    try {
+        const { findDeviceRequest } = require("../utils/deviceTrust");
+        const request = await findDeviceRequest("ref_hash", req.params.ref);
+        if (!request) return res.status(404).json({ error: "Unknown request." });
+        return res.json({ status: request.status });
+    } catch (error) {
+        console.error("getDeviceRequestStatus:", error);
+        return res.status(500).json({ error: "Could not check status." });
+    }
+}
+
+// Renders the confirmation page's content. A GET never decides anything, so a
+// mail scanner fetching the link cannot approve a sign-in.
+async function getDeviceRequestDetails(req, res) {
+    try {
+        const { findDeviceRequest } = require("../utils/deviceTrust");
+        const token = req.query.t || req.query.d;
+        const column = req.query.t ? "approve_token_hash" : "deny_token_hash";
+        const request = await findDeviceRequest(column, token);
+        if (!request) return res.status(404).json({ error: "This link is not valid." });
+
+        return res.json({
+            status: request.status,
+            action: req.query.t ? "approve" : "deny",
+            email: request.email,
+            role: request.role,
+            surface: request.surface,
+            ip: request.ip_address,
+            userAgent: request.user_agent,
+            requestedAt: request.created_at,
+            expiresAt: request.expires_at
+        });
+    } catch (error) {
+        console.error("getDeviceRequestDetails:", error);
+        return res.status(500).json({ error: "Could not load this request." });
+    }
+}
+
+async function decideDeviceRequestHandler(req, res) {
+    try {
+        const { findDeviceRequest, decideDeviceRequest } = require("../utils/deviceTrust");
+        const { token, decision } = req.body;
+
+        if (!["approve", "deny"].includes(decision)) {
+            return res.status(400).json({ error: "Unknown decision." });
+        }
+
+        const column = decision === "approve" ? "approve_token_hash" : "deny_token_hash";
+        const request = await findDeviceRequest(column, token);
+        if (!request) return res.status(404).json({ error: "This link is not valid." });
+        if (request.status !== "pending") {
+            return res.status(409).json({ error: `This request was already ${request.status}.` });
+        }
+
+        const updated = await decideDeviceRequest(request.id, decision === "approve" ? "approved" : "denied");
+        if (!updated) return res.status(409).json({ error: "This request has expired." });
+
+        if (decision === "approve") {
+            return res.json({ ok: true, message: "Approved. Return to the sign-in page — it will continue on its own." });
+        }
+
+        // Denial is the security event: the password is known to someone else,
+        // so lock the account, evict every live session, and force a reset.
+        await pool.query(
+            `UPDATE users
+                SET security_locked_at = COALESCE(security_locked_at, NOW()),
+                    security_locked_reason = 'device_denied',
+                    must_reset_password = TRUE
+              WHERE id = $1`,
+            [request.user_id]
+        );
+        await pool.query("DELETE FROM sessions WHERE user_id = $1", [request.user_id]);
+
+        const { sendSecurityLockAlert } = require("../utils/mailer");
+        sendSecurityLockAlert({
+            email: request.email,
+            role: request.role,
+            surface: request.surface,
+            ip: request.ip_address,
+            userAgent: request.user_agent,
+            time: new Date().toISOString()
+        }).catch(err => console.error("Security lock alert failed:", err));
+
+        return res.json({
+            ok: true,
+            denied: true,
+            message: "Sign-in refused. The account is locked and every signed-in device has been signed out."
+        });
+    } catch (error) {
+        console.error("decideDeviceRequestHandler:", error);
+        return res.status(500).json({ error: "Could not record that decision." });
+    }
+}
+
 async function requestEmail2FACode(req, res) {
     try {
         const { pendingToken } = req.body;
@@ -1262,6 +1387,13 @@ async function requestEmail2FACode(req, res) {
 
         if (!decoded.pending2FA) {
             return res.status(401).json({ error: "Invalid session. Please log in again." });
+        }
+
+        // An unrecognised device must use the authenticator. Sending a code to
+        // the same inbox that approves the device would make one compromised
+        // mailbox sufficient on its own.
+        if (decoded.deviceRef) {
+            return res.status(403).json({ error: "Please use your authenticator app to complete this sign-in." });
         }
 
         const userResult = await pool.query(
@@ -1374,6 +1506,30 @@ async function verifyLogin2FA(req, res) {
                 attemptedEmail: user.email
             });
             return res.status(401).json({ error: "Invalid code. Please try again." });
+        }
+
+        // Both factors are checked here rather than at the gate: an approved
+        // request with a wrong TOTP code must not leave the door ajar.
+        if (decoded.deviceRef) {
+            const { findDeviceRequest, consumeDeviceRequest } = require("../utils/deviceTrust");
+            const request = await findDeviceRequest("ref_hash", decoded.deviceRef);
+
+            if (!request || request.user_id !== user.id) {
+                return res.status(403).json({ error: "This sign-in is no longer valid. Please log in again." });
+            }
+            if (request.status === "denied") {
+                return res.status(403).json({ error: "This sign-in was refused." });
+            }
+            if (request.status !== "approved") {
+                return res.status(403).json({ error: "This sign-in has not been approved yet." });
+            }
+
+            // Single-use, and claimed before the session exists so a race
+            // cannot mint two sessions from one approval.
+            const consumed = await consumeDeviceRequest(request.id);
+            if (!consumed) {
+                return res.status(403).json({ error: "This approval has already been used." });
+            }
         }
 
         const sessionToken = await createSession(user.id, req, res);

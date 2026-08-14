@@ -1,3 +1,56 @@
+// Device approval (phase 4c): the sign-in is on hold until the account owner
+// decides from the emailed link. Poll until they do, then fall through to the
+// authenticator prompt — approval alone never completes a login.
+function lzShowDeviceWait(data, onApproved) {
+    pendingLoginToken = data.pendingToken;
+
+    ["login-email", "login-password", "login-btn"].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.add("hidden");
+    });
+
+    var err = document.getElementById("login-error");
+    var deadline = new Date(data.expiresAt).getTime();
+    var stopped = false;
+
+    function say(text) { if (err) err.textContent = text; }
+
+    say("We have emailed you to confirm this sign-in. Approve it from that email — this page will continue on its own.");
+
+    var timer = setInterval(function () {
+        if (stopped) return;
+
+        if (Date.now() > deadline) {
+            clearInterval(timer);
+            say("This sign-in request expired. Please log in again.");
+            setTimeout(function () { location.reload(); }, 4000);
+            return;
+        }
+
+        fetch("/api/auth/device-request/" + encodeURIComponent(data.ref) + "/status")
+            .then(function (r) { return r.json(); })
+            .then(function (s) {
+                if (stopped) return;
+
+                if (s.status === "approved") {
+                    stopped = true;
+                    clearInterval(timer);
+                    onApproved();
+                } else if (s.status === "denied") {
+                    stopped = true;
+                    clearInterval(timer);
+                    say("This sign-in was refused. The account has been locked.");
+                } else if (s.status === "expired") {
+                    stopped = true;
+                    clearInterval(timer);
+                    say("This sign-in request expired. Please log in again.");
+                    setTimeout(function () { location.reload(); }, 4000);
+                }
+            })
+            .catch(function () { /* transient - the next tick retries */ });
+    }, 3000);
+}
+
 const API_URL = "";
 
 function getToken() {
@@ -46,6 +99,16 @@ async function handleLogin() {
 
         if (!response.ok) {
             document.getElementById("login-error").textContent = data.error || "Login failed.";
+            return;
+        }
+
+        if (data.requiresDeviceApproval) {
+            lzShowDeviceWait(data, function () {
+                document.getElementById("login-2fa-code").classList.remove("hidden");
+                document.getElementById("login-2fa-btn").classList.remove("hidden");
+                document.getElementById("login-error").textContent =
+                    "Approved. Enter the 6-digit code from your authenticator app.";
+            });
             return;
         }
 

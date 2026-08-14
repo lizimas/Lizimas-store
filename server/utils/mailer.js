@@ -170,4 +170,33 @@ async function sendSecurityLockAlert(details) {
     }
 }
 
-module.exports = { sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert };
+async function sendDeviceApprovalRequest(details) {
+    const { email, name, role, surface, ip, userAgent, time, approveUrl, denyUrl } = details;
+
+    const html = `
+        <h2>New sign-in needs your approval</h2>
+        <p>Someone signed in with the correct password for <strong>${email}</strong> on a device we do not recognise. The sign-in is on hold until you decide.</p>
+        <table cellpadding="6" style="border-collapse:collapse;font-size:14px">
+            <tr><td><strong>Account</strong></td><td>${email} (${role || "unknown"})</td></tr>
+            <tr><td><strong>Portal</strong></td><td>${surface || "unknown"}</td></tr>
+            <tr><td><strong>IP address</strong></td><td>${ip || "unknown"}</td></tr>
+            <tr><td><strong>Device</strong></td><td>${userAgent || "unknown"}</td></tr>
+            <tr><td><strong>Time</strong></td><td>${time}</td></tr>
+        </table>
+        <p style="margin:24px 0">
+            <a href="${approveUrl}" style="background:#0d1b3e;color:#fff;padding:12px 22px;border-radius:4px;text-decoration:none;margin-right:10px">This was me</a>
+            <a href="${denyUrl}" style="background:#c0392b;color:#fff;padding:12px 22px;border-radius:4px;text-decoration:none">This was not me</a>
+        </p>
+        <p style="font-size:13px;color:#555">Approving opens a confirmation page — the sign-in still has to pass your authenticator afterwards. This request expires in 10 minutes.</p>
+        <p style="font-size:13px;color:#c0392b"><strong>If this was not you, choose "This was not me".</strong> The account will be locked and your password reset.</p>
+    `;
+
+    await transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: [email, process.env.ADMIN_ALERT_EMAIL].filter(Boolean).join(","),
+        subject: `Approve sign-in for ${email}`,
+        html
+    });
+}
+
+module.exports = { sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert };

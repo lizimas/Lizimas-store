@@ -103,7 +103,100 @@ async function issueDeviceCookie(res, req, userId) {
     }
 }
 
+// ---- Device approval requests (phase 4c) --------------------------------
+// An unrecognised device raises one of these instead of locking the account.
+// Three separate secrets: a ref the browser polls with, and one token each for
+// approve and deny, so a denial link can never be replayed as an approval.
+const REQUEST_TTL_MS = 10 * 60 * 1000;
+
+async function createDeviceRequest(userId, req, surface) {
+    // Only one live request per account: a second login attempt supersedes
+    // the first rather than leaving two approvable rows in the wild.
+    await pool.query(
+        "UPDATE device_requests SET status = 'expired' WHERE user_id = $1 AND status = 'pending'",
+        [userId]
+    );
+
+    const ref = crypto.randomBytes(32).toString("hex");
+    const approveToken = crypto.randomBytes(32).toString("hex");
+    const denyToken = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + REQUEST_TTL_MS);
+
+    await pool.query(
+        `INSERT INTO device_requests
+           (user_id, ref_hash, approve_token_hash, deny_token_hash,
+            surface, ip_address, user_agent, expires_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [
+            userId,
+            hashToken(ref),
+            hashToken(approveToken),
+            hashToken(denyToken),
+            surface || null,
+            clientIp(req),
+            (req.headers["user-agent"] || "Unknown device").slice(0, 500),
+            expiresAt
+        ]
+    );
+
+    return { ref, approveToken, denyToken, expiresAt };
+}
+
+// Lookup by any of the three secrets. Expiry is evaluated on read so a row
+// never has to be swept to stop being usable.
+async function findDeviceRequest(column, rawToken) {
+    if (!rawToken) return null;
+    if (!["ref_hash", "approve_token_hash", "deny_token_hash"].includes(column)) return null;
+
+    const result = await pool.query(
+        `SELECT d.*, u.email, u.name, u.role
+           FROM device_requests d
+           JOIN users u ON u.id = d.user_id
+          WHERE d.${column} = $1`,
+        [hashToken(rawToken)]
+    );
+    if (result.rows.length === 0) return null;
+
+    const row = result.rows[0];
+    if (row.status === "pending" && new Date(row.expires_at) < new Date()) {
+        await pool.query("UPDATE device_requests SET status = 'expired' WHERE id = $1", [row.id]);
+        row.status = "expired";
+    }
+    return row;
+}
+
+// Guarded by status so a double-tap on the emailed link cannot flip an
+// already-decided request.
+async function decideDeviceRequest(id, decision) {
+    const result = await pool.query(
+        `UPDATE device_requests
+            SET status = $2, decided_at = NOW()
+          WHERE id = $1 AND status = 'pending' AND expires_at > NOW()
+      RETURNING *`,
+        [id, decision]
+    );
+    return result.rows[0] || null;
+}
+
+// Single-use: consumed in the same breath as the session is created, so an
+// approval cannot be spent twice.
+async function consumeDeviceRequest(id) {
+    const result = await pool.query(
+        `UPDATE device_requests
+            SET status = 'consumed', consumed_at = NOW()
+          WHERE id = $1 AND status = 'approved'
+      RETURNING *`,
+        [id]
+    );
+    return result.rows[0] || null;
+}
+
 module.exports = {
+    createDeviceRequest,
+    findDeviceRequest,
+    decideDeviceRequest,
+    consumeDeviceRequest,
+    REQUEST_TTL_MS,
     COOKIE_NAME,
     isEnforced,
     hashToken,
