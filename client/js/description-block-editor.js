@@ -141,13 +141,18 @@
 
     function msoInfo(p) {
         const marker = p.querySelector('span[style*="mso-list"]');
-        const probe = (p.getAttribute("style") || "") + " " +
-            (marker ? (marker.getAttribute("style") || "") + " " + marker.innerHTML : "");
+        // Word puts the font on an ancestor of the mso-list span, so walk up
+        // for it. The glyph itself is the reliable signal: Wingdings maps the
+        // tick to u00fc and the ticked box to u00fe.
+        let fonts = "";
+        let n = marker;
+        while (n && n !== p) { fonts += " " + (n.getAttribute("style") || ""); n = n.parentElement; }
+        const probe = (p.getAttribute("style") || "") + " " + fonts;
         const lvl = /level(\d+)/i.exec(probe);
         const txt = marker ? (marker.textContent || "").replace(/\u00a0/g, " ").trim() : "";
         let kind = "ul";
-        if (/Wingdings|Symbol/i.test(probe) && /^[\u00fc\u00fe\u0076]/.test(txt)) kind = "check";
-        else if (/^(\d+|[a-z]|[ivx]+)[.)]/i.test(txt)) kind = "ol";
+        if (/^[\u00fc\u00fe\u2713\u2714]/.test(txt)) kind = "check";
+        else if (/^(\d+|[a-zA-Z]|[ivxIVX]+)[.)]/.test(txt)) kind = "ol";
         return { level: lvl ? parseInt(lvl[1], 10) : 1, kind: kind, marker: marker };
     }
 
