@@ -305,6 +305,10 @@
                             <div class="product-form-section">
                                 <h4>Details</h4>
                                 <div class="field-row">
+                                    <select id="promo-layout" onchange="togglePromoLayout()">
+                                        <option value="image">Image banner &mdash; artwork only</option>
+                                        <option value="text">Text banner &mdash; typed copy</option>
+                                    </select>
                                     <input type="text" id="promo-title" placeholder="Title (optional, for your reference)">
                                     <select id="promo-slot">
                                         <option value="1">Slot 1 &mdash; top banner</option>
@@ -315,8 +319,18 @@
                                 </div>
                             </div>
 
+                            <div class="product-form-section hidden" id="promo-copy-section">
+                                <h4>Copy</h4>
+                                <div class="field-row">
+                                    <input type="text" id="promo-headline" maxlength="80" placeholder="Headline (required for a text banner)">
+                                    <input type="text" id="promo-subtext" maxlength="200" placeholder="Subtext (optional)">
+                                    <input type="text" id="promo-cta" maxlength="40" placeholder="Button label, e.g. Shop now (optional)">
+                                    <input type="text" id="promo-bg" maxlength="16" placeholder="Background colour, e.g. #ffffff">
+                                </div>
+                            </div>
+
                             <div class="product-form-section">
-                                <h4>Image</h4>
+                                <h4 id="promo-image-heading">Image</h4>
                                 <div class="drag-drop-zone" id="promo-image-dropzone">
                                     Tap to choose a promotional image
                                 </div>
@@ -562,7 +576,7 @@
 <script src="js/prepare-picked-file.js?v=9"></script>
 <script src="js/description-block-editor.js?v=5"></script>
 <script src="js/category-select.js?v=2"></script>
-    <script src="js/admin.js?v=28"></script>
+    <script src="js/admin.js?v=29"></script>
 <script src="js/photo-crop.js"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

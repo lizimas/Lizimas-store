@@ -3253,6 +3253,12 @@ function openPromoForm() {
     document.getElementById("promo-slot").value = "1";
     document.getElementById("promo-link").value = "";
     document.getElementById("promo-order").value = "";
+    document.getElementById("promo-layout").value = "image";
+    document.getElementById("promo-headline").value = "";
+    document.getElementById("promo-subtext").value = "";
+    document.getElementById("promo-cta").value = "";
+    document.getElementById("promo-bg").value = "";
+    togglePromoLayout();
     document.getElementById("promo-image-preview").innerHTML = "";
     document.getElementById("promo-form-error").textContent = "";
     promoPickedFile = null;
@@ -3269,6 +3275,12 @@ function editPromo(id) {
     document.getElementById("promo-slot").value = String(p.slot);
     document.getElementById("promo-link").value = p.link_url || "";
     document.getElementById("promo-order").value = p.display_order;
+    document.getElementById("promo-layout").value = p.layout || "image";
+    document.getElementById("promo-headline").value = p.headline || "";
+    document.getElementById("promo-subtext").value = p.subtext || "";
+    document.getElementById("promo-cta").value = p.cta_label || "";
+    document.getElementById("promo-bg").value = p.bg_color || "";
+    togglePromoLayout();
     document.getElementById("promo-form-error").textContent = "";
     promoPickedFile = null;
 
@@ -3281,6 +3293,13 @@ function editPromo(id) {
 function closePromoForm() {
     document.getElementById("promo-form-container").classList.add("hidden");
     promoPickedFile = null;
+}
+
+function togglePromoLayout() {
+    const isText = document.getElementById("promo-layout").value === "text";
+    document.getElementById("promo-copy-section").classList.toggle("hidden", !isText);
+    document.getElementById("promo-image-heading").textContent =
+        isText ? "Image (optional cutout)" : "Image";
 }
 
 function setupPromoImagePicker() {
@@ -3317,8 +3336,15 @@ async function savePromo() {
     errorEl.textContent = "";
 
     const id = document.getElementById("promo-id").value;
-    if (!id && !promoPickedFile) {
+    const layout = document.getElementById("promo-layout").value;
+    const headline = document.getElementById("promo-headline").value.trim();
+
+    if (layout === "image" && !id && !promoPickedFile) {
         errorEl.textContent = "An image is required.";
+        return;
+    }
+    if (layout === "text" && !headline) {
+        errorEl.textContent = "A text banner needs a headline.";
         return;
     }
 
@@ -3327,6 +3353,11 @@ async function savePromo() {
     formData.append("slot", document.getElementById("promo-slot").value);
     formData.append("link_url", document.getElementById("promo-link").value.trim());
     formData.append("display_order", document.getElementById("promo-order").value || 0);
+    formData.append("layout", layout);
+    formData.append("headline", headline);
+    formData.append("subtext", document.getElementById("promo-subtext").value.trim());
+    formData.append("cta_label", document.getElementById("promo-cta").value.trim());
+    formData.append("bg_color", document.getElementById("promo-bg").value.trim() || "#ffffff");
     if (promoPickedFile) formData.append("image", promoPickedFile);
 
     try {
