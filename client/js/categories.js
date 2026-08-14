@@ -147,11 +147,39 @@ async function loadPromoSlots() {
 
         let slides;
         if (mine.length) {
+            const esc = s => String(s == null ? "" : s)
+                .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
             slides = mine.map(p => {
-                const img = `<img src="${p.image_url}" alt="${(p.title || "Promotion").replace(/"/g, "&quot;")}" loading="lazy">`;
+                let inner;
+                if (p.layout === "text") {
+                    const cut = p.image_url
+                        ? `<img class="ls-promo-cut" src="${esc(p.image_url)}" alt="" loading="lazy">`
+                        : "";
+                    const cta = p.cta_label
+                        ? `<span class="ls-promo-cta">${esc(p.cta_label)}</span>`
+                        : "";
+                    const sub = p.subtext
+                        ? `<p class="ls-promo-sub">${esc(p.subtext)}</p>`
+                        : "";
+                    inner =
+                        `<div class="ls-promo-copy">
+                            <h3 class="ls-promo-head">${esc(p.headline)}</h3>
+                            ${sub}${cta}
+                         </div>${cut}`;
+                } else {
+                    inner = `<img src="${esc(p.image_url)}" alt="${esc(p.title || "Promotion")}" loading="lazy">`;
+                }
+                const cls = p.layout === "text"
+                    ? `ls-promo-slide ls-promo-text${p.image_url ? " has-cut" : ""}`
+                    : "ls-promo-slide";
+                const style = p.layout === "text"
+                    ? ` style="background:${esc(p.bg_color || "#ffffff")}"`
+                    : "";
                 return p.link_url
-                    ? `<a class="ls-promo-slide" href="${p.link_url}">${img}</a>`
-                    : `<span class="ls-promo-slide">${img}</span>`;
+                    ? `<a class="${cls}" href="${esc(p.link_url)}"${style}>${inner}</a>`
+                    : `<span class="${cls}"${style}>${inner}</span>`;
             });
         } else {
             const items = fallbackFor(slot).length ? fallbackFor(slot) : fallback;

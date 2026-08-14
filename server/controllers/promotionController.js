@@ -19,7 +19,8 @@ function uploadBufferToCloudinary(fileBuffer) {
 exports.listPromotions = async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT id, image_url, link_url, title, slot, display_order
+            `SELECT id, image_url, link_url, title, slot, display_order,
+                    headline, subtext, cta_label, bg_color, layout
              FROM promotions
              WHERE is_active = true
              ORDER BY slot ASC, display_order ASC, id ASC`
@@ -35,7 +36,8 @@ exports.listPromotions = async (req, res) => {
 exports.listAllPromotions = async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT id, image_url, link_url, title, slot, display_order, is_active, created_at
+            `SELECT id, image_url, link_url, title, slot, display_order, is_active, created_at,
+                    headline, subtext, cta_label, bg_color, layout
              FROM promotions
              ORDER BY slot ASC, display_order ASC, id ASC`
         );
@@ -57,13 +59,32 @@ exports.createPromotion = async (req, res) => {
         const title = (req.body.title || "").trim() || null;
         const linkUrl = (req.body.link_url || "").trim() || null;
 
-        const imageUrl = await uploadBufferToCloudinary(req.file.buffer);
+        const layout = req.body.layout === "text" ? "text" : "image";
+        const headline = (req.body.headline || "").trim() || null;
+        const subtext = (req.body.subtext || "").trim() || null;
+        const ctaLabel = (req.body.cta_label || "").trim() || null;
+        const bgColor = /^#[0-9a-fA-F]{3,8}$/.test((req.body.bg_color || "").trim())
+            ? req.body.bg_color.trim() : "#ffffff";
+
+        if (layout === "text" && !headline) {
+            return res.status(400).json({ message: "A text promotion needs a headline." });
+        }
+        if (layout === "image" && !req.file) {
+            return res.status(400).json({ message: "An image promotion needs an image." });
+        }
+
+        const imageUrl = req.file
+            ? await uploadBufferToCloudinary(req.file.buffer)
+            : null;
 
         const result = await pool.query(
-            `INSERT INTO promotions (image_url, link_url, title, slot, display_order)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING id, image_url, link_url, title, slot, display_order, is_active`,
-            [imageUrl, linkUrl, title, slot, displayOrder]
+            `INSERT INTO promotions (image_url, link_url, title, slot, display_order,
+                                     headline, subtext, cta_label, bg_color, layout)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+             RETURNING id, image_url, link_url, title, slot, display_order, is_active,
+                       headline, subtext, cta_label, bg_color, layout`,
+            [imageUrl, linkUrl, title, slot, displayOrder,
+                headline, subtext, ctaLabel, bgColor, layout]
         );
 
         await logActivity(req.user.id, "create_promotion", "promotion",
@@ -98,16 +119,31 @@ exports.updatePromotion = async (req, res) => {
         const linkUrl = req.body.link_url !== undefined
             ? ((req.body.link_url || "").trim() || null)
             : current.link_url;
+        const layout = req.body.layout !== undefined
+            ? (req.body.layout === "text" ? "text" : "image")
+            : current.layout;
+        const headline = req.body.headline !== undefined
+            ? ((req.body.headline || "").trim() || null) : current.headline;
+        const subtext = req.body.subtext !== undefined
+            ? ((req.body.subtext || "").trim() || null) : current.subtext;
+        const ctaLabel = req.body.cta_label !== undefined
+            ? ((req.body.cta_label || "").trim() || null) : current.cta_label;
+        const bgColor = /^#[0-9a-fA-F]{3,8}$/.test((req.body.bg_color || "").trim())
+            ? req.body.bg_color.trim() : current.bg_color;
 
         let imageUrl = current.image_url;
         if (req.file) imageUrl = await uploadBufferToCloudinary(req.file.buffer);
 
         const result = await pool.query(
             `UPDATE promotions
-             SET image_url = $1, link_url = $2, title = $3, slot = $4, display_order = $5
+             SET image_url = $1, link_url = $2, title = $3, slot = $4, display_order = $5,
+                     headline = $7, subtext = $8, cta_label = $9,
+                     bg_color = $10, layout = $11
              WHERE id = $6
-             RETURNING id, image_url, link_url, title, slot, display_order, is_active`,
-            [imageUrl, linkUrl, title, slot, displayOrder, id]
+             RETURNING id, image_url, link_url, title, slot, display_order, is_active,
+                       headline, subtext, cta_label, bg_color, layout`,
+            [imageUrl, linkUrl, title, slot, displayOrder, id,
+                headline, subtext, ctaLabel, bgColor, layout]
         );
 
         await logActivity(req.user.id, "update_promotion", "promotion", id, "Updated promotion");
