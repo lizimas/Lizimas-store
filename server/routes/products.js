@@ -31,6 +31,16 @@ const { requireAuth, requireAdmin, requireStaffOrAdmin } = require("../middlewar
 const upload = require("../middleware/upload");
 
 // Public: anyone can view products/categories (storefront needs this)
+// Staging upload for the Add Product form, where no product id exists yet.
+// Must stay above every "/:id/..." route or Express matches it as an id.
+router.post(
+    "/description-blocks/image",
+    requireAuth,
+    requireStaffOrAdmin,
+    upload.single("image"),
+    uploadBlockImage
+);
+
 router.get("/", getProducts);
 router.get("/categories", getCategories);
 router.get("/mine", requireAuth, requireStaffOrAdmin, getMyProducts);

@@ -963,6 +963,10 @@ async function renderImagePreviews(fileList) {
 function openProductForm() {
     document.getElementById("product-form-title").textContent = "Add Product";
     document.getElementById("product-id").value = "";
+    const newBlockHost = document.getElementById("desc-blocks-editor");
+    if (newBlockHost && window.LzBlockEditor) {
+        LzBlockEditor.mount(newBlockHost, null, { tokenKey: "adminToken" });
+    }
     document.getElementById("product-name").value = "";
     document.getElementById("product-description").value = "";
     document.getElementById("product-price").value = "";
@@ -1088,10 +1092,11 @@ async function saveProduct() {
             }
         }
 
-        // Description blocks: only on edit, where the editor was mounted with
-        // a real product id. A failure here must not lose the product save.
-        if (id && window.LzBlockEditor) {
-            const blockRes = await LzBlockEditor.save(id);
+        // Description blocks: on create the editor mounts without an id, so
+        // flush against the id the server just returned. A failure here must
+        // not lose the product save.
+        if (savedProductId && window.LzBlockEditor) {
+            const blockRes = await LzBlockEditor.save(savedProductId);
             if (!blockRes.ok) {
                 errorEl.textContent = "Product saved, but description blocks failed: " + blockRes.message;
                 loadProducts();

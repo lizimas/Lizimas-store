@@ -45,11 +45,13 @@
 
     async function handleFile(file) {
         if (!file) return;
+        // On the Add Product form there is no id yet, so images go to the
+        // staging endpoint. Upload still happens immediately, which is what
+        // keeps true Cloudinary dimensions on the block.
         const productId = host.dataset.productId;
-        if (!productId) {
-            alert("Save the product first, then add description images.");
-            return;
-        }
+        const uploadUrl = productId
+            ? `/api/products/${productId}/description-blocks/image`
+            : "/api/products/description-blocks/image";
 
         setBusy(1);
         try {
@@ -61,7 +63,7 @@
             const fd = new FormData();
             fd.append("image", prepared.file || file);
 
-            const res = await fetch(`/api/products/${productId}/description-blocks/image`, {
+            const res = await fetch(uploadUrl, {
                 method: "POST",
                 headers: { Authorization: `Bearer ${token()}` },
                 body: fd
