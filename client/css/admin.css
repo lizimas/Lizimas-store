@@ -1230,8 +1230,9 @@ select.status-select {
 .lzbe-rich:empty:before { content: attr(data-ph); color: #9aa0ab; }
 .lzbe-rich ul, .lzbe-rich ol { margin: 6px 0; padding-left: 22px; }
 .lzbe-rich li { margin: 2px 0; }
-.lzbe-rich ul.lzbe-check { list-style: none; padding-left: 20px; }
-.lzbe-rich .tick { color: #c0392b; font-weight: 700; }
+.lzbe-rich ul.lzbe-check { list-style: none; padding-left: 0; }
+.lzbe-rich ul.lzbe-check > li { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 10px; }
+.lzbe-rich .tick { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: #fbeaea; color: #c0392b; font-weight: 700; font-size: 0.8rem; display: inline-flex; align-items: center; justify-content: center; }
 .lzbe-tickbar { margin-top: 6px; }
 .lzbe-tickbar button { padding: 4px 10px; border: 1px solid #0d1b3e; background: #fff; color: #0d1b3e; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
 .lzbe-tickbar button:hover { background: #0d1b3e; color: #fff; }

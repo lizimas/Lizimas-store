@@ -230,5 +230,6 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 .pdb-text p { margin: 0 0 10px; }
 .pdb-text ul, .pdb-text ol { margin: 8px 0; padding-left: 24px; }
 .pdb-text li { margin: 4px 0; line-height: 1.6; }
-.pdb-text ul.lzbe-check { list-style: none; padding-left: 22px; }
-.pdb-text .tick { color: #c0392b; font-weight: 700; }
+.pdb-text ul.lzbe-check { list-style: none; padding-left: 0; }
+.pdb-text ul.lzbe-check > li { display: flex; align-items: flex-start; gap: 12px; margin: 0 0 16px; line-height: 1.65; }
+.pdb-text .tick { flex: 0 0 26px; width: 26px; height: 26px; margin-top: 1px; border-radius: 50%; background: #fbeaea; color: #c0392b; font-weight: 700; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; }
