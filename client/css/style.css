@@ -3351,9 +3351,15 @@ body.sheet-open {
 }
 
 .ls-promo-slide {
+    /* Exactly one frame, never more. flex-basis alone is not enough: the
+       automatic minimum size of a flex item is its content, so wide copy
+       would still push the slide past 100% and desynchronise the track. */
+    flex: 0 0 100%;
     min-width: 100%;
+    max-width: 100%;
     height: 100%;
     display: block;
+    box-sizing: border-box;
 }
 
 .ls-promo-slide img {
@@ -4396,16 +4402,19 @@ body.sheet-open {
 .ls-promo-slide.ls-promo-text:not(.has-cut) .ls-promo-copy { text-align: center; }
 .ls-promo-head {
     margin: 0 0 10px;
-    font-size: clamp(1.25rem, 2.4vw, 2rem);
+    font-size: clamp(1.05rem, 2.4vw, 2rem);
     line-height: 1.2;
     color: #0f1c3f;
     font-weight: 700;
+    /* A single long word has to break rather than widen the slide. */
+    overflow-wrap: anywhere;
 }
 .ls-promo-sub {
     margin: 0;
-    font-size: clamp(0.9rem, 1.3vw, 1.05rem);
+    font-size: clamp(0.82rem, 1.3vw, 1.05rem);
     line-height: 1.55;
     color: #4a5568;
+    overflow-wrap: anywhere;
 }
 .ls-promo-cta {
     display: inline-block;
@@ -4424,6 +4433,13 @@ body.sheet-open {
     object-fit: contain;
 }
 @media (max-width: 640px) {
-    .ls-promo-slide.ls-promo-text { padding: 22px 20px; gap: 14px; }
+    .ls-promo-slide.ls-promo-text { padding: 20px 16px; gap: 14px; }
     .ls-promo-cut { flex-basis: 32%; max-width: 32%; }
+
+    /* vw-based sizing is what pushed copy off the edge here, so the phone
+       step gets fixed sizes instead. */
+    .ls-promo-head { font-size: 1.15rem; margin-bottom: 8px; }
+    .ls-promo-sub { font-size: 0.85rem; line-height: 1.45; }
+    .ls-promo-cta { margin-top: 12px; padding: 8px 16px; font-size: 0.85rem; }
+    .ls-promo-copy { min-width: 0; }
 }
