@@ -3281,51 +3281,6 @@ body.sheet-open {
 
 /* Auto-scrolling product strip, right to left.
    Swap the contents for promotional images when those exist. */
-.ls-strip {
-    overflow: hidden;
-    background: #f3f4f6;
-    padding: 14px 0;
-    border-bottom: 1px solid #e5e7eb;
-}
-
-.ls-strip-track {
-    display: flex;
-    gap: 14px;
-    width: max-content;
-    animation: ls-scroll 40s linear infinite;
-}
-
-.ls-strip:hover .ls-strip-track { animation-play-state: paused; }
-
-.ls-strip-item {
-    width: 120px;
-    height: 120px;
-    border-radius: 12px;
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    overflow: hidden;
-    flex-shrink: 0;
-    display: block;
-}
-
-.ls-strip-item img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-}
-
-/* The track holds two copies of the list, so -50% is one seamless loop */
-@keyframes ls-scroll {
-    from { transform: translateX(0); }
-    to   { transform: translateX(-50%); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .ls-strip-track { animation: none; }
-    .ls-strip { overflow-x: auto; }
-}
-
 /* Promotional slots. Product images for now, promo artwork later. */
 .ls-promos {
     max-width: 1400px;
