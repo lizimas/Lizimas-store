@@ -250,6 +250,114 @@ function startCarousel(track, count) {
 
 document.addEventListener("DOMContentLoaded", loadPromoSlots);
 
+// ---------------------------------------------------------------------------
+// Announcement strip (promotions slot 3).
+//
+// strip_text rows scroll right to left and carry no link at all: the track has
+// pointer-events disabled so a tap on moving copy does nothing.
+// strip_link rows are ordinary anchors that never move, which is what makes
+// them safe to hit on a phone.
+// ---------------------------------------------------------------------------
+
+// Mirrors the server-side allowlist. Anything that is not an https URL, a
+// site-relative path, a mailto or a tel is dropped rather than rendered, so a
+// bad row shows nothing instead of shipping a live javascript: href.
+function stripSafeHref(value) {
+    const v = String(value || "").trim();
+    if (!v) return "";
+    // "//evil.com" is protocol-relative and resolves off-site, so a leading
+    // slash alone is not enough to call something internal.
+    if (v.startsWith("/") && !v.startsWith("//")) return v;
+    if (/^https:\/\/[^\s]+$/i.test(v)) return v;
+    if (/^mailto:[^\s@]+@[^\s@]+$/i.test(v)) return v;
+    if (/^tel:\+?[0-9\s-]{6,20}$/i.test(v)) return v;
+    return "";
+}
+
+function isHexColor(value) {
+    return /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(value || "").trim());
+}
+
+async function loadPromoStrip() {
+    const strip = document.querySelector(".ls-strip");
+    if (!strip) return;
+
+    const track = strip.querySelector(".ls-strip-track");
+    const linkBox = strip.querySelector(".ls-strip-links");
+
+    let rows = [];
+    try {
+        const response = await fetch("/api/promotions");
+        if (response.ok) rows = await response.json();
+    } catch (error) {
+        console.error("Load strip error:", error);
+    }
+
+    const mine = rows.filter(p => Number(p.slot) === 3);
+    const texts = mine.filter(p => p.layout === "strip_text");
+    const tiles = mine.filter(p => p.layout === "strip_link");
+
+    if (!texts.length && !tiles.length) {
+        strip.hidden = true;
+        return;
+    }
+
+    // The bg_color column defaults to #ffffff for every row, so treat that as
+    // "not set" and let the stylesheet's light red stand. Anything else the
+    // admin pastes wins. Only a literal hex is accepted: the value goes into a
+    // style property, which is not somewhere to put unchecked input.
+    const painted = texts.find(p => isHexColor(p.bg_color)
+        && p.bg_color.toLowerCase() !== "#ffffff");
+    if (painted) {
+        const marquee = strip.querySelector(".ls-strip-marquee");
+        if (marquee) marquee.style.background = painted.bg_color;
+    }
+
+    if (texts.length && track) {
+        const items = texts.map(p => {
+            const head = p.headline ? `<strong>${esc(p.headline)}</strong>` : "";
+            const sub = p.subtext ? `<span>${esc(p.subtext)}</span>` : "";
+            return `<span class="ls-strip-item">${head}${sub}</span>`;
+        }).join("");
+
+        // Printed twice so the -50% translate wraps without a gap.
+        track.innerHTML = items + items;
+    } else if (track) {
+        track.closest(".ls-strip-marquee").style.display = "none";
+    }
+
+    if (tiles.length && linkBox) {
+        linkBox.innerHTML = tiles.map(p => {
+            const href = stripSafeHref(p.link_url);
+            if (!href) return "";
+
+            const label = p.title ? esc(p.title) : "";
+            const icon = p.image_url
+                ? `<img src="${esc(p.image_url)}" alt="" loading="lazy">`
+                : "";
+            const cls = label ? "ls-strip-link" : "ls-strip-link icon-only";
+
+            // Anything not site-relative opens in its own tab. noopener cuts
+            // the window.opener handle so the opened page cannot navigate this
+            // one somewhere else while the customer is looking away.
+            const external = !href.startsWith("/");
+            const target = external
+                ? ' target="_blank" rel="noopener noreferrer"'
+                : "";
+            const aria = label ? "" : ` aria-label="${esc(p.headline || "Link")}"`;
+
+            return `<a class="${cls}" href="${esc(href)}"${target}${aria}>` +
+                   `${icon}${label ? `<span>${label}</span>` : ""}</a>`;
+        }).join("");
+    } else if (linkBox) {
+        linkBox.style.display = "none";
+    }
+
+    strip.hidden = false;
+}
+
+document.addEventListener("DOMContentLoaded", loadPromoStrip);
+
 // ---------- Category drawer and header parent nav ----------
 
 let drawerTree = null;

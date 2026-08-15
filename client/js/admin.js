@@ -3295,11 +3295,53 @@ function closePromoForm() {
     promoPickedFile = null;
 }
 
+// Each layout says what it needs rather than the form guessing from a single
+// boolean. Adding a fifth layout later means one entry here, not another branch.
+const PROMO_LAYOUT_RULES = {
+    image: {
+        copy: false,
+        imageHeading: "Image",
+        linkHint: "Link, e.g. product-detail.html?id=68"
+    },
+    text: {
+        copy: true,
+        imageHeading: "Image (optional cutout)",
+        linkHint: "Link, e.g. product-detail.html?id=68"
+    },
+    strip_text: {
+        copy: true,
+        imageHeading: "Image (not used on announcements)",
+        linkHint: "Not used \u2014 announcements are not tappable"
+    },
+    strip_link: {
+        copy: false,
+        imageHeading: "Icon (120\u00d7120)",
+        linkHint: "Required \u2014 https://... or a page such as /faq.html"
+    }
+};
+
 function togglePromoLayout() {
-    const isText = document.getElementById("promo-layout").value === "text";
-    document.getElementById("promo-copy-section").classList.toggle("hidden", !isText);
-    document.getElementById("promo-image-heading").textContent =
-        isText ? "Image (optional cutout)" : "Image";
+    const layout = document.getElementById("promo-layout").value;
+    const rules = PROMO_LAYOUT_RULES[layout] || PROMO_LAYOUT_RULES.image;
+
+    document.getElementById("promo-copy-section").classList.toggle("hidden", !rules.copy);
+    document.getElementById("promo-image-heading").textContent = rules.imageHeading;
+
+    const link = document.getElementById("promo-link");
+    if (link) {
+        link.placeholder = rules.linkHint;
+        link.disabled = layout === "strip_text";
+        if (link.disabled) link.value = "";
+    }
+
+    // Picking a strip layout from either banner slot is almost always a
+    // mis-set slot, so move it rather than letting the save fail.
+    const slot = document.getElementById("promo-slot");
+    if (slot) {
+        const isStrip = layout === "strip_text" || layout === "strip_link";
+        if (isStrip && slot.value !== "3") slot.value = "3";
+        if (!isStrip && slot.value === "3") slot.value = "1";
+    }
 }
 
 function setupPromoImagePicker() {
@@ -3339,12 +3381,29 @@ async function savePromo() {
     const layout = document.getElementById("promo-layout").value;
     const headline = document.getElementById("promo-headline").value.trim();
 
+    const link = document.getElementById("promo-link").value.trim();
+
     if (layout === "image" && !id && !promoPickedFile) {
         errorEl.textContent = "An image is required.";
         return;
     }
-    if (layout === "text" && !headline) {
-        errorEl.textContent = "A text banner needs a headline.";
+    if ((layout === "text" || layout === "strip_text") && !headline) {
+        errorEl.textContent = "This layout needs a headline.";
+        return;
+    }
+    if (layout === "strip_link" && !link) {
+        errorEl.textContent = "A strip tile needs a link.";
+        return;
+    }
+    if (layout === "strip_link" && !document.getElementById("promo-title").value.trim()
+        && !id && !promoPickedFile) {
+        errorEl.textContent = "A strip tile needs a label or an icon.";
+        return;
+    }
+    // Same allowlist the server enforces, shown here so a bad paste is caught
+    // before the upload rather than after it.
+    if (link && !/^(?:https:\/\/|mailto:|tel:|\/(?!\/))/i.test(link)) {
+        errorEl.textContent = "Link must be https://, a path starting with /, or mailto:/tel:.";
         return;
     }
 

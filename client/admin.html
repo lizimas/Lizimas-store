@@ -292,8 +292,14 @@
 
                 <section id="tab-promotions" class="tab-content hidden">
                     <h2 class="admin-page-title">Homepage Promotions</h2>
-                    <p class="promo-hint">Slot 1 is the shorter banner, slot 2 the taller one.
-                       When a slot is empty the homepage falls back to random product images.</p>
+                    <p class="promo-hint">Slots 1 and 2 sit side by side on desktop: slot 1 is the
+                       wide banner on the left, slot 2 the narrow one on the right. Upload slot 1 at
+                       1940&times;600 and slot 2 at 824&times;600. When either is empty the homepage
+                       falls back to random product images.</p>
+                    <p class="promo-hint">Slot 3 is the strip above them. Scrolling announcements sit
+                       on the left and cannot be tapped; icon tiles sit on the right and stay still.
+                       Tile icons upload at 120&times;120. Set a background colour on any announcement
+                       to recolour the whole strip.</p>
 
                     <button class="add-btn" onclick="openPromoForm()">+ Add Promotion</button>
 
@@ -308,11 +314,14 @@
                                     <select id="promo-layout" onchange="togglePromoLayout()">
                                         <option value="image">Image banner &mdash; artwork only</option>
                                         <option value="text">Text banner &mdash; typed copy</option>
+                                        <option value="strip_text">Strip announcement &mdash; scrolling text</option>
+                                        <option value="strip_link">Strip tile &mdash; icon and link</option>
                                     </select>
                                     <input type="text" id="promo-title" placeholder="Title (optional, for your reference)">
                                     <select id="promo-slot">
-                                        <option value="1">Slot 1 &mdash; top banner</option>
-                                        <option value="2">Slot 2 &mdash; lower banner</option>
+                                        <option value="1">Slot 1 &mdash; left banner</option>
+                                        <option value="2">Slot 2 &mdash; right banner</option>
+                                        <option value="3">Slot 3 &mdash; announcement strip</option>
                                     </select>
                                     <input type="text" id="promo-link" placeholder="Link, e.g. product-detail.html?id=68">
                                     <input type="number" id="promo-order" placeholder="Display order (lower shows first)">
@@ -576,7 +585,7 @@
 <script src="js/prepare-picked-file.js?v=9"></script>
 <script src="js/description-block-editor.js?v=5"></script>
 <script src="js/category-select.js?v=2"></script>
-    <script src="js/admin.js?v=29"></script>
+    <script src="js/admin.js?v=30"></script>
 <script src="js/photo-crop.js"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

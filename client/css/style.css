@@ -3340,7 +3340,7 @@ body.sheet-open {
     position: relative;
     border-radius: 16px;
     overflow: hidden;
-    background: #ffffff;
+    background: #e5e7eb;
     aspect-ratio: 16 / 7;
 }
 
@@ -3359,7 +3359,7 @@ body.sheet-open {
 .ls-promo-slide img {
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    object-fit: cover;
     display: block;
 }
 
@@ -3413,6 +3413,140 @@ body.sheet-open {
 @media (max-width: 720px) {
     .ls-promo { aspect-ratio: 16 / 9; }
     .ls-promos { padding: 12px 12px 0; gap: 12px; }
+}
+
+/* Announcement strip (promotions slot 3).
+
+   Two things share the row and they deliberately do not overlap: the left
+   side scrolls and cannot be tapped, the right side is tappable and does not
+   move. Chasing a moving link with a thumb is the thing we are avoiding. */
+.ls-strip {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 14px 18px 0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.ls-strip[hidden] { display: none; }
+
+.ls-strip-marquee {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    border-radius: 10px;
+    /* Default only. A strip_text row carrying a bg_color other than the
+       column default overrides this inline, so the colour is pastable from
+       the admin form without a code change. Matches the tick-list palette. */
+    background: #fbeaea;
+}
+
+/* The track holds the announcements twice over. Translating it by half its
+   own width lands the copy exactly where the original started, so the loop
+   has no visible seam. */
+.ls-strip-track {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding-left: 20px;
+    will-change: transform;
+    pointer-events: none;
+    animation: ls-strip-scroll 42s linear infinite;
+}
+
+@keyframes ls-strip-scroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+}
+
+.ls-strip-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+    padding-right: 52px;
+    font-size: 15px;
+    color: #c0392b;
+}
+
+.ls-strip-item strong {
+    font-weight: 700;
+    color: #111827;
+}
+
+.ls-strip-links {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 16px;
+    border-left: 1px solid #e5e7eb;
+}
+
+.ls-strip-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    color: #374151;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.ls-strip-link:hover,
+.ls-strip-link:focus-visible {
+    border-color: #F5C518;
+    color: #111827;
+}
+
+.ls-strip-link img {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+    border-radius: 4px;
+    display: block;
+}
+
+/* Icon-only tiles: drop the label and the box tightens around the image. */
+.ls-strip-link.icon-only { padding: 0 11px; }
+
+@media (max-width: 899px) {
+    .ls-strip {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 12px 12px 0;
+    }
+
+    .ls-strip-marquee { height: 48px; }
+    .ls-strip-item { font-size: 14px; padding-right: 40px; }
+
+    /* Tiles become a thumb-swiped row rather than wrapping onto
+       several lines. */
+    .ls-strip-links {
+        padding-left: 0;
+        border-left: none;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .ls-strip-links::-webkit-scrollbar { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ls-strip-track { animation: none; }
 }
 
 /* Explore Categories: level-2 tiles in two rows, paged horizontally.
@@ -3570,8 +3704,26 @@ body.sheet-open {
 
 /* First promo slot sits shorter than the second, so the eye lands on the
    larger one below it. */
-#ls-promo-1 { aspect-ratio: 16 / 5.5; }
-#ls-promo-2 { aspect-ratio: 16 / 7.5; }
+/* Phones stack the two slots, so height follows width here. The desktop
+   block below drops the ratio entirely and pins a fixed height, which keeps
+   the banner the same size on a 1366px laptop and a 2560px monitor. */
+#ls-promo-1 { aspect-ratio: 16 / 9; }
+#ls-promo-2 { aspect-ratio: 16 / 9; }
+
+@media (min-width: 900px) {
+    .ls-promos {
+        display: grid;
+        grid-template-columns: 2.35fr 1fr;
+        gap: 20px;
+        align-items: stretch;
+    }
+
+    #ls-promo-1,
+    #ls-promo-2 {
+        aspect-ratio: auto;
+        height: 300px;
+    }
+}
 
 
 

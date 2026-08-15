@@ -11,7 +11,7 @@
 Lizimas Store | Online Shopping in Uganda
 </title>
 
-<link rel="stylesheet" href="css/style.css?v=42">
+<link rel="stylesheet" href="css/style.css?v=43">
 
 </head>
 
@@ -95,6 +95,15 @@ Lizimas Store | Online Shopping in Uganda
 
 <!-- Two promotional slots. Filled with product images until promo artwork
      exists; swap the contents of each track and the JS becomes unnecessary. -->
+<!-- Announcement strip. Scrolling copy on the left is not tappable;
+     the tiles on the right are static links. Hidden until slot 3 has rows. -->
+<section class="ls-strip" hidden>
+  <div class="ls-strip-marquee">
+    <div class="ls-strip-track"></div>
+  </div>
+  <div class="ls-strip-links"></div>
+</section>
+
 <section class="ls-promos">
   <div class="ls-promo" id="ls-promo-1">
     <div class="ls-promo-track" data-track="1"></div>
@@ -231,7 +240,7 @@ Lizimas Store | Online Shopping in Uganda
 <script src="js/api.js"></script>
 <script src="js/hero.js"></script>
 <script src="js/lz-image.js?v=2"></script>
-<script src="js/categories.js?v=16"></script>
+<script src="js/categories.js?v=17"></script>
 
 <script src="js/cart.js?v=5"></script>
 

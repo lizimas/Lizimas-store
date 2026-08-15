@@ -1,3 +1,30 @@
+// Slot 3 is the announcement strip. strip_text scrolls and carries no link;
+// strip_link is a static tile. Kept in sync with migration 034's constraints.
+const PROMO_SLOTS = [1, 2, 3];
+const PROMO_LAYOUTS = ["image", "text", "strip_text", "strip_link"];
+
+const LINK_ERROR = "Link must be an https:// address, a site path starting " +
+    "with /, or a mailto: or tel: link.";
+
+// The value reaches a live href, so this is an allowlist rather than a
+// blocklist: anything unrecognised is refused instead of guessed at.
+function isSafeLink(value) {
+    const v = String(value || "").trim();
+    if (!v) return false;
+    // "//example.com" is protocol-relative and resolves off-site, so a leading
+    // slash on its own does not make a link internal.
+    if (v.startsWith("/") && !v.startsWith("//")) return true;
+    if (/^mailto:[^\s@]+@[^\s@]+$/i.test(v)) return true;
+    if (/^tel:\+?[0-9\s-]{6,20}$/i.test(v)) return true;
+    try {
+        // Bare http:// is refused too: a tile should not drop a customer onto
+        // an unencrypted page.
+        return new URL(v).protocol === "https:";
+    } catch (error) {
+        return false;
+    }
+}
+
 const pool = require("../config/database");
 const cloudinary = require("../config/cloudinary");
 const { logActivity } = require("../utils/activityLog");
@@ -54,23 +81,36 @@ exports.createPromotion = async (req, res) => {
             return res.status(400).json({ message: "An image is required" });
         }
 
-        const slot = parseInt(req.body.slot, 10) === 2 ? 2 : 1;
+        const requestedSlot = parseInt(req.body.slot, 10);
+        const slot = PROMO_SLOTS.includes(requestedSlot) ? requestedSlot : 1;
         const displayOrder = parseInt(req.body.display_order, 10) || 0;
         const title = (req.body.title || "").trim() || null;
         const linkUrl = (req.body.link_url || "").trim() || null;
 
-        const layout = req.body.layout === "text" ? "text" : "image";
+        if (linkUrl && !isSafeLink(linkUrl)) {
+            return res.status(400).json({ message: LINK_ERROR });
+        }
+
+        const layout = PROMO_LAYOUTS.includes(req.body.layout)
+            ? req.body.layout : "image";
         const headline = (req.body.headline || "").trim() || null;
         const subtext = (req.body.subtext || "").trim() || null;
         const ctaLabel = (req.body.cta_label || "").trim() || null;
         const bgColor = /^#[0-9a-fA-F]{3,8}$/.test((req.body.bg_color || "").trim())
             ? req.body.bg_color.trim() : "#ffffff";
 
-        if (layout === "text" && !headline) {
+        if ((layout === "text" || layout === "strip_text") && !headline) {
             return res.status(400).json({ message: "A text promotion needs a headline." });
         }
         if (layout === "image" && !req.file) {
             return res.status(400).json({ message: "An image promotion needs an image." });
+        }
+        // A tile with no destination is just an inert box on the homepage.
+        if (layout === "strip_link" && !linkUrl) {
+            return res.status(400).json({ message: "A strip link needs a link URL." });
+        }
+        if (layout === "strip_link" && !title && !req.file) {
+            return res.status(400).json({ message: "A strip link needs a label or an icon." });
         }
 
         const imageUrl = req.file
@@ -108,7 +148,8 @@ exports.updatePromotion = async (req, res) => {
         const current = existing.rows[0];
 
         const slot = req.body.slot !== undefined
-            ? (parseInt(req.body.slot, 10) === 2 ? 2 : 1)
+            ? (PROMO_SLOTS.includes(parseInt(req.body.slot, 10))
+                ? parseInt(req.body.slot, 10) : 1)
             : current.slot;
         const displayOrder = req.body.display_order !== undefined
             ? (parseInt(req.body.display_order, 10) || 0)
@@ -119,8 +160,16 @@ exports.updatePromotion = async (req, res) => {
         const linkUrl = req.body.link_url !== undefined
             ? ((req.body.link_url || "").trim() || null)
             : current.link_url;
+
+        // Only checked when the field was sent. An existing row saved before
+        // this rule is left alone unless someone edits the link itself.
+        if (req.body.link_url !== undefined && linkUrl && !isSafeLink(linkUrl)) {
+            return res.status(400).json({ message: LINK_ERROR });
+        }
+
         const layout = req.body.layout !== undefined
-            ? (req.body.layout === "text" ? "text" : "image")
+            ? (PROMO_LAYOUTS.includes(req.body.layout)
+                ? req.body.layout : "image")
             : current.layout;
         const headline = req.body.headline !== undefined
             ? ((req.body.headline || "").trim() || null) : current.headline;
@@ -130,6 +179,13 @@ exports.updatePromotion = async (req, res) => {
             ? ((req.body.cta_label || "").trim() || null) : current.cta_label;
         const bgColor = /^#[0-9a-fA-F]{3,8}$/.test((req.body.bg_color || "").trim())
             ? req.body.bg_color.trim() : current.bg_color;
+
+        if ((layout === "text" || layout === "strip_text") && !headline) {
+            return res.status(400).json({ message: "A text promotion needs a headline." });
+        }
+        if (layout === "strip_link" && !linkUrl) {
+            return res.status(400).json({ message: "A strip link needs a link URL." });
+        }
 
         let imageUrl = current.image_url;
         if (req.file) imageUrl = await uploadBufferToCloudinary(req.file.buffer);
