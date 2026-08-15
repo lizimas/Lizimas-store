@@ -77,10 +77,8 @@ exports.listAllPromotions = async (req, res) => {
 
 exports.createPromotion = async (req, res) => {
     try {
-        if (!req.file) {
-            return res.status(400).json({ message: "An image is required" });
-        }
-
+        // No blanket image check here: whether a file is required depends on
+        // the layout, and that is validated below once layout is known.
         const requestedSlot = parseInt(req.body.slot, 10);
         const slot = PROMO_SLOTS.includes(requestedSlot) ? requestedSlot : 1;
         const displayOrder = parseInt(req.body.display_order, 10) || 0;
