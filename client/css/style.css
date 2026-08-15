@@ -3407,6 +3407,56 @@ body.sheet-open {
        value recolours everything inside. */
     background: #fbeaea;
     color: #c0392b;
+    /* The tile is painted over this padding. Overflow clips to the padding
+       box, so an announcement scrolled this far still renders -- the tile
+       being opaque is what hides it, which is the effect we want. */
+    position: relative;
+    padding-left: var(--ls-strip-tile, 200px);
+}
+
+/* Brand tile. Same navy and mark as the header block so the strip reads as
+   part of the same furniture, at a smaller scale to suit the 56px band. */
+.ls-strip-brand {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 2;
+    width: var(--ls-strip-tile, 200px);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 0 16px;
+    background: #1a1a2e;
+    border-radius: 10px 0 0 10px;
+    /* Depth rather than a gradient fade: the marquee background is set inline
+       from bg_color, so a gradient could not be blended against it here. */
+    box-shadow: 7px 0 14px -7px rgba(0, 0, 0, 0.45);
+    pointer-events: none;
+}
+
+.ls-strip-mark {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    display: block;
+}
+
+.ls-strip-wordmark {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+}
+
+/* Narrow screens keep the mark and drop the wordmark: a 200px tile would eat
+   most of the band, leaving no room for the copy to actually scroll. */
+@media (max-width: 768px) {
+    .ls-strip-marquee { --ls-strip-tile: 62px; }
+    .ls-strip-brand { padding: 0 16px; gap: 0; }
+    .ls-strip-wordmark { display: none; }
+    .ls-strip-mark { width: 28px; height: 28px; }
 }
 
 /* The track holds the announcements twice over. Translating it by half its
