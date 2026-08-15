@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Admin Dashboard</title>
-<link rel="stylesheet" href="css/admin.css?v=7">
+<link rel="stylesheet" href="css/admin.css?v=8">
 </head>
 <body>
 
@@ -334,7 +334,18 @@
                                     <input type="text" id="promo-headline" maxlength="80" placeholder="Headline (required for a text banner)">
                                     <input type="text" id="promo-subtext" maxlength="200" placeholder="Subtext (optional)">
                                     <input type="text" id="promo-cta" maxlength="40" placeholder="Button label, e.g. Shop now (optional)">
-                                    <input type="text" id="promo-bg" maxlength="16" placeholder="Background colour, e.g. #ffffff">
+                                    <input type="text" id="promo-bg" maxlength="16" placeholder="Background colour, e.g. #fbeaea">
+                                    <div class="promo-swatch-row" id="promo-bg-swatches">
+                                        <button type="button" class="promo-swatch" data-color="#fbeaea" style="background:#fbeaea" onclick="setPromoBg('#fbeaea')" title="Light red #fbeaea">Light red</button>
+                                        <button type="button" class="promo-swatch" data-color="#fde8e8" style="background:#fde8e8" onclick="setPromoBg('#fde8e8')" title="Blush #fde8e8">Blush</button>
+                                        <button type="button" class="promo-swatch" data-color="#ffe9e0" style="background:#ffe9e0" onclick="setPromoBg('#ffe9e0')" title="Peach #ffe9e0">Peach</button>
+                                        <button type="button" class="promo-swatch" data-color="#fdf6dd" style="background:#fdf6dd" onclick="setPromoBg('#fdf6dd')" title="Cream #fdf6dd">Cream</button>
+                                        <button type="button" class="promo-swatch" data-color="#e8f4ea" style="background:#e8f4ea" onclick="setPromoBg('#e8f4ea')" title="Mint #e8f4ea">Mint</button>
+                                        <button type="button" class="promo-swatch" data-color="#e6f0fa" style="background:#e6f0fa" onclick="setPromoBg('#e6f0fa')" title="Sky #e6f0fa">Sky</button>
+                                        <button type="button" class="promo-swatch" data-color="#f0ecf9" style="background:#f0ecf9" onclick="setPromoBg('#f0ecf9')" title="Lilac #f0ecf9">Lilac</button>
+                                        <button type="button" class="promo-swatch" data-color="#f2f3f5" style="background:#f2f3f5" onclick="setPromoBg('#f2f3f5')" title="Grey #f2f3f5">Grey</button>
+                                        <button type="button" class="promo-swatch clear" onclick="setPromoBg('')" title="No colour set">None</button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -585,7 +596,7 @@
 <script src="js/prepare-picked-file.js?v=9"></script>
 <script src="js/description-block-editor.js?v=5"></script>
 <script src="js/category-select.js?v=2"></script>
-    <script src="js/admin.js?v=30"></script>
+    <script src="js/admin.js?v=31"></script>
 <script src="js/photo-crop.js"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

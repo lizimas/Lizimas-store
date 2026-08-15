@@ -1236,3 +1236,41 @@ select.status-select {
 .lzbe-tickbar { margin-top: 6px; }
 .lzbe-tickbar button { padding: 4px 10px; border: 1px solid #0d1b3e; background: #fff; color: #0d1b3e; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
 .lzbe-tickbar button:hover { background: #0d1b3e; color: #fff; }
+
+
+/* Promotion background swatches. Pale tints only: strip text is a fixed dark
+   red, so a dark background would be unreadable. */
+.promo-swatch-row {
+    flex: 1 1 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.promo-swatch {
+    width: 40px;
+    height: 32px;
+    padding: 0;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    cursor: pointer;
+    font-size: 0;
+    transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.promo-swatch:hover { transform: translateY(-1px); }
+
+.promo-swatch.selected {
+    border-color: #111827;
+    box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.15);
+}
+
+.promo-swatch.clear {
+    width: auto;
+    padding: 0 12px;
+    background: #ffffff;
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 600;
+}

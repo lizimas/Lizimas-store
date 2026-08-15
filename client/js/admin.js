@@ -3320,6 +3320,29 @@ const PROMO_LAYOUT_RULES = {
     }
 };
 
+// Background colour swatches. The field stays a text input so a brand hex can
+// still be pasted; the swatches just fill it in.
+function setPromoBg(value) {
+    const field = document.getElementById("promo-bg");
+    if (!field) return;
+    field.value = value;
+    markPromoSwatch();
+}
+
+function markPromoSwatch() {
+    const field = document.getElementById("promo-bg");
+    const row = document.getElementById("promo-bg-swatches");
+    if (!field || !row) return;
+
+    const current = field.value.trim().toLowerCase();
+    row.querySelectorAll(".promo-swatch").forEach(btn => {
+        const mine = (btn.dataset.color || "").toLowerCase();
+        btn.classList.toggle("selected", mine === current && current !== "");
+    });
+    row.querySelector(".promo-swatch.clear")
+        .classList.toggle("selected", current === "");
+}
+
 function togglePromoLayout() {
     const layout = document.getElementById("promo-layout").value;
     const rules = PROMO_LAYOUT_RULES[layout] || PROMO_LAYOUT_RULES.image;
