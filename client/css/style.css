@@ -3445,10 +3445,13 @@ body.sheet-open {
     align-items: center;
     overflow: hidden;
     border-radius: 10px;
-    /* Default only. A strip_text row carrying a bg_color other than the
-       column default overrides this inline, so the colour is pastable from
-       the admin form without a code change. Matches the tick-list palette. */
+    /* Defaults only. A strip_text row carrying a bg_color other than the
+       column default overrides these inline, so the colours are pastable from
+       the admin form without a code change. Matches the tick-list palette.
+       The text colour lives here rather than on the items so that one inline
+       value recolours everything inside. */
     background: #fbeaea;
+    color: #c0392b;
 }
 
 /* The track holds the announcements twice over. Translating it by half its
@@ -3476,12 +3479,14 @@ body.sheet-open {
     gap: 10px;
     padding-right: 52px;
     font-size: 15px;
-    color: #c0392b;
+    color: inherit;
 }
 
+/* Weight, not colour, is what separates the headline from the detail. A second
+   hardcoded colour here would break the moment a dark background is chosen. */
 .ls-strip-item strong {
     font-weight: 700;
-    color: #111827;
+    color: inherit;
 }
 
 .ls-strip-links {

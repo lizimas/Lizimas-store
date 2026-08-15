@@ -274,6 +274,29 @@ function stripSafeHref(value) {
     return "";
 }
 
+// Relative luminance per WCAG, used to pick readable strip text when no
+// colour was set. Mirrors promoAutoText in admin.js.
+function stripLuminance(hex) {
+    const raw = String(hex || "").trim().replace("#", "");
+    const full = raw.length === 3
+        ? raw.split("").map(c => c + c).join("")
+        : raw;
+    if (full.length < 6) return 1;
+
+    const channel = value => {
+        const c = parseInt(value, 16) / 255;
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    };
+
+    return 0.2126 * channel(full.slice(0, 2))
+        + 0.7152 * channel(full.slice(2, 4))
+        + 0.0722 * channel(full.slice(4, 6));
+}
+
+function stripAutoText(bg) {
+    return stripLuminance(bg) > 0.45 ? "#c0392b" : "#fff5f5";
+}
+
 function isHexColor(value) {
     return /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(value || "").trim());
 }
@@ -308,9 +331,15 @@ async function loadPromoStrip() {
     // style property, which is not somewhere to put unchecked input.
     const painted = texts.find(p => isHexColor(p.bg_color)
         && p.bg_color.toLowerCase() !== "#ffffff");
-    if (painted) {
-        const marquee = strip.querySelector(".ls-strip-marquee");
-        if (marquee) marquee.style.background = painted.bg_color;
+    const marquee = strip.querySelector(".ls-strip-marquee");
+
+    if (painted && marquee) {
+        marquee.style.background = painted.bg_color;
+        // text_color is null unless it was set deliberately, in which case the
+        // readable colour is worked out from the background instead.
+        marquee.style.color = isHexColor(painted.text_color)
+            ? painted.text_color
+            : stripAutoText(painted.bg_color);
     }
 
     if (texts.length && track) {

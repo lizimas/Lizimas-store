@@ -3213,17 +3213,58 @@ async function loadAdminPromos() {
     }
 }
 
+// "all", "1", "2" or "3". Kept as a string so it matches the tile dataset.
+let promoSlotFilter = "all";
+
+function setPromoSlotFilter(slot) {
+    promoSlotFilter = String(slot);
+    renderPromosTable();
+}
+
+const PROMO_LAYOUT_NAMES = {
+    image: "Image banner",
+    text: "Text banner",
+    strip_text: "Announcement",
+    strip_link: "Strip tile"
+};
+
+function renderPromoSlotTiles() {
+    const wrap = document.getElementById("promo-slot-tiles");
+    if (!wrap) return;
+
+    wrap.querySelectorAll(".promo-slot-tile").forEach(tile => {
+        const slot = tile.dataset.slot;
+        const count = slot === "all"
+            ? adminPromos.length
+            : adminPromos.filter(p => String(p.slot) === slot).length;
+
+        const badge = tile.querySelector(".pst-count");
+        if (badge) badge.textContent = count;
+        tile.classList.toggle("selected", slot === promoSlotFilter);
+        tile.classList.toggle("empty", count === 0 && slot !== "all");
+    });
+}
+
 function renderPromosTable() {
     const tbody = document.getElementById("promotions-table-body");
     if (!tbody) return;
 
-    if (adminPromos.length === 0) {
+    renderPromoSlotTiles();
+
+    const rows = promoSlotFilter === "all"
+        ? adminPromos
+        : adminPromos.filter(p => String(p.slot) === promoSlotFilter);
+
+    if (rows.length === 0) {
+        const message = adminPromos.length === 0
+            ? "No promotions yet. The homepage is showing random product images."
+            : `Nothing in slot ${promoSlotFilter} yet.`;
         tbody.innerHTML = `<tr><td colspan="6" style="padding:18px; color:#6b7280">
-            No promotions yet. The homepage is showing random product images.</td></tr>`;
+            ${message}</td></tr>`;
         return;
     }
 
-    tbody.innerHTML = adminPromos.map(p => {
+    tbody.innerHTML = rows.map(p => {
         const status = p.is_active
             ? `<span class="badge badge-active">Live</span>`
             : `<span class="badge badge-hidden">Hidden</span>`;
@@ -3232,8 +3273,11 @@ function renderPromosTable() {
             : `<button onclick="setPromoActive(${p.id}, true)">Show</button>`;
 
         return `<tr>
-            <td data-label="Image"><img src="${p.image_url}" class="promo-thumb" alt=""></td>
-            <td data-label="Title">${p.title || "<em style='color:#9ca3af'>Untitled</em>"}</td>
+            <td data-label="Image">${p.image_url
+                ? `<img src="${p.image_url}" class="promo-thumb" alt="">`
+                : `<span class="promo-thumb-none">${PROMO_LAYOUT_NAMES[p.layout] || "No image"}</span>`}</td>
+            <td data-label="Title">${p.title || p.headline
+                || "<em style='color:#9ca3af'>Untitled</em>"}</td>
             <td data-label="Slot">${p.slot}</td>
             <td data-label="Order">${p.display_order}</td>
             <td data-label="Status">${status}</td>
@@ -3258,6 +3302,8 @@ function openPromoForm() {
     document.getElementById("promo-subtext").value = "";
     document.getElementById("promo-cta").value = "";
     document.getElementById("promo-bg").value = "";
+    document.getElementById("promo-text-color").value = "";
+    renderPromoPreview();
     togglePromoLayout();
     document.getElementById("promo-image-preview").innerHTML = "";
     document.getElementById("promo-form-error").textContent = "";
@@ -3280,6 +3326,8 @@ function editPromo(id) {
     document.getElementById("promo-subtext").value = p.subtext || "";
     document.getElementById("promo-cta").value = p.cta_label || "";
     document.getElementById("promo-bg").value = p.bg_color || "";
+    document.getElementById("promo-text-color").value = p.text_color || "";
+    renderPromoPreview();
     togglePromoLayout();
     document.getElementById("promo-form-error").textContent = "";
     promoPickedFile = null;
@@ -3329,9 +3377,22 @@ function setPromoBg(value) {
     markPromoSwatch();
 }
 
+function setPromoText(value) {
+    const field = document.getElementById("promo-text-color");
+    if (!field) return;
+    field.value = value;
+    markPromoSwatch();
+    renderPromoPreview();
+}
+
 function markPromoSwatch() {
-    const field = document.getElementById("promo-bg");
-    const row = document.getElementById("promo-bg-swatches");
+    markSwatchRow("promo-bg", "promo-bg-swatches");
+    markSwatchRow("promo-text-color", "promo-text-swatches");
+}
+
+function markSwatchRow(fieldId, rowId) {
+    const field = document.getElementById(fieldId);
+    const row = document.getElementById(rowId);
     if (!field || !row) return;
 
     const current = field.value.trim().toLowerCase();
@@ -3339,8 +3400,74 @@ function markPromoSwatch() {
         const mine = (btn.dataset.color || "").toLowerCase();
         btn.classList.toggle("selected", mine === current && current !== "");
     });
-    row.querySelector(".promo-swatch.clear")
-        .classList.toggle("selected", current === "");
+
+    const clear = row.querySelector(".promo-swatch.clear");
+    if (clear) clear.classList.toggle("selected", current === "");
+}
+
+// Relative luminance per WCAG. Used to pick readable text when no colour has
+// been set, so the swatch grid cannot produce an unreadable combination.
+function promoLuminance(hex) {
+    const raw = String(hex || "").trim().replace("#", "");
+    const full = raw.length === 3
+        ? raw.split("").map(c => c + c).join("")
+        : raw;
+    if (full.length < 6) return 1;
+
+    const channel = value => {
+        const c = parseInt(value, 16) / 255;
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    };
+
+    return 0.2126 * channel(full.slice(0, 2))
+        + 0.7152 * channel(full.slice(2, 4))
+        + 0.0722 * channel(full.slice(4, 6));
+}
+
+function promoAutoText(bg) {
+    return promoLuminance(bg) > 0.45 ? "#c0392b" : "#fff5f5";
+}
+
+function renderPromoPreview() {
+    const box = document.getElementById("promo-preview");
+    if (!box) return;
+
+    const bgField = document.getElementById("promo-bg").value.trim();
+    const textField = document.getElementById("promo-text-color").value.trim();
+    const isHex = value => /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
+
+    const bg = isHex(bgField) ? bgField : "#fbeaea";
+    const auto = promoAutoText(bg);
+    const text = isHex(textField) ? textField : auto;
+
+    box.style.background = bg;
+    box.style.color = text;
+
+    const head = document.getElementById("promo-preview-head");
+    const sub = document.getElementById("promo-preview-sub");
+    head.textContent = document.getElementById("promo-headline").value.trim()
+        || "Your headline";
+    sub.textContent = document.getElementById("promo-subtext").value.trim();
+
+    // Contrast ratio, so a hand-typed brand colour gets a warning rather than
+    // silently shipping something unreadable.
+    const note = document.getElementById("promo-preview-note");
+    const lighter = Math.max(promoLuminance(bg), promoLuminance(text));
+    const darker = Math.min(promoLuminance(bg), promoLuminance(text));
+    const ratio = (lighter + 0.05) / (darker + 0.05);
+
+    if (!isHex(textField)) {
+        note.textContent = `Automatic (${auto})`;
+        note.className = "promo-preview-note";
+    } else if (ratio < 4.5) {
+        note.textContent = `Low contrast (${ratio.toFixed(1)}:1) - hard to read`;
+        note.className = "promo-preview-note warn";
+    } else {
+        note.textContent = `Contrast ${ratio.toFixed(1)}:1`;
+        note.className = "promo-preview-note";
+    }
+
+    markPromoSwatch();
 }
 
 function togglePromoLayout() {
@@ -3440,6 +3567,7 @@ async function savePromo() {
     formData.append("subtext", document.getElementById("promo-subtext").value.trim());
     formData.append("cta_label", document.getElementById("promo-cta").value.trim());
     formData.append("bg_color", document.getElementById("promo-bg").value.trim() || "#ffffff");
+    formData.append("text_color", document.getElementById("promo-text-color").value.trim());
     if (promoPickedFile) formData.append("image", promoPickedFile);
 
     try {

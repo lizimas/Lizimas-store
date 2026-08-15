@@ -47,7 +47,7 @@ exports.listPromotions = async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT id, image_url, link_url, title, slot, display_order,
-                    headline, subtext, cta_label, bg_color, layout
+                    headline, subtext, cta_label, bg_color, text_color, layout
              FROM promotions
              WHERE is_active = true
              ORDER BY slot ASC, display_order ASC, id ASC`
@@ -64,7 +64,7 @@ exports.listAllPromotions = async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT id, image_url, link_url, title, slot, display_order, is_active, created_at,
-                    headline, subtext, cta_label, bg_color, layout
+                    headline, subtext, cta_label, bg_color, text_color, layout
              FROM promotions
              ORDER BY slot ASC, display_order ASC, id ASC`
         );
@@ -98,6 +98,10 @@ exports.createPromotion = async (req, res) => {
         const ctaLabel = (req.body.cta_label || "").trim() || null;
         const bgColor = /^#[0-9a-fA-F]{3,8}$/.test((req.body.bg_color || "").trim())
             ? req.body.bg_color.trim() : "#ffffff";
+        // Left null when unset: null means "derive it from the background",
+        // which is not the same as any particular colour.
+        const textColor = /^#[0-9a-fA-F]{3,8}$/.test((req.body.text_color || "").trim())
+            ? req.body.text_color.trim() : null;
 
         if ((layout === "text" || layout === "strip_text") && !headline) {
             return res.status(400).json({ message: "A text promotion needs a headline." });
@@ -119,12 +123,13 @@ exports.createPromotion = async (req, res) => {
 
         const result = await pool.query(
             `INSERT INTO promotions (image_url, link_url, title, slot, display_order,
-                                     headline, subtext, cta_label, bg_color, layout)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                                     headline, subtext, cta_label, bg_color, layout,
+                                     text_color)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
              RETURNING id, image_url, link_url, title, slot, display_order, is_active,
-                       headline, subtext, cta_label, bg_color, layout`,
+                       headline, subtext, cta_label, bg_color, text_color, layout`,
             [imageUrl, linkUrl, title, slot, displayOrder,
-                headline, subtext, ctaLabel, bgColor, layout]
+                headline, subtext, ctaLabel, bgColor, layout, textColor]
         );
 
         await logActivity(req.user.id, "create_promotion", "promotion",
@@ -179,6 +184,12 @@ exports.updatePromotion = async (req, res) => {
             ? ((req.body.cta_label || "").trim() || null) : current.cta_label;
         const bgColor = /^#[0-9a-fA-F]{3,8}$/.test((req.body.bg_color || "").trim())
             ? req.body.bg_color.trim() : current.bg_color;
+        // An empty string sent deliberately clears the override back to auto;
+        // the field being absent leaves whatever is already stored.
+        const textColor = req.body.text_color !== undefined
+            ? (/^#[0-9a-fA-F]{3,8}$/.test((req.body.text_color || "").trim())
+                ? req.body.text_color.trim() : null)
+            : current.text_color;
 
         if ((layout === "text" || layout === "strip_text") && !headline) {
             return res.status(400).json({ message: "A text promotion needs a headline." });
@@ -194,12 +205,12 @@ exports.updatePromotion = async (req, res) => {
             `UPDATE promotions
              SET image_url = $1, link_url = $2, title = $3, slot = $4, display_order = $5,
                      headline = $7, subtext = $8, cta_label = $9,
-                     bg_color = $10, layout = $11
+                     bg_color = $10, layout = $11, text_color = $12
              WHERE id = $6
              RETURNING id, image_url, link_url, title, slot, display_order, is_active,
-                       headline, subtext, cta_label, bg_color, layout`,
+                       headline, subtext, cta_label, bg_color, text_color, layout`,
             [imageUrl, linkUrl, title, slot, displayOrder, id,
-                headline, subtext, ctaLabel, bgColor, layout]
+                headline, subtext, ctaLabel, bgColor, layout, textColor]
         );
 
         await logActivity(req.user.id, "update_promotion", "promotion", id, "Updated promotion");

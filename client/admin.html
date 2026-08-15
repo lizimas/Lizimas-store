@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Admin Dashboard</title>
-<link rel="stylesheet" href="css/admin.css?v=8">
+<link rel="stylesheet" href="css/admin.css?v=9">
 </head>
 <body>
 
@@ -301,6 +301,32 @@
                        Tile icons upload at 120&times;120. Set a background colour on any announcement
                        to recolour the whole strip.</p>
 
+                    <div class="promo-slot-tiles" id="promo-slot-tiles">
+                        <button type="button" class="promo-slot-tile selected" data-slot="all"
+                                onclick="setPromoSlotFilter('all')">
+                            <span class="pst-name">All</span>
+                            <span class="pst-count" data-count="all">0</span>
+                        </button>
+                        <button type="button" class="promo-slot-tile" data-slot="1"
+                                onclick="setPromoSlotFilter('1')">
+                            <span class="pst-name">Slot 1</span>
+                            <span class="pst-note">Wide banner, left</span>
+                            <span class="pst-count" data-count="1">0</span>
+                        </button>
+                        <button type="button" class="promo-slot-tile" data-slot="2"
+                                onclick="setPromoSlotFilter('2')">
+                            <span class="pst-name">Slot 2</span>
+                            <span class="pst-note">Narrow banner, right</span>
+                            <span class="pst-count" data-count="2">0</span>
+                        </button>
+                        <button type="button" class="promo-slot-tile" data-slot="3"
+                                onclick="setPromoSlotFilter('3')">
+                            <span class="pst-name">Slot 3</span>
+                            <span class="pst-note">Announcement strip</span>
+                            <span class="pst-count" data-count="3">0</span>
+                        </button>
+                    </div>
+
                     <button class="add-btn" onclick="openPromoForm()">+ Add Promotion</button>
 
                     <div id="promo-form-container" class="hidden panel">
@@ -331,10 +357,10 @@
                             <div class="product-form-section hidden" id="promo-copy-section">
                                 <h4>Copy</h4>
                                 <div class="field-row">
-                                    <input type="text" id="promo-headline" maxlength="80" placeholder="Headline (required for a text banner)">
-                                    <input type="text" id="promo-subtext" maxlength="200" placeholder="Subtext (optional)">
+                                    <input type="text" id="promo-headline" maxlength="80" oninput="renderPromoPreview()" placeholder="Headline (required for a text banner)">
+                                    <input type="text" id="promo-subtext" maxlength="200" oninput="renderPromoPreview()" placeholder="Subtext (optional)">
                                     <input type="text" id="promo-cta" maxlength="40" placeholder="Button label, e.g. Shop now (optional)">
-                                    <input type="text" id="promo-bg" maxlength="16" placeholder="Background colour, e.g. #fbeaea">
+                                    <input type="text" id="promo-bg" maxlength="16" oninput="renderPromoPreview()" placeholder="Background colour, e.g. #fbeaea">
                                     <div class="promo-swatch-row" id="promo-bg-swatches">
                                         <button type="button" class="promo-swatch" data-color="#fbeaea" style="background:#fbeaea" onclick="setPromoBg('#fbeaea')" title="Light red #fbeaea">Light red</button>
                                         <button type="button" class="promo-swatch" data-color="#fde8e8" style="background:#fde8e8" onclick="setPromoBg('#fde8e8')" title="Blush #fde8e8">Blush</button>
@@ -345,6 +371,28 @@
                                         <button type="button" class="promo-swatch" data-color="#f0ecf9" style="background:#f0ecf9" onclick="setPromoBg('#f0ecf9')" title="Lilac #f0ecf9">Lilac</button>
                                         <button type="button" class="promo-swatch" data-color="#f2f3f5" style="background:#f2f3f5" onclick="setPromoBg('#f2f3f5')" title="Grey #f2f3f5">Grey</button>
                                         <button type="button" class="promo-swatch clear" onclick="setPromoBg('')" title="No colour set">None</button>
+                                    </div>
+
+                                    <input type="text" id="promo-text-color" maxlength="16"
+                                           oninput="renderPromoPreview()"
+                                           placeholder="Text colour (leave blank for automatic)">
+                                    <div class="promo-swatch-row" id="promo-text-swatches">
+                                        <button type="button" class="promo-swatch" data-color="#c0392b" style="background:#c0392b" onclick="setPromoText('#c0392b')" title="Deep red #c0392b">Deep red</button>
+                                        <button type="button" class="promo-swatch" data-color="#111827" style="background:#111827" onclick="setPromoText('#111827')" title="Near black #111827">Near black</button>
+                                        <button type="button" class="promo-swatch" data-color="#0f1c3f" style="background:#0f1c3f" onclick="setPromoText('#0f1c3f')" title="Navy #0f1c3f">Navy</button>
+                                        <button type="button" class="promo-swatch" data-color="#4a5568" style="background:#4a5568" onclick="setPromoText('#4a5568')" title="Slate #4a5568">Slate</button>
+                                        <button type="button" class="promo-swatch" data-color="#7a4b00" style="background:#7a4b00" onclick="setPromoText('#7a4b00')" title="Bronze #7a4b00">Bronze</button>
+                                        <button type="button" class="promo-swatch" data-color="#ffffff" style="background:#ffffff" onclick="setPromoText('#ffffff')" title="White #ffffff">White</button>
+                                        <button type="button" class="promo-swatch clear" onclick="setPromoText('')" title="Chosen automatically from the background">Auto</button>
+                                    </div>
+
+                                    <div class="promo-preview-wrap">
+                                        <span class="promo-preview-label">Preview</span>
+                                        <div class="promo-preview" id="promo-preview">
+                                            <strong id="promo-preview-head">Your headline</strong>
+                                            <span id="promo-preview-sub"></span>
+                                        </div>
+                                        <span class="promo-preview-note" id="promo-preview-note"></span>
                                     </div>
                                 </div>
                             </div>
@@ -596,7 +644,7 @@
 <script src="js/prepare-picked-file.js?v=9"></script>
 <script src="js/description-block-editor.js?v=5"></script>
 <script src="js/category-select.js?v=2"></script>
-    <script src="js/admin.js?v=31"></script>
+    <script src="js/admin.js?v=32"></script>
 <script src="js/photo-crop.js"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>
