@@ -9,6 +9,12 @@ let exploreTimer = null;
 
 // Must match the grid-template-columns in the CSS, or the page overflows
 // into a third row.
+// Escapes text before it goes into innerHTML. Shared by the promo slots
+// and the announcement strip, so it lives at module scope.
+const esc = s => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
 function exploreColumns() {
     return window.matchMedia("(max-width: 900px)").matches ? 4 : 10;
 }
@@ -147,10 +153,6 @@ async function loadPromoSlots() {
 
         let slides;
         if (mine.length) {
-            const esc = s => String(s == null ? "" : s)
-                .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
             slides = mine.map(p => {
                 let inner;
                 if (p.layout === "text") {
