@@ -3277,7 +3277,7 @@ body.sheet-open {
     /* Categories move into the drawer on mobile, as on Lulu. The row
        is pure height here: the burger beside the brand replaces it. */
     .ls-nav { display: none; }
-    .ls-burger-top { display: flex; }
+    .ls-header .ls-burger-top { display: flex; }
     .ls-action-label { display: none; }
     .ls-search { order: 3; flex-basis: 100%; }
     .ls-nav-all-label { display: none; }
