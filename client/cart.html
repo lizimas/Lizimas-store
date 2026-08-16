@@ -9,18 +9,80 @@
 
 <body>
 
-<header>
-<h1>Lizimas Store</h1>
-<p>Your Shopping Cart</p>
-</header>
+<header class="ls-header">
 
-<nav>
-<a href="index.html">Home</a>
-<a href="products.html">Products</a>
-<a href="cart.html">Cart</a>
-<a href="checkout.html">Checkout</a>
-<a href="login.html">Login</a>
-</nav>
+  <div class="ls-header-top">
+
+    <button class="ls-burger-top" id="ls-burger-top" type="button" aria-label="All categories">
+      <span class="ls-burger-lines"><span></span><span></span><span></span></span>
+    </button>
+    <a href="index.html" class="ls-brand">
+      <svg class="ls-mark" viewBox="0 0 512 512" aria-hidden="true">
+        <rect width="512" height="512" rx="123" fill="#1a1a2e"/>
+        <path d="M182 253 A74 74 0 0 1 330 253" fill="none" stroke="#F5C518" stroke-width="26"/>
+        <rect x="123" y="195" width="266" height="215" rx="31" fill="#F5C518"/>
+        <text x="256" y="335" font-family="Poppins, Segoe UI, sans-serif" font-size="133"
+              font-weight="700" fill="#1a1a2e" text-anchor="middle">LS</text>
+      </svg>
+      <span class="ls-wordmark">Lizimas Store</span>
+    </a>
+
+    <form class="ls-search" onsubmit="return false;">
+      <svg viewBox="0 0 24 24" class="ls-search-icon" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
+        <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round"/>
+      </svg>
+      <input type="search" id="header-search" placeholder="Search for anything" autocomplete="off">
+    </form>
+
+    <div class="ls-header-actions">
+
+
+      <div class="ls-menu">
+        <a class="ls-menu-trigger" href="login.html" aria-haspopup="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span class="ls-action-label">Account</span>
+        </a>
+        <div class="ls-menu-panel">
+          <a class="ls-menu-item" href="login.html">My account</a>
+          <a class="ls-menu-item" href="orders.html">Orders</a>
+        </div>
+      </div>
+
+      <a href="cart.html" class="ls-action" title="Cart">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 4h2.2l2.6 12h9.6l2.2-8H7" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+          <circle cx="10" cy="20" r="1.6" fill="currentColor"/>
+          <circle cx="17" cy="20" r="1.6" fill="currentColor"/>
+        </svg>
+        <span class="ls-cart-count" id="cart-count">0</span>
+      </a>
+    </div>
+
+  </div>
+
+  <nav class="ls-nav" id="ls-nav">
+    <div class="ls-mega" id="ls-mega">
+      <button class="ls-nav-all" id="ls-nav-all" type="button">
+        <span class="ls-burger"><span></span><span></span><span></span></span>
+        <span class="ls-nav-all-label">All Categories</span>
+      </button>
+      <div class="ls-mega-panel">
+        <div class="ls-mega-rail" id="ls-mega-rail"></div>
+        <div class="ls-mega-col" id="ls-mega-l2" hidden></div>
+        <div class="ls-mega-col" id="ls-mega-l3" hidden></div>
+      </div>
+    </div>
+    <div class="ls-nav-parents" id="ls-nav-parents"></div>
+  </nav>
+
+</header>
 
 <div class="cart-page">
 
@@ -57,7 +119,24 @@
 
 </div>
 
+<div class="ls-drawer-backdrop" id="ls-drawer-backdrop" hidden></div>
+
+<aside class="ls-drawer" id="ls-drawer" hidden aria-label="All categories">
+  <div class="ls-drawer-head">
+    <span class="ls-drawer-title">All Categories</span>
+    <button class="ls-drawer-close" id="ls-drawer-close" aria-label="Close">&times;</button>
+  </div>
+
+  <div class="ls-drawer-body">
+    <div class="ls-drawer-track">
+      <nav class="ls-drawer-rail" id="ls-drawer-rail"></nav>
+      <div class="ls-drawer-panel" id="ls-drawer-panel"></div>
+    </div>
+  </div>
+</aside>
+
 <script src="js/api.js"></script>
+<script src="js/categories.js?v=20"></script>
 <script src="js/cart.js?v=5"></script>
 
 
