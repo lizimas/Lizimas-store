@@ -522,19 +522,54 @@ function searchProducts() {
         return;
     }
 
-    const matches = product => {
+    // Terms customers type rarely match the catalogue word for word. Kept as a
+    // flat list per concept: any term in a group expands to all the others.
+    const SYNONYMS = [
+        ["tv", "tvs", "television", "televisions"],
+        ["phone", "phones", "smartphone", "smartphones", "mobile"],
+        ["fridge", "fridges", "refrigerator", "refrigerators"],
+        ["speaker", "speakers", "soundbar", "soundbars"],
+        ["laptop", "laptops", "notebook", "computer"]
+    ];
+
+    const expand = term => {
+        const group = SYNONYMS.find(g => g.includes(term));
+        return group ? group : [term];
+    };
+
+    const terms = expand(searchValue);
+
+    // A category hit outranks a name hit, because that is what separates a
+    // television from an accessory that merely mentions one. Without it,
+    // "LG Soundbar for TV" scores as highly as an actual TV.
+    const scoreOf = product => {
         const name = (product.name || "").toLowerCase();
         const category = (product.category || "").toLowerCase();
         const description = (product.description || "").toLowerCase();
+        let best = 0;
 
-        return (
-            name.includes(searchValue) ||
-            category.includes(searchValue) ||
-            description.includes(searchValue)
-        );
+        for (const term of terms) {
+            let score = 0;
+            const whole = new RegExp("\\b" + term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b");
+
+            if (category.includes(term)) score += 100;
+            if (name.startsWith(term)) score += 70;
+            else if (whole.test(name)) score += 60;
+            else if (name.includes(term)) score += 40;
+            if (description.includes(term)) score += 20;
+
+            if (score > best) best = score;
+        }
+
+        return best;
     };
 
-    const allMatches = allProducts.filter(matches);
+    const scored = allProducts
+        .map(p => ({ product: p, score: scoreOf(p) }))
+        .filter(entry => entry.score > 0)
+        .sort((a, b) => b.score - a.score);
+
+    const allMatches = scored.map(entry => entry.product);
     const scopedMatches = activeCategory === ALL_CATEGORIES
         ? allMatches
         : allMatches.filter(p => categoryNameOf(p) === activeCategory);
