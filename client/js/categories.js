@@ -461,12 +461,21 @@ function buildDrawer(rail) {
             b.classList.toggle("active", n === i));
 
         const parent = drawerTree[i];
+        // Mobile slides to this pane, so it needs its own way back. Hidden
+        // by CSS at desktop widths where the rail is permanently beside it.
+        const back = `<button class="ls-drawer-back" type="button">
+                <span class="ls-drawer-back-arrow">&#8249;</span>
+                <span>Back</span>
+                <span class="ls-drawer-back-label">${parent.name}</span>
+            </button>`;
+
         if (!parent.children.length) {
-            panel.innerHTML = `<p class="ls-drawer-empty" style="padding:20px">Nothing here yet.</p>`;
+            panel.innerHTML = back +
+                `<p class="ls-drawer-empty" style="padding:20px">Nothing here yet.</p>`;
             return;
         }
 
-        panel.innerHTML = parent.children.map(second => {
+        panel.innerHTML = back + parent.children.map(second => {
             const leaves = second.children.length
                 ? second.children.map(third =>
                     `<a class="ls-drawer-child"
@@ -486,13 +495,21 @@ function buildDrawer(rail) {
         panel.scrollTop = 0;
     };
 
+    const body = document.querySelector(".ls-drawer-body");
+
     rail.addEventListener("click", e => {
         const btn = e.target.closest(".ls-drawer-parent");
-        if (btn) showParent(Number(btn.dataset.i));
+        if (!btn) return;
+        showParent(Number(btn.dataset.i));
+        if (body) body.classList.add("at-level-2");
     });
 
     // One group open at a time, so a long list does not push the rest off-screen
     panel.addEventListener("click", e => {
+        if (e.target.closest(".ls-drawer-back")) {
+            if (body) body.classList.remove("at-level-2");
+            return;
+        }
         const head = e.target.closest(".ls-drawer-group-head");
         if (!head) return;
         const group = head.parentElement;
@@ -512,6 +529,12 @@ function setupDrawerToggle() {
     if (!openBtn || !drawer) return;
 
     const setOpen = open => {
+        // Reopening should start at the top level, not wherever the
+        // customer happened to leave off.
+        if (!open) {
+            const body = document.querySelector(".ls-drawer-body");
+            if (body) body.classList.remove("at-level-2");
+        }
         drawer.hidden = !open;
         backdrop.hidden = !open;
         document.body.style.overflow = open ? "hidden" : "";

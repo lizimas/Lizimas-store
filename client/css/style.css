@@ -4467,12 +4467,12 @@ body.sheet-open {
     display: none;
     align-items: center;
     justify-content: center;
-    width: 34px;
-    height: 34px;
+    width: 30px;
+    height: 30px;
     padding: 0;
+    margin-right: -2px;
     border: none;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.1);
+    background: none;
     color: #F5C518;
     cursor: pointer;
     flex-shrink: 0;
@@ -4480,13 +4480,114 @@ body.sheet-open {
 
 .ls-burger-top span {
     display: block;
-    width: 17px;
-    height: 2px;
-    margin: 2px 0;
+    width: 20px;
+    height: 2.5px;
+    margin: 3.5px 0;
     background: currentColor;
     border-radius: 2px;
 }
 
 .ls-burger-top .ls-burger-lines {
     display: block;
+}
+
+
+/* ============================================================
+   Mobile drawer — one column at a time, as on Lulu. The rail and
+   panel already exist side by side for desktop-width tablets; here
+   the body becomes a 200%-wide track that slides, so the page stays
+   partly visible behind a narrower panel. Desktop (>=901px) uses the
+   .ls-mega hover cascade instead and is untouched by any of this.
+   ============================================================ */
+@media (max-width: 900px) {
+    .ls-drawer { width: min(400px, 84vw); }
+
+    .ls-drawer-body {
+        display: block;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .ls-drawer-track {
+        display: flex;
+        width: 200%;
+        height: 100%;
+        transform: translateX(0);
+        transition: transform .26s ease;
+    }
+
+    .ls-drawer-body.at-level-2 .ls-drawer-track {
+        transform: translateX(-50%);
+    }
+
+    .ls-drawer-rail,
+    .ls-drawer-panel {
+        width: 50%;
+        flex-shrink: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .ls-drawer-rail {
+        background: #fff;
+        border-right: none;
+        padding: 4px 0;
+    }
+
+    .ls-drawer-parent {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 15px 18px;
+        font-size: 15px;
+        border-left: none;
+        border-bottom: 1px solid #f3f4f6;
+    }
+
+    /* The rail is a menu, not a selection: the active tint that made
+       sense beside a visible panel would linger meaninglessly here. */
+    .ls-drawer-parent.active {
+        background: none;
+        color: #374151;
+    }
+
+    .ls-drawer-parent::after {
+        content: "\203A";
+        font-size: 20px;
+        line-height: 1;
+        color: #9ca3af;
+    }
+
+    .ls-drawer-back {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 13px 18px;
+        background: none;
+        border: none;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 14px;
+        font-weight: 600;
+        color: #1a1a2e;
+        cursor: pointer;
+        text-align: left;
+    }
+
+    .ls-drawer-back .ls-drawer-back-arrow {
+        font-size: 18px;
+        line-height: 1;
+        color: #F5C518;
+    }
+
+    .ls-drawer-back .ls-drawer-back-label {
+        margin-left: auto;
+        font-weight: 400;
+        color: #6b7280;
+    }
+}
+
+/* The back control has no role in the side-by-side desktop layout. */
+@media (min-width: 901px) {
+    .ls-drawer-back { display: none; }
 }
