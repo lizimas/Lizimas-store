@@ -4500,7 +4500,7 @@ body.sheet-open {
    .ls-mega hover cascade instead and is untouched by any of this.
    ============================================================ */
 @media (max-width: 900px) {
-    .ls-drawer { width: min(300px, 62vw); }
+    .ls-drawer { width: max(150px, 34vw); }
 
     .ls-drawer-body {
         display: block;
@@ -4626,4 +4626,39 @@ body.sheet-open {
         gap: 8px;
         align-items: center;
     }
+}
+
+
+/* The burger and the brand are siblings in a wrapping flex row, so each
+   was centring against its own box rather than a shared line. Pinning
+   both to a fixed height puts them on one axis. */
+@media (max-width: 720px) {
+    .ls-header .ls-burger-top {
+        height: 34px;
+        margin: 0;
+        align-self: center;
+    }
+
+    .ls-header .ls-brand {
+        height: 34px;
+        align-self: center;
+    }
+}
+
+
+/* At 34vw the longer category names wrap. Give the wrap room to look
+   intentional and keep the chevron centred against both lines. */
+@media (max-width: 900px) {
+    .ls-drawer-parent {
+        align-items: center;
+        gap: 6px;
+        padding: 11px 12px;
+        font-size: 12.5px;
+        line-height: 1.35;
+    }
+
+    .ls-drawer-parent::after { flex-shrink: 0; }
+    .ls-drawer-group-head { padding: 11px 12px; font-size: 12.5px; }
+    .ls-drawer-children { padding: 0 12px 10px 20px; }
+    .ls-drawer-child { font-size: 12px; }
 }
