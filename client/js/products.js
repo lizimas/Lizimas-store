@@ -17,6 +17,20 @@ async function loadProducts() {
             if (match) activeCategory = requestedCategory;
         }
 
+        // Arriving from the header search: seed the existing input and let
+        // searchProducts() do the matching, so behaviour is identical to
+        // typing the term here directly.
+        const requestedQuery = new URLSearchParams(window.location.search).get("q");
+        if (requestedQuery) {
+            const input = document.getElementById("search-input");
+            if (input) {
+                input.value = requestedQuery;
+                searchProducts();
+                displayFeaturedProducts(allProducts);
+                return;
+            }
+        }
+
         renderCatalogue();
         displayFeaturedProducts(allProducts);
     } catch (error) {

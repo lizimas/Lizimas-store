@@ -78,6 +78,17 @@ exports.addProduct = async (req, res) => {
 // Get all products
 exports.getProducts = async (req, res) => {
     try {
+        // Optional free-text filter. Matches the product name or its category
+        // name, so "electronics" finds the section and "hisense" finds the item.
+        const q = (req.query.q || "").trim();
+        const params = [];
+        let filter = "";
+
+        if (q) {
+            params.push(`%${q}%`);
+            filter = ` AND (products.name ILIKE $1 OR categories.name ILIKE $1)`;
+        }
+
         const products = await pool.query(
             `SELECT products.*, categories.name AS category,
                     COALESCE(
@@ -89,8 +100,9 @@ exports.getProducts = async (req, res) => {
                     ) AS card_image
              FROM products
              LEFT JOIN categories ON products.category_id = categories.id
-             WHERE products.status = 'approved' AND products.deleted_at IS NULL
-             ORDER BY products.id DESC`
+             WHERE products.status = 'approved' AND products.deleted_at IS NULL${filter}
+             ORDER BY products.id DESC`,
+            params
         );
 
         res.json(products.rows);

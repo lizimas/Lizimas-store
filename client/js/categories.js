@@ -552,9 +552,26 @@ function setupDrawerToggle() {
     });
 }
 
+// The header search only navigates. products.html owns the matching logic,
+// so there is one search implementation rather than two that can drift.
+function setupHeaderSearch() {
+    const input = document.getElementById("header-search");
+    if (!input) return;
+    const form = input.closest("form");
+    if (!form) return;
+
+    form.addEventListener("submit", e => {
+        e.preventDefault();
+        const q = input.value.trim();
+        if (!q) return;
+        window.location.href = "products.html?q=" + encodeURIComponent(q);
+    });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     loadCategoryNav();
     setupDrawerToggle();
+    setupHeaderSearch();
 });
 
 // ---------- All Categories hover panel (desktop) ----------
