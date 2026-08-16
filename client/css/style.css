@@ -3730,8 +3730,11 @@ body.sheet-open {
 /* Phones stack the two slots, so height follows width here. The desktop
    block below drops the ratio entirely and pins a fixed height, which keeps
    the banner the same size on a 1366px laptop and a 2560px monitor. */
-#ls-promo-1 { aspect-ratio: 16 / 9; }
-#ls-promo-2 { aspect-ratio: 16 / 9; }
+/* Shorter than before on purpose: two 16/9 banners stacked was most of two
+   screens of scrolling before any product appeared. Slot 1 stays widest
+   since it carries the primary campaign; slot 2 is a little more square. */
+#ls-promo-1 { aspect-ratio: 16 / 6; }
+#ls-promo-2 { aspect-ratio: 16 / 8; }
 
 @media (min-width: 900px) {
     .ls-promos {
