@@ -206,14 +206,15 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
     height: auto;
 }
 .pd-desc-blocks .pdb-heading {
-    margin: 18px 0 8px;
-    font-size: 1.05rem;
+    margin: 14px 0 6px;
+    font-size: 0.95rem;
     font-weight: 700;
     color: #0d1b3e;
 }
 .pd-desc-blocks .pdb-text {
-    margin: 0 0 12px;
-    line-height: 1.65;
+    margin: 0 0 10px;
+    font-size: 0.85rem;
+    line-height: 1.5;
     color: #333;
     white-space: pre-line;
 }
@@ -231,5 +232,5 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 .pdb-text ul, .pdb-text ol { margin: 8px 0; padding-left: 24px; }
 .pdb-text li { margin: 4px 0; line-height: 1.6; }
 .pdb-text ul.lzbe-check { list-style: none; padding-left: 0; }
-.pdb-text ul.lzbe-check > li { display: flex; align-items: flex-start; gap: 12px; margin: 0 0 16px; line-height: 1.65; }
-.pdb-text .tick { flex: 0 0 26px; width: 26px; height: 26px; margin-top: 1px; border-radius: 50%; background: #fbeaea; color: #c0392b; font-weight: 700; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; }
+.pdb-text ul.lzbe-check > li { display: flex; align-items: flex-start; gap: 9px; margin: 0 0 10px; line-height: 1.45; font-size: 0.85rem; }
+.pdb-text .tick { flex: 0 0 20px; width: 20px; height: 20px; margin-top: 1px; border-radius: 50%; background: #fbeaea; color: #c0392b; font-weight: 700; font-size: 0.72rem; display: inline-flex; align-items: center; justify-content: center; }
