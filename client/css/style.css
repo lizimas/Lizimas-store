@@ -4480,9 +4480,9 @@ body.sheet-open {
 
 .ls-burger-top span {
     display: block;
-    width: 20px;
-    height: 2.5px;
-    margin: 3.5px 0;
+    width: 17px;
+    height: 2px;
+    margin: 3px 0;
     background: currentColor;
     border-radius: 2px;
 }
@@ -4500,7 +4500,7 @@ body.sheet-open {
    .ls-mega hover cascade instead and is untouched by any of this.
    ============================================================ */
 @media (max-width: 900px) {
-    .ls-drawer { width: min(330px, 76vw); }
+    .ls-drawer { width: min(300px, 62vw); }
 
     .ls-drawer-body {
         display: block;
@@ -4604,4 +4604,26 @@ body.sheet-open {
     .ls-drawer-children { padding: 0 16px 12px 26px; }
     .ls-drawer-child { font-size: 13px; }
     .ls-drawer-title { font-size: 15px; }
+}
+
+
+/* The mark is the brand; the burger is a control. Sizing them equally
+   made the burger compete, so it steps back and the mark leads. */
+@media (max-width: 720px) {
+    .ls-header .ls-burger-top {
+        width: 24px;
+        height: 24px;
+        align-self: center;
+    }
+
+    .ls-header .ls-mark {
+        width: 34px;
+        height: 34px;
+        flex-shrink: 0;
+    }
+
+    .ls-header .ls-brand {
+        gap: 8px;
+        align-items: center;
+    }
 }
