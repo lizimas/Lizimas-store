@@ -4686,3 +4686,9 @@ body.sheet-open {
     font-size: 12px;
     padding: 12px 0;
 }
+
+
+/* The checkout button is wrapped in a bare anchor, so the underline is
+   drawn by the parent and inherits down. Styling the button alone never
+   reached it. */
+.cart-footer a { text-decoration: none; }
