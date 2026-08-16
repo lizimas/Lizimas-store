@@ -518,6 +518,10 @@ function setupDrawerToggle() {
     };
 
     openBtn.addEventListener("click", () => setOpen(true));
+    // The header burger is the mobile trigger; .ls-nav is hidden below 720px
+    // so openBtn is unreachable there. Same drawer, second entry point.
+    const topBtn = document.getElementById("ls-burger-top");
+    if (topBtn) topBtn.addEventListener("click", () => setOpen(true));
     closeBtn.addEventListener("click", () => setOpen(false));
     backdrop.addEventListener("click", () => setOpen(false));
     document.addEventListener("keydown", e => {
