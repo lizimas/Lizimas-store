@@ -1478,6 +1478,8 @@ width:90%;
 }
 
 .cart-checkout-btn {
+    /* It is an anchor, so the browser underlines it unless told not to. */
+    text-decoration: none;
     height: 56px;
     border-radius: 28px;
     background: #1a1a2e;
@@ -4661,4 +4663,26 @@ body.sheet-open {
     .ls-drawer-group-head { padding: 11px 12px; font-size: 12.5px; }
     .ls-drawer-children { padding: 0 12px 10px 20px; }
     .ls-drawer-child { font-size: 12px; }
+}
+
+
+/* Site footer: links sit in <p> tags, so each carried default paragraph
+   margins above and below. Zeroing those and tightening the scale is
+   most of the height back without touching the markup on eleven pages. */
+.site-footer p {
+    margin: 0 0 8px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.site-footer h4 {
+    margin: 0 0 10px;
+    font-size: 14px;
+}
+
+.site-footer a { font-size: 13px; }
+
+.site-footer .copyright {
+    font-size: 12px;
+    padding: 12px 0;
 }
