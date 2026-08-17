@@ -4351,6 +4351,34 @@ body.sheet-open {
 }
 .site-footer .copyright a { color: inherit; }
 
+.footer-social {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.footer-social-label {
+  font-size: 13px;
+  color: #d8dce6;
+}
+.footer-social-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #2a2a3e;
+  color: #d8dce6;
+  transition: background 0.2s, color 0.2s;
+}
+.footer-social-icon:hover,
+.footer-social-icon:focus {
+  background: #F5C518;
+  color: #1a1a2e;
+  text-decoration: none;
+}
+
 .footer-container {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
