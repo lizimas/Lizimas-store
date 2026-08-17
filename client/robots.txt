@@ -1,4 +1,14 @@
 User-agent: *
 Allow: /
+Disallow: /admin.html
+Disallow: /login.html
+Disallow: /staff-login.html
+Disallow: /register.html
+Disallow: /forgot-password.html
+Disallow: /reset-password.html
+Disallow: /device-approve.html
+Disallow: /cart.html
+Disallow: /checkout.html
+Disallow: /orders.html
 
 Sitemap: https://lizimasstore.com/sitemap.xml
