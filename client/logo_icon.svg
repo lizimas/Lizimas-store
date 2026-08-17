@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="123" fill="#1a1a2e"/>
+  <path d="M182 253 A74 74 0 0 1 330 253" fill="none" stroke="#F5C518" stroke-width="26"/>
+  <rect x="123" y="195" width="266" height="215" rx="31" fill="#F5C518"/>
+  <text x="256" y="335" font-family="Poppins, Segoe UI, sans-serif" font-size="133"
+        font-weight="700" fill="#1a1a2e" text-anchor="middle">LS</text>
+</svg>
