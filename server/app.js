@@ -51,6 +51,8 @@ require("./config/database");
 const routes = require("./routes");
 app.use("/api", routes);
 
+app.use("/", require("./routes/sitemap"));
+
 // Static files
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use(express.static(path.join(__dirname, "../client")));
