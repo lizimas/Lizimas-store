@@ -97,7 +97,12 @@ exports.getProducts = async (req, res) => {
                        ORDER BY COALESCE(pi.display_order, 999999) ASC, pi.id ASC
                        LIMIT 1),
                       products.image
-                    ) AS card_image
+                    ) AS card_image,
+                    (SELECT pi.image_path FROM product_images pi
+                     WHERE pi.product_id = products.id
+                     ORDER BY COALESCE(pi.display_order, 999999) ASC, pi.id ASC
+                     OFFSET 1 LIMIT 1
+                    ) AS hover_image
              FROM products
              LEFT JOIN categories ON products.category_id = categories.id
              WHERE products.status = 'approved' AND products.deleted_at IS NULL${filter}

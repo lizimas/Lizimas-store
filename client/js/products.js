@@ -108,9 +108,15 @@ function buildProductCard(product) {
             <img
                 src="${product.card_image || product.image}"
                 alt="${product.name}"
-                class="product-image"
+                class="product-image product-image-primary"
                 loading="lazy"
             >
+            ${product.hover_image ? `<img
+                src="${product.hover_image}"
+                alt="${product.name} alternate view"
+                class="product-image product-image-hover"
+                loading="lazy"
+            >` : ""}
             <button
                 type="button"
                 class="quick-add-btn"
