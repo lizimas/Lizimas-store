@@ -1092,6 +1092,7 @@ function editProduct(id) {
     document.getElementById("product-price").value = product.price;
     document.getElementById("product-stock").value = product.stock;
     document.getElementById("product-package-size").value = product.package_size || "Small";
+    document.getElementById("product-warranty-months").value = product.warranty_months || "";
     document.getElementById("variants-section").classList.remove("hidden");
     loadVariants(product.id);
     loadProductOptionsIntoForm(product.id);
@@ -1115,6 +1116,7 @@ async function saveProduct() {
     const price = document.getElementById("product-price").value;
     const stock = document.getElementById("product-stock").value;
     const packageSize = document.getElementById("product-package-size").value;
+    const warrantyMonths = document.getElementById("product-warranty-months").value.trim();
     const files = pdPickedFiles;
 
     const errorEl = document.getElementById("product-form-error");
@@ -1131,6 +1133,7 @@ async function saveProduct() {
     formData.append("price", price);
     formData.append("stock", stock);
     formData.append("package_size", packageSize);
+    formData.append("warranty_months", warrantyMonths);
 
     for (let i = 0; i < files.length; i++) {
         formData.append("images", files[i]);

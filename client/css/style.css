@@ -4744,3 +4744,70 @@ body.sheet-open {
    drawn by the parent and inherits down. Styling the button alone never
    reached it. */
 .cart-footer a { text-decoration: none; }
+
+
+/* Manufacturer warranty badge, shown beside the price on product-detail.html
+   when a product has warranty_months set. Hidden entirely otherwise. */
+.pd-warranty {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: #2c7a4b;
+    margin-top: 8px;
+}
+
+.pd-warranty.hidden {
+    display: none;
+}
+
+.pd-warranty-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+
+/* Description / Specifications tabs on product-detail.html, replacing the
+   old "Product details" modal sheet - specs render inline now. */
+.pd-tabs {
+    display: flex;
+    gap: 24px;
+    margin-top: 18px;
+    border-bottom: 1px solid #e6e6e6;
+}
+
+.pd-tab {
+    background: none;
+    border: none;
+    padding: 10px 2px 12px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #999;
+    cursor: pointer;
+    position: relative;
+}
+
+.pd-tab.active {
+    color: #1a1a2e;
+}
+
+.pd-tab.active::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 3px;
+    background: #F5C518;
+    border-radius: 2px;
+}
+
+.pd-tab-panel {
+    display: none;
+    padding-top: 18px;
+}
+
+.pd-tab-panel.active {
+    display: block;
+}

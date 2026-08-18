@@ -63,6 +63,73 @@
         return out.innerHTML;
     }
 
+    // A multi-column feature grid. Per-column items ride in the JSONB
+    // payload rather than as sibling rows, so a column's image and its
+    // caption can never drift apart during reordering.
+    function gridEl(b) {
+        let payload = b.payload || {};
+        if (typeof payload === "string") {
+            try {
+                payload = JSON.parse(payload);
+            } catch (e) {
+                payload = {};
+            }
+        }
+
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        const section = document.createElement("section");
+        section.className = "pdb-grid-section";
+
+        if (payload.heading) {
+            const h = document.createElement("h3");
+            h.className = "pdb-heading";
+            h.textContent = payload.heading;
+            section.appendChild(h);
+        }
+
+        const grid = document.createElement("div");
+        grid.className = "pdb-grid";
+
+        const requested = parseInt(payload.columns, 10) || items.length;
+        const cols = Math.min(Math.max(requested, 1), 8);
+        grid.style.setProperty("--pdb-grid-cols", cols);
+
+        items.forEach((item) => {
+            const cell = document.createElement("div");
+            cell.className = "pdb-grid-cell";
+
+            if (item.image_url) {
+                cell.appendChild(
+                    imageEl({
+                        image_url: item.image_url,
+                        image_width: item.image_width,
+                        image_height: item.image_height,
+                        alt_text: item.alt_text || item.caption || ""
+                    })
+                );
+            }
+
+            if (item.caption) {
+                const cap = document.createElement("div");
+                cap.className = "pdb-grid-caption";
+                cap.textContent = item.caption;
+                cell.appendChild(cap);
+            }
+
+            if (item.body) {
+                const body = document.createElement("div");
+                body.className = "pdb-grid-body";
+                body.innerHTML = pdbSanitize(item.body);
+                cell.appendChild(body);
+            }
+
+            grid.appendChild(cell);
+        });
+
+        section.appendChild(grid);
+        return section;
+    }
+
     function render(blocks) {
         const frag = document.createDocumentFragment();
         blocks.forEach((b) => {
@@ -73,6 +140,8 @@
                 h.className = "pdb-heading";
                 h.textContent = b.body;
                 frag.appendChild(h);
+            } else if (b.type === "grid") {
+                frag.appendChild(gridEl(b));
             } else if (/<(p|ul|ol|li|br|strong|em|b|i|u)\b/i.test(b.body || "")) {
                 const d = document.createElement("div");
                 d.className = "pdb-text";

@@ -31,6 +31,25 @@ async function loadProductDetail() {
             ? `UGX ${Number(product.price).toLocaleString()}`
             : "";
         document.getElementById("pd-description").textContent = product.description || "No description available.";
+
+        const warrantyEl = document.getElementById("pd-warranty");
+        if (warrantyEl) {
+            if (product.warranty_months) {
+                const months = Number(product.warranty_months);
+                const label = months === 1 ? "1 Month" : (months + " Months");
+                warrantyEl.innerHTML =
+                    '<svg class="pd-warranty-icon" viewBox="0 0 24 24" fill="none">' +
+                        '<path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="#2c7a4b" opacity="0.15"/>' +
+                        '<path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" stroke="#2c7a4b" stroke-width="1.6" stroke-linejoin="round"/>' +
+                        '<path d="M9 12l2 2 4-4" stroke="#2c7a4b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
+                    '</svg>' +
+                    '<span>' + label + ' Manufacturer Warranty</span>';
+                warrantyEl.classList.remove("hidden");
+            } else {
+                warrantyEl.classList.add("hidden");
+                warrantyEl.innerHTML = "";
+            }
+        }
         const idEl = document.getElementById("pd-item-id");
         if (idEl) idEl.textContent = "Item ID: " + product.id;
 
@@ -549,14 +568,24 @@ function renderSpecs(specs, sizes) {
         sizeRow;
 }
 
+function pdSwitchTab(name) {
+    document.querySelectorAll(".pd-tab").forEach(function (t) {
+        t.classList.toggle("active", t.dataset.pdTab === name);
+    });
+    document.querySelectorAll(".pd-tab-panel").forEach(function (p) {
+        p.classList.toggle("active", p.id === "pd-panel-" + name);
+    });
+}
+
 function openAllDetails() {
-    const el = document.getElementById("pd-sheet");
-    if (el) el.classList.remove("hidden");
+    pdSwitchTab("specs");
+    const panel = document.getElementById("pd-panel-specs");
+    if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function closeAllDetails() {
-    const el = document.getElementById("pd-sheet");
-    if (el) el.classList.add("hidden");
+    // No-op: specs now render inline in the tab panel, there is no modal
+    // sheet to close. Kept so any stray references don't throw.
 }
 
 function toggleSaveProduct() {

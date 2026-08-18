@@ -1370,3 +1370,24 @@ select.status-select {
     color: #6b7280;
     font-size: 12px;
 }
+
+/* Grid block authoring — mirrors .lzbe-row's card look so it doesn't read
+   as a bolted-on special case. */
+.lzbe-grid-cols { display: block; font-size: 0.8rem; color: #666; margin: 6px 0; }
+.lzbe-grid-cols input { width: 60px; margin-left: 6px; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; }
+.lzbe-grid-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin: 8px 0; }
+.lzbe-grid-item { border: 1px solid #e2e2e2; border-radius: 5px; padding: 8px; background: #fff; }
+.lzbe-grid-item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.lzbe-grid-item-head button { width: 24px; height: 22px; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; }
+.lzbe-grid-item .lzbe-thumb { max-width: 100%; }
+.lzbe-grid-item input, .lzbe-grid-item textarea { width: 100%; margin-top: 6px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 0.85rem; }
+.lzbe-grid-item button { margin-top: 6px; padding: 4px 8px; border: 1px solid #0d1b3e; background: #fff; color: #0d1b3e; border-radius: 4px; cursor: pointer; font-size: 0.78rem; }
+.lzbe-grid-add { margin-top: 4px; padding: 6px 12px; border: 1px dashed #0d1b3e; background: #fff; color: #0d1b3e; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+.lzbe-grid-add:hover { background: #0d1b3e; color: #fff; }
+
+/* Grid column's rich-text field reuses .lzbe-rich but is shorter and a
+   touch smaller, since it sits in a narrow card next to an image/caption
+   rather than being the whole block. */
+.lzbe-grid-rich { min-height: 60px; font-size: 0.85rem; margin-top: 6px; }
+.lzbe-grid-item .lzbe-tickbar { margin-top: 4px; }
+.lzbe-grid-item .lzbe-tickbar button { padding: 3px 8px; font-size: 0.72rem; }

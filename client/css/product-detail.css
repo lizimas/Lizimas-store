@@ -98,17 +98,14 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
         position: static;
         box-shadow: none;
         padding: 0;
-        max-width: 1280px;
-        margin: -40px auto 0;
+        max-width: none;
+        margin: 22px 0 0;
     }
 
     .pd-sticky-bar .pd-add-to-cart-btn {
-        max-width: 440px;
-        margin-left: auto;
-        margin-right: 40px;
-        display: block;
-        border-radius: 999px;
-        padding: 16px;
+        width: 100%;
+        max-width: none;
+        margin: 0;
     }
 
     .pd-size-btn { padding: 10px 20px; }
@@ -234,3 +231,82 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 .pdb-text ul.lzbe-check { list-style: none; padding-left: 0; }
 .pdb-text ul.lzbe-check > li { display: flex; align-items: flex-start; gap: 9px; margin: 0 0 10px; line-height: 1.45; font-size: 0.85rem; }
 .pdb-text .tick { flex: 0 0 20px; width: 20px; height: 20px; margin-top: 1px; border-radius: 50%; background: #fbeaea; color: #c0392b; font-weight: 700; font-size: 0.72rem; display: inline-flex; align-items: center; justify-content: center; }
+
+
+/* Description / Specifications tabs sit under the gallery in the left column
+   on desktop. On mobile they stack in normal document order. */
+@media (min-width: 900px) {
+    .pd-tabs-col {
+        grid-column: 1;
+        min-width: 0;
+        margin-top: 36px;
+    }
+}
+
+
+/* Price and warranty share a line; the warranty badge is optional and simply
+   drops out of the row when hidden. */
+.pd-price-row {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+}
+
+.pd-price-row .pd-price {
+    margin: 8px 0;
+}
+
+.pd-price-row .pd-warranty {
+    margin: 0;
+}
+
+
+/* Multi-column feature grid. Column count comes from the block payload via
+   --pdb-grid-cols; anything above two collapses to two on a phone so the
+   images never shrink below a usable size. */
+.pdb-grid-section {
+    margin: 30px 0;
+}
+
+.pdb-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--pdb-grid-cols, 3), minmax(0, 1fr));
+    gap: 20px;
+}
+
+.pdb-grid-cell img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 10px;
+}
+
+.pdb-grid-caption {
+    font-weight: 700;
+    font-size: 15px;
+    color: #1a1a2e;
+    margin-top: 10px;
+}
+
+.pdb-grid-body {
+    font-size: 14px;
+    line-height: 1.55;
+    color: #555;
+    margin-top: 4px;
+}
+
+.pdb-grid-body ul, .pdb-grid-body ol { margin: 4px 0 0; padding-left: 22px; }
+.pdb-grid-body li { margin: 3px 0; line-height: 1.55; }
+.pdb-grid-body ul.lzbe-check { list-style: none; padding-left: 0; }
+.pdb-grid-body ul.lzbe-check > li { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 8px; line-height: 1.4; font-size: 0.85rem; }
+.pdb-grid-body .tick { flex: 0 0 18px; width: 18px; height: 18px; margin-top: 1px; border-radius: 50%; background: #fbeaea; color: #c0392b; font-weight: 700; font-size: 0.68rem; display: inline-flex; align-items: center; justify-content: center; }
+.pdb-grid-body p { margin: 0 0 6px; }
+.pdb-grid-body p:last-child { margin-bottom: 0; }
+
+@media (max-width: 640px) {
+    .pdb-grid {
+        grid-template-columns: repeat(min(var(--pdb-grid-cols, 2), 2), minmax(0, 1fr));
+        gap: 14px;
+    }
+}

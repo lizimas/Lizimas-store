@@ -39,8 +39,42 @@
             document.getElementById("lzbe-file").click();
             return;
         }
+        if (type === "grid") {
+            blocks.push({ type, payload: { heading: "", columns: 3, items: [] } });
+            render();
+            return;
+        }
         blocks.push({ type, body: "" });
         render();
+    }
+
+    // Shared upload primitive. A top-level Image block and a grid column's
+    // image both go through the same endpoint, so the request lives here
+    // once rather than twice.
+    async function uploadImage(file) {
+        const productId = host.dataset.productId;
+        const uploadUrl = productId
+            ? `/api/products/${productId}/description-blocks/image`
+            : "/api/products/description-blocks/image";
+
+        const prepared = typeof preparePickedFile === "function"
+            ? await preparePickedFile(file)
+            : { ok: true, file };
+        if (!prepared.ok) throw new Error(prepared.reason || "File could not be read");
+
+        const fd = new FormData();
+        fd.append("image", prepared.file || file);
+
+        const res = await fetch(uploadUrl, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token()}` },
+            body: fd
+        });
+        if (!res.ok) {
+            const detail = await res.text().catch(() => "");
+            throw new Error(`Upload failed (${res.status})${detail ? ": " + detail.slice(0, 200) : ""}`);
+        }
+        return res.json();
     }
 
     async function handleFile(file) {
@@ -48,29 +82,9 @@
         // On the Add Product form there is no id yet, so images go to the
         // staging endpoint. Upload still happens immediately, which is what
         // keeps true Cloudinary dimensions on the block.
-        const productId = host.dataset.productId;
-        const uploadUrl = productId
-            ? `/api/products/${productId}/description-blocks/image`
-            : "/api/products/description-blocks/image";
-
         setBusy(1);
         try {
-            const prepared = typeof preparePickedFile === "function"
-                ? await preparePickedFile(file)
-                : { ok: true, file };
-            if (!prepared.ok) throw new Error(prepared.reason || "File could not be read");
-
-            const fd = new FormData();
-            fd.append("image", prepared.file || file);
-
-            const res = await fetch(uploadUrl, {
-                method: "POST",
-                headers: { Authorization: `Bearer ${token()}` },
-                body: fd
-            });
-            if (!res.ok) throw new Error("Upload failed");
-            const data = await res.json();
-
+            const data = await uploadImage(file);
             blocks.push({
                 type: "image",
                 image_url: data.image_url,
@@ -85,6 +99,34 @@
         } finally {
             setBusy(-1);
         }
+    }
+
+    async function handleGridItemFile(gridIndex, itemIndex, file) {
+        if (!file) return;
+        setBusy(1);
+        try {
+            const data = await uploadImage(file);
+            const item = blocks[gridIndex].payload.items[itemIndex];
+            item.image_url = data.image_url;
+            item.image_width = data.image_width;
+            item.image_height = data.image_height;
+            render();
+        } catch (err) {
+            console.error("grid item image upload:", err);
+            alert("Image upload failed: " + err.message);
+        } finally {
+            setBusy(-1);
+        }
+    }
+
+    function addGridItem(gridIndex) {
+        blocks[gridIndex].payload.items.push({});
+        render();
+    }
+
+    function removeGridItem(gridIndex, itemIndex) {
+        blocks[gridIndex].payload.items.splice(itemIndex, 1);
+        render();
     }
 
     // ---- Rich paste -------------------------------------------------------
@@ -137,6 +179,16 @@
             });
         })(doc.body.firstChild, out);
         return out.innerHTML;
+    }
+
+    // A stray Enter (or a paste with a leading blank line) before any real
+    // text becomes a leading <br> that sanitizeHtml correctly preserves —
+    // it's a legal tag mid-content. This strips only leading/trailing runs
+    // of it, so the visible gap it caused doesn't get saved permanently.
+    function trimBreaks(html) {
+        return String(html || "")
+            .replace(/^(?:<br\s*\/?>|&nbsp;|\s)+/i, "")
+            .replace(/(?:<br\s*\/?>|&nbsp;|\s)+$/i, "");
     }
 
     function isMso(p) {
@@ -238,11 +290,13 @@
 
     // Ticks are real characters, not a CSS pseudo-element, so they survive
     // the round trip through Postgres and copy back out to Word intact.
-    function toggleTicks(i, el) {
+    // Shared by the top-level Text block and a grid column's description,
+    // since both use the same rich-paste editor.
+    function applyTickToggle(el) {
         const lists = el.querySelectorAll("ul");
         if (!lists.length) {
             alert("This block has no bulleted list to tick.");
-            return;
+            return null;
         }
         const on = !lists[0].classList.contains("lzbe-check");
         lists.forEach((ul) => {
@@ -263,8 +317,22 @@
                 }
             });
         });
-        blocks[i].body = sanitizeHtml(el.innerHTML);
-        el.innerHTML = blocks[i].body;
+        return sanitizeHtml(el.innerHTML);
+    }
+
+    function toggleTicks(i, el) {
+        const html = applyTickToggle(el);
+        if (html === null) return;
+        blocks[i].body = html;
+        el.innerHTML = html;
+    }
+
+    function toggleGridItemTicks(gridIndex, itemIndex, el) {
+        const html = applyTickToggle(el);
+        if (html === null) return;
+        const item = blocks[gridIndex].payload.items[itemIndex];
+        item.body = html;
+        el.innerHTML = html;
     }
 
     function onPaste(e) {
@@ -335,6 +403,114 @@
                 ta.value = b.body || "";
                 ta.addEventListener("input", (e) => { blocks[i].body = e.target.value; });
                 row.appendChild(ta);
+            } else if (b.type === "grid") {
+                const payload = b.payload || (b.payload = { heading: "", columns: 3, items: [] });
+                if (!Array.isArray(payload.items)) payload.items = [];
+
+                const headingInput = document.createElement("input");
+                headingInput.type = "text";
+                headingInput.placeholder = "Section heading (optional)";
+                headingInput.value = payload.heading || "";
+                headingInput.addEventListener("input", (e) => { payload.heading = e.target.value; });
+                row.appendChild(headingInput);
+
+                const colsLabel = document.createElement("label");
+                colsLabel.className = "lzbe-grid-cols";
+                colsLabel.textContent = "Columns on desktop: ";
+                const colsInput = document.createElement("input");
+                colsInput.type = "number";
+                colsInput.min = "1";
+                colsInput.max = "8";
+                colsInput.value = payload.columns || payload.items.length || 3;
+                colsInput.addEventListener("input", (e) => {
+                    payload.columns = Math.min(Math.max(parseInt(e.target.value, 10) || 1, 1), 8);
+                });
+                colsLabel.appendChild(colsInput);
+                row.appendChild(colsLabel);
+
+                const itemsWrap = document.createElement("div");
+                itemsWrap.className = "lzbe-grid-items";
+
+                payload.items.forEach((item, j) => {
+                    const cell = document.createElement("div");
+                    cell.className = "lzbe-grid-item";
+
+                    const cellHead = document.createElement("div");
+                    cellHead.className = "lzbe-grid-item-head";
+                    cellHead.innerHTML = `<span class="lzbe-type">Column ${j + 1}</span>`;
+                    const delBtn = document.createElement("button");
+                    delBtn.type = "button";
+                    delBtn.textContent = "✕";
+                    delBtn.addEventListener("click", () => removeGridItem(i, j));
+                    cellHead.appendChild(delBtn);
+                    cell.appendChild(cellHead);
+
+                    if (item.image_url) {
+                        const img = document.createElement("img");
+                        img.src = item.image_url;
+                        img.className = "lzbe-thumb";
+                        cell.appendChild(img);
+                    }
+
+                    const fileInput = document.createElement("input");
+                    fileInput.type = "file";
+                    fileInput.accept = "image/*";
+                    fileInput.hidden = true;
+                    fileInput.addEventListener("change", (e) => {
+                        handleGridItemFile(i, j, e.target.files[0]);
+                        e.target.value = "";
+                    });
+
+                    const fileBtn = document.createElement("button");
+                    fileBtn.type = "button";
+                    fileBtn.textContent = item.image_url ? "Change image" : "Add image";
+                    fileBtn.addEventListener("click", () => fileInput.click());
+                    cell.appendChild(fileBtn);
+                    cell.appendChild(fileInput);
+
+                    const captionInput = document.createElement("input");
+                    captionInput.type = "text";
+                    captionInput.placeholder = "Caption";
+                    captionInput.value = item.caption || "";
+                    captionInput.addEventListener("input", (e) => { item.caption = e.target.value; });
+                    cell.appendChild(captionInput);
+
+                    const itemEd = document.createElement("div");
+                    itemEd.className = "lzbe-rich lzbe-grid-rich";
+                    itemEd.contentEditable = "true";
+                    itemEd.dataset.ph = "Feature list or description \u2014 paste from Word or Docs";
+                    itemEd.innerHTML = /<[a-z][\s\S]*>/i.test(item.body || "")
+                        ? sanitizeHtml(item.body)
+                        : plainToHtml(item.body || "");
+                    itemEd.addEventListener("paste", onPaste);
+                    itemEd.addEventListener("input", () => { item.body = itemEd.innerHTML; });
+                    itemEd.addEventListener("blur", () => {
+                        item.body = trimBreaks(sanitizeHtml(itemEd.innerHTML));
+                        itemEd.innerHTML = item.body;
+                    });
+                    cell.appendChild(itemEd);
+
+                    const itemTickBar = document.createElement("div");
+                    itemTickBar.className = "lzbe-tickbar";
+                    const itemTb = document.createElement("button");
+                    itemTb.type = "button";
+                    itemTb.textContent = "\u2713 Tick list";
+                    itemTb.title = "Turn the bullets in this column into ticks";
+                    itemTb.addEventListener("click", () => toggleGridItemTicks(i, j, itemEd));
+                    itemTickBar.appendChild(itemTb);
+                    cell.appendChild(itemTickBar);
+
+                    itemsWrap.appendChild(cell);
+                });
+
+                row.appendChild(itemsWrap);
+
+                const addItemBtn = document.createElement("button");
+                addItemBtn.type = "button";
+                addItemBtn.className = "lzbe-grid-add";
+                addItemBtn.textContent = "+ Column";
+                addItemBtn.addEventListener("click", () => addGridItem(i));
+                row.appendChild(addItemBtn);
             } else {
                 const ed = document.createElement("div");
                 ed.className = "lzbe-rich";
@@ -346,7 +522,7 @@
                 ed.addEventListener("paste", onPaste);
                 ed.addEventListener("input", () => { blocks[i].body = ed.innerHTML; });
                 ed.addEventListener("blur", () => {
-                    blocks[i].body = sanitizeHtml(ed.innerHTML);
+                    blocks[i].body = trimBreaks(sanitizeHtml(ed.innerHTML));
                     ed.innerHTML = blocks[i].body;
                 });
                 row.appendChild(ed);
@@ -379,6 +555,7 @@
                         <button type="button" data-add="heading">+ Heading</button>
                         <button type="button" data-add="text">+ Text</button>
                         <button type="button" data-add="image">+ Image</button>
+                        <button type="button" data-add="grid">+ Grid</button>
                     </span>
                 </div>
                 <div id="lzbe-busy" class="lzbe-busy"></div>
@@ -423,7 +600,8 @@
                         image_url: r.image_url,
                         image_width: r.image_width,
                         image_height: r.image_height,
-                        alt_text: r.alt_text
+                        alt_text: r.alt_text,
+                        payload: r.payload || null
                     }));
                 }
             } catch (err) {
@@ -439,7 +617,22 @@
         if (!id) return { ok: false, message: "No product id" };
 
         for (const [i, b] of blocks.entries()) {
-            if (b.type === "text") b.body = sanitizeHtml(b.body || "");
+            if (b.type === "text") b.body = trimBreaks(sanitizeHtml(b.body || ""));
+
+            if (b.type === "grid") {
+                const items = (b.payload && Array.isArray(b.payload.items)) ? b.payload.items : [];
+                if (!items.length) {
+                    return { ok: false, message: `Block ${i + 1} (grid) needs at least one column` };
+                }
+                for (const [j, it] of items.entries()) {
+                    if (it.body) it.body = trimBreaks(sanitizeHtml(it.body));
+                    if (!it.image_url && !String(it.caption || "").trim() && !textOf(it.body || "").trim()) {
+                        return { ok: false, message: `Block ${i + 1} (grid), column ${j + 1} is empty` };
+                    }
+                }
+                continue;
+            }
+
             if (b.type !== "image" && !textOf(b.body).trim()) {
                 return { ok: false, message: `Block ${i + 1} (${b.type}) is empty` };
             }

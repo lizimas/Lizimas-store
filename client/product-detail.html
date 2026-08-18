@@ -7,7 +7,7 @@
 
 <meta name="description" content="Shop quality products at Lizimas Store with fast delivery across Uganda and Mobile Money payment options.">
 <link rel="stylesheet" href="css/style.css?v=58">
-<link rel="stylesheet" href="css/product-detail.css?v=16">
+<link rel="stylesheet" href="css/product-detail.css?v=21">
 </head>
 <body>
 
@@ -40,41 +40,41 @@
     <h1 id="pd-name"></h1>
     <div id="pd-item-id" class="pd-item-id"></div>
     <div id="pd-rating" class="pd-rating"></div>
-    <div id="pd-price" class="pd-price"></div>
+    <div class="pd-price-row">
+        <div id="pd-price" class="pd-price"></div>
+        <div id="pd-warranty" class="pd-warranty hidden"></div>
+    </div>
 
     <div id="pd-selector-section" class="pd-selector-section hidden"></div>
 
-    <div class="pd-section">
-        <h2>Description</h2>
-        <div id="pd-desc-blocks" class="pd-desc-blocks"></div>
-        <p id="pd-description"></p>
+    <div class="pd-sticky-bar">
+        <button id="pd-add-to-cart-btn" class="pd-add-to-cart-btn">Add To Cart 🛒</button>
     </div>
 
     <div id="pd-details-card" class="pd-card"></div>
 </div>
-</div>
 
-<div class="pd-sticky-bar">
-    <button id="pd-add-to-cart-btn" class="pd-add-to-cart-btn">Add To Cart 🛒</button>
-</div>
+<div class="pd-tabs-col">
+    <div class="pd-tabs">
+        <button type="button" class="pd-tab active" data-pd-tab="desc" onclick="pdSwitchTab('desc')">Description</button>
+        <button type="button" class="pd-tab" data-pd-tab="specs" onclick="pdSwitchTab('specs')">Specifications</button>
+    </div>
 
-<div id="pd-sheet" class="pd-sheet hidden">
-  <div class="pd-sheet-backdrop" onclick="closeAllDetails()"></div>
-  <div class="pd-sheet-panel">
-    <div class="pd-sheet-head">
-      <h3>Product details</h3>
-      <button type="button" class="pd-sheet-close" onclick="closeAllDetails()">&times;</button>
+    <div class="pd-tab-panel active" id="pd-panel-desc">
+        <div id="pd-desc-blocks" class="pd-desc-blocks"></div>
+        <p id="pd-description"></p>
     </div>
-    <div class="pd-sheet-body">
-      <table id="pd-specs-table" class="pd-specs-table"></table>
+
+    <div class="pd-tab-panel" id="pd-panel-specs">
+        <table id="pd-specs-table" class="pd-specs-table"></table>
     </div>
-  </div>
+</div>
 </div>
 
 <script src="js/api.js"></script>
 <script src="js/cart.js?v=5"></script>
-<script src="js/product-detail.js?v=14"></script>
-<script src="js/description-blocks.js?v=3"></script>
+<script src="js/product-detail.js?v=15"></script>
+<script src="js/description-blocks.js?v=4"></script>
 
 </body>
 </html>

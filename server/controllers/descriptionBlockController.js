@@ -7,7 +7,7 @@ const getDescriptionBlocks = async (req, res) => {
     try {
         const { rows } = await pool.query(
             `SELECT id, "position", type, body, image_url,
-                    image_width, image_height, alt_text
+                    image_width, image_height, alt_text, payload
              FROM product_description_blocks b
              WHERE b.product_id = $1
                AND EXISTS (
@@ -63,7 +63,7 @@ const saveDescriptionBlocks = async (req, res) => {
     }
 
     for (const [i, b] of blocks.entries()) {
-        if (!["image", "text", "heading"].includes(b.type)) {
+        if (!["image", "text", "heading", "grid"].includes(b.type)) {
             return res.status(400).json({ message: `Block ${i}: bad type` });
         }
         if (b.type === "image" && !b.image_url) {
@@ -71,7 +71,27 @@ const saveDescriptionBlocks = async (req, res) => {
         }
         if (b.type === "text") b.body = sanitizeBlockHtml(b.body || "");
         if (b.type === "heading") b.body = stripTags(b.body || "").trim();
-        if (b.type !== "image" && !stripTags(b.body || "").trim()) {
+
+        if (b.type === "grid") {
+            // Mirrors the DB's pdb_grid_needs_items check constraint, so a
+            // bad payload is rejected here with a useful message instead of
+            // failing later as an opaque constraint-violation 500.
+            const items = b.payload && Array.isArray(b.payload.items) ? b.payload.items : null;
+            if (!items || items.length === 0) {
+                return res.status(400).json({ message: `Block ${i}: grid needs at least one column` });
+            }
+            for (const [j, it] of items.entries()) {
+                if (it && it.body) it.body = sanitizeBlockHtml(it.body);
+                const hasContent = it && (
+                    it.image_url ||
+                    stripTags(it.caption || "").trim() ||
+                    stripTags(it.body || "").trim()
+                );
+                if (!hasContent) {
+                    return res.status(400).json({ message: `Block ${i}, column ${j}: empty` });
+                }
+            }
+        } else if (b.type !== "image" && !stripTags(b.body || "").trim()) {
             return res.status(400).json({ message: `Block ${i}: ${b.type} needs body` });
         }
     }
@@ -95,15 +115,16 @@ const saveDescriptionBlocks = async (req, res) => {
             await client.query(
                 `INSERT INTO product_description_blocks
                    (product_id, "position", type, body, image_url,
-                    image_width, image_height, alt_text)
-                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+                    image_width, image_height, alt_text, payload)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
                 [
                     productId, i, b.type,
                     b.body || null,
                     b.image_url || null,
                     b.image_width || null,
                     b.image_height || null,
-                    b.alt_text || null
+                    b.alt_text || null,
+                    b.type === "grid" ? JSON.stringify(b.payload || {}) : null
                 ]
             );
         }
