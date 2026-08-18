@@ -1,0 +1,190 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>
+All Categories | Lizimas Store
+</title>
+
+<link rel="stylesheet" href="css/style.css?v=57">
+<link rel="stylesheet" href="css/categories-page.css?v=1">
+
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+<meta name="description" content="Browse all categories at Lizimas Store - groceries, electronics, apparel, home & living and more, shipped across Uganda.">
+
+</head>
+
+
+<body>
+
+
+<!-- Header -->
+
+<header class="ls-header">
+
+  <div class="ls-header-top">
+
+    <button class="ls-burger-top" id="ls-burger-top" type="button" aria-label="All categories">
+      <span class="ls-burger-lines"><span></span><span></span><span></span></span>
+    </button>
+    <a href="index.html" class="ls-brand">
+      <svg class="ls-mark" viewBox="0 0 512 512" aria-hidden="true">
+        <rect width="512" height="512" rx="123" fill="#1a1a2e"/>
+        <path d="M182 253 A74 74 0 0 1 330 253" fill="none" stroke="#F5C518" stroke-width="26"/>
+        <rect x="123" y="195" width="266" height="215" rx="31" fill="#F5C518"/>
+        <text x="256" y="335" font-family="Poppins, Segoe UI, sans-serif" font-size="133"
+              font-weight="700" fill="#1a1a2e" text-anchor="middle">LS</text>
+      </svg>
+      <span class="ls-wordmark">Lizimas Store</span>
+    </a>
+
+    <form class="ls-search" onsubmit="return false;">
+      <svg viewBox="0 0 24 24" class="ls-search-icon" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
+        <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round"/>
+      </svg>
+      <input type="search" id="header-search" placeholder="Search for anything" autocomplete="off">
+    </form>
+
+    <div class="ls-header-actions">
+
+
+      <div class="ls-menu">
+        <a class="ls-menu-trigger" href="login.html" aria-haspopup="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span class="ls-action-label">Account</span>
+        </a>
+        <div class="ls-menu-panel">
+          <a class="ls-menu-item" href="login.html">My account</a>
+          <a class="ls-menu-item" href="orders.html">Orders</a>
+        </div>
+      </div>
+
+      <a href="cart.html" class="ls-action" title="Cart">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 4h2.2l2.6 12h9.6l2.2-8H7" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+          <circle cx="10" cy="20" r="1.6" fill="currentColor"/>
+          <circle cx="17" cy="20" r="1.6" fill="currentColor"/>
+        </svg>
+        <span class="ls-cart-count" id="cart-count">0</span>
+      </a>
+    </div>
+
+  </div>
+
+  <nav class="ls-nav" id="ls-nav">
+    <div class="ls-mega" id="ls-mega">
+      <button class="ls-nav-all" id="ls-nav-all" type="button">
+        <span class="ls-burger"><span></span><span></span><span></span></span>
+        <span class="ls-nav-all-label">All Categories</span>
+      </button>
+      <div class="ls-mega-panel">
+        <div class="ls-mega-rail" id="ls-mega-rail"></div>
+        <div class="ls-mega-col" id="ls-mega-l2" hidden></div>
+        <div class="ls-mega-col" id="ls-mega-l3" hidden></div>
+      </div>
+    </div>
+    <div class="ls-nav-parents" id="ls-nav-parents"></div>
+  </nav>
+
+</header>
+
+<!-- All Categories overview -->
+
+<div class="cat-page-breadcrumb">
+  <a href="index.html">Home</a>
+  <span class="cat-page-breadcrumb-sep">&#8250;</span>
+  <span>Categories</span>
+</div>
+
+<main id="categories-page-container" class="cat-page-container">
+  <p class="cat-page-loading">Loading categories...</p>
+</main>
+
+<footer class="site-footer">
+
+<div class="container footer-container">
+
+<div>
+<h3>Lizimas Store</h3>
+<p>Your trusted online shopping partner.</p>
+<div class="footer-social">
+<span class="footer-social-label">Follow Us</span>
+<a href="https://www.facebook.com/profile.php?id=100063755850728" target="_blank" rel="noopener noreferrer" aria-label="Follow Lizimas Store on Facebook" class="footer-social-icon">
+<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+<path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5.02 3.66 9.18 8.44 9.94v-7.03H7.9v-2.91h2.54V9.85c0-2.51 1.49-3.9 3.77-3.9 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56v1.89h2.78l-.44 2.91h-2.34V22c4.78-.76 8.44-4.92 8.44-9.94z"/>
+</svg>
+</a>
+</div>
+</div>
+
+<div>
+<h4>Payments</h4>
+<p>Mobile Money: +256792363104</p>
+<p>Cash on Delivery</p>
+</div>
+
+<div>
+<h4>Help &amp; Support</h4>
+<p><a href="faq.html">FAQ</a></p>
+<p><a href="help.html">Help Centre</a></p>
+<p><a href="contact.html">Contact Us</a></p>
+<p><a href="returns.html">Returns &amp; Refunds</a></p>
+</div>
+
+<div>
+<h4>Legal &amp; Privacy</h4>
+<p><a href="privacy.html">Privacy Policy</a></p>
+</div>
+
+</div>
+
+<div class="copyright">
+&copy; 2026 Lizimas Store
+</div>
+
+</footer>
+
+<!-- Category drawer: level 1 in the rail, level 2 in the panel,
+     level 3 revealed by the arrow on each level-2 row. -->
+<div class="ls-drawer-backdrop" id="ls-drawer-backdrop" hidden></div>
+
+<aside class="ls-drawer" id="ls-drawer" hidden aria-label="All categories">
+  <div class="ls-drawer-head">
+    <span class="ls-drawer-title">All Categories</span>
+    <button class="ls-drawer-close" id="ls-drawer-close" aria-label="Close">&times;</button>
+  </div>
+
+  <div class="ls-drawer-body">
+    <div class="ls-drawer-track">
+      <nav class="ls-drawer-rail" id="ls-drawer-rail"></nav>
+      <div class="ls-drawer-panel" id="ls-drawer-panel"></div>
+    </div>
+  </div>
+</aside>
+
+<script src="js/api.js"></script>
+<script src="js/lz-image.js?v=2"></script>
+<script src="js/categories.js?v=22"></script>
+<script src="js/cart.js?v=5"></script>
+<script src="js/categories-page.js?v=1"></script>
+<script src="js/lz-chat.js?v=17"></script>
+
+</body>
+
+</html>

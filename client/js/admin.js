@@ -462,55 +462,77 @@ async function loadOrders() {
     try {
         const orders = await authorizedFetch("/api/admin/orders");
         adminOrders = orders;
-        const ordersTable = document.getElementById("orders-table");
-
-        if (!orders || orders.length === 0) {
-            ordersTable.innerHTML = `<p class="no-data">No orders yet.</p>`;
-            return;
-        }
-
-        const statusOptions = ["pending", "paid", "shipped", "delivered", "cancelled"];
-
-        ordersTable.innerHTML = `
-            <table>
-                <thead>
-                    <tr>
-                        <th>Order #</th>
-                        <th>Customer</th>
-                        <th>Total</th>
-                        <th>Delivery</th>
-                        <th>Status</th>
-                        <th>Date</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${orders.map(order => `
-                        <tr>
-                            <td data-label="Order #">#${order.id}</td>
-                            <td data-label="Customer">${order.customer_name || order.customer_email || "Guest"}</td>
-                            <td data-label="Total">UGX ${Number(order.total).toLocaleString()}</td>
-                            <td data-label="Delivery">${order.delivery_method === "pickup" ? "Pickup" : "UGX " + Number(order.delivery_fee || 0).toLocaleString()}</td>
-                            <td data-label="Status">
-                                <select class="status-select" onchange="updateOrderStatus(${order.id}, this.value)">
-                                    ${statusOptions.map(s => `
-                                        <option value="${s}" ${s === order.status ? "selected" : ""}>${s}</option>
-                                    `).join("")}
-                                </select>
-                            </td>
-                            <td data-label="Date">${new Date(order.created_at).toLocaleDateString()}</td>
-                            <td data-label="Actions">
-                                <button onclick="viewOrderDetails(${order.id})">View</button>
-                            </td>
-                        </tr>
-                    `).join("")}
-                </tbody>
-            </table>
-        `;
-
+        renderOrdersTable();
     } catch (error) {
         console.error("Load orders error:", error);
     }
+}
+
+function renderOrdersTable() {
+    const ordersTable = document.getElementById("orders-table");
+    if (!ordersTable) return;
+
+    if (!adminOrders || adminOrders.length === 0) {
+        ordersTable.innerHTML = `<p class="no-data">No orders yet.</p>`;
+        return;
+    }
+
+    const searchInput = document.getElementById("order-search-input");
+    const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : "";
+
+    let orders = adminOrders;
+    if (searchTerm) {
+        orders = adminOrders.filter(order => {
+            const customer = (order.customer_name || order.customer_email || "guest").toLowerCase();
+            return String(order.id).includes(searchTerm)
+                || customer.includes(searchTerm)
+                || (order.status || "").toLowerCase().includes(searchTerm);
+        });
+    }
+
+    if (orders.length === 0) {
+        ordersTable.innerHTML = `<p class="no-data">No orders found.</p>`;
+        return;
+    }
+
+    const statusOptions = ["pending", "paid", "shipped", "delivered", "cancelled"];
+
+    ordersTable.innerHTML = `
+        <table>
+            <thead>
+                <tr>
+                    <th>Order #</th>
+                    <th>Customer</th>
+                    <th>Total</th>
+                    <th>Delivery</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${orders.map(order => `
+                    <tr>
+                        <td data-label="Order #">#${order.id}</td>
+                        <td data-label="Customer">${order.customer_name || order.customer_email || "Guest"}</td>
+                        <td data-label="Total">UGX ${Number(order.total).toLocaleString()}</td>
+                        <td data-label="Delivery">${order.delivery_method === "pickup" ? "Pickup" : "UGX " + Number(order.delivery_fee || 0).toLocaleString()}</td>
+                        <td data-label="Status">
+                            <select class="status-select" onchange="updateOrderStatus(${order.id}, this.value)">
+                                ${statusOptions.map(s => `
+                                    <option value="${s}" ${s === order.status ? "selected" : ""}>${s}</option>
+                                `).join("")}
+                            </select>
+                        </td>
+                        <td data-label="Date">${new Date(order.created_at).toLocaleDateString()}</td>
+                        <td data-label="Actions">
+                            <button onclick="viewOrderDetails(${order.id})">View</button>
+                        </td>
+                    </tr>
+                `).join("")}
+            </tbody>
+        </table>
+    `;
 }
 
 async function updateOrderStatus(orderId, newStatus) {
@@ -3005,13 +3027,42 @@ function renderCategoriesTable() {
     const tbody = document.getElementById("categories-table-body");
     if (!tbody) return;
 
+    const categorySearchInput = document.getElementById("category-search-input");
+    const categorySearchTerm = categorySearchInput ? categorySearchInput.value.trim().toLowerCase() : "";
+
+    let keepCategoryIds = null;
+    if (categorySearchTerm) {
+        const matchedCategories = adminCategories.filter(c => c.name.toLowerCase().includes(categorySearchTerm));
+        keepCategoryIds = new Set();
+        const addAncestors = (cat) => {
+            let current = cat;
+            while (current && current.parent_id) {
+                keepCategoryIds.add(current.parent_id);
+                current = adminCategories.find(x => x.id === current.parent_id);
+            }
+        };
+        const addDescendants = (id) => {
+            adminCategories.filter(c => c.parent_id === id).forEach(child => {
+                keepCategoryIds.add(child.id);
+                addDescendants(child.id);
+            });
+        };
+        matchedCategories.forEach(m => {
+            keepCategoryIds.add(m.id);
+            addAncestors(m);
+            addDescendants(m.id);
+        });
+    }
+
     // Render as a tree: each parent in display order, followed by its children.
     const parents = adminCategories
-        .filter(c => !c.parent_id)
+        .filter(c => !c.parent_id && (!keepCategoryIds || keepCategoryIds.has(c.id)))
         .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
 
     const byOrder = (a, b) => (a.display_order || 0) - (b.display_order || 0);
-    const kidsOf = id => adminCategories.filter(c => c.parent_id === id).sort(byOrder);
+    const kidsOf = id => adminCategories
+        .filter(c => c.parent_id === id && (!keepCategoryIds || keepCategoryIds.has(c.id)))
+        .sort(byOrder);
 
     const ordered = [];
     for (const top of parents) {

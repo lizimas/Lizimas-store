@@ -1,0 +1,141 @@
+/* All Categories overview page (categories.html) */
+
+.cat-page-breadcrumb {
+    max-width: 1280px;
+    margin: 18px auto 0;
+    padding: 0 20px;
+    font-size: 0.85rem;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.cat-page-breadcrumb a {
+    color: #1a1a2e;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.cat-page-breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.cat-page-breadcrumb-sep {
+    color: #999;
+}
+
+.cat-page-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 12px 20px 60px;
+}
+
+.cat-page-loading,
+.no-products-message {
+    text-align: center;
+    color: #777;
+    padding: 60px 0;
+    font-size: 1rem;
+}
+
+.cat-page-section {
+    margin-top: 36px;
+}
+
+.cat-page-section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 2px solid #1a1a2e;
+    padding-bottom: 10px;
+    margin-bottom: 18px;
+}
+
+.cat-page-section-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #1a1a2e;
+    margin: 0;
+}
+
+.cat-page-viewall {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: #a9791f;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.cat-page-viewall:hover {
+    color: #F5C518;
+    text-decoration: underline;
+}
+
+.cat-page-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px 16px;
+}
+
+@media (min-width: 720px) {
+    .cat-page-grid {
+        grid-template-columns: repeat(6, 1fr);
+    }
+}
+
+@media (min-width: 1080px) {
+    .cat-page-grid {
+        grid-template-columns: repeat(8, 1fr);
+    }
+}
+
+.cat-page-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    text-decoration: none;
+    color: #1a1a2e;
+    gap: 8px;
+}
+
+.cat-page-thumb {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    background: #f0f0f0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cat-page-thumb.is-empty {
+    background: #eaeaea;
+}
+
+.cat-page-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.cat-page-name {
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+@media (min-width: 720px) {
+    .cat-page-thumb {
+        width: 100px;
+        height: 100px;
+    }
+
+    .cat-page-name {
+        font-size: 0.88rem;
+    }
+}

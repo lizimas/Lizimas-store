@@ -121,6 +121,7 @@
 
                 <section id="tab-orders" class="tab-content hidden">
                     <h2 class="admin-page-title">All Orders</h2>
+                    <input type="text" id="order-search-input" class="product-search-input" placeholder="Search orders by #, customer, or status..." oninput="renderOrdersTable()">
                     <div id="orders-table">Loading...</div>
                 </section>
 
@@ -238,6 +239,7 @@
 
                 <section id="tab-categories" class="tab-content hidden">
                     <h2 class="admin-page-title">Categories</h2>
+                    <input type="text" id="category-search-input" class="product-search-input" placeholder="Search categories..." oninput="renderCategoriesTable()">
 
                     <button class="add-btn" onclick="openCategoryForm()">+ Add Category</button>
 
