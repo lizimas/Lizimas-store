@@ -1,6 +1,6 @@
 const router = require("express").Router();
 
-const { authLimiter } = require("../middleware/rateLimiter");
+const { authLimiter, reportLimiter } = require("../middleware/rateLimiter");
 
 router.use("/auth", authLimiter, require("./auth"));
 router.use("/checkout", require("./checkout"));
@@ -15,5 +15,6 @@ router.use("/delivery", require("./delivery"));
 router.use("/locations", require("./locations"));
 router.use("/search", require("./search"));
 router.use("/reviews", require("./reviews"));
+router.use("/reports", reportLimiter, require("./reports"));
 
 module.exports = router;

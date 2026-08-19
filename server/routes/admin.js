@@ -29,7 +29,7 @@ const { createStaffAccount, activateStaffAccount, blockStaffAccount, forcePasswo
 
 const { requireAuth, requireAdmin } = require("./../middleware/authMiddleware");
 const csvUpload = require("../middleware/csvUpload");
-const { getSecurityLogins, unlockAccount } = require("../controllers/adminController");
+const { getSecurityLogins, unlockAccount, getAccountReports, updateAccountReport } = require("../controllers/adminController");
 
 router.use(requireAuth, requireAdmin);
 
@@ -69,6 +69,8 @@ router.get("/activity-log", getActivityLog);
 router.get("/staff-sessions", getStaffSessions);
 router.get("/security/logins", getSecurityLogins);
 router.post("/security/unlock/:id", unlockAccount);
+router.get("/security/reports", getAccountReports);
+router.patch("/security/reports/:id", updateAccountReport);
 router.patch("/orders/:id/status", updateOrderStatus);
 
 router.post("/products/import", csvUpload.single("file"), require("../controllers/adminController").importProducts);

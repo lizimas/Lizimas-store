@@ -89,6 +89,19 @@ const chatPollLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Account issue reports from the public footer form. Unauthenticated write
+// that fans out to email, so this is the tightest bucket in the file. Keyed on
+// IP only - the reporter may be locked out and cannot be trusted to identify.
+const reportLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  store: new PostgresStore("report"),
+  keyGenerator: (req, res) => clientIp(req),
+  message: { error: "Too many reports submitted. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // General limiter for the rest of the API - prevents scraping/hammering
 const CHAT_POLL_PATH = /^\/api\/chat\/\d+\/(messages|read)$/;
 
@@ -104,4 +117,4 @@ const generalLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-module.exports = { loginLimiter, otpLimiter, authLimiter, generalLimiter, chatStartLimiter, chatMessageLimiter, chatPollLimiter };
+module.exports = { loginLimiter, otpLimiter, authLimiter, generalLimiter, chatStartLimiter, chatMessageLimiter, chatPollLimiter, reportLimiter };

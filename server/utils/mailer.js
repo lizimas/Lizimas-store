@@ -199,4 +199,17 @@ async function sendDeviceApprovalRequest(details) {
     });
 }
 
-module.exports = { sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert };
+async function sendAccountReportAlert(details) {
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: process.env.ADMIN_ALERT_EMAIL,
+            subject: "Account Issue Report #" + details.id + " - Lizimas Store",
+            text: `A customer submitted an account issue report from the website footer.\n\nReport ID: ${details.id}\nType: ${details.reportType}\nEmail given: ${details.email}\nMatches an account: ${details.hasAccount ? "yes" : "no"}\nIP: ${details.ip}\nTime: ${details.time}\n\nMessage:\n${details.message}\n\nReview and action this from the Security tab in your admin dashboard.`
+        });
+    } catch (error) {
+        console.error("Account report alert email error:", error);
+    }
+}
+
+module.exports = { sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert };

@@ -474,6 +474,72 @@ exports.getSecurityLogins = async (req, res) => {
 // account has no trusted device by definition, so the next sign-in would lock
 // it straight back up.
 // ---------------------------------------------------------------------------
+// GET /api/admin/security/reports?status=new|reviewed|resolved|all
+// Joins users so the panel can offer an unlock inline where the reported
+// address matches an account and that account is currently locked.
+exports.getAccountReports = async (req, res) => {
+    try {
+        const status = String(req.query.status || "new");
+        const params = [];
+        let where = "";
+        if (status !== "all") {
+            params.push(status);
+            where = "WHERE r.status = $1";
+        }
+
+        const result = await pool.query(
+            `SELECT r.id, r.report_type, r.email, r.user_id, r.message, r.ip,
+                    r.status, r.admin_note, r.created_at, r.reviewed_at,
+                    u.name AS account_name, u.role AS account_role,
+                    (u.security_locked_at IS NOT NULL) AS account_locked
+               FROM account_reports r
+               LEFT JOIN users u ON u.id = r.user_id
+               ${where}
+              ORDER BY r.created_at DESC
+              LIMIT 200`,
+            params
+        );
+
+        res.json({ reports: result.rows });
+    } catch (error) {
+        console.error("getAccountReports error:", error);
+        res.status(500).json({ error: "Failed to load account reports." });
+    }
+};
+
+// PATCH /api/admin/security/reports/:id
+exports.updateAccountReport = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const status = String((req.body && req.body.status) || "");
+        const note = req.body && req.body.admin_note ? String(req.body.admin_note).slice(0, 1000) : null;
+
+        if (!["new", "reviewed", "resolved"].includes(status)) {
+            return res.status(400).json({ error: "Invalid status." });
+        }
+
+        const result = await pool.query(
+            `UPDATE account_reports
+                SET status = $1,
+                    admin_note = COALESCE($2, admin_note),
+                    reviewed_by = $3,
+                    reviewed_at = NOW()
+              WHERE id = $4
+              RETURNING id, status`,
+            [status, note, req.user && req.user.userId ? req.user.userId : null, id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Report not found." });
+        }
+
+        res.json({ message: "Report updated.", report: result.rows[0] });
+    } catch (error) {
+        console.error("updateAccountReport error:", error);
+        res.status(500).json({ error: "Failed to update report." });
+    }
+};
+
 exports.unlockAccount = async (req, res) => {
     try {
         const { id } = req.params;

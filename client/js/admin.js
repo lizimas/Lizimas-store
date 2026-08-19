@@ -1471,6 +1471,105 @@ async function loadSecurityLogins() {
     }
 }
 
+const REPORT_TYPE_LABELS = {
+    blocked: "Cannot sign in / blocked",
+    compromised: "Suspected compromise",
+    no_email: "Not receiving emails",
+    other: "Other"
+};
+
+function escapeReportText(v) {
+    return String(v == null ? "" : v)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+async function loadAccountReports() {
+    const box = document.getElementById("security-reports");
+    if (!box) return;
+    const sel = document.getElementById("reports-status");
+    const status = sel ? sel.value : "new";
+
+    box.textContent = "Loading...";
+    const base = (typeof API_URL !== "undefined" && API_URL) ? API_URL : "";
+    const token = localStorage.getItem("adminToken");
+
+    try {
+        const res = await fetch(`${base}/api/admin/security/reports?status=${encodeURIComponent(status)}`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (!res.ok) {
+            box.textContent = `Could not load (HTTP ${res.status}).`;
+            return;
+        }
+        const data = await res.json();
+        renderAccountReports(data.reports || []);
+    } catch (err) {
+        console.error("loadAccountReports error:", err);
+        box.textContent = "Could not connect to server.";
+    }
+}
+
+function renderAccountReports(rows) {
+    const box = document.getElementById("security-reports");
+    if (!box) return;
+
+    if (!rows.length) {
+        box.innerHTML = '<p style="color:#666; font-size:14px;">No reports in this view.</p>';
+        return;
+    }
+
+    box.innerHTML = rows.map(r => {
+        const when = new Date(r.created_at).toLocaleString();
+        const type = REPORT_TYPE_LABELS[r.report_type] || escapeReportText(r.report_type);
+        const acct = r.user_id
+            ? `<span style="color:#0a6b2d;">matches account: ${escapeReportText(r.account_name || "-")} (${escapeReportText(r.account_role || "-")})</span>`
+            : '<span style="color:#666;">no matching account</span>';
+        const locked = r.account_locked
+            ? ` &middot; <strong style="color:#b00020;">locked</strong>` : "";
+        const msg = r.message
+            ? `<p style="margin:8px 0 0; white-space:pre-wrap;">${escapeReportText(r.message)}</p>` : "";
+        const note = r.admin_note
+            ? `<p style="margin:6px 0 0; font-size:13px; color:#555;">Note: ${escapeReportText(r.admin_note)}</p>` : "";
+
+        const unlockBtn = (r.user_id && r.account_locked)
+            ? `<button onclick="unlockSecurityAccount(${r.user_id})" style="background:#b00020; color:#fff; border:none; border-radius:6px; padding:6px 12px; cursor:pointer;">Unlock account</button>` : "";
+        const reviewBtn = r.status !== "reviewed"
+            ? `<button onclick="setReportStatus(${r.id}, 'reviewed')" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:6px 12px; cursor:pointer;">Mark reviewed</button>` : "";
+        const resolveBtn = r.status !== "resolved"
+            ? `<button onclick="setReportStatus(${r.id}, 'resolved')" style="background:#0a6b2d; color:#fff; border:none; border-radius:6px; padding:6px 12px; cursor:pointer;">Resolve</button>` : "";
+
+        return `<div style="border:1px solid #e4e6ee; border-radius:10px; padding:14px; margin-bottom:12px;">
+            <div style="font-size:13px; color:#666;">#${r.id} &middot; ${when} &middot; status: ${escapeReportText(r.status)}</div>
+            <div style="margin-top:4px; font-weight:600;">${type}</div>
+            <div style="margin-top:2px;">${escapeReportText(r.email)} &middot; ${acct}${locked}</div>
+            ${msg}${note}
+            <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">${unlockBtn}${reviewBtn}${resolveBtn}</div>
+        </div>`;
+    }).join("");
+}
+
+async function setReportStatus(id, status) {
+    const base = (typeof API_URL !== "undefined" && API_URL) ? API_URL : "";
+    const token = localStorage.getItem("adminToken");
+    try {
+        const res = await fetch(`${base}/api/admin/security/reports/${id}`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ status: status })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            alert(data.error || "Could not update the report.");
+            return;
+        }
+        loadAccountReports();
+    } catch (err) {
+        console.error("setReportStatus error:", err);
+        alert("Could not connect to server.");
+    }
+}
+
 function setupTabs() {
     const tabButtons = document.querySelectorAll(".tab-btn");
     const tabContents = document.querySelectorAll(".tab-content");
@@ -1493,6 +1592,7 @@ function setupTabs() {
 
             if (button.dataset.tab === "security") {
                 loadSecurityLogins();
+                loadAccountReports();
             }
 
             if (button.dataset.tab === "account") {

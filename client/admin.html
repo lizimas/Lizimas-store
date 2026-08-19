@@ -544,6 +544,21 @@
                         </div>
                     </div>
 
+                    <div class="panel" id="security-reports-panel" style="border-left:4px solid #F5C518;">
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <h2 style="margin:0; flex:1;">Account Issue Reports</h2>
+                            <select id="reports-status" onchange="loadAccountReports()" style="padding:8px; border:1px solid #ccc; border-radius:8px;">
+                                <option value="new" selected>New</option>
+                                <option value="reviewed">Reviewed</option>
+                                <option value="resolved">Resolved</option>
+                                <option value="all">All</option>
+                            </select>
+                            <button onclick="loadAccountReports()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:8px 14px; cursor:pointer;">Refresh</button>
+                        </div>
+                        <p style="font-size:13px; color:#666;">Submitted from the public report form in the site footer. Unlock is offered where the reported address matches a locked account.</p>
+                        <div id="security-reports">Loading...</div>
+                    </div>
+
                     <div class="panel hidden" id="security-locked-panel" style="border-left:4px solid #b00020;">
                         <h2>Locked Accounts</h2>
                         <p style="font-size:13px; color:#666;">Sign-in was refused from an unrecognised device. Unlocking allows 15 minutes in which one sign-in registers that device.</p>

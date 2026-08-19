@@ -6,10 +6,29 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Returns &amp; Refunds | Lizimas Store</title>
+<title>Report an Account Issue | Lizimas Store</title>
+
+<meta name="robots" content="noindex, nofollow">
+
+<meta name="description" content="Report a blocked or compromised Lizimas Store account.">
 
 <link rel="stylesheet" href="css/style.css?v=58">
 
+<style>
+.lz-report label { display:block; margin:18px 0 6px; font-weight:600; }
+.lz-report input[type=email], .lz-report select, .lz-report textarea {
+  width:100%; max-width:520px; padding:11px 12px; border:1px solid #ccc;
+  border-radius:8px; font:inherit; background:#fff; }
+.lz-report textarea { resize:vertical; }
+.lz-hp { position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }
+.lz-report { padding-bottom:90px; }
+.lz-report-btn { display:block; clear:both; margin-top:22px; padding:12px 26px; border:0; border-radius:8px;
+  background:#1a1a2e; color:#F5C518; font-weight:600; font-size:1rem; cursor:pointer; }
+.lz-report-btn:disabled { opacity:.6; cursor:default; }
+.lz-report-err { margin-top:14px; color:#b00020; font-weight:600; }
+.lz-report-note { margin-top:20px; font-size:.9rem; color:#666; max-width:520px; }
+.lz-report-done h2 { margin-top:0; }
+</style>
 </head>
 
 <body>
@@ -89,131 +108,51 @@
 <main class="ls-help">
 
   <div class="ls-help-hero">
-    <h1>Returns &amp; Refunds</h1>
-    <p>Our full returns policy. If you just need the short version, see the <a href="help.html#returns">Help Centre</a>, or <a href="https://wa.me/256792363104" target="_blank" rel="noopener">message us on WhatsApp</a>.</p>
+    <h1>Report an Account Issue</h1>
+    <p>Locked out, or think someone else has used your account? Tell us here and we
+       will look into it.</p>
   </div>
 
-  <nav class="ls-help-toc" aria-label="Topics">
-    <a href="#period">Return period</a>
-    <a href="#reasons">Accepted reasons</a>
-    <a href="#excluded">What cannot be returned</a>
-    <a href="#packaging">Packaging</a>
-    <a href="#refunds">Refunds</a>
-    <a href="#rejected">Rejected requests</a>
-    <a href="#how">How to request</a>
-  </nav>
+  <section class="ls-help-section">
 
-  <section class="ls-help-section" id="period">
-    <h2>Return period</h2>
+    <div class="lz-report" id="lz-report">
 
-    <p>We accept returns for most items within <strong>7 days</strong> after delivery.
-       We cannot accept returns after the 7-day period has lapsed, for any reason.
-       This does not affect your statutory rights.</p>
+      <label for="lzr-type">What is the problem?</label>
+      <select id="lzr-type">
+        <option value="">Choose one</option>
+        <option value="blocked">I cannot sign in / my account is blocked</option>
+        <option value="compromised">I think someone else has used my account</option>
+        <option value="no_email">I am not receiving emails from Lizimas Store</option>
+        <option value="other">Something else</option>
+      </select>
 
-  </section>
+      <label for="lzr-email">Your email address</label>
+      <input type="email" id="lzr-email" autocomplete="email" placeholder="you@example.com">
 
-  <section class="ls-help-section" id="reasons">
-    <h2>Reasons we accept</h2>
+      <label for="lzr-message">Anything else we should know? (optional)</label>
+      <textarea id="lzr-message" rows="5" maxlength="2000"
+                placeholder="When it started, anything unusual you noticed."></textarea>
 
-    <h3>You changed your mind</h3>
-    <p>All categories except those listed under
-       <a href="#excluded">what cannot be returned</a>, and except products with
-       broken seals or missing tags.</p>
+      <div class="lz-hp" aria-hidden="true">
+        <label for="lzr-website">Website</label>
+        <input type="text" id="lzr-website" tabindex="-1" autocomplete="off">
+      </div>
 
-    <h3>The size is correct but it does not fit as expected</h3>
-    <p>Clothing and shoes only.</p>
+      <p class="lz-report-err" id="lzr-error" hidden></p>
 
-    <h3>The item stopped working properly after use</h3>
-    <p>All categories except clothing, sport and fitness items, and consumables.</p>
+      <button type="button" class="lz-report-btn" id="lzr-submit">Submit report</button>
 
-    <h3>The item arrived broken, defective or damaged</h3>
-    <p>All categories.</p>
+      <p class="lz-report-note">For your security we never confirm whether an email
+         address has an account with us. If it does, we will reply to that address.</p>
 
-    <h3>The packaging was damaged</h3>
-    <p>All categories.</p>
+    </div>
 
-    <h3>Missing parts or accessories</h3>
-    <p>All categories.</p>
-
-    <h3>The item arrived used or expired</h3>
-    <p>All categories.</p>
-
-    <h3>The item appears to be fake or unauthentic</h3>
-    <p>All categories.</p>
-
-    <h3>Wrong item, colour, size or model</h3>
-    <p>All categories.</p>
-
-  </section>
-
-  <section class="ls-help-section" id="excluded">
-    <h2>What cannot be returned</h2>
-
-    <p>For health and hygiene reasons, and because some products deteriorate or
-       expire quickly, we cannot accept returns on:</p>
-    <ul>
-      <li>Detergent packs and tablets, and fabric deodorisers</li>
-      <li>Drinks, beverages, groceries and food supplements</li>
-      <li>Medicines and health products</li>
-      <li>Underwear, beachwear and swimwear</li>
-      <li>Make-up, facial skincare, body care, fragrances and haircare</li>
-      <li>Hygiene products, and hand, foot and nail care</li>
-      <li>Health and relaxation products, and adult products</li>
-      <li>Stationery</li>
-      <li>Earrings and other pierced jewellery</li>
-    </ul>
-    <p>You can still return these items if you received the wrong item, a damaged
-       or defective item, or a fake or inauthentic item.</p>
-    <p>We also cannot accept returns of customised items, items damaged after
-       delivery, or used or worn items &mdash; unless they became damaged or
-       defective after reasonable use.</p>
-
-  </section>
-
-  <section class="ls-help-section" id="packaging">
-    <h2>Packaging your return</h2>
-
-    <p>Return the item in the exact condition you received it, with its original
-       packaging and all tags and labels attached.</p>
-    <p>Returned items remain your responsibility until they reach us, so please
-       package them properly so they cannot be damaged on the way.</p>
-
-  </section>
-
-  <section class="ls-help-section" id="refunds">
-    <h2>Refunds</h2>
-
-    <p>If we accept your return, we aim to refund the purchase price within the
-       period we confirm to you when the return is approved.</p>
-    <p>Where the item was incorrect, defective or damaged, we also refund the
-       delivery cost.</p>
-    <p>Refunds are sent using the same payment method you used for the order,
-       unless we agree another method with you.</p>
-
-  </section>
-
-  <section class="ls-help-section" id="rejected">
-    <h2>If a return is not approved</h2>
-
-    <p>All returned items are inspected so we can verify the reason given. If your
-       return is not approved, we will explain why and make two attempts to
-       re-deliver the item to you.</p>
-    <p>If both attempts are unsuccessful, you must collect the item within
-       60 days. After that period the item is forfeited.</p>
-    <h3>Exchanges</h3>
-    <p>We do not offer exchanges. If you would like a different size or colour,
-       return the unwanted item under this policy and place a new order.</p>
-
-  </section>
-
-  <section class="ls-help-section" id="how">
-    <h2>How to request a return</h2>
-
-    <p>Message us on
-       <a href="https://wa.me/256792363104" target="_blank" rel="noopener">WhatsApp</a>
-       or through the chat on this site with your order number, the reason for the
-       return, and a photo of the item. We will confirm whether the item is
-       eligible and explain the next steps.</p>
+    <div class="lz-report-done" id="lz-report-done" hidden>
+      <h2>Report received</h2>
+      <p>Thank you. If the email address you gave has an account with us, we will be
+         in touch at that address once we have reviewed it.</p>
+      <p><a href="index.html">Back to shopping</a></p>
+    </div>
 
   </section>
 
@@ -265,5 +204,50 @@
 <script src="js/cart.js?v=5"></script>
 <script src="js/lz-chat.js?v=17"></script>
 
+<script>
+(function () {
+  var btn = document.getElementById("lzr-submit");
+  if (!btn) return;
+  var err = document.getElementById("lzr-error");
+
+  function fail(msg) { err.textContent = msg; err.hidden = false; }
+
+  btn.addEventListener("click", async function () {
+    err.hidden = true;
+    var email = document.getElementById("lzr-email").value.trim();
+    var type = document.getElementById("lzr-type").value;
+    if (!type) return fail("Please choose what the problem is.");
+    if (!email || email.indexOf("@") < 1) return fail("Please enter a valid email address.");
+
+    btn.disabled = true;
+    btn.textContent = "Submitting...";
+    try {
+      var res = await fetch("/api/reports/account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email,
+          report_type: type,
+          message: document.getElementById("lzr-message").value,
+          website: document.getElementById("lzr-website").value
+        })
+      });
+      var data = await res.json().catch(function () { return {}; });
+      if (!res.ok) {
+        btn.disabled = false;
+        btn.textContent = "Submit report";
+        return fail(data.error || "Could not submit your report. Please try again later.");
+      }
+      document.getElementById("lz-report").hidden = true;
+      document.getElementById("lz-report-done").hidden = false;
+      window.scrollTo(0, 0);
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = "Submit report";
+      fail("Network error. Please check your connection and try again.");
+    }
+  });
+})();
+</script>
 </body>
 </html>
