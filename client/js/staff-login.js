@@ -100,11 +100,12 @@ async function handleStaffLogin() {
         }
 
         if (data.requiresDeviceApproval) {
+            // Re-run the login now the device is trusted. The server decides what
+            // comes next - 2FA enrolment for a new account, or a code prompt for an
+            // existing one - rather than this callback assuming either.
             lzShowDeviceWait(data, function () {
-                document.getElementById("login-2fa-code").classList.remove("hidden");
-                document.getElementById("login-2fa-btn").classList.remove("hidden");
-                document.getElementById("login-error").textContent =
-                    "Approved. Enter the 6-digit code from your authenticator app.";
+                document.getElementById("login-error").textContent = "Approved. Continuing...";
+                handleStaffLogin();
             });
             return;
         }
