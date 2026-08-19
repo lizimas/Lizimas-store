@@ -321,13 +321,20 @@ async function handleLogin(req, res, allowedRoles, surface) {
         if (deviceCheck && deviceCheck.pending) {
             // The browser holds this ref and polls; the pendingToken carries it
             // so an approval granted for this login cannot be spent by another.
+            // An account that has never enrolled 2FA needs the setup token, not the
+            // verify token: the QR step runs behind pendingSetup. Either way the
+            // deviceRef rides along so the approval is spent by this login only.
+            const needsSetup = !user.two_factor_enabled;
             const pendingToken = jwt.sign(
-                { userId: user.id, email: user.email, pending2FA: true, deviceRef: deviceCheck.ref },
+                needsSetup
+                    ? { userId: user.id, email: user.email, role: user.role, pendingSetup: true, deviceRef: deviceCheck.ref }
+                    : { userId: user.id, email: user.email, pending2FA: true, deviceRef: deviceCheck.ref },
                 JWT_SECRET,
                 { expiresIn: "15m" }
             );
             return res.status(202).json({
                 requiresDeviceApproval: true,
+                requires2FASetup: needsSetup,
                 pendingToken,
                 ref: deviceCheck.ref,
                 expiresAt: deviceCheck.expiresAt,
@@ -585,13 +592,20 @@ async function adminLogin(req, res) {
         if (deviceCheck && deviceCheck.pending) {
             // The browser holds this ref and polls; the pendingToken carries it
             // so an approval granted for this login cannot be spent by another.
+            // An account that has never enrolled 2FA needs the setup token, not the
+            // verify token: the QR step runs behind pendingSetup. Either way the
+            // deviceRef rides along so the approval is spent by this login only.
+            const needsSetup = !user.two_factor_enabled;
             const pendingToken = jwt.sign(
-                { userId: user.id, email: user.email, pending2FA: true, deviceRef: deviceCheck.ref },
+                needsSetup
+                    ? { userId: user.id, email: user.email, role: user.role, pendingSetup: true, deviceRef: deviceCheck.ref }
+                    : { userId: user.id, email: user.email, pending2FA: true, deviceRef: deviceCheck.ref },
                 JWT_SECRET,
                 { expiresIn: "15m" }
             );
             return res.status(202).json({
                 requiresDeviceApproval: true,
+                requires2FASetup: needsSetup,
                 pendingToken,
                 ref: deviceCheck.ref,
                 expiresAt: deviceCheck.expiresAt,
@@ -1212,6 +1226,29 @@ exports.verify2FA = async (req, res) => {
         await pool.query("UPDATE users SET two_factor_enabled = true WHERE id = $1", [userId]);
 
         if (req.isSetupToken) {
+            // Enrolment reached through a device approval must spend that approval,
+            // exactly as verifyLogin2FA does. Claimed before the session exists so a
+            // race cannot mint two sessions from one approval.
+            if (req.user.deviceRef) {
+                const { findDeviceRequest, consumeDeviceRequest } = require("../utils/deviceTrust");
+                const request = await findDeviceRequest("ref_hash", req.user.deviceRef);
+
+                if (!request || request.user_id !== userId) {
+                    return res.status(403).json({ error: "This sign-in is no longer valid. Please log in again." });
+                }
+                if (request.status === "denied") {
+                    return res.status(403).json({ error: "This sign-in was refused." });
+                }
+                if (request.status !== "approved") {
+                    return res.status(403).json({ error: "This sign-in has not been approved yet." });
+                }
+
+                const consumed = await consumeDeviceRequest(request.id);
+                if (!consumed) {
+                    return res.status(403).json({ error: "This approval has already been used." });
+                }
+            }
+
             const sessionToken = await createSession(userId, req, res);
             const authToken = jwt.sign(
                 { userId: userId, email: req.user.email, role: req.user.role, sessionToken },

@@ -107,8 +107,22 @@ async function handleLogin() {
             // comes next - 2FA enrolment for a new account, or a code prompt for an
             // existing one - rather than this callback assuming either.
             lzShowDeviceWait(data, function () {
-                document.getElementById("login-error").textContent = "Approved. Continuing...";
-                handleLogin();
+                pendingLoginToken = data.pendingToken;
+                document.getElementById("login-email").classList.add("hidden");
+                document.getElementById("login-password").classList.add("hidden");
+                document.getElementById("login-btn").classList.add("hidden");
+
+                if (data.requires2FASetup) {
+                    document.getElementById("login-error").textContent =
+                        "Approved. Set up your authenticator app to finish.";
+                    startStaff2FASetup();
+                    return;
+                }
+
+                document.getElementById("login-2fa-code").classList.remove("hidden");
+                document.getElementById("login-2fa-btn").classList.remove("hidden");
+                document.getElementById("login-error").textContent =
+                    "Approved. Enter the 6-digit code from your authenticator app.";
             });
             return;
         }
