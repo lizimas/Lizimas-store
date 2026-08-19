@@ -329,6 +329,7 @@ async function handleLogin(req, res, allowedRoles, surface) {
             return res.status(202).json({
                 requiresDeviceApproval: true,
                 pendingToken,
+                ref: deviceCheck.ref,
                 expiresAt: deviceCheck.expiresAt,
                 message: "We have emailed you to confirm this sign-in. Approve it to continue."
             });
@@ -582,6 +583,7 @@ async function adminLogin(req, res) {
             return res.status(202).json({
                 requiresDeviceApproval: true,
                 pendingToken,
+                ref: deviceCheck.ref,
                 expiresAt: deviceCheck.expiresAt,
                 message: "We have emailed you to confirm this sign-in. Approve it to continue."
             });
