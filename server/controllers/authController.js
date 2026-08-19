@@ -16,7 +16,7 @@ function uploadProfilePhotoToCloudinary(fileBuffer) {
         stream.end(fileBuffer);
     });
 }
-const { sendAdminLoginAlert, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail } = require("../utils/mailer");
+const { sendStaffInviteEmail, sendAdminLoginAlert, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail } = require("../utils/mailer");
 
 const { issueDeviceCookie } = require("../utils/deviceTrust");
 
@@ -409,20 +409,16 @@ async function handleLogin(req, res, allowedRoles, surface) {
 
 async function createStaffAccount(req, res) {
     try {
-        const { name, email, password, role } = req.body;
+        const { name, email, role } = req.body;
 
         const allowedStaffRoles = ["product_staff", "store_manager", "customer_support"];
 
-        if (!name || !email || !password || !role) {
-            return res.status(400).json({ error: "Name, email, password, and role are required." });
+        if (!name || !email || !role) {
+            return res.status(400).json({ error: "Name, email, and role are required." });
         }
 
         if (!allowedStaffRoles.includes(role)) {
             return res.status(400).json({ error: `Role must be one of: ${allowedStaffRoles.join(", ")}` });
-        }
-
-        if (password.length < 6) {
-            return res.status(400).json({ error: "Password must be at least 6 characters." });
         }
 
         const existingUser = await pool.query(
@@ -434,7 +430,9 @@ async function createStaffAccount(req, res) {
             return res.status(409).json({ error: "An account with this email already exists." });
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        // Staff never receive a password from the administrator. A throwaway is
+        // stored so the row is valid, then the invite link is the only way in.
+        const hashedPassword = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
 
         const usernameBase = email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "").toLowerCase() || "staff";
         let username = usernameBase;
@@ -451,13 +449,25 @@ async function createStaffAccount(req, res) {
         }
 
         const result = await pool.query(
-            "INSERT INTO users (name, email, password, role, username, is_active) VALUES ($1, $2, $3, $4, $5, false) RETURNING id, name, email, role, is_active",
+            "INSERT INTO users (name, email, password, role, username, is_active, must_reset_password) VALUES ($1, $2, $3, $4, $5, true, true) RETURNING id, name, email, role, is_active",
             [name, email, hashedPassword, role, username]
         );
 
+        const invited = result.rows[0];
+        const inviteToken = jwt.sign(
+            { userId: invited.id, email: invited.email, purpose: "passwordReset" },
+            JWT_SECRET,
+            { expiresIn: "15m" }
+        );
+        const setupLink = `${req.protocol}://${req.get("host")}/reset-password.html?token=${inviteToken}`;
+        const inviteSent = await sendStaffInviteEmail(invited.email, invited.name, setupLink, 15);
+
         res.status(201).json({
-            message: "Staff account created successfully.",
-            user: result.rows[0]
+            message: inviteSent
+                ? `Staff account created. A setup link has been emailed to ${invited.email}. It expires in 15 minutes.`
+                : `Staff account created, but the invite email to ${invited.email} could not be sent. Use Force Reset to send a new link.`,
+            inviteSent,
+            user: invited
         });
 
     } catch (error) {

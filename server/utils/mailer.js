@@ -81,6 +81,52 @@ async function sendTwoFactorCodeEmail(email, code) {
     }
 }
 
+async function sendStaffInviteEmail(email, name, setupLink, validMinutes) {
+    const body = [
+        `Welcome to Lizimas Store!`,
+        ``,
+        `Hi ${name},`,
+        ``,
+        `We're delighted to welcome you to the Lizimas Store team.`,
+        ``,
+        `Your staff account has been created. To keep your login secure, you`,
+        `will need to create your own password before you can sign in.`,
+        ``,
+        `Set your password:`,
+        setupLink,
+        ``,
+        `This link expires in ${validMinutes} minutes. If it expires, ask the`,
+        `administrator to send you a new one.`,
+        ``,
+        `For your security:`,
+        `  - Create a strong, unique password that you do not use elsewhere.`,
+        `  - Keep your login details private and do not share them with anyone.`,
+        `  - This setup link is personal to you and should not be forwarded.`,
+        ``,
+        `We're happy to have you with us, and we look forward to working`,
+        `together to make Lizimas Store even better.`,
+        ``,
+        `Welcome to the team!`,
+        ``,
+        `Warm regards,`,
+        `Admin`,
+        `Lizimas Store`
+    ].join("\n");
+
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: "Welcome to Lizimas Store - Set Up Your Staff Account",
+            text: body
+        });
+        return true;
+    } catch (error) {
+        console.error("Staff invite email error:", error);
+        return false;
+    }
+}
+
 async function sendStaffActivationEmail(email, name) {
     try {
         await transporter.sendMail({
@@ -212,4 +258,4 @@ async function sendAccountReportAlert(details) {
     }
 }
 
-module.exports = { sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert };
+module.exports = { sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert };

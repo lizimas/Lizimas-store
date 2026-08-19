@@ -2109,11 +2109,10 @@ async function revokeSession(sessionId) {
 async function createStaffAccount() {
     const name = document.getElementById("staff-name").value.trim();
     const email = document.getElementById("staff-email").value.trim();
-    const password = document.getElementById("staff-password").value;
     const role = document.getElementById("staff-role").value;
     const statusEl = document.getElementById("staff-create-status");
 
-    if (!name || !email || !password) {
+    if (!name || !email) {
         statusEl.textContent = "Please fill in all fields.";
         return;
     }
@@ -2128,7 +2127,7 @@ async function createStaffAccount() {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${token}`
             },
-            body: JSON.stringify({ name, email, password, role })
+            body: JSON.stringify({ name, email, role })
         });
 
         const data = await response.json();
@@ -2138,10 +2137,9 @@ async function createStaffAccount() {
             return;
         }
 
-        statusEl.textContent = `Staff account created for ${name}.`;
+        statusEl.textContent = data.message || `Staff account created for ${name}.`;
         document.getElementById("staff-name").value = "";
         document.getElementById("staff-email").value = "";
-        document.getElementById("staff-password").value = "";
         loadCustomers();
 
     } catch (error) {
