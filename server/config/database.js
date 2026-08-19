@@ -1,7 +1,12 @@
 const { Pool } = require("pg");
 require("dotenv").config();
 
-const useSSL = process.env.DB_SSL === "true";
+const dbUrl = process.env.DATABASE_URL || "";
+// Remote databases (Render) require TLS. Detect that rather than relying
+// on DB_SSL being set, so recovery scripts run from a local shell without
+// needing the flag remembered at the moment it matters most.
+const isRemote = dbUrl.startsWith("postgres") && !/@(localhost|127\.0\.0\.1)/.test(dbUrl);
+const useSSL = process.env.DB_SSL === "true" || isRemote;
 
 const pool = process.env.DATABASE_URL
     ? new Pool({
