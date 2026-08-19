@@ -53,7 +53,7 @@ exports.createAccountReport = async (req, res) => {
             hasAccount: Boolean(userId),
             message: message || "(none)",
             ip: ip || "unknown",
-            time: new Date().toISOString(),
+            time: new Date().toLocaleString("en-GB", { timeZone: "Africa/Kampala" }) + " (EAT)",
         }).catch((err) => console.error("Account report alert email error:", err));
 
         return res.json({ ok: true });

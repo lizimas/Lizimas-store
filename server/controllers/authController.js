@@ -73,7 +73,7 @@ async function deviceGate(user, req, surface) {
         surface: surface,
         ip: req.headers["cf-connecting-ip"] || req.ip,
         userAgent: req.headers["user-agent"] || "unknown",
-        time: new Date().toISOString(),
+        time: new Date().toLocaleString("en-GB", { timeZone: "Africa/Kampala" }) + " (EAT)",
         approveUrl: `${base}/device-approve.html?t=${request.approveToken}`,
         denyUrl: `${base}/device-approve.html?d=${request.denyToken}`
     }).catch(err => console.error("Device approval email failed:", err));
@@ -279,7 +279,7 @@ async function handleLogin(req, res, allowedRoles, surface) {
                 surface: surface,
                 ip: req.headers["cf-connecting-ip"] || req.ip,
                 userAgent: req.headers["user-agent"] || "unknown",
-                time: new Date().toISOString()
+                time: new Date().toLocaleString("en-GB", { timeZone: "Africa/Kampala" }) + " (EAT)"
             }).catch(err => console.error("Scope violation alert failed:", err));
 
             // Deliberately identical to a wrong-password response: same status,
@@ -387,7 +387,7 @@ async function handleLogin(req, res, allowedRoles, surface) {
             sendAdminLoginAlert({
                 name: user.name,
                 email: user.email,
-                time: new Date().toISOString(),
+                time: new Date().toLocaleString("en-GB", { timeZone: "Africa/Kampala" }) + " (EAT)",
                 ip: req.ip || req.connection.remoteAddress || "Unknown"
             }).catch(err => console.error("Admin login alert failed:", err));
         }
@@ -538,7 +538,7 @@ async function adminLogin(req, res) {
                 sendAdminBlockAlert({
                     name: user.name,
                     email: user.email,
-                    time: new Date().toISOString()
+                    time: new Date().toLocaleString("en-GB", { timeZone: "Africa/Kampala" }) + " (EAT)"
                 }).catch(err => console.error("Admin block alert failed:", err));
 
                 return res.status(403).json({ error: "This account has been blocked due to repeated unauthorized admin access attempts." });
@@ -644,7 +644,7 @@ async function adminLogin(req, res) {
         sendAdminLoginAlert({
             name: user.name,
             email: user.email,
-            time: new Date().toISOString(),
+            time: new Date().toLocaleString("en-GB", { timeZone: "Africa/Kampala" }) + " (EAT)",
             ip: req.ip || req.connection.remoteAddress || "Unknown"
         }).catch(err => console.error("Admin login alert failed:", err));
 
@@ -1357,7 +1357,7 @@ async function decideDeviceRequestHandler(req, res) {
             surface: request.surface,
             ip: request.ip_address,
             userAgent: request.user_agent,
-            time: new Date().toISOString()
+            time: new Date().toLocaleString("en-GB", { timeZone: "Africa/Kampala" }) + " (EAT)"
         }).catch(err => console.error("Security lock alert failed:", err));
 
         return res.json({
@@ -1543,7 +1543,7 @@ async function verifyLogin2FA(req, res) {
             sendAdminLoginAlert({
                 name: user.name,
                 email: user.email,
-                time: new Date().toISOString(),
+                time: new Date().toLocaleString("en-GB", { timeZone: "Africa/Kampala" }) + " (EAT)",
                 ip: req.ip || req.connection.remoteAddress || "Unknown"
             }).catch(err => console.error("Admin login alert failed:", err));
         }
