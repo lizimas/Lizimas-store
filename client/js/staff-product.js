@@ -80,6 +80,14 @@ async function init() {
     if (imageInput) {
         imageInput.addEventListener("change", handleImagePreview);
     }
+
+    // The Add Product form is visible from load, so mount the block editor here
+    // rather than waiting for Clear or a save. Null id: blocks are held client
+    // side until the product exists.
+    const blockHost = document.getElementById("desc-blocks-editor");
+    if (blockHost && window.LzBlockEditor) {
+        LzBlockEditor.mount(blockHost, null, { tokenKey: "staffToken" });
+    }
 }
 
 let pdLocalPreviews = [];
@@ -364,6 +372,13 @@ function loadProductIntoForm(product) {
 }
 
 function resetProductForm() {
+    // Mount the block editor with no product id: on create the product does not
+    // exist yet, so blocks are held client-side and saved once it does.
+    const newBlockHost = document.getElementById("desc-blocks-editor");
+    if (newBlockHost && window.LzBlockEditor) {
+        LzBlockEditor.mount(newBlockHost, null, { tokenKey: "staffToken" });
+    }
+
     document.getElementById("product-id").value = "";
     document.getElementById("product-name").value = "";
     document.getElementById("product-description").value = "";
