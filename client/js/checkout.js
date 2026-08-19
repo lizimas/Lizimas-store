@@ -316,7 +316,7 @@ async function confirmAndSubmitOrder() {
 
 function finishOrderSuccess(orderId) {
     alert(
-        `Thank you for shopping with Lizimas & Talent Enterprise!\n\nOrder #${orderId} has been received.`
+        `Thank you for shopping with Lizimas Store!\n\nOrder #${orderId} has been received.`
     );
     localStorage.removeItem("cart");
     window.location.href = "index.html";
