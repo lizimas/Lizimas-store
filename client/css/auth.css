@@ -558,3 +558,10 @@
     }
     .auth-page .auth-title { font-size: 21px; }
 }
+
+/* An empty status line should take no space. min-height stops layout jump
+   only when a message is actually present. */
+.auth-page .auth-error:empty {
+    min-height: 0;
+    margin: 0;
+}
