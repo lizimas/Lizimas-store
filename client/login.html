@@ -6,7 +6,7 @@
 <meta charset="UTF-8">
 <title>Login - Lizimas Store</title>
 <link rel="stylesheet" href="css/style.css?v=58">
-<link rel="stylesheet" href="css/auth.css?v=2">
+<link rel="stylesheet" href="css/auth.css?v=3">
 </head>
 
 <body>
@@ -16,7 +16,7 @@
     <header class="checkout-header">
         <div class="checkout-logo-row">
             <div class="checkout-logo-badge">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                <svg viewBox="0 0 24 26" width="24" height="26" aria-hidden="true"><path d="M6.5 11V7.5a5.5 5.5 0 0 1 11 0V11" fill="none" stroke="#EFC02E" stroke-width="2.8" stroke-linecap="round"/><rect x="2.5" y="10.5" width="19" height="14.5" rx="4" fill="#EFC02E"/><text x="12" y="20.5" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8.5" font-weight="700" fill="#1A1608">LS</text></svg>
             </div>
             <h1 class="checkout-brand-name">Lizimas Store</h1>
         </div>
@@ -59,16 +59,27 @@
             </span>
         </div>
 
-        <p class="auth-forgot">
-            <a href="forgot-password.html">Forgot password?</a>
-        </p>
+        <div class="auth-meta-row">
+            <label class="auth-remember" for="login-remember">
+                <input type="checkbox" id="login-remember">
+                Remember me
+            </label>
+            <p class="auth-forgot">
+                <a href="forgot-password.html">Forgot password?</a>
+            </p>
+        </div>
 
         <p id="login-status" class="auth-error"></p>
 
         <button class="auth-submit" onclick="loginAccount()">
-            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/></svg>
-            Log In
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#1A1608" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/></svg>
+            Sign in
         </button>
+
+        <div class="auth-social" aria-hidden="true">
+            <p class="auth-social-sep"><span>Or continue with</span></p>
+            <div class="auth-social-row"></div>
+        </div>
 
         <p class="auth-foot">
             Don't have an account? <a href="register.html">Sign up</a>
@@ -96,7 +107,7 @@
 
         <p id="twofa-status" class="auth-error"></p>
 
-        <button class="auth-submit" onclick="verifyTwoFactor()">Verify &amp; Log In</button>
+        <button class="auth-submit" onclick="verifyTwoFactor()">Verify &amp; sign in</button>
 
         <button id="twofa-email-btn" class="auth-alt-btn" onclick="requestEmailLoginCode()">Email me a code instead</button>
 
@@ -107,22 +118,29 @@
             <div class="auth-trust-icon">
                 <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#E8B33A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
             </div>
-            <p class="auth-trust-title">Secure &amp; Private</p>
-            <p class="auth-trust-note">Your data is always protected</p>
+            <p class="auth-trust-title">Secure checkout</p>
+            <p class="auth-trust-note">Your details stay protected</p>
         </div>
         <div class="auth-trust-item">
             <div class="auth-trust-icon">
                 <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#E8B33A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8Z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
             </div>
-            <p class="auth-trust-title">Faster Checkout</p>
-            <p class="auth-trust-note">Save time on your next order</p>
+            <p class="auth-trust-title">Fast delivery</p>
+            <p class="auth-trust-note">Across Uganda, tracked end to end</p>
         </div>
         <div class="auth-trust-item">
             <div class="auth-trust-icon">
-                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#E8B33A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#E8B33A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><path d="m9 14.5-1.5 7L12 19l4.5 2.5-1.5-7"/><path d="m10.5 9 1 1 2-2"/></svg>
             </div>
-            <p class="auth-trust-title">Better Support</p>
-            <p class="auth-trust-note">Get help when you need it</p>
+            <p class="auth-trust-title">Genuine products</p>
+            <p class="auth-trust-note">Sourced and checked by us</p>
+        </div>
+        <div class="auth-trust-item">
+            <div class="auth-trust-icon">
+                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#E8B33A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9H5a2 2 0 0 1-2-2Z"/><circle cx="17" cy="14" r="1.2"/></svg>
+            </div>
+            <p class="auth-trust-title">Flexible payment</p>
+            <p class="auth-trust-note">Mobile money or cash on delivery</p>
         </div>
     </div>
 

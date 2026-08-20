@@ -407,3 +407,136 @@
 .auth-field .auth-strength {
     margin-top: 12px;
 }
+
+
+/* ================================================================== */
+/* Auth redesign - navy hero band, overlapping card, gold primary.     */
+/* Scoped to .auth-page so checkout.html is untouched.                 */
+/* ================================================================== */
+
+.auth-page {
+    --lzauth-navy: #101731;
+    --lzauth-navy-deep: #0B1226;
+    --lzauth-gold: #EFC02E;
+    --lzauth-gold-ink: #1A1608;
+
+    background: #ffffff;
+    min-height: 100vh;
+}
+
+/* Header sits on the deepest navy; the band continues below it. */
+.auth-page .checkout-header {
+    background: var(--lzauth-navy-deep);
+    border-bottom: 0;
+    padding: 12px 16px;
+}
+
+.auth-page .checkout-brand-name { color: #ffffff; }
+
+.auth-page .checkout-logo-badge {
+    background: transparent;
+    width: auto;
+    height: auto;
+}
+
+.auth-page .checkout-secure-badge { color: #9fb8ab; }
+
+/* Nav on navy, sitting inside the band. */
+.auth-page .checkout-nav-links {
+    background: var(--lzauth-navy);
+    padding: 10px 16px 0;
+    border-bottom: 0;
+}
+
+.auth-page .checkout-nav-links a { color: #aab2c8; }
+.auth-page .checkout-nav-links a:hover { color: #ffffff; }
+
+/* The band itself: navy behind the top of the card, white beneath. */
+.auth-page::before {
+    content: "";
+    display: block;
+    height: 92px;
+    background: var(--lzauth-navy);
+}
+
+/* Card rides up over the band's lower edge. */
+.auth-page .auth-card {
+    margin-top: -74px;
+    box-shadow: 0 8px 28px rgba(11, 18, 38, 0.18);
+    border-color: transparent;
+}
+
+/* The icon badge is redundant once the header carries the padlock. */
+.auth-page .auth-card-head .auth-icon-badge { display: none; }
+
+.auth-page .auth-title { font-size: 24px; }
+
+/* Primary action is gold; navy is now the page, not the button. */
+.auth-page .auth-submit {
+    background: var(--lzauth-gold);
+    color: var(--lzauth-gold-ink);
+}
+
+.auth-page .auth-submit:hover { background: #e0b224; }
+
+/* Remember me sits opposite Forgot password on one row. */
+.auth-page .auth-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: -4px 0 18px;
+}
+
+.auth-page .auth-remember {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+    color: #4b5563;
+    cursor: pointer;
+    margin: 0;
+}
+
+.auth-page .auth-remember input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--lzauth-navy);
+    margin: 0;
+}
+
+.auth-page .auth-meta-row .auth-forgot {
+    margin: 0 0 0 auto;
+    text-align: right;
+}
+
+/* Four trust items wrap two-up on narrow screens. */
+.auth-page .auth-trust {
+    flex-wrap: wrap;
+    gap: 18px 14px;
+    margin-top: 30px;
+}
+
+.auth-page .auth-trust-item { flex: 1 1 120px; }
+
+/* 2FA: the code is the whole interface, so give it room. */
+.auth-page #twofa-code {
+    text-align: center;
+    font-size: 22px;
+    letter-spacing: 10px;
+    text-indent: 10px;
+    padding-left: 15px;
+    font-weight: 600;
+}
+
+.auth-page #twofa-form-card .auth-input-wrap > svg { display: none; }
+
+.auth-page #twofa-form-card .auth-label { text-align: center; }
+
+/* Social sign-in: markup is in place, revealed when OAuth is wired. */
+.auth-page .auth-social { display: none; }
+
+@media (max-width: 420px) {
+    .auth-page::before { height: 76px; }
+    .auth-page .auth-card { margin-top: -62px; }
+    .auth-page .auth-title { font-size: 21px; }
+}
