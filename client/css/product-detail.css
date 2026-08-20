@@ -321,3 +321,6 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
         gap: 14px;
     }
 }
+
+/* A heading that introduces a tick list stays left-aligned with its list. */
+.pd-desc-blocks .pdb-heading:has(+ .pdb-text ul.lzbe-check) { text-align: left; }
