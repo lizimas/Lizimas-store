@@ -140,6 +140,15 @@
         return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
+    // A stored body counts as HTML if it has tags OR entities. Testing tags
+    // alone sent entity-only bodies (e.g. "Coffee &amp; Tea", no markup)
+    // through plainToHtml, which escaped the "&" a second time and produced
+    // "&amp;amp;" on every load-and-save cycle.
+    function lzbeIsHtml(s) {
+        const v = String(s || "");
+        return /<[a-z][\s\S]*>/i.test(v) || /&(amp|lt|gt|quot|apos|nbsp|#\d+);/i.test(v);
+    }
+
     function plainToHtml(s) {
         return esc(s).replace(/\r\n|\r|\n/g, "<br>");
     }
@@ -497,7 +506,7 @@
                     itemEd.className = "lzbe-rich lzbe-grid-rich";
                     itemEd.contentEditable = "true";
                     itemEd.dataset.ph = "Feature list or description \u2014 paste from Word or Docs";
-                    itemEd.innerHTML = /<[a-z][\s\S]*>/i.test(item.body || "")
+                    itemEd.innerHTML = lzbeIsHtml(item.body)
                         ? sanitizeHtml(item.body)
                         : plainToHtml(item.body || "");
                     itemEd.addEventListener("paste", onPaste);
@@ -534,7 +543,7 @@
                 ed.className = "lzbe-rich";
                 ed.contentEditable = "true";
                 ed.dataset.ph = "Paragraph text \u2014 paste from Word or Docs and lists, ticks and levels are kept";
-                ed.innerHTML = /<[a-z][\s\S]*>/i.test(b.body || "")
+                ed.innerHTML = lzbeIsHtml(b.body)
                     ? sanitizeHtml(b.body)
                     : plainToHtml(b.body || "");
                 ed.addEventListener("paste", onPaste);
