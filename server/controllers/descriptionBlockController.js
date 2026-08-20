@@ -94,6 +94,13 @@ const saveDescriptionBlocks = async (req, res) => {
         } else if (b.type !== "image" && !stripTags(b.body || "").trim()) {
             return res.status(400).json({ message: `Block ${i}: ${b.type} needs body` });
         }
+
+        if (b.alt_text && String(b.alt_text).length > 255) {
+            return res.status(400).json({
+                message: `Block ${i}: alt text is ${String(b.alt_text).length} characters, limit is 255. ` +
+                         `Alt text should briefly describe the image, not repeat the product description.`
+            });
+        }
     }
 
     const client = await pool.connect();
@@ -134,7 +141,10 @@ const saveDescriptionBlocks = async (req, res) => {
     } catch (err) {
         await client.query("ROLLBACK");
         console.error("saveDescriptionBlocks:", err);
-        res.status(500).json({ message: "Failed to save description blocks" });
+        res.status(500).json({
+            message: "Failed to save description blocks",
+            detail: process.env.NODE_ENV === "production" ? undefined : err.message
+        });
     } finally {
         client.release();
     }

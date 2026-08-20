@@ -387,10 +387,28 @@
 
                 const alt = document.createElement("input");
                 alt.type = "text";
+                alt.maxLength = 255;
                 alt.placeholder = "Alt text (describes the image)";
                 alt.value = b.alt_text || "";
-                alt.addEventListener("input", (e) => { blocks[i].alt_text = e.target.value; });
+
+                const altCount = document.createElement("div");
+                altCount.className = "lzbe-altcount";
+
+                const renderAltCount = () => {
+                    const n = (blocks[i].alt_text || "").length;
+                    altCount.textContent = n + " / 255";
+                    altCount.classList.toggle("is-near", n > 200);
+                };
+
+                alt.addEventListener("input", (e) => {
+                    blocks[i].alt_text = e.target.value.slice(0, 255);
+                    if (e.target.value.length > 255) e.target.value = blocks[i].alt_text;
+                    renderAltCount();
+                });
+
                 row.appendChild(alt);
+                renderAltCount();
+                row.appendChild(altCount);
 
                 const dim = document.createElement("div");
                 dim.className = "lzbe-dim";
