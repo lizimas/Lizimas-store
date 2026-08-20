@@ -63,6 +63,15 @@
         return out.innerHTML;
     }
 
+    // Bodies are stored as HTML, so "&" lives as "&amp;". For plain-text
+    // targets (headings, captions) decode entities without allowing markup:
+    // parse into a detached node, then read the text straight back out.
+    function pdbDecode(s) {
+        const d = document.createElement("div");
+        d.innerHTML = String(s || "");
+        return d.textContent || "";
+    }
+
     // A multi-column feature grid. Per-column items ride in the JSONB
     // payload rather than as sibling rows, so a column's image and its
     // caption can never drift apart during reordering.
@@ -112,7 +121,7 @@
             if (item.caption) {
                 const cap = document.createElement("div");
                 cap.className = "pdb-grid-caption";
-                cap.textContent = item.caption;
+                cap.textContent = pdbDecode(item.caption);
                 cell.appendChild(cap);
             }
 
@@ -138,11 +147,12 @@
             } else if (b.type === "heading") {
                 const h = document.createElement("h3");
                 h.className = "pdb-heading";
-                h.textContent = b.body;
+                h.textContent = pdbDecode(b.body);
                 frag.appendChild(h);
             } else if (b.type === "grid") {
                 frag.appendChild(gridEl(b));
-            } else if (/<(p|ul|ol|li|br|strong|em|b|i|u)\b/i.test(b.body || "")) {
+            } else if (/<(p|ul|ol|li|br|strong|em|b|i|u)\b/i.test(b.body || "") ||
+                       /&(amp|lt|gt|quot|apos|nbsp|#\d+);/i.test(b.body || "")) {
                 const d = document.createElement("div");
                 d.className = "pdb-text";
                 d.innerHTML = pdbSanitize(b.body);
