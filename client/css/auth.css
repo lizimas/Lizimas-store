@@ -427,7 +427,9 @@
 /* Header sits on the deepest navy; the band continues below it. */
 .auth-page .checkout-header {
     background: var(--lzauth-navy-deep);
-    border-bottom: 0;
+    border: 0;
+    box-shadow: none;
+    margin: 0;
     padding: 12px 16px;
 }
 
@@ -444,9 +446,10 @@
 /* Nav on navy, sitting inside the band. */
 .auth-page .checkout-nav-links {
     background: var(--lzauth-navy);
-    padding: 10px 16px 0;
-    border-bottom: 0;
-    margin-bottom: 0;
+    padding: 12px 16px 0;
+    border: 0;
+    box-shadow: none;
+    margin: 0;
 }
 
 .auth-page .checkout-nav-links a { color: #aab2c8; }
@@ -455,14 +458,15 @@
 /* The band is the nav strip's own padding, so it can only ever sit
    directly under the header - never above it. */
 .auth-page .checkout-nav-links {
-    padding-bottom: 86px;
+    padding-bottom: 96px;
 }
 
 /* Card rides up over the band's lower edge. Width is capped so the band
    is never narrower than the card (which showed as navy shoulders). */
 .auth-page .auth-card {
-    margin-top: -68px;
+    margin-top: -34px;
     max-width: 480px;
+    padding-top: 34px;
     box-shadow: 0 8px 28px rgba(11, 18, 38, 0.18);
     border-color: transparent;
     position: relative;
@@ -539,7 +543,10 @@
 .auth-page .auth-social { display: none; }
 
 @media (max-width: 420px) {
-    .auth-page .checkout-nav-links { padding-bottom: 72px; }
-    .auth-page .auth-card { margin-top: -58px; margin-left: 12px; margin-right: 12px; }
+    .auth-page .checkout-nav-links { padding-bottom: 82px; }
+    .auth-page .auth-card {
+        margin: -30px 16px 0;
+        padding-top: 30px;
+    }
     .auth-page .auth-title { font-size: 21px; }
 }
