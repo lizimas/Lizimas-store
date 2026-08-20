@@ -464,7 +464,7 @@
 /* Card rides up over the band's lower edge. Width is capped so the band
    is never narrower than the card (which showed as navy shoulders). */
 .auth-page .auth-card {
-    margin-top: -34px;
+    margin: -34px auto 0;
     max-width: 480px;
     padding-top: 34px;
     box-shadow: 0 8px 28px rgba(11, 18, 38, 0.18);
@@ -516,6 +516,12 @@
     text-align: right;
 }
 
+/* The submit button's own top margin is enough; the row should not add
+   more underneath it. */
+.auth-page .auth-meta-row { margin-bottom: 6px; }
+
+.auth-page .auth-submit { margin-top: 10px; }
+
 /* Four trust items wrap two-up on narrow screens. */
 .auth-page .auth-trust {
     flex-wrap: wrap;
@@ -545,7 +551,9 @@
 @media (max-width: 420px) {
     .auth-page .checkout-nav-links { padding-bottom: 82px; }
     .auth-page .auth-card {
-        margin: -30px 16px 0;
+        width: auto;
+        margin: -30px auto 0;
+        max-width: calc(100% - 32px);
         padding-top: 30px;
     }
     .auth-page .auth-title { font-size: 21px; }
