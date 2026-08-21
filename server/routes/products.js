@@ -65,6 +65,6 @@ router.post("/", requireAuth, requireStaffOrAdmin, upload.array("images", 20), a
 router.put("/:id", requireAuth, requireStaffOrAdmin, upload.array("images", 20), updateProduct);
 router.delete("/:id", requireAuth, requireStaffOrAdmin, deleteProduct);
 router.patch("/:id/images/order", requireAuth, requireStaffOrAdmin, updateImageOrder);
-router.delete("/images/:imageId", requireAuth, requireStaffOrAdmin, deleteProductImage);
+router.delete("/images/:imageId", requireAuth, requireAdmin, deleteProductImage);
 
 module.exports = router;

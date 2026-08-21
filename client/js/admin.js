@@ -670,6 +670,7 @@ let allCategories = [];
 let pdLocalPreviews = [];
 let pdAllImages = [];
 let pdPickedFiles = [];
+let pdSaveInFlight = false;
 let pdSelectedSizes = [];
 let pdSelectedColors = {};
 let pdSpecRowCounter = 0;
@@ -1053,11 +1054,7 @@ async function renderImagePreviews(fileList) {
         .concat(pdPickedFiles.map((f, i) => ({ key: "new:" + i, url: pdLocalPreviews[i] })));
     document.querySelectorAll(".pd-color-thumb-picker").forEach(picker => renderThumbOptions(picker));
 
-    pdPickedFiles.forEach((f, i) => {
-        const img = document.createElement("img");
-        img.src = pdLocalPreviews[i];
-        preview.appendChild(img);
-    });
+    renderPhotoOrderList();
 }
 
 function openProductForm() {
@@ -1141,6 +1138,12 @@ async function saveProduct() {
         return;
     }
 
+    if (pdSaveInFlight) return;
+    pdSaveInFlight = true;
+    const saveBtn = document.getElementById("product-save-btn");
+    const saveBtnLabel = saveBtn ? saveBtn.textContent : null;
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving..."; }
+
     const formData = new FormData();
     formData.append("name", name);
     formData.append("category_id", category_id);
@@ -1163,12 +1166,19 @@ async function saveProduct() {
             }
         );
 
-        if (result.error) {
-            errorEl.textContent = result.error;
+        // The server's error handler replies with { message }, validation
+        // paths reply with { error }: accept either, or a create that came
+        // back without a product row.
+        if (result.error || result.message && !result.product && !id) {
+            errorEl.textContent = result.error || result.message;
             return;
         }
 
         const savedProductId = result.product ? result.product.id : id;
+        if (!savedProductId) {
+            errorEl.textContent = "Save failed: the server did not return a product.";
+            return;
+        }
         const returnedImages = result.images || [];
         const returnedRecords = result.image_records || [];
 
@@ -1214,6 +1224,12 @@ async function saveProduct() {
     } catch (error) {
         console.error("Save product error:", error);
         errorEl.textContent = "Could not connect to server.";
+    } finally {
+        pdSaveInFlight = false;
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            if (saveBtnLabel !== null) saveBtn.textContent = saveBtnLabel;
+        }
     }
 }
 
@@ -3066,41 +3082,157 @@ document.addEventListener("click", (e) => {
 });
 
 // ---- Stored photo order (edit mode only; new picks have no id yet) ----
+function pdIsNew(key) { return key.startsWith("new:"); }
+
+function pdRebuildAllImages() {
+    const stored = pdAllImages.filter(im => im.key.startsWith("id:"));
+    pdAllImages = stored.concat(
+        pdPickedFiles.map((f, i) => ({ key: "new:" + i, url: pdLocalPreviews[i] }))
+    );
+}
+
+// Removing an unsaved photo shifts every later new: index, so colour
+// assignments have to move with it or they silently point at the wrong file.
+function pdRemapColorsAfterRemoval(removedIndex) {
+    Object.keys(pdSelectedColors).forEach(name => {
+        if (!Array.isArray(pdSelectedColors[name])) return;
+        pdSelectedColors[name] = pdSelectedColors[name]
+            .filter(k => k !== "new:" + removedIndex)
+            .map(k => {
+                if (!pdIsNew(k)) return k;
+                const n = Number(k.slice(4));
+                return n > removedIndex ? "new:" + (n - 1) : k;
+            });
+    });
+}
+
+function pdSwapColorKeys(i, j) {
+    const ki = "new:" + i, kj = "new:" + j;
+    Object.keys(pdSelectedColors).forEach(name => {
+        if (!Array.isArray(pdSelectedColors[name])) return;
+        pdSelectedColors[name] = pdSelectedColors[name].map(k =>
+            k === ki ? kj : (k === kj ? ki : k)
+        );
+    });
+}
+
 function renderPhotoOrderList() {
     const preview = document.getElementById("product-image-preview");
     if (!preview) return;
     let block = document.getElementById("pd-photo-order");
-    const stored = pdAllImages.filter(im => im.key.startsWith("id:"));
-    if (stored.length < 2) { if (block) block.remove(); return; }
+    const all = pdAllImages;
+    if (all.length === 0) { if (block) block.remove(); return; }
     if (!block) {
         block = document.createElement("div");
         block.id = "pd-photo-order";
         block.style.cssText = "width:100%; margin-bottom:10px;";
         preview.parentNode.insertBefore(block, preview);
     }
+
+    const storedCount = all.filter(im => im.key.startsWith("id:")).length;
+
     block.innerHTML =
-        '<div style="font-size:12px;font-weight:700;color:#444;margin-bottom:6px;">Photo order</div>' +
-        stored.map((im, i) =>
-            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">' +
-            '<span style="min-width:18px;font-size:12px;color:#666;">' + (i + 1) + '</span>' +
-            '<img src="' + im.url + '" style="width:40px;height:40px;object-fit:cover;border-radius:4px;">' +
-            '<button type="button" onclick="movePhotoOrder(' + i + ',-1)" ' + (i === 0 ? 'disabled' : '') + ' style="padding:6px 12px;">&uarr;</button>' +
-            '<button type="button" onclick="movePhotoOrder(' + i + ',1)" ' + (i === stored.length - 1 ? 'disabled' : '') + ' style="padding:6px 12px;">&darr;</button>' +
-            '</div>'
-        ).join("") +
-        '<button type="button" onclick="savePhotoOrder()" style="margin-top:6px;padding:6px 14px;background:#ff6a00;color:#fff;border:none;border-radius:4px;">Save order</button>' +
+        '<div style="font-size:12px;font-weight:700;color:#444;margin-bottom:8px;">Photos</div>' +
+        all.map((im, i) => {
+            const isNew = pdIsNew(im.key);
+            const prev = all[i - 1];
+            const next = all[i + 1];
+            const canUp = prev && pdIsNew(prev.key) === isNew;
+            const canDown = next && pdIsNew(next.key) === isNew;
+            return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+                '<span style="min-width:16px;font-size:12px;color:#666;">' + (i + 1) + '</span>' +
+                '<div style="position:relative;flex:0 0 auto;">' +
+                    '<img src="' + im.url + '" style="width:46px;height:46px;object-fit:cover;border-radius:4px;display:block;">' +
+                    '<button type="button" onclick="removePhoto(\'' + im.key + '\')" title="Remove photo" ' +
+                        'style="position:absolute;top:-7px;right:-7px;width:21px;height:21px;padding:0;line-height:19px;text-align:center;' +
+                        'background:#fff;color:#c0392b;border:1px solid #e0b4ae;border-radius:50%;font-size:12px;cursor:pointer;">&#10005;</button>' +
+                '</div>' +
+                '<button type="button" onclick="movePhotoOrder(' + i + ',-1)" ' + (canUp ? '' : 'disabled') + ' style="padding:6px 12px;">&uarr;</button>' +
+                '<button type="button" onclick="movePhotoOrder(' + i + ',1)" ' + (canDown ? '' : 'disabled') + ' style="padding:6px 12px;">&darr;</button>' +
+                (isNew ? '<span style="font-size:10px;font-weight:700;color:#ff6a00;letter-spacing:.5px;">NEW</span>' : '') +
+            '</div>';
+        }).join("") +
+        (storedCount > 1
+            ? '<button type="button" onclick="savePhotoOrder()" style="margin-top:4px;padding:6px 14px;background:#ff6a00;color:#fff;border:none;border-radius:4px;">Save order</button>'
+            : '') +
         '<span id="pd-photo-order-status" style="margin-left:8px;font-size:12px;color:#666;"></span>';
 }
 
+function removePhoto(key) {
+    if (key.startsWith("id:")) return deleteStoredPhoto(key);
+    return removeNewPhoto(key);
+}
+
+// Unsaved upload: nothing has reached the server, so this is purely local.
+function removeNewPhoto(key) {
+    const i = Number(key.slice(4));
+    if (!Number.isInteger(i) || i < 0 || i >= pdPickedFiles.length) return;
+    try { URL.revokeObjectURL(pdLocalPreviews[i]); } catch (e) {}
+    pdPickedFiles.splice(i, 1);
+    pdLocalPreviews.splice(i, 1);
+    pdRemapColorsAfterRemoval(i);
+    pdRebuildAllImages();
+    renderPhotoOrderList();
+    document.querySelectorAll(".pd-color-thumb-picker").forEach(pk => renderThumbOptions(pk));
+}
+
+let pdDeleteInFlight = false;
+
+async function deleteStoredPhoto(key) {
+    if (pdDeleteInFlight) return;
+    const imageId = key.split(":")[1];
+    if (!imageId) return;
+    if (!confirm("Remove this photo from the product?")) return;
+
+    pdDeleteInFlight = true;
+    document.querySelectorAll("#pd-photo-order button").forEach(b => b.disabled = true);
+    const status = document.getElementById("pd-photo-order-status");
+    if (status) status.textContent = "Removing...";
+    try {
+        // authorizedFetch returns parsed JSON and throws on error.
+        const data = await authorizedFetch("/api/products/images/" + imageId, { method: "DELETE" });
+        if (data && data.error) {
+            if (status) status.textContent = "Failed: " + data.error;
+            return;
+        }
+        pdAllImages = pdAllImages.filter(im => im.key !== key);
+        Object.keys(pdSelectedColors).forEach(name => {
+            if (Array.isArray(pdSelectedColors[name])) {
+                pdSelectedColors[name] = pdSelectedColors[name].filter(k => k !== key);
+            }
+        });
+        renderPhotoOrderList();
+        document.querySelectorAll(".pd-color-thumb-picker").forEach(pk => renderThumbOptions(pk));
+        const s2 = document.getElementById("pd-photo-order-status");
+        if (s2) s2.textContent = "Removed";
+    } catch (e) {
+        if (status) status.textContent = "Failed: " + e.message;
+    } finally {
+        pdDeleteInFlight = false;
+        renderPhotoOrderList();
+    }
+}
+
 function movePhotoOrder(index, delta) {
-    const stored = pdAllImages.filter(im => im.key.startsWith("id:"));
-    const rest = pdAllImages.filter(im => !im.key.startsWith("id:"));
     const target = index + delta;
-    if (target < 0 || target >= stored.length) return;
-    const tmp = stored[index];
-    stored[index] = stored[target];
-    stored[target] = tmp;
-    pdAllImages = stored.concat(rest);
+    if (target < 0 || target >= pdAllImages.length) return;
+    const a = pdAllImages[index];
+    const b = pdAllImages[target];
+    // Saved and unsaved photos do not interleave: unsaved always sort last.
+    if (pdIsNew(a.key) !== pdIsNew(b.key)) return;
+
+    if (pdIsNew(a.key)) {
+        const i = Number(a.key.slice(4));
+        const j = Number(b.key.slice(4));
+        const tf = pdPickedFiles[i]; pdPickedFiles[i] = pdPickedFiles[j]; pdPickedFiles[j] = tf;
+        const tp = pdLocalPreviews[i]; pdLocalPreviews[i] = pdLocalPreviews[j]; pdLocalPreviews[j] = tp;
+        pdSwapColorKeys(i, j);
+        pdRebuildAllImages();
+    } else {
+        pdAllImages[index] = b;
+        pdAllImages[target] = a;
+    }
+
     renderPhotoOrderList();
     document.querySelectorAll(".pd-color-thumb-picker").forEach(p => renderThumbOptions(p));
 }

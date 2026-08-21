@@ -712,16 +712,57 @@ exports.deleteProductImage = async (req, res) => {
             return res.status(permission.status).json({ error: permission.error });
         }
 
-        const image = await pool.query(
-            `DELETE FROM product_images WHERE id=$1 RETURNING *`,
-            [imageId]
-        );
+        const client = await pool.connect();
+        let deletedRow;
+        try {
+            await client.query("BEGIN");
 
-        if (image.rows.length === 0) {
-            return res.status(404).json({ error: "Image not found" });
+            const image = await client.query(
+                `DELETE FROM product_images WHERE id=$1 RETURNING *`,
+                [imageId]
+            );
+            if (image.rows.length === 0) {
+                await client.query("ROLLBACK");
+                return res.status(404).json({ error: "Image not found" });
+            }
+            deletedRow = image.rows[0];
+
+            // Close the gap left in display_order.
+            const remaining = await client.query(
+                `SELECT id FROM product_images WHERE product_id = $1
+                 ORDER BY COALESCE(display_order, 999999) ASC, id ASC`,
+                [deletedRow.product_id]
+            );
+            for (let i = 0; i < remaining.rows.length; i++) {
+                await client.query(
+                    "UPDATE product_images SET display_order = $1 WHERE id = $2",
+                    [i, remaining.rows[i].id]
+                );
+            }
+
+            // Swatch thumbnail pointed at the deleted file: re-derive or null it.
+            if (deletedRow.color_id) {
+                const next = await client.query(
+                    `SELECT image_path FROM product_images
+                     WHERE product_id = $1 AND color_id = $2
+                     ORDER BY COALESCE(display_order, 999999) ASC, id ASC LIMIT 1`,
+                    [deletedRow.product_id, deletedRow.color_id]
+                );
+                await client.query(
+                    "UPDATE product_colors SET image_path = $1 WHERE id = $2",
+                    [next.rows[0] ? next.rows[0].image_path : null, deletedRow.color_id]
+                );
+            }
+
+            await client.query("COMMIT");
+        } catch (e) {
+            try { await client.query("ROLLBACK"); } catch (e2) {}
+            throw e;
+        } finally {
+            client.release();
         }
 
-        res.json({ message: "Image deleted successfully" });
+        res.json({ message: "Image deleted successfully", deletedId: Number(imageId) });
 
     } catch (error) {
         res.status(500).json({ error: error.message });
