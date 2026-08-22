@@ -1675,6 +1675,52 @@ async function loadVariants(productId) {
     }
 }
 
+let editingVariantId = null;
+
+function startVariantEdit(variantId) {
+    editingVariantId = variantId;
+    renderVariantsList();
+}
+
+function cancelVariantEdit() {
+    editingVariantId = null;
+    renderVariantsList();
+}
+
+// updateVariant sets name, price and stock unconditionally, so all three are
+// sent every time even when only one changed. Image is left alone.
+async function saveVariantEdit(variantId) {
+    const nameEl = document.getElementById("ev-name-" + variantId);
+    const priceEl = document.getElementById("ev-price-" + variantId);
+    const stockEl = document.getElementById("ev-stock-" + variantId);
+    if (!nameEl || !priceEl || !stockEl) return;
+
+    const variant_name = nameEl.value.replace(/\s+/g, " ").trim();
+    const price = Number(priceEl.value);
+    const stock = Number(stockEl.value);
+
+    if (!variant_name) { alert("Variant name cannot be empty."); return; }
+    if (!Number.isFinite(price) || price < 0) { alert("Enter a valid price."); return; }
+    if (!Number.isInteger(stock) || stock < 0) { alert("Stock must be a whole number of 0 or more."); return; }
+
+    const form = new FormData();
+    form.append("variant_name", variant_name);
+    form.append("price", price);
+    form.append("stock", stock);
+
+    try {
+        const result = await authorizedFetch("/api/variants/" + variantId, {
+            method: "PUT",
+            body: form
+        });
+        if (result && result.error) { alert("Failed: " + result.error); return; }
+        editingVariantId = null;
+        loadVariants(document.getElementById("product-id").value);
+    } catch (error) {
+        alert("Failed: " + error.message);
+    }
+}
+
 function renderVariantsList() {
     const container = document.getElementById("variants-list");
 
@@ -1683,15 +1729,30 @@ function renderVariantsList() {
         return;
     }
 
-    container.innerHTML = currentVariants.map(v => `
+    container.innerHTML = currentVariants.map(v => {
+        if (Number(v.id) === Number(editingVariantId)) {
+            return `
+        <div class="variant-row">
+            <input type="text" id="ev-name-${v.id}" value="${String(v.variant_name).replace(/"/g, '&quot;')}" style="flex:1;min-width:120px;padding:6px;">
+            <input type="number" id="ev-price-${v.id}" value="${v.price}" style="width:100px;padding:6px;">
+            <input type="number" id="ev-stock-${v.id}" value="${v.stock}" style="width:80px;padding:6px;">
+            <button type="button" onclick="saveVariantEdit(${v.id})">Save</button>
+            <button type="button" onclick="cancelVariantEdit()">Cancel</button>
+        </div>`;
+        }
+        return `
         <div class="variant-row">
             <img src="${v.image_path || ''}" alt="" class="variant-thumb">
             <span>${v.variant_name}</span>
             <span>UGX ${Number(v.price).toLocaleString()}</span>
             <span>Stock: ${v.stock}</span>
+            <button type="button" onclick="startVariantEdit(${v.id})">Edit</button>
             <button type="button" onclick="deleteVariant(${v.id})">Delete</button>
-        </div>
-    `).join("");
+        </div>`;
+    }).join("");
+
+    const err = document.getElementById("variant-edit-error");
+    if (err) err.remove();
 }
 
 async function addVariant() {
