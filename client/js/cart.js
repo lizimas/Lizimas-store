@@ -9,15 +9,16 @@ function saveCart(cart) {
     updateCartCount();
 }
 
-function addToCart(id, name, price, image, description, colorId, colorName, sizeId, sizeName) {
+function addToCart(id, name, price, image, description, colorId, colorName, sizeId, sizeName, variantId, variantName) {
     let cart = getCart();
-    let existing = cart.find(item => item.id === id && item.colorId === (colorId || null) && item.sizeId === (sizeId || null));
+    const cartId = variantId ? `${id}-v${variantId}` : id;
+    let existing = cart.find(item => item.id === cartId && item.colorId === (colorId || null) && item.sizeId === (sizeId || null));
 
     if (existing) {
         existing.quantity += 1;
     } else {
         cart.push({
-            id,
+            id: cartId,
             name,
             price: Number(price),
             image,
@@ -26,6 +27,8 @@ function addToCart(id, name, price, image, description, colorId, colorName, size
             colorName: colorName || null,
             sizeId: sizeId || null,
             sizeName: sizeName || null,
+            variantId: variantId || null,
+            variantName: variantName || null,
             quantity: 1
         });
     }
@@ -202,12 +205,12 @@ function loadCart() {
                     ${isChecked ? "checked" : ""}
                     onchange="toggleItemSelection(${index}, this.checked)"
                 >
-                <a href="product-detail.html?id=${item.id}" class="cart-row-image-link">
+                <a href="product-detail.html?id=${getBaseProductId(item.id)}" class="cart-row-image-link">
                     <img src="${imageSrc}" class="cart-row-image" alt="${baseName}">
                 </a>
                 <div class="cart-row-details">
                     <p class="cart-row-name">${baseName}</p>
-                    <span class="variant-pill" onclick="goToChangeVariant('${item.id}')">${[item.colorName, item.sizeName].filter(Boolean).join(" / ") || (item.description || variantLabel || "View details").slice(0, 40)} <span class="variant-pill-arrow">›</span></span>
+                    <span class="variant-pill" onclick="goToChangeVariant('${item.id}')">${item.variantName || [item.colorName, item.sizeName].filter(Boolean).join(" / ") || (item.description || variantLabel || "View details").slice(0, 40)} <span class="variant-pill-arrow">›</span></span>
                     <div class="cart-row-price-row">
                         <p class="cart-row-price">UGX ${Number(item.price).toLocaleString()}</p>
                         <div class="cart-row-stepper">

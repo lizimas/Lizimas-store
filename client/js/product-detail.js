@@ -66,7 +66,14 @@ async function loadProductDetail() {
                     cartImage = match.image_path || match.url || match.src;
                 }
             }
-            addToCart(product.id, product.name, product.price, cartImage, product.description, pdSelectedColorId, pdSelectedColorName, pdSelectedSizeId, pdSelectedSizeName);
+            // A product with standalone variants has no sensible default price,
+            // so refuse rather than silently charging the base price.
+            if (pdStandaloneVariants.length > 0 && pdSelectedVariantId === null) {
+                alert("Please choose an option first.");
+                return;
+            }
+            const cartPrice = pdSelectedVariantPrice !== null ? pdSelectedVariantPrice : product.price;
+            addToCart(product.id, product.name, cartPrice, cartImage, product.description, pdSelectedColorId, pdSelectedColorName, pdSelectedSizeId, pdSelectedSizeName, pdSelectedVariantId, pdSelectedVariantName);
         };
 
         document.getElementById("pd-fullscreen-share").onclick = () => sharePdProduct(product);
@@ -329,6 +336,10 @@ let pdSelectedSizeName = null;
 let pdVariants = [];
 let pdVariantStockEnabled = undefined;
 let pdColors = [];
+let pdStandaloneVariants = [];
+let pdSelectedVariantId = null;
+let pdSelectedVariantName = null;
+let pdSelectedVariantPrice = null;
 
 async function loadOptions(id, product) {
     const section = document.getElementById("pd-selector-section");
@@ -347,12 +358,40 @@ async function loadOptions(id, product) {
 
     renderSpecs(data.specs || [], data.sizes || []);
 
-    if (data.colors.length === 0 && data.sizes.length === 0) {
+    // Variants with no colour and no size are standalone choices in their own
+    // right (juice volumes, pack sizes). They carry their own price and stock,
+    // so they get their own selector rather than being derived from a grid.
+    pdStandaloneVariants = (data.variants || []).filter(
+        v => v.color_id === null && v.size_id === null && v.variant_name
+    );
+
+    if (data.colors.length === 0 && data.sizes.length === 0 && pdStandaloneVariants.length === 0) {
         section.classList.add("hidden");
         return;
     }
     section.classList.remove("hidden");
     section.innerHTML = "";
+
+    if (pdStandaloneVariants.length > 0) {
+        const vRow = document.createElement("div");
+        vRow.className = "pd-selector-row";
+        vRow.innerHTML = '<span class="pd-selector-label">Option</span><div id="pd-variant-buttons" class="pd-size-buttons"></div>';
+        section.appendChild(vRow);
+
+        const vContainer = vRow.querySelector("#pd-variant-buttons");
+        pdStandaloneVariants.forEach(v => {
+            const btn = document.createElement("button");
+            btn.className = "pd-size-btn";
+            btn.textContent = String(v.variant_name).replace(/\s+/g, " ").trim();
+            btn.dataset.variantId = v.id;
+            if (Number(v.stock) <= 0) {
+                btn.classList.add("disabled");
+                btn.disabled = true;
+            }
+            btn.onclick = () => selectVariant(v.id);
+            vContainer.appendChild(btn);
+        });
+    }
 
     if (data.colors.length > 0) {
         const colorRow = document.createElement("div");
@@ -407,6 +446,22 @@ function selectColor(colorId, imagePath, colorName) {
             behavior: "smooth"
         });
     }
+}
+
+function selectVariant(variantId) {
+    const v = pdStandaloneVariants.find(x => Number(x.id) === Number(variantId));
+    if (!v || Number(v.stock) <= 0) return;
+
+    pdSelectedVariantId = v.id;
+    pdSelectedVariantName = String(v.variant_name).replace(/\s+/g, " ").trim();
+    pdSelectedVariantPrice = Number(v.price);
+
+    document.querySelectorAll("#pd-variant-buttons .pd-size-btn").forEach(el => {
+        el.classList.toggle("selected", Number(el.dataset.variantId) === Number(variantId));
+    });
+
+    const priceEl = document.getElementById("pd-price");
+    if (priceEl) priceEl.textContent = "UGX " + pdSelectedVariantPrice.toLocaleString();
 }
 
 function selectSize(sizeId, sizeName) {

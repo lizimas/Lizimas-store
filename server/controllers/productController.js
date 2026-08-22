@@ -604,7 +604,7 @@ exports.getProductOptions = async (req, res) => {
         );
 
         const variants = await pool.query(
-            `SELECT id, color_id, size_id, price, stock FROM product_variants WHERE product_id = $1`,
+            `SELECT id, variant_name, color_id, size_id, price, stock FROM product_variants WHERE product_id = $1`,
             [id]
         );
 
