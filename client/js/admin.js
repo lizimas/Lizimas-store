@@ -3251,7 +3251,7 @@ async function savePhotoOrder() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ imageIds: imageIds })
         });
-        if (status) status.textContent = (res && res.success) ? "Order saved." : "Unexpected response.";
+        if (status) status.textContent = (res && res.success) ? "Order saved." : ("Failed: " + ((res && res.error) || "Unexpected response."));
     } catch (e) {
         if (status) status.textContent = "Failed: " + e.message;
     }
