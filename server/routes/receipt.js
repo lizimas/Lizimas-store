@@ -2,6 +2,7 @@ const express = require("express");
 const crypto = require("crypto");
 const router = express.Router();
 const pool = require("../config/database");
+const QRCode = require("qrcode");
 
 const SECRET = process.env.RECEIPT_SECRET || process.env.JWT_SECRET || "change-me";
 
@@ -31,7 +32,15 @@ router.get("/receipt/:orderId", async (req, res) => {
     const items = await pool.query(
       "SELECT * FROM order_items WHERE order_id = $1 ORDER BY id", [id]
     );
-    res.send(renderReceipt(o.rows[0], items.rows));
+    let qr = null;
+    try {
+      qr = await QRCode.toDataURL("https://lizimasstore.com", {
+        margin: 1, width: 220, color: { dark: "#0f1b3d", light: "#ffffff" }
+      });
+    } catch (qe) {
+      console.warn("QR generation failed:", qe.message);
+    }
+    res.send(renderReceipt(o.rows[0], items.rows, qr));
   } catch (e) {
     console.error("Receipt render failed:", e);
     res.status(500).send("Could not load receipt.");
@@ -43,14 +52,14 @@ module.exports.sign = sign;
 
 const STORE = {
   name: "LIZIMAS STORE",
-  tagline: "Quality You Love, Service You Trust.",
+  tagline: "Excellence in Every Order",
   address: "Central Region, Kampala, Uganda",
   phone: "+256 792 363 104",
   email: "support@lizimasstore.com",
   web: "www.lizimasstore.com"
 };
 
-function renderReceipt(o, items) {
+function renderReceipt(o, items, qr) {
   const created = new Date(o.paid_at || o.created_at);
   const date = created.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   const time = created.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
@@ -119,6 +128,16 @@ td{padding:9px;border-bottom:1px solid #eee;vertical-align:top}
 .card .mrow{font-weight:600}.card .big{font-size:1.05rem;font-weight:800;color:#0f1b3d}
 .foot{border-top:1px dashed #ccc;margin-top:26px;padding-top:16px;font-size:.78rem;color:#555}
 .foot b{color:#0f1b3d}
+.fgrid{display:flex;gap:22px;align-items:flex-start}.fgrid>div:first-child{flex:1}
+.badges{margin-top:9px;display:flex;gap:8px;flex-wrap:wrap}
+.badge{background:#fdf6e0;border:1px solid #f5c518;border-radius:20px;padding:4px 11px;font-size:.72rem;font-weight:600;color:#0f1b3d}
+.links{margin-top:9px}.links a{color:#0f1b3d;font-weight:600;text-decoration:none}
+.social{margin-top:6px}.social a{color:#0f1b3d;font-weight:600;text-decoration:none}
+.soon{color:#999}
+.qrbox{text-align:center;flex-shrink:0}.qrbox img{width:96px;height:96px;display:block}
+.qrbox div{font-size:.68rem;color:#666;margin-top:3px;line-height:1.3}
+.fcontact{margin-top:12px}
+@media(max-width:640px){.fgrid{flex-direction:column}.qrbox{align-self:center;margin-top:10px}}
 .printbtn{display:block;width:100%;margin:0 0 18px;padding:11px;background:#0f1b3d;color:#f5c518;border:none;border-radius:6px;font-size:.9rem;font-weight:700;cursor:pointer}
 @media print{body{background:#fff;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}.sheet{padding:0}.printbtn{display:none}}
 @media(max-width:640px){
@@ -152,7 +171,7 @@ h3{margin:16px 0 6px;font-size:.72rem}
 
 <div class="top">
   <div style="display:flex;gap:16px;flex-wrap:wrap">
-    <div class="logo"><b>LS</b><span>LIZIMAS STORE</span></div>
+    <img class="logo" src="https://res.cloudinary.com/ag407tk0/image/upload/whatsapp-gold.jpg" alt="Lizimas Store">
     <div class="brand">
       <h1>${STORE.name}</h1>
       <div class="tag">${STORE.tagline}</div><div class="line"></div>
@@ -206,8 +225,27 @@ h3{margin:16px 0 6px;font-size:.72rem}
 </div>
 
 <div class="foot">
-  <b>THANK YOU!</b> Thank you for shopping with Lizimas Store. We appreciate your business and look forward to serving you again.
-  <div style="margin-top:8px">${STORE.phone} &nbsp;&middot;&nbsp; ${STORE.email} &nbsp;&middot;&nbsp; ${STORE.web}</div>
+  <div class="fgrid">
+    <div>
+      <b>THANK YOU!</b> Thank you for shopping with Lizimas Store. We appreciate your business and look forward to serving you again.
+      <div class="badges">
+        <span class="badge">7-Day Return Policy</span>
+        <span class="badge">100% Quality Guaranteed</span>
+      </div>
+      <div class="links">
+        <a href="https://lizimasstore.com/returns.html">Returns Policy</a> &middot;
+        <a href="https://lizimasstore.com/faq.html">FAQ</a> &middot;
+        <a href="https://lizimasstore.com/privacy.html">Privacy Notice</a>
+      </div>
+      <div class="social">
+        Follow us: <a href="https://www.facebook.com/Lizimas.store">Facebook</a>
+        &middot; <span class="soon">Instagram (soon)</span>
+        &middot; <span class="soon">TikTok (soon)</span>
+      </div>
+    </div>
+    ${qr ? `<div class="qrbox"><img src="${qr}" alt="Scan to visit our store"><div>Scan to visit<br>our store</div></div>` : ""}
+  </div>
+  <div class="fcontact">${STORE.phone} &nbsp;&middot;&nbsp; ${STORE.email} &nbsp;&middot;&nbsp; ${STORE.web}</div>
 </div>
 
 </div></body></html>`;
