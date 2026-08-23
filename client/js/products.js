@@ -97,7 +97,7 @@ function buildProductCard(product) {
         if (event.target.closest(".add-to-cart-btn")) {
             return;
         }
-        window.location.href = `product-detail.html?id=${product.id}`;
+        window.location.href = `/product/${product.id}`;
     };
 
     const outOfStock = product.stock !== undefined && Number(product.stock) <= 0;
@@ -317,7 +317,7 @@ async function handleQuickAdd(productId, button) {
         console.error("Quick add failed:", error);
         // Falling back to the detail page is better than a silent failure -
         // the customer can still choose properly there.
-        window.location.href = `product-detail.html?id=${productId}`;
+        window.location.href = `/product/${productId}`;
     } finally {
         if (button) {
             button.disabled = false;
@@ -718,7 +718,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const openProductId = urlParams.get("openProduct");
     if (openProductId) {
         cameFromCart = true;
-        window.location.href = `product-detail.html?id=${openProductId}`;
+        window.location.href = `/product/${openProductId}`;
     }
 });
 

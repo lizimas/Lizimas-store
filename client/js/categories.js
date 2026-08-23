@@ -186,7 +186,7 @@ async function loadPromoSlots() {
         } else {
             const items = fallbackFor(slot).length ? fallbackFor(slot) : fallback;
             slides = items.map(p =>
-                `<a class="ls-promo-slide" href="product-detail.html?id=${p.id}">
+                `<a class="ls-promo-slide" href="/product/${p.id}">
                     <img src="${p.image}" alt="${(p.name || "").replace(/"/g, "&quot;")}" loading="lazy">
                  </a>`);
         }

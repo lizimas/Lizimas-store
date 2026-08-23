@@ -2,6 +2,18 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 
+function slugify(name) {
+  return String(name || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80)
+    .replace(/-+$/, "") || "product";
+}
+
 router.get('/sitemap.xml', async (req, res) => {
   try {
     const baseUrl = 'https://lizimasstore.com';
@@ -13,15 +25,14 @@ router.get('/sitemap.xml', async (req, res) => {
       { url: '/contact.html', priority: '0.5', changefreq: 'monthly' },
     ];
 
-    // Try full query first, fall back to just id if columns differ
-    let products = [];
-    try {
-      const result = await pool.query('SELECT id, updated_at FROM products');
-      products = result.rows;
-    } catch (e) {
-      const result = await pool.query('SELECT id FROM products');
-      products = result.rows;
-    }
+    const productResult = await pool.query(
+      `SELECT id, name, created_at
+         FROM products
+        WHERE status = 'approved'
+          AND deleted_at IS NULL
+        ORDER BY id`
+    );
+    const products = productResult.rows;
 
     let categories = [];
     try {
@@ -43,11 +54,11 @@ router.get('/sitemap.xml', async (req, res) => {
     }
 
     for (const p of products) {
-      const lastmod = p.updated_at
-        ? new Date(p.updated_at).toISOString().split('T')[0]
+      const lastmod = p.created_at
+        ? new Date(p.created_at).toISOString().split('T')[0]
         : '';
       xml += `  <url>\n`;
-      xml += `    <loc>${baseUrl}/product-detail.html?id=${p.id}</loc>\n`;
+      xml += `    <loc>${baseUrl}/product/${slugify(p.name)}-${p.id}</loc>\n`;
       if (lastmod) xml += `    <lastmod>${lastmod}</lastmod>\n`;
       xml += `    <changefreq>weekly</changefreq>\n`;
       xml += `    <priority>0.8</priority>\n`;

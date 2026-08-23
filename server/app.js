@@ -52,6 +52,7 @@ const routes = require("./routes");
 app.use("/api", routes);
 
 app.use("/", require("./routes/sitemap"));
+app.use("/", require("./routes/product-page"));
 
 // Static files
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));

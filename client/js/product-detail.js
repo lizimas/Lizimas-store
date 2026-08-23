@@ -201,10 +201,10 @@ async function renderBreadcrumbs(categoryId) {
         current = current.parent_id ? byId.get(current.parent_id) : null;
     }
 
-    const crumbs = [`<a href="index.html">Home</a>`].concat(
+    const crumbs = [`<a href="/index.html">Home</a>`].concat(
         trail.map((c, i) => {
             const last = i === trail.length - 1;
-            const href = `products.html?category=${encodeURIComponent(c.name)}`;
+            const href = `/products.html?category=${encodeURIComponent(c.name)}`;
             return last
                 ? `<span class="pd-crumb-current">${c.name}</span>`
                 : `<a href="${href}">${c.name}</a>`;

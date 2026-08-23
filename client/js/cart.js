@@ -205,7 +205,7 @@ function loadCart() {
                     ${isChecked ? "checked" : ""}
                     onchange="toggleItemSelection(${index}, this.checked)"
                 >
-                <a href="product-detail.html?id=${getBaseProductId(item.id)}" class="cart-row-image-link">
+                <a href="/product/${getBaseProductId(item.id)}" class="cart-row-image-link">
                     <img src="${imageSrc}" class="cart-row-image" alt="${baseName}">
                 </a>
                 <div class="cart-row-details">

@@ -3709,12 +3709,12 @@ const PROMO_LAYOUT_RULES = {
     image: {
         copy: false,
         imageHeading: "Image",
-        linkHint: "Link, e.g. product-detail.html?id=68"
+        linkHint: "Link, e.g. /product/68"
     },
     text: {
         copy: true,
         imageHeading: "Image (optional cutout)",
-        linkHint: "Link, e.g. product-detail.html?id=68"
+        linkHint: "Link, e.g. /product/68"
     },
     strip_text: {
         copy: true,
