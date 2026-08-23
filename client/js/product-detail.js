@@ -10,9 +10,14 @@ const PD_SPEC_LABELS = {
     occasion: "Occasion"
 };
 
+function pdResolveId() {
+    const m = window.location.pathname.match(/\/product\/(?:.*-)?(\d+)\/?$/);
+    if (m) return m[1];
+    return new URLSearchParams(window.location.search).get("id");
+}
+
 async function loadProductDetail() {
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get("id");
+    const id = pdResolveId();
 
     if (!id) {
         document.getElementById("pd-name").textContent = "Product not found";
@@ -559,7 +564,7 @@ function pdEscape(str) {
 }
 
 function pdCurrentId() {
-    return new URLSearchParams(window.location.search).get("id");
+    return pdResolveId();
 }
 
 function renderSpecs(specs, sizes) {
