@@ -295,15 +295,12 @@ exports.checkout = async (req, res) => {
         // Order confirmation notifications - best-effort, never block the response
         sendOrderStatusSms(phone, order, "pending").catch(err => console.error("SMS notify error:", err));
 
-        if (userId) {
-            pool.query("SELECT email FROM users WHERE id = $1", [userId])
-                .then(userResult => {
-                    if (userResult.rows.length > 0) {
-                        sendOrderStatusEmail(userResult.rows[0].email, order, "pending")
-                            .catch(err => console.error("Email notify error:", err));
-                    }
-                })
-                .catch(err => console.error("User email lookup error:", err));
+        // customer_email is captured at checkout for guests and members alike.
+        if (order.customer_email) {
+            sendOrderStatusEmail(order.customer_email, order, "pending")
+                .catch(err => console.error("Email notify error:", err));
+        } else {
+            console.warn(`Order ${order.id} placed with no email - no confirmation sent.`);
         }
 
         res.status(201).json({

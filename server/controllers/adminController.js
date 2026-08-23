@@ -167,7 +167,10 @@ exports.updateOrderStatus = async (req, res) => {
         // Status change notifications - best-effort, never block the response
         sendOrderStatusSms(updatedOrder.phone, updatedOrder, status).catch(err => console.error("SMS notify error:", err));
 
-        if (updatedOrder.user_id) {
+        if (updatedOrder.customer_email) {
+            sendOrderStatusEmail(updatedOrder.customer_email, updatedOrder, status)
+                .catch(err => console.error("Email notify error:", err));
+        } else if (updatedOrder.user_id) {
             pool.query("SELECT email FROM users WHERE id = $1", [updatedOrder.user_id])
                 .then(userResult => {
                     if (userResult.rows.length > 0) {
