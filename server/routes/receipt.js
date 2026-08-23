@@ -119,7 +119,8 @@ td{padding:9px;border-bottom:1px solid #eee;vertical-align:top}
 .card .mrow{font-weight:600}.card .big{font-size:1.05rem;font-weight:800;color:#0f1b3d}
 .foot{border-top:1px dashed #ccc;margin-top:26px;padding-top:16px;font-size:.78rem;color:#555}
 .foot b{color:#0f1b3d}
-@media print{body{background:#fff;padding:0}.sheet{padding:0}}
+.printbtn{display:block;width:100%;margin:0 0 18px;padding:11px;background:#0f1b3d;color:#f5c518;border:none;border-radius:6px;font-size:.9rem;font-weight:700;cursor:pointer}
+@media print{body{background:#fff;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}.sheet{padding:0}.printbtn{display:none}}
 @media(max-width:640px){
 body{padding:8px}.sheet{padding:16px}
 .top{flex-direction:column}.rbox{text-align:left;width:100%}
@@ -146,6 +147,8 @@ h3{margin:16px 0 6px;font-size:.72rem}
 .foot{font-size:.72rem;margin-top:18px}
 }
 </style></head><body><div class="sheet">
+
+<button class="printbtn" onclick="window.print()">Download / Print PDF</button>
 
 <div class="top">
   <div style="display:flex;gap:16px;flex-wrap:wrap">
