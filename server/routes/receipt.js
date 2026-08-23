@@ -120,6 +120,22 @@ td{padding:9px;border-bottom:1px solid #eee;vertical-align:top}
 .foot{border-top:1px dashed #ccc;margin-top:26px;padding-top:16px;font-size:.78rem;color:#555}
 .foot b{color:#0f1b3d}
 @media print{body{background:#fff;padding:0}.sheet{padding:0}}
+@media(max-width:640px){
+body{padding:8px}.sheet{padding:16px}
+.top{flex-direction:column}.rbox{text-align:left;width:100%}
+.brand h1{font-size:1.4rem}.logo{width:84px;height:84px}.logo b{font-size:1.4rem}.logo span{font-size:.45rem}
+table,tbody,tr,td{display:block;width:100%}
+table tr:first-child{display:none}
+tr{border:1px solid #eee;border-radius:6px;margin-bottom:10px;padding:10px;position:relative}
+td{border:none;padding:3px 0}
+.p-img{width:auto}.p-img img{width:64px;height:64px}
+.c,.r{text-align:left}
+.c:before{content:"Qty: ";color:#666}
+td:nth-child(4):before{content:"Unit: ";color:#666}
+td:nth-child(5):before{content:"Subtotal: ";color:#666;font-weight:600}
+td:nth-child(5){font-weight:700;color:#0f1b3d}
+.pay>div{min-width:0}
+}
 </style></head><body><div class="sheet">
 
 <div class="top">
