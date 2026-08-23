@@ -391,6 +391,10 @@ function loadProductIntoForm(product) {
     document.getElementById("product-price").value = product.price;
     document.getElementById("product-stock").value = product.stock;
     document.getElementById("product-package-size").value = product.package_size || "Small";
+    document.getElementById("product-warranty-months").value = product.warranty_months || "";
+    document.getElementById("product-brand").value = product.brand || "";
+    document.getElementById("product-gtin").value = product.gtin || "";
+    document.getElementById("product-mpn").value = product.mpn || "";
     document.getElementById("product-image-preview").innerHTML = "";
     document.getElementById("product-form-title").textContent = `Edit Product: ${product.name}`;
     document.getElementById("product-submit-btn").textContent = "Update Product";
@@ -404,6 +408,10 @@ function resetProductForm() {
     document.getElementById("product-price").value = "";
     document.getElementById("product-stock").value = "";
     document.getElementById("product-package-size").value = "Small";
+    document.getElementById("product-warranty-months").value = "";
+    document.getElementById("product-brand").value = "";
+    document.getElementById("product-gtin").value = "";
+    document.getElementById("product-mpn").value = "";
     document.getElementById("product-image").value = "";
     pdPickedFiles = [];
     document.getElementById("product-image-preview").innerHTML = "";
@@ -428,6 +436,10 @@ async function submitProductForm() {
     const price = document.getElementById("product-price").value;
     const stock = document.getElementById("product-stock").value;
     const packageSize = document.getElementById("product-package-size").value;
+    const warrantyMonths = document.getElementById("product-warranty-months").value.trim();
+    const brand = document.getElementById("product-brand").value.trim();
+    const gtin = document.getElementById("product-gtin").value.trim();
+    const mpn = document.getElementById("product-mpn").value.trim();
     const imageFiles = pdPickedFiles;
     const statusEl = document.getElementById("product-form-status");
     const submitBtn = document.getElementById("product-submit-btn");
@@ -455,6 +467,10 @@ async function submitProductForm() {
     formData.append("price", price);
     formData.append("stock", stock);
     formData.append("package_size", packageSize);
+    formData.append("warranty_months", warrantyMonths);
+    formData.append("brand", brand);
+    formData.append("gtin", gtin);
+    formData.append("mpn", mpn);
     for (const file of imageFiles) {
         formData.append("images", file);
     }
