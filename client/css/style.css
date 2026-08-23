@@ -1560,7 +1560,7 @@ width:90%;
 .checkout-logo-badge {
     width: 40px;
     height: 40px;
-    background: #F5C518;
+    overflow: hidden;
     border-radius: 10px;
     display: flex;
     align-items: center;
