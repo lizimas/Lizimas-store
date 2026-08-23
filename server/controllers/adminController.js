@@ -104,6 +104,18 @@ exports.getOrderItems = async (req, res) => {
     }
 };
 
+exports.getReceiptLink = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (!id) return res.status(400).json({ error: "Bad order id." });
+        const { sign } = require("../routes/receipt");
+        res.json({ url: `https://lizimasstore.com/receipt/${id}?t=${sign(id)}` });
+    } catch (error) {
+        console.error("Receipt link error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+};
+
 exports.getAllCustomers = async (req, res) => {
     try {
         const { search } = req.query;

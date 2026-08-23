@@ -1857,6 +1857,19 @@ async function viewOrderDetails(orderId) {
         : "UGX " + Number(order.delivery_fee || 0).toLocaleString();
     document.getElementById("order-detail-total").textContent = "UGX " + Number(order.total).toLocaleString();
 
+    const receiptLink = document.getElementById("order-detail-receipt");
+    if (receiptLink) {
+        receiptLink.classList.add("hidden");
+        authorizedFetch(`/api/admin/orders/${orderId}/receipt-link`)
+            .then(function (r) {
+                if (r && r.url) {
+                    receiptLink.href = r.url;
+                    receiptLink.classList.remove("hidden");
+                }
+            })
+            .catch(function (e) { console.warn("Receipt link unavailable:", e); });
+    }
+
     const itemsContainer = document.getElementById("order-detail-items");
     itemsContainer.innerHTML = "Loading...";
 

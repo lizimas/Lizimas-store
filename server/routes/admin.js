@@ -5,6 +5,7 @@ const {
     getDashboardStats,
     getAllOrdersAdmin,
     getOrderItems,
+    getReceiptLink,
     getAllCustomers,
     updateOrderStatus,
     getVisitorStats,
@@ -37,6 +38,7 @@ router.get("/stats", getDashboardStats);
 router.get("/visitor-stats", getVisitorStats);
 router.get("/orders", getAllOrdersAdmin);
 router.get("/orders/:id/items", getOrderItems);
+router.get("/orders/:id/receipt-link", getReceiptLink);
 router.get("/customers", getAllCustomers);
 router.delete("/customers/:id", deleteCustomer);
 
