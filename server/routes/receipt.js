@@ -135,6 +135,15 @@ td:nth-child(4):before{content:"Unit: ";color:#666}
 td:nth-child(5):before{content:"Subtotal: ";color:#666;font-weight:600}
 td:nth-child(5){font-weight:700;color:#0f1b3d}
 .pay>div{min-width:0}
+.cols{display:block}.cols>div{min-width:0}
+h3{margin:16px 0 6px;font-size:.72rem}
+.kv{font-size:.8rem;margin:3px 0}.kv b{min-width:66px}
+.brand p{font-size:.75rem;margin:1px 0}
+.brand .tag{font-size:.8rem;margin:2px 0 6px}
+.rtag{padding:5px 14px;font-size:.8rem;margin:10px 0 6px}
+.rbox{font-size:.75rem}.rbox div{margin:2px 0}
+.p-name{font-size:.85rem}
+.foot{font-size:.72rem;margin-top:18px}
 }
 </style></head><body><div class="sheet">
 
