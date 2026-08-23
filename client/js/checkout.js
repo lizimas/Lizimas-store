@@ -179,6 +179,8 @@ function placeOrder() {
     const firstName = document.getElementById("first-name").value.trim();
     const lastName = document.getElementById("last-name").value.trim();
     const name = `${firstName} ${lastName}`.trim();
+    const emailEl = document.getElementById("customer-email");
+    const email = emailEl ? emailEl.value.trim().toLowerCase() : "";
 
     const phoneDigits = document.getElementById("phone").value.trim();
     const altPhoneDigits = document.getElementById("alt-phone").value.trim();
@@ -195,6 +197,11 @@ function placeOrder() {
 
     if (!firstName || !lastName || !phoneDigits) {
         alert("Please complete your name and phone number.");
+        return;
+    }
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        alert("Please enter a valid email address so we can send your order confirmation.");
         return;
     }
 
@@ -256,6 +263,7 @@ function placeOrder() {
 
     pendingOrder = {
         customer_name: name,
+        customer_email: email,
         phone: phone,
         alt_phone: altPhone || null,
         delivery_address: deliveryAddress,

@@ -238,6 +238,17 @@ exports.checkout = async (req, res) => {
             console.warn(`Order priced without a location_id; trusting client fee ${safeDeliveryFee}`);
         }
 
+        const rawEmail = (req.body.customer_email || "").trim().toLowerCase();
+        let customerEmail = rawEmail || null;
+        if (!customerEmail && userId) {
+            const ur = await client.query("SELECT email FROM users WHERE id = $1", [userId]);
+            customerEmail = ur.rows[0] ? ur.rows[0].email : null;
+        }
+        if (customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
+            console.warn(`Rejected malformed customer_email on checkout: ${customerEmail}`);
+            customerEmail = null;
+        }
+
         const finalTotal = total + effectiveDeliveryFee;
 
         const orderResult = await client.query(
@@ -245,16 +256,16 @@ exports.checkout = async (req, res) => {
                 (user_id, customer_name, phone, alt_phone, total, payment_method, delivery_address, status, delivery_fee, delivery_method,
                  delivery_location_id, delivery_location_path, delivery_zone_id, delivery_zone_name,
                  delivery_village, delivery_street, delivery_building, delivery_landmark,
-                 delivery_recipient, delivery_phone, delivery_phone_alt)
+                 delivery_recipient, delivery_phone, delivery_phone_alt, customer_email)
              VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9,
                      $10, $11, $12, $13,
                      $14, $15, $16, $17,
-                     $18, $19, $20)
+                     $18, $19, $20, $21)
              RETURNING *`,
             [userId, customer_name, phone, alt_phone || null, finalTotal, payment_method, delivery_address, effectiveDeliveryFee, safeDeliveryMethod,
              resolvedLocationId, locationPath, zoneId, zoneName,
              deliveryVillage, deliveryStreet, deliveryBuilding, deliveryLandmark,
-             customer_name, phone, alt_phone || null]
+             customer_name, phone, alt_phone || null, customerEmail]
         );
 
         const order = orderResult.rows[0];
