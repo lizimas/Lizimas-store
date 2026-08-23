@@ -256,16 +256,16 @@ exports.checkout = async (req, res) => {
                 (user_id, customer_name, phone, alt_phone, total, payment_method, delivery_address, status, delivery_fee, delivery_method,
                  delivery_location_id, delivery_location_path, delivery_zone_id, delivery_zone_name,
                  delivery_village, delivery_street, delivery_building, delivery_landmark,
-                 delivery_recipient, delivery_phone, delivery_phone_alt, customer_email)
+                 delivery_recipient, delivery_phone, delivery_phone_alt, customer_email, subtotal)
              VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9,
                      $10, $11, $12, $13,
                      $14, $15, $16, $17,
-                     $18, $19, $20, $21)
+                     $18, $19, $20, $21, $22)
              RETURNING *`,
             [userId, customer_name, phone, alt_phone || null, finalTotal, payment_method, delivery_address, effectiveDeliveryFee, safeDeliveryMethod,
              resolvedLocationId, locationPath, zoneId, zoneName,
              deliveryVillage, deliveryStreet, deliveryBuilding, deliveryLandmark,
-             customer_name, phone, alt_phone || null, customerEmail]
+             customer_name, phone, alt_phone || null, customerEmail, total]
         );
 
         const order = orderResult.rows[0];

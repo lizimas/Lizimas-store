@@ -4811,3 +4811,52 @@ body.sheet-open {
 .pd-tab-panel.active {
     display: block;
 }
+
+/* Confirm modal item list */
+.modal-item-list {
+    max-height: 220px;
+    overflow-y: auto;
+    margin: 12px 0;
+    border-top: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+    -webkit-overflow-scrolling: touch;
+}
+.modal-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 2px;
+    border-bottom: 1px solid #f4f4f4;
+}
+.modal-item:last-child { border-bottom: none; }
+.modal-item-img {
+    width: 46px;
+    height: 46px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: #f4f4f4;
+    flex-shrink: 0;
+}
+.modal-item-info { flex: 1; min-width: 0; }
+.modal-item-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #0f1b3d;
+    line-height: 1.3;
+}
+.modal-item-variant {
+    font-size: 0.75rem;
+    color: #777;
+    margin-top: 2px;
+}
+.modal-item-qty {
+    font-size: 0.75rem;
+    color: #999;
+    margin-top: 2px;
+}
+.modal-item-price {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #0f1b3d;
+    white-space: nowrap;
+}

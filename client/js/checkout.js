@@ -285,12 +285,33 @@ function placeOrder() {
 
 function showConfirmModal() {
     const detailsEl = document.getElementById("confirm-order-details");
-    const itemCount = pendingOrder.items.reduce((sum, i) => sum + i.quantity, 0);
+    const esc = (s) => String(s == null ? "" : s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+    const confirmCart = JSON.parse(localStorage.getItem("cart")) || [];
+
+    const itemRows = confirmCart.map(function (it) {
+        const variant = [it.variantName, it.colorName, it.sizeName]
+            .filter(Boolean).join(" \u00b7 ");
+        const line = Number(it.price) * Number(it.quantity);
+        return `
+            <div class="modal-item">
+                <img class="modal-item-img" src="${esc(it.image)}" alt="" loading="lazy">
+                <div class="modal-item-info">
+                    <div class="modal-item-name">${esc(it.name)}</div>
+                    ${variant ? `<div class="modal-item-variant">${esc(variant)}</div>` : ""}
+                    <div class="modal-item-qty">Qty ${Number(it.quantity)}</div>
+                </div>
+                <div class="modal-item-price">UGX ${line.toLocaleString()}</div>
+            </div>`;
+    }).join("");
 
     detailsEl.innerHTML = `
         <div class="modal-detail-row"><span>Name</span><span>${pendingOrder.customer_name}</span></div>
         <div class="modal-detail-row"><span>Phone</span><span>${pendingOrder.phone}</span></div>
-        <div class="modal-detail-row"><span>Items</span><span>${itemCount}</span></div>
+        <div class="modal-detail-row"><span>Email</span><span>${esc(pendingOrder.customer_email)}</span></div>
+        <div class="modal-item-list">${itemRows}</div>
         <div class="modal-detail-row"><span>Delivery</span><span>${pendingOrder.delivery_method === "pickup" ? "Self pickup" : "UGX " + pendingOrder.delivery_fee.toLocaleString()}</span></div>
         <div class="modal-detail-row"><span>Payment Method</span><span>${pendingOrder.payment_method}</span></div>
         <div class="modal-detail-row modal-detail-total"><span>Total</span><span>UGX ${pendingOrder.total.toLocaleString()}</span></div>
