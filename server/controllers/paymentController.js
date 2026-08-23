@@ -1,4 +1,5 @@
 const pool = require("../config/database");
+const { assignReceiptNumber } = require("../utils/receiptNumber");
 
 const MOBILE_MONEY_NUMBER = "+256792363104";
 const PAYEE_NAME = "Lizimas Senteza";
@@ -130,6 +131,8 @@ exports.verifyPayment = async (req, res) => {
             "UPDATE orders SET status = 'paid' WHERE id = $1",
             [payment.order_id]
         );
+
+        await assignReceiptNumber(client, payment.order_id);
 
         await client.query("COMMIT");
 

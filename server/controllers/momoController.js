@@ -1,5 +1,6 @@
 const pool = require("../config/database");
 const { requestToPay, checkPaymentStatus } = require("../services/momoService");
+const { assignReceiptNumber } = require("../utils/receiptNumber");
 
 exports.initiateMomoPayment = async (req, res) => {
     try {
@@ -106,6 +107,8 @@ exports.getMomoPaymentStatus = async (req, res) => {
                     "UPDATE orders SET status = 'paid' WHERE id = $1",
                     [payment.order_id]
                 );
+
+                await assignReceiptNumber(pool, payment.order_id);
             }
         }
 
