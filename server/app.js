@@ -53,6 +53,7 @@ app.use("/api", routes);
 
 app.use("/", require("./routes/sitemap"));
 app.use("/", require("./routes/product-page"));
+app.use("/", require("./routes/feed"));
 
 // Static files
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));

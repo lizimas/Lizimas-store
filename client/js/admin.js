@@ -1105,6 +1105,9 @@ function editProduct(id) {
     document.getElementById("product-stock").value = product.stock;
     document.getElementById("product-package-size").value = product.package_size || "Small";
     document.getElementById("product-warranty-months").value = product.warranty_months || "";
+    document.getElementById("product-brand").value = product.brand || "";
+    document.getElementById("product-gtin").value = product.gtin || "";
+    document.getElementById("product-mpn").value = product.mpn || "";
     document.getElementById("variants-section").classList.remove("hidden");
     loadVariants(product.id);
     loadProductOptionsIntoForm(product.id);
@@ -1129,6 +1132,9 @@ async function saveProduct() {
     const stock = document.getElementById("product-stock").value;
     const packageSize = document.getElementById("product-package-size").value;
     const warrantyMonths = document.getElementById("product-warranty-months").value.trim();
+    const brand = document.getElementById("product-brand").value.trim();
+    const gtin = document.getElementById("product-gtin").value.trim();
+    const mpn = document.getElementById("product-mpn").value.trim();
     const files = pdPickedFiles;
 
     const errorEl = document.getElementById("product-form-error");
@@ -1152,6 +1158,9 @@ async function saveProduct() {
     formData.append("stock", stock);
     formData.append("package_size", packageSize);
     formData.append("warranty_months", warrantyMonths);
+    formData.append("brand", brand);
+    formData.append("gtin", gtin);
+    formData.append("mpn", mpn);
 
     for (let i = 0; i < files.length; i++) {
         formData.append("images", files[i]);

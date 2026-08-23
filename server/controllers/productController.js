@@ -30,7 +30,7 @@ exports.addProduct = async (req, res) => {
     try {
         const { name, category_id, description, price, stock, package_size,
                 material, color, sleeve, style, length, fit, pattern, care_instructions, occasion,
-                warranty_months } = req.body;
+                warranty_months, brand, gtin, mpn } = req.body;
 
         const packageSize = safePackageSize(package_size);
         const warrantyMonths = warranty_months ? Number(warranty_months) : null;
@@ -45,12 +45,14 @@ exports.addProduct = async (req, res) => {
 
         const product = await pool.query(
             `INSERT INTO products (name,category_id,description,price,stock,image,status,created_by,
-                material,color,sleeve,style,length,fit,pattern,care_instructions,occasion,package_size,warranty_months)
-             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
+                material,color,sleeve,style,length,fit,pattern,care_instructions,occasion,package_size,warranty_months,
+              brand,gtin,mpn)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING *`,
             [name, category_id, description, price, stock, mainImage, status, req.user.userId,
                 material || null, color || null, sleeve || null, style || null, length || null,
                 fit || null, pattern || null, care_instructions || null, occasion || null,
-                packageSize, warrantyMonths]
+                packageSize, warrantyMonths,
+                brand || null, gtin || null, mpn || null]
         );
 
         const newProduct = product.rows[0];
@@ -636,7 +638,7 @@ exports.updateProduct = async (req, res) => {
 
         const { name, category_id, description, price, stock, package_size,
                 material, color, sleeve, style, length, fit, pattern, care_instructions, occasion,
-                warranty_months } = req.body;
+                warranty_months, brand, gtin, mpn } = req.body;
 
         const packageSize = safePackageSize(package_size);
         const warrantyMonths = warranty_months ? Number(warranty_months) : null;
@@ -650,17 +652,19 @@ exports.updateProduct = async (req, res) => {
 
         let updateQuery = `UPDATE products SET name=$1, category_id=$2, description=$3, price=$4, stock=$5,
             material=$6, color=$7, sleeve=$8, style=$9, length=$10, fit=$11, pattern=$12, care_instructions=$13, occasion=$14,
-            package_size=$15, warranty_months=$16${statusClause}`;
+            package_size=$15, warranty_months=$16,
+            brand=$17, gtin=$18, mpn=$19${statusClause}`;
         let params = [name, category_id, description, price, stock,
             material || null, color || null, sleeve || null, style || null, length || null,
             fit || null, pattern || null, care_instructions || null, occasion || null,
-            packageSize, warrantyMonths];
+            packageSize, warrantyMonths,
+            brand || null, gtin || null, mpn || null];
 
         if (newImagePaths.length > 0) {
-            updateQuery += `, image=$17 WHERE id=$18 RETURNING *`;
+            updateQuery += `, image=$20 WHERE id=$21 RETURNING *`;
             params.push(newImagePaths[0], id);
         } else {
-            updateQuery += ` WHERE id=$17 RETURNING *`;
+            updateQuery += ` WHERE id=$20 RETURNING *`;
             params.push(id);
         }
 
