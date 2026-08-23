@@ -1,6 +1,7 @@
 const pool = require("../config/database");
 const { sendOrderStatusSms } = require("../utils/sms");
-const { sendOrderStatusEmail } = require("../utils/mailer");
+const { sendOrderStatusEmail, sendOrderConfirmationEmail } = require("../utils/mailer");
+const { sign: signReceipt } = require("../routes/receipt");
 const { priceOrder } = require("../utils/deliveryPricing");
 
 exports.checkout = async (req, res) => {
@@ -297,8 +298,15 @@ exports.checkout = async (req, res) => {
 
         // customer_email is captured at checkout for guests and members alike.
         if (order.customer_email) {
-            sendOrderStatusEmail(order.customer_email, order, "pending")
-                .catch(err => console.error("Email notify error:", err));
+            pool.query(
+                "SELECT product_name, quantity, price FROM order_items WHERE order_id = $1 ORDER BY id",
+                [order.id]
+            )
+                .then(function (r) {
+                    const receiptUrl = `https://lizimasstore.com/receipt/${order.id}?t=${signReceipt(order.id)}`;
+                    return sendOrderConfirmationEmail(order.customer_email, order, r.rows, receiptUrl);
+                })
+                .catch(err => console.error("Confirmation email error:", err));
         } else {
             console.warn(`Order ${order.id} placed with no email - no confirmation sent.`);
         }

@@ -8,6 +8,89 @@ const transporter = nodemailer.createTransport({
     }
 });
 
+const BRAND = {
+    name: "Lizimas Store",
+    tagline: "Excellence in Every Order",
+    logo: "https://res.cloudinary.com/ag407tk0/image/upload/whatsapp-gold.jpg",
+    site: "https://lizimasstore.com",
+    phone: "+256 792 363 104",
+    email: "support@lizimasstore.com",
+    facebook: "https://www.facebook.com/Lizimas.store",
+    navy: "#0f1b3d",
+    gold: "#f5c518"
+};
+
+function ugxFmt(n) {
+    return "UGX " + Math.round(Number(n) || 0).toLocaleString("en-UG");
+}
+
+function escHtml(v) {
+    return String(v == null ? "" : v)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/**
+ * Shared wrapper for every customer-facing email. Individual senders supply
+ * only their own content; the header, CTA and footer live here so the brand
+ * stays consistent and only needs changing in one place.
+ *
+ * Table-based layout on purpose - Gmail, Outlook and most mobile clients
+ * strip or ignore flexbox and grid.
+ */
+function renderCustomerEmail(opts) {
+    const title = opts.title || "";
+    const body = opts.bodyHtml || "";
+    const cta = opts.ctaUrl && opts.ctaText
+        ? `<tr><td style="padding:6px 0 20px"><a href="${opts.ctaUrl}" style="display:inline-block;background:${BRAND.navy};color:${BRAND.gold};padding:12px 26px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px">${escHtml(opts.ctaText)}</a></td></tr>`
+        : "";
+
+    return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f5f7">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:18px 10px">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+
+  <tr><td style="background:${BRAND.gold};padding:20px;text-align:center">
+    <img src="${BRAND.logo}" alt="${BRAND.name}" width="76" style="width:76px;height:76px;border-radius:6px;display:inline-block">
+    <div style="margin-top:8px;font-size:19px;font-weight:800;color:${BRAND.navy};letter-spacing:.5px">LIZIMAS STORE</div>
+    <div style="font-size:12px;color:${BRAND.navy};opacity:.75">${BRAND.tagline}</div>
+  </td></tr>
+
+  <tr><td style="padding:26px 24px 4px">
+    ${title ? `<h2 style="margin:0 0 16px;color:${BRAND.navy};font-size:21px">${title}</h2>` : ""}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+           style="font-size:15px;line-height:1.6;color:#333">
+      <tr><td>${body}</td></tr>
+      ${cta}
+    </table>
+  </td></tr>
+
+  <tr><td style="padding:16px 24px 22px;border-top:1px dashed #ddd;font-size:12.5px;color:#666;line-height:1.7">
+    <strong style="color:${BRAND.navy}">${BRAND.name}</strong> &nbsp;&middot;&nbsp; ${BRAND.tagline}<br>
+    <a href="${BRAND.site}/faq.html" style="color:${BRAND.navy};text-decoration:none;font-weight:600">FAQ</a> &middot;
+    <a href="${BRAND.site}/returns.html" style="color:${BRAND.navy};text-decoration:none;font-weight:600">Returns</a> &middot;
+    <a href="${BRAND.site}/privacy.html" style="color:${BRAND.navy};text-decoration:none;font-weight:600">Privacy</a> &middot;
+    <a href="${BRAND.facebook}" style="color:${BRAND.navy};text-decoration:none;font-weight:600">Facebook</a><br>
+    ${BRAND.phone} &nbsp;&middot;&nbsp; ${BRAND.email} &nbsp;&middot;&nbsp; www.lizimasstore.com
+  </td></tr>
+
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
+function renderCustomerText(lines) {
+    return lines.concat([
+        "",
+        "--",
+        BRAND.name + " - " + BRAND.tagline,
+        BRAND.phone + " | " + BRAND.email,
+        BRAND.site
+    ]).join("\n");
+}
+
 async function sendAdminLoginAlert(details) {
     await transporter.sendMail({
         from: process.env.EMAIL_USER,
@@ -47,6 +130,73 @@ async function sendOrderStatusEmail(email, order, status) {
     } catch (error) {
         console.error("Order status email error:", error);
         // Don't throw - a failed email should never block an order or status update
+    }
+}
+
+/**
+ * Sent once, when an order is placed. Status changes use sendOrderStatusEmail.
+ * Never throws - a mail failure must not affect an order that already exists.
+ */
+async function sendOrderConfirmationEmail(email, order, items, receiptUrl) {
+    if (!email) return;
+
+    const rows = (items || []).map(function (i) {
+        return `<tr>
+          <td style="padding:9px 0;border-bottom:1px solid #eee">
+            <div style="font-weight:600;color:${BRAND.navy}">${escHtml(i.product_name)}</div>
+            <div style="font-size:12px;color:#888">Qty ${Number(i.quantity)}</div>
+          </td>
+          <td style="padding:9px 0;border-bottom:1px solid #eee;text-align:right;white-space:nowrap;color:${BRAND.navy};font-weight:600">
+            ${ugxFmt(Number(i.price) * Number(i.quantity))}
+          </td>
+        </tr>`;
+    }).join("");
+
+    const body = `
+<p style="margin:0 0 12px">Hi ${escHtml(order.customer_name)},</p>
+<p style="margin:0 0 12px">Thank you for shopping with Lizimas Store.</p>
+<p style="margin:0 0 12px">We're pleased to confirm that we've received your order successfully. Your order is now being reviewed and processed by our team.</p>
+
+<h3 style="color:${BRAND.navy};font-size:13px;letter-spacing:.6px;border-bottom:2px solid ${BRAND.gold};padding-bottom:4px;display:inline-block;margin:18px 0 10px">ORDER DETAILS</h3>
+<p style="margin:3px 0"><strong>Order Number:</strong> #${order.id}</p>
+<p style="margin:3px 0"><strong>Order Total:</strong> ${ugxFmt(order.total)}</p>
+
+${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:14px 0 4px;font-size:14px">${rows}</table>` : ""}
+
+<p style="margin:16px 0 12px">We'll keep you updated as your order moves through the next stage. Once your order has been approved and prepared, you'll receive another notification with the relevant delivery or collection information.</p>
+<p style="margin:0 0 12px">If you have any questions regarding your order, please contact our support team and have your order number <strong>#${order.id}</strong> ready.</p>
+<p style="margin:0 0 4px">Thank you for choosing Lizimas Store. We truly appreciate your business and look forward to serving you again.</p>`;
+
+    const html = renderCustomerEmail({
+        title: "Order Confirmed &#127881;",
+        bodyHtml: body,
+        ctaText: receiptUrl ? "View Your Receipt" : null,
+        ctaUrl: receiptUrl || null
+    });
+
+    const text = renderCustomerText([
+        "Order Confirmed", "",
+        `Hi ${order.customer_name},`, "",
+        "Thank you for shopping with Lizimas Store.",
+        "We've received your order successfully and it is being reviewed.", "",
+        `Order Number: #${order.id}`,
+        `Order Total: ${ugxFmt(order.total)}`,
+        receiptUrl ? `` : null,
+        receiptUrl ? `View your receipt: ${receiptUrl}` : null,
+        "",
+        "We'll notify you as your order progresses."
+    ].filter(function (l) { return l !== null; }));
+
+    try {
+        await transporter.sendMail({
+            from: `"Lizimas Store" <${process.env.EMAIL_USER}>`,
+            to: email,
+            subject: `Order #${order.id} Confirmed - Lizimas Store`,
+            text: text,
+            html: html
+        });
+    } catch (error) {
+        console.error("Order confirmation email error:", error);
     }
 }
 
@@ -258,4 +408,4 @@ async function sendAccountReportAlert(details) {
     }
 }
 
-module.exports = { sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert };
+module.exports = { sendOrderConfirmationEmail, sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert };
