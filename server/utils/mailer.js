@@ -189,7 +189,7 @@ ${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0
 
     try {
         await transporter.sendMail({
-            from: `"Lizimas Store" <${process.env.EMAIL_USER}>`,
+            from: `"Lizimas Store" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
             to: email,
             subject: `Order #${order.id} Confirmed - Lizimas Store`,
             text: text,
