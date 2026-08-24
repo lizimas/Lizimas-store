@@ -173,6 +173,7 @@ document.addEventListener("click", (e) => {
 });
 
 let selectedMapArea = null;
+let selectedMapLocality = null;
 let pendingOrder = null;
 let momoPollInterval = null;
 
@@ -528,6 +529,8 @@ async function reverseGeocodeAndPreview(lat, lng) {
         selectedMapAddressText = (data && data.display_name) || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
         previewEl.textContent = selectedMapAddressText;
         selectedMapArea = (data && data.location) || null;
+        const ad = (data && data.address) || {};
+        selectedMapLocality = ad.suburb || ad.neighbourhood || ad.village || ad.hamlet || null;
 
         if (areaNote) {
             if (selectedMapArea) {
@@ -562,6 +565,20 @@ function confirmMapLocation() {
     // The area was already resolved during the geocode, so this is instant.
     if (selectedMapArea && selectedMapArea.id && locationPicker) {
         locationPicker.setLocation(selectedMapArea.id);
+
+        // A district-level match still asks for a free-text area. The pin
+        // already told us the locality, so fill it rather than making the
+        // customer retype what the map found. Deferred because the field is
+        // only revealed once the picker has painted the new anchor.
+        if (selectedMapLocality) {
+            setTimeout(function () {
+                const areaInput = document.getElementById("lz-lp-area-text");
+                if (areaInput && !areaInput.value.trim()) {
+                    areaInput.value = selectedMapLocality;
+                    areaInput.dispatchEvent(new Event("input", { bubbles: true }));
+                }
+            }, 600);
+        }
     }
 
     document.getElementById("map-picker-container").style.display = "none";
