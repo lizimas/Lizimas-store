@@ -335,7 +335,12 @@
                 var L = res.location;
 
                 state.region   = L.region_id ? { id: L.region_id, name: L.region_name } : null;
-                state.district = L.district_id ? { id: L.district_id, name: L.district_name } : null;
+                // A district row has no parent district, so district_id is null on it.
+                // Anchor on the row itself, or the picker ends up with no
+                // location id and delivery pricing silently skips.
+                state.district = L.level === 2
+                    ? { id: L.id, name: L.name }
+                    : (L.district_id ? { id: L.district_id, name: L.district_name } : null);
 
                 if (L.level === 4) {
                     state.division = { id: L.id, name: L.name };
