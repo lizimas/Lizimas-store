@@ -90,7 +90,23 @@ exports.getProducts = async (req, res) => {
 
         if (q) {
             params.push(`%${q}%`);
-            filter = ` AND (products.name ILIKE $1 OR categories.name ILIKE $1)`;
+            filter = ` AND (products.name ILIKE $${params.length} OR categories.name ILIKE $${params.length})`;
+        }
+
+        // Navigation links point at parent categories while every product is
+        // filed on a leaf, so a parent has to match its entire subtree.
+        const categoryName = (req.query.category || "").trim();
+        if (categoryName) {
+            params.push(categoryName);
+            filter += ` AND products.category_id IN (
+                WITH RECURSIVE subtree AS (
+                    SELECT id FROM categories WHERE name = $${params.length}
+                    UNION ALL
+                    SELECT c.id FROM categories c
+                      JOIN subtree s ON c.parent_id = s.id
+                )
+                SELECT id FROM subtree
+            )`;
         }
 
         const products = await pool.query(

@@ -18,11 +18,11 @@ async function loadProducts() {
             // silently fell through to the whole catalogue.
             const names = await categoryWithDescendants(requestedCategory);
             const scoped = allProducts.filter(p => names.has(categoryNameOf(p)));
-            if (scoped.length) {
-                displayProducts(scoped);
-                renderCategoryHeading(requestedCategory, scoped.length);
-                return;
-            }
+            // Always honour the request, even when empty. Falling through to
+            // the full catalogue showed TVs under Cooking & Dining.
+            displayProducts(scoped);
+            renderCategoryHeading(requestedCategory, scoped.length);
+            return;
         }
 
         // Arriving from the header search: seed the existing input and let
