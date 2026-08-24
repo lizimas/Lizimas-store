@@ -172,7 +172,7 @@ document.addEventListener("click", (e) => {
     }
 });
 
-let selectedMapAddressParts = null;
+let selectedMapArea = null;
 let pendingOrder = null;
 let momoPollInterval = null;
 
@@ -508,22 +508,44 @@ function useLiveLocation() {
 
 async function reverseGeocodeAndPreview(lat, lng) {
     const previewEl = document.getElementById("map-address-preview");
+    const areaNote = document.getElementById("map-area-note");
+
     previewEl.textContent = "Looking up address...";
+    if (areaNote) { areaNote.textContent = ""; }
+    selectedMapArea = null;
 
     try {
-        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
-        const response = await fetch(url, {
-            headers: { "User-Agent": "LizimasStore/1.0 (checkout address lookup)" }
+        // Goes through our own server rather than Nominatim directly: lookups
+        // average ~5s and are rate limited, so results are cached by coordinate
+        // and the delivery area is resolved in the same round trip.
+        const response = await fetch("/api/delivery/geocode-pin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lat: lat, lng: lng })
         });
         const data = await response.json();
 
         selectedMapAddressText = (data && data.display_name) || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
         previewEl.textContent = selectedMapAddressText;
-        selectedMapAddressParts = (data && data.address) || null;
+        selectedMapArea = (data && data.location) || null;
+
+        if (areaNote) {
+            if (selectedMapArea) {
+                areaNote.textContent = "Delivery area: " + selectedMapArea.name;
+                areaNote.style.color = "#1a8f3c";
+            } else {
+                areaNote.textContent = "We could not match this pin to a delivery area - please choose it below.";
+                areaNote.style.color = "#c0392b";
+            }
+        }
     } catch (error) {
         console.error("Reverse geocoding failed:", error);
         selectedMapAddressText = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
         previewEl.textContent = "Could not look up address name, but location was captured.";
+        if (areaNote) {
+            areaNote.textContent = "Address service unavailable - please choose your area below.";
+            areaNote.style.color = "#c0392b";
+        }
     }
 }
 
@@ -537,40 +559,9 @@ function confirmMapLocation() {
     document.getElementById("street").value = parts[0] || selectedMapAddressText;
     document.getElementById("landmark").value = parts.slice(1, 3).join(", ") || "";
 
-    // Try to resolve the pin to a priced delivery area. A miss is fine -
-    // the customer picks manually, exactly as before.
-    const areaNote = document.getElementById("map-area-note");
-    if (areaNote) {
-        areaNote.textContent = "Matching your delivery area...";
-        areaNote.style.color = "#777";
-    }
-
-    if (selectedMapAddressParts && locationPicker) {
-        fetch("/api/delivery/match-location", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(selectedMapAddressParts)
-        })
-            .then(r => r.json())
-            .then(function (res) {
-                if (res && res.location && res.location.id) {
-                    locationPicker.setLocation(res.location.id);
-                    if (areaNote) {
-                        areaNote.textContent = "Delivery area set to " + res.location.name + ".";
-                        areaNote.style.color = "#1a8f3c";
-                    }
-                } else if (areaNote) {
-                    areaNote.textContent = "We could not match this pin automatically - please choose your area below.";
-                    areaNote.style.color = "#c0392b";
-                }
-            })
-            .catch(function (err) {
-                console.warn("Could not match map location to a delivery area:", err);
-                if (areaNote) {
-                    areaNote.textContent = "Could not reach the address service - please choose your area below.";
-                    areaNote.style.color = "#c0392b";
-                }
-            });
+    // The area was already resolved during the geocode, so this is instant.
+    if (selectedMapArea && selectedMapArea.id && locationPicker) {
+        locationPicker.setLocation(selectedMapArea.id);
     }
 
     document.getElementById("map-picker-container").style.display = "none";

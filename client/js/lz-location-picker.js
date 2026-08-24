@@ -103,6 +103,7 @@
 
               '<div class="lz-lp__field" data-role="search">' +
                 '<label class="lz-lp__label" for="lz-lp-search">Delivery area <span class="req">*</span></label>' +
+                '<div id="map-area-note" style="font-size:.8rem;margin:2px 0 6px;min-height:1em"></div>' +
                 '<input class="lz-lp__control" id="lz-lp-search" type="text" autocomplete="off" ' +
                   'placeholder="Type your area, e.g. Ntinda">' +
                 '<div class="lz-lp__menu" data-menu="search"></div>' +
