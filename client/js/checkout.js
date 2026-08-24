@@ -540,7 +540,7 @@ function confirmMapLocation() {
     // Try to resolve the pin to a priced delivery area. A miss is fine -
     // the customer picks manually, exactly as before.
     if (selectedMapAddressParts && locationPicker) {
-        fetch(`${API_URL}/api/delivery/match-location`, {
+        fetch("/api/delivery/match-location", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(selectedMapAddressParts)
