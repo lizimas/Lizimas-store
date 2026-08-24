@@ -13,8 +13,16 @@ async function loadProducts() {
         // Applied before the first render so the filtered view is what paints.
         const requestedCategory = new URLSearchParams(window.location.search).get("category");
         if (requestedCategory) {
-            const match = allProducts.find(p => categoryNameOf(p) === requestedCategory);
-            if (match) activeCategory = requestedCategory;
+            // Tiles link to parent categories, but every product is filed under
+            // a leaf. Matching on the name alone therefore found nothing and
+            // silently fell through to the whole catalogue.
+            const names = await categoryWithDescendants(requestedCategory);
+            const scoped = allProducts.filter(p => names.has(categoryNameOf(p)));
+            if (scoped.length) {
+                displayProducts(scoped);
+                renderCategoryHeading(requestedCategory, scoped.length);
+                return;
+            }
         }
 
         // Arriving from the header search: seed the existing input and let
@@ -1324,4 +1332,46 @@ async function renderProductReviews(productId) {
             msg.textContent = "Network error.";
         }
     };
+}
+
+
+/**
+ * Every name in the subtree rooted at `name`, itself included.
+ *
+ * Products are filed on leaf categories while navigation links point at
+ * parents, so a parent view has to match anything beneath it.
+ */
+async function categoryWithDescendants(name) {
+    const out = new Set([name]);
+    try {
+        const response = await fetch("/api/categories");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const categories = await response.json();
+
+        const root = categories.find(c => c.name === name);
+        if (!root) return out;
+
+        const childrenOf = new Map();
+        for (const c of categories) {
+            if (!childrenOf.has(c.parent_id)) childrenOf.set(c.parent_id, []);
+            childrenOf.get(c.parent_id).push(c);
+        }
+
+        const stack = [root];
+        while (stack.length) {
+            const node = stack.pop();
+            out.add(node.name);
+            for (const child of (childrenOf.get(node.id) || [])) stack.push(child);
+        }
+    } catch (error) {
+        console.error("Category tree load failed:", error);
+    }
+    return out;
+}
+
+function renderCategoryHeading(name, count) {
+    const row = document.getElementById("category-chips");
+    if (!row) return;
+    row.innerHTML = `<h2 class="category-section-title">${name}</h2>
+        <span class="category-section-count">${count} item${count === 1 ? "" : "s"}</span>`;
 }
