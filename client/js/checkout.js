@@ -539,6 +539,12 @@ function confirmMapLocation() {
 
     // Try to resolve the pin to a priced delivery area. A miss is fine -
     // the customer picks manually, exactly as before.
+    const areaNote = document.getElementById("map-area-note");
+    if (areaNote) {
+        areaNote.textContent = "Matching your delivery area...";
+        areaNote.style.color = "#777";
+    }
+
     if (selectedMapAddressParts && locationPicker) {
         fetch("/api/delivery/match-location", {
             method: "POST",
@@ -549,9 +555,22 @@ function confirmMapLocation() {
             .then(function (res) {
                 if (res && res.location && res.location.id) {
                     locationPicker.setLocation(res.location.id);
+                    if (areaNote) {
+                        areaNote.textContent = "Delivery area set to " + res.location.name + ".";
+                        areaNote.style.color = "#1a8f3c";
+                    }
+                } else if (areaNote) {
+                    areaNote.textContent = "We could not match this pin automatically - please choose your area below.";
+                    areaNote.style.color = "#c0392b";
                 }
             })
-            .catch(err => console.warn("Could not match map location to a delivery area:", err));
+            .catch(function (err) {
+                console.warn("Could not match map location to a delivery area:", err);
+                if (areaNote) {
+                    areaNote.textContent = "Could not reach the address service - please choose your area below.";
+                    areaNote.style.color = "#c0392b";
+                }
+            });
     }
 
     document.getElementById("map-picker-container").style.display = "none";

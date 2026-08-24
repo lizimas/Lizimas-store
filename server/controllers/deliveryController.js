@@ -118,65 +118,132 @@ exports.getDistricts = async (req, res) => {
  * Returns null rather than guessing when nothing matches cleanly - a wrong
  * area means a wrong delivery fee, which is worse than an empty field.
  */
+const AREA_SUFFIX = "(county|division|municipality|sub ?county|subcounty|parish|ward|town council|city)";
+
+function normPlace(v) {
+    return String(v || "")
+        .toLowerCase()
+        .replace(new RegExp("\\s+" + AREA_SUFFIX + "$", "i"), "")
+        .replace(/[^a-z0-9 ]/g, "")
+        .trim();
+}
+
+async function findPlace(needle, levels, underPath) {
+    if (!needle || needle.length < 3) return null;
+    const params = [needle, levels];
+    let sql = `SELECT id, name, level, label, path
+                 FROM locations
+                WHERE is_active = TRUE
+                  AND level = ANY($2::int[])
+                  AND regexp_replace(name_norm, '\\s+${AREA_SUFFIX}$', '') = $1`;
+    if (underPath) {
+        params.push(underPath + "%");
+        sql += ` AND path LIKE $3`;
+    }
+    sql += ` ORDER BY array_position($2::int[], level) LIMIT 1`;
+    const { rows } = await pool.query(sql, params);
+    return rows[0] || null;
+}
+
+/**
+ * Resolves an OSM address object to a row in `locations`.
+ *
+ * Anchors on district first: Uganda reuses place names heavily - there are six
+ * Luziras - so an unanchored match can land hundreds of kilometres away.
+ * Returns null rather than guessing; a wrong area means a wrong delivery fee.
+ */
+async function resolveArea(a) {
+    if (!a) return null;
+
+    const district =
+        (await findPlace(normPlace(a.city), [2])) ||
+        (await findPlace(normPlace(a.state), [2])) ||
+        (await findPlace(normPlace(a.county), [2]));
+
+    const scope = district ? district.path + district.id + "/" : null;
+
+    const finer = [
+        { v: a.suburb,        levels: [5, 4] },
+        { v: a.neighbourhood, levels: [5, 4] },
+        { v: a.village,       levels: [5, 4] },
+        { v: a.hamlet,        levels: [5, 4] },
+        { v: a.city_district, levels: [4, 3] },
+        { v: a.county,        levels: [4, 3] }
+    ];
+
+    for (const f of finer) {
+        const hit = await findPlace(normPlace(f.v), f.levels, scope);
+        if (hit) return hit;
+    }
+
+    return district || null;
+}
+
 exports.matchLocation = async (req, res) => {
     try {
-        const SUFFIX = "(county|division|municipality|sub ?county|subcounty|parish|ward|town council|city)";
-
-        const norm = (v) => String(v || "")
-            .toLowerCase()
-            .replace(new RegExp("\\s+" + SUFFIX + "$", "i"), "")
-            .replace(/[^a-z0-9 ]/g, "")
-            .trim();
-
-        const findOne = async (needle, levels, underPath) => {
-            if (!needle || needle.length < 3) return null;
-            const params = [needle, levels];
-            let sql = `SELECT id, name, level, label, path
-                         FROM locations
-                        WHERE is_active = TRUE
-                          AND level = ANY($2::int[])
-                          AND regexp_replace(name_norm, '\\s+${SUFFIX}$', '') = $1`;
-            if (underPath) {
-                params.push(underPath + "%");
-                sql += ` AND path LIKE $3`;
-            }
-            sql += ` ORDER BY array_position($2::int[], level) LIMIT 1`;
-            const { rows } = await pool.query(sql, params);
-            return rows[0] || null;
-        };
-
-        // Anchor on the district first. Uganda reuses place names heavily -
-        // there are six Luziras - so an unanchored match can land 400km away.
-        const district =
-            (await findOne(norm(req.body.city), [2])) ||
-            (await findOne(norm(req.body.state), [2])) ||
-            (await findOne(norm(req.body.county), [2]));
-
-        const scope = district ? district.path + district.id + "/" : null;
-
-        const finer = [
-            { v: req.body.suburb,        levels: [5, 4] },
-            { v: req.body.neighbourhood, levels: [5, 4] },
-            { v: req.body.village,       levels: [5, 4] },
-            { v: req.body.hamlet,        levels: [5, 4] },
-            { v: req.body.city_district, levels: [4, 3] },
-            { v: req.body.county,        levels: [4, 3] }
-        ];
-
-        for (const f of finer) {
-            const hit = await findOne(norm(f.v), f.levels, scope);
-            if (hit) {
-                return res.json({ location: hit, matched_on: f.v, district: district ? district.name : null });
-            }
-        }
-
-        if (district) {
-            return res.json({ location: district, matched_on: district.name, district: district.name });
-        }
-
-        res.json({ location: null });
+        const location = await resolveArea(req.body);
+        res.json({ location: location });
     } catch (error) {
         console.error("Location match error:", error);
         res.status(500).json({ error: "Could not match location." });
+    }
+};
+
+exports.geocodePin = async (req, res) => {
+    const lat = Number(req.body.lat);
+    const lng = Number(req.body.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return res.status(400).json({ error: "Bad coordinates." });
+    }
+
+    const latKey = lat.toFixed(4);
+    const lngKey = lng.toFixed(4);
+
+    try {
+        let displayName = null;
+        let address = null;
+
+        const cached = await pool.query(
+            "SELECT display_name, address FROM geocode_cache WHERE lat_key = $1 AND lng_key = $2",
+            [latKey, lngKey]
+        );
+
+        if (cached.rows.length) {
+            displayName = cached.rows[0].display_name;
+            address = cached.rows[0].address;
+        } else {
+            const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
+            try {
+                const r = await fetch(url, {
+                    signal: controller.signal,
+                    headers: { "User-Agent": "LizimasStore/1.0 (https://lizimasstore.com)" }
+                });
+                const data = await r.json();
+                displayName = data && data.display_name ? data.display_name : null;
+                address = data && data.address ? data.address : null;
+                if (displayName || address) {
+                    await pool.query(
+                        `INSERT INTO geocode_cache (lat_key, lng_key, display_name, address)
+                         VALUES ($1, $2, $3, $4)
+                         ON CONFLICT (lat_key, lng_key) DO NOTHING`,
+                        [latKey, lngKey, displayName, address]
+                    );
+                }
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
+
+        let location = null;
+        if (address) {
+            location = await resolveArea(address);
+        }
+
+        res.json({ display_name: displayName, address: address, location: location });
+    } catch (error) {
+        console.error("Geocode pin error:", error);
+        res.status(502).json({ error: "Address lookup unavailable." });
     }
 };
