@@ -16,10 +16,16 @@ async function loadProducts() {
             // Tiles link to parent categories, but every product is filed under
             // a leaf. Matching on the name alone therefore found nothing and
             // silently fell through to the whole catalogue.
-            const names = await categoryWithDescendants(requestedCategory);
-            const scoped = allProducts.filter(p => names.has(categoryNameOf(p)));
-            // Always honour the request, even when empty. Falling through to
-            // the full catalogue showed TVs under Cooking & Dining.
+            // The server resolves the whole subtree, so a parent tile returns
+            // everything filed beneath it. An empty category returns an empty
+            // list rather than falling through to the full catalogue.
+            let scoped = [];
+            try {
+                const r = await fetch(`${API_URL}/api/products?category=${encodeURIComponent(requestedCategory)}`);
+                if (r.ok) scoped = await r.json();
+            } catch (error) {
+                console.error("Category load failed:", error);
+            }
             displayProducts(scoped);
             renderCategoryHeading(requestedCategory, scoped.length);
             return;
@@ -1334,40 +1340,6 @@ async function renderProductReviews(productId) {
     };
 }
 
-
-/**
- * Every name in the subtree rooted at `name`, itself included.
- *
- * Products are filed on leaf categories while navigation links point at
- * parents, so a parent view has to match anything beneath it.
- */
-async function categoryWithDescendants(name) {
-    const out = new Set([name]);
-    try {
-        const response = await fetch("/api/categories");
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const categories = await response.json();
-
-        const root = categories.find(c => c.name === name);
-        if (!root) return out;
-
-        const childrenOf = new Map();
-        for (const c of categories) {
-            if (!childrenOf.has(c.parent_id)) childrenOf.set(c.parent_id, []);
-            childrenOf.get(c.parent_id).push(c);
-        }
-
-        const stack = [root];
-        while (stack.length) {
-            const node = stack.pop();
-            out.add(node.name);
-            for (const child of (childrenOf.get(node.id) || [])) stack.push(child);
-        }
-    } catch (error) {
-        console.error("Category tree load failed:", error);
-    }
-    return out;
-}
 
 function renderCategoryHeading(name, count) {
     const row = document.getElementById("category-chips");
