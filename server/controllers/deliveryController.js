@@ -120,42 +120,58 @@ exports.getDistricts = async (req, res) => {
  */
 exports.matchLocation = async (req, res) => {
     try {
-        const parts = [
-            { name: req.body.suburb,        levels: [5, 4] },
-            { name: req.body.neighbourhood, levels: [5, 4] },
-            { name: req.body.village,       levels: [5, 4] },
-            { name: req.body.city_district, levels: [4, 3] },
-            { name: req.body.county,        levels: [3, 4] },
-            { name: req.body.city,          levels: [2] },
-            { name: req.body.state,         levels: [2] }
-        ].filter(p => p.name && String(p.name).trim());
-
-        if (!parts.length) return res.json({ location: null });
-
         const SUFFIX = "(county|division|municipality|sub ?county|subcounty|parish|ward|town council|city)";
 
-        for (const part of parts) {
-            const needle = String(part.name)
-                .toLowerCase()
-                .replace(new RegExp("\\s+" + SUFFIX + "$", "i"), "")
-                .replace(/[^a-z0-9 ]/g, "")
-                .trim();
-            if (needle.length < 3) continue;
+        const norm = (v) => String(v || "")
+            .toLowerCase()
+            .replace(new RegExp("\\s+" + SUFFIX + "$", "i"), "")
+            .replace(/[^a-z0-9 ]/g, "")
+            .trim();
 
-            const { rows } = await pool.query(
-                `SELECT id, name, level, label
-                   FROM locations
-                  WHERE is_active = TRUE
-                    AND level = ANY($2::int[])
-                    AND regexp_replace(name_norm, '\\s+${SUFFIX}$', '') = $1
-                  ORDER BY array_position($2::int[], level)
-                  LIMIT 1`,
-                [needle, part.levels]
-            );
-
-            if (rows.length) {
-                return res.json({ location: rows[0], matched_on: part.name });
+        const findOne = async (needle, levels, underPath) => {
+            if (!needle || needle.length < 3) return null;
+            const params = [needle, levels];
+            let sql = `SELECT id, name, level, label, path
+                         FROM locations
+                        WHERE is_active = TRUE
+                          AND level = ANY($2::int[])
+                          AND regexp_replace(name_norm, '\\s+${SUFFIX}$', '') = $1`;
+            if (underPath) {
+                params.push(underPath + "%");
+                sql += ` AND path LIKE $3`;
             }
+            sql += ` ORDER BY array_position($2::int[], level) LIMIT 1`;
+            const { rows } = await pool.query(sql, params);
+            return rows[0] || null;
+        };
+
+        // Anchor on the district first. Uganda reuses place names heavily -
+        // there are six Luziras - so an unanchored match can land 400km away.
+        const district =
+            (await findOne(norm(req.body.city), [2])) ||
+            (await findOne(norm(req.body.state), [2])) ||
+            (await findOne(norm(req.body.county), [2]));
+
+        const scope = district ? district.path + district.id + "/" : null;
+
+        const finer = [
+            { v: req.body.suburb,        levels: [5, 4] },
+            { v: req.body.neighbourhood, levels: [5, 4] },
+            { v: req.body.village,       levels: [5, 4] },
+            { v: req.body.hamlet,        levels: [5, 4] },
+            { v: req.body.city_district, levels: [4, 3] },
+            { v: req.body.county,        levels: [4, 3] }
+        ];
+
+        for (const f of finer) {
+            const hit = await findOne(norm(f.v), f.levels, scope);
+            if (hit) {
+                return res.json({ location: hit, matched_on: f.v, district: district ? district.name : null });
+            }
+        }
+
+        if (district) {
+            return res.json({ location: district, matched_on: district.name, district: district.name });
         }
 
         res.json({ location: null });
