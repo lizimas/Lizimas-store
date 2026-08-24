@@ -118,7 +118,7 @@ exports.getDistricts = async (req, res) => {
  * Returns null rather than guessing when nothing matches cleanly - a wrong
  * area means a wrong delivery fee, which is worse than an empty field.
  */
-const AREA_SUFFIX = "(county|division|municipality|sub ?county|subcounty|parish|ward|town council|city)";
+const AREA_SUFFIX = "(capital city authority|capital city|county|division|municipality|sub ?county|subcounty|parish|ward|town council|city)";
 
 function normPlace(v) {
     return String(v || "")
