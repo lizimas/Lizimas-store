@@ -106,3 +106,61 @@ exports.getDistricts = async (req, res) => {
         res.status(500).json({ error: "Could not load delivery districts." });
     }
 };
+
+/**
+ * Matches an OpenStreetMap reverse-geocode result to a row in `locations`.
+ *
+ * OSM and UBOS name the same places differently - OSM returns bare names
+ * ("Nakawa") while UBOS stores administrative suffixes ("Nakawa Division"),
+ * so both sides are stripped before comparing. Matching runs most-specific
+ * first: a village-level hit is better than a district-level one.
+ *
+ * Returns null rather than guessing when nothing matches cleanly - a wrong
+ * area means a wrong delivery fee, which is worse than an empty field.
+ */
+exports.matchLocation = async (req, res) => {
+    try {
+        const parts = [
+            { name: req.body.suburb,        levels: [5, 4] },
+            { name: req.body.neighbourhood, levels: [5, 4] },
+            { name: req.body.village,       levels: [5, 4] },
+            { name: req.body.city_district, levels: [4, 3] },
+            { name: req.body.county,        levels: [3, 4] },
+            { name: req.body.city,          levels: [2] },
+            { name: req.body.state,         levels: [2] }
+        ].filter(p => p.name && String(p.name).trim());
+
+        if (!parts.length) return res.json({ location: null });
+
+        const SUFFIX = "(county|division|municipality|sub ?county|subcounty|parish|ward|town council|city)";
+
+        for (const part of parts) {
+            const needle = String(part.name)
+                .toLowerCase()
+                .replace(new RegExp("\\s+" + SUFFIX + "$", "i"), "")
+                .replace(/[^a-z0-9 ]/g, "")
+                .trim();
+            if (needle.length < 3) continue;
+
+            const { rows } = await pool.query(
+                `SELECT id, name, level, label
+                   FROM locations
+                  WHERE is_active = TRUE
+                    AND level = ANY($2::int[])
+                    AND regexp_replace(name_norm, '\\s+${SUFFIX}$', '') = $1
+                  ORDER BY array_position($2::int[], level)
+                  LIMIT 1`,
+                [needle, part.levels]
+            );
+
+            if (rows.length) {
+                return res.json({ location: rows[0], matched_on: part.name });
+            }
+        }
+
+        res.json({ location: null });
+    } catch (error) {
+        console.error("Location match error:", error);
+        res.status(500).json({ error: "Could not match location." });
+    }
+};
