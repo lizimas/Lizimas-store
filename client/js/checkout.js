@@ -172,6 +172,7 @@ document.addEventListener("click", (e) => {
     }
 });
 
+let selectedMapAddressParts = null;
 let pendingOrder = null;
 let momoPollInterval = null;
 
@@ -510,7 +511,7 @@ async function reverseGeocodeAndPreview(lat, lng) {
     previewEl.textContent = "Looking up address...";
 
     try {
-        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`;
+        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
         const response = await fetch(url, {
             headers: { "User-Agent": "LizimasStore/1.0 (checkout address lookup)" }
         });
@@ -518,6 +519,7 @@ async function reverseGeocodeAndPreview(lat, lng) {
 
         selectedMapAddressText = (data && data.display_name) || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
         previewEl.textContent = selectedMapAddressText;
+        selectedMapAddressParts = (data && data.address) || null;
     } catch (error) {
         console.error("Reverse geocoding failed:", error);
         selectedMapAddressText = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
@@ -534,6 +536,23 @@ function confirmMapLocation() {
     const parts = selectedMapAddressText.split(",").map(p => p.trim());
     document.getElementById("street").value = parts[0] || selectedMapAddressText;
     document.getElementById("landmark").value = parts.slice(1, 3).join(", ") || "";
+
+    // Try to resolve the pin to a priced delivery area. A miss is fine -
+    // the customer picks manually, exactly as before.
+    if (selectedMapAddressParts && locationPicker) {
+        fetch(`${API_URL}/api/delivery/match-location`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(selectedMapAddressParts)
+        })
+            .then(r => r.json())
+            .then(function (res) {
+                if (res && res.location && res.location.id) {
+                    locationPicker.setLocation(res.location.id);
+                }
+            })
+            .catch(err => console.warn("Could not match map location to a delivery area:", err));
+    }
 
     document.getElementById("map-picker-container").style.display = "none";
 }
