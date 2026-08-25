@@ -67,7 +67,7 @@ exports.createPayment = async (req, res) => {
         const amountMatches = Number(amount) === Number(order.total);
 
         const payment = await pool.query(
-            `INSERT INTO payments (order_id, amount, method, transaction_id, status)
+            `INSERT INTO payments_legacy (order_id, amount, method, transaction_id, status)
              VALUES ($1, $2, $3, $4, 'pending')
              RETURNING *`,
             [order_id, amount, method, transaction_id]
@@ -89,7 +89,7 @@ exports.getPayments = async (req, res) => {
     try {
         const payments = await pool.query(
             `SELECT payments.*, orders.customer_name, orders.phone
-             FROM payments
+             FROM payments_legacy AS payments
              JOIN orders ON payments.order_id = orders.id
              ORDER BY payments.created_at DESC`
         );
@@ -111,7 +111,7 @@ exports.verifyPayment = async (req, res) => {
         await client.query("BEGIN");
 
         const paymentResult = await client.query(
-            "SELECT * FROM payments WHERE id = $1",
+            "SELECT * FROM payments_legacy WHERE id = $1",
             [id]
         );
 
@@ -123,7 +123,7 @@ exports.verifyPayment = async (req, res) => {
         const payment = paymentResult.rows[0];
 
         await client.query(
-            "UPDATE payments SET status = 'verified' WHERE id = $1",
+            "UPDATE payments_legacy SET status = 'verified' WHERE id = $1",
             [id]
         );
 

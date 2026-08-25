@@ -4,6 +4,9 @@ const { authLimiter, reportLimiter } = require("../middleware/rateLimiter");
 
 router.use("/auth", authLimiter, require("./auth"));
 router.use("/checkout", require("./checkout"));
+// New payment module. Serves POST /api/payments and
+// GET /api/payments/:id/status, which is what client/js/lz-payment.js calls.
+router.use("/payments", require("./checkoutPayment"));
 router.use("/admin", require("./admin"));
 router.use("/momo", require("./momo"));
 router.use("/categories", require("./categories"));

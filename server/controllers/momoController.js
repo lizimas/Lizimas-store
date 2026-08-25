@@ -47,7 +47,7 @@ exports.initiateMomoPayment = async (req, res) => {
         });
 
         const payment = await pool.query(
-            `INSERT INTO payments (order_id, amount, method, transaction_id, status)
+            `INSERT INTO payments_legacy (order_id, amount, method, transaction_id, status)
              VALUES ($1, $2, 'mtn_momo_api', $3, 'pending')
              RETURNING *`,
             [orderId, order.total, referenceId]
@@ -91,7 +91,7 @@ exports.getMomoPaymentStatus = async (req, res) => {
 
         if (statusResult.status === "SUCCESSFUL") {
             const paymentResult = await pool.query(
-                "SELECT * FROM payments WHERE transaction_id = $1",
+                "SELECT * FROM payments_legacy WHERE transaction_id = $1",
                 [referenceId]
             );
 
@@ -99,7 +99,7 @@ exports.getMomoPaymentStatus = async (req, res) => {
                 const payment = paymentResult.rows[0];
 
                 await pool.query(
-                    "UPDATE payments SET status = 'verified' WHERE id = $1",
+                    "UPDATE payments_legacy SET status = 'verified' WHERE id = $1",
                     [payment.id]
                 );
 
@@ -114,7 +114,7 @@ exports.getMomoPaymentStatus = async (req, res) => {
 
         if (statusResult.status === "FAILED") {
             await pool.query(
-                "UPDATE payments SET status = 'failed' WHERE transaction_id = $1",
+                "UPDATE payments_legacy SET status = 'failed' WHERE transaction_id = $1",
                 [referenceId]
             );
         }

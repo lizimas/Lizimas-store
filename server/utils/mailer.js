@@ -125,7 +125,7 @@ async function sendOrderStatusEmail(email, order, status) {
             from: process.env.EMAIL_USER,
             to: email,
             subject: `Order #${order.id} Update - Lizimas Store`,
-            text: `Hi ${order.customer_name},\n\n${statusMessage}\n\nOrder ID: ${order.id}\nTotal: UGX ${order.total}\n\nThank you for shopping with Lizimas Store.`
+            text: `Hi ${order.customer_name || order.customer_email || "Customer"},\n\n${statusMessage}\n\nOrder ID: ${order.id}\nTotal: UGX ${order.total}\n\nThank you for shopping with Lizimas Store.`
         });
     } catch (error) {
         console.error("Order status email error:", error);
@@ -137,8 +137,12 @@ async function sendOrderStatusEmail(email, order, status) {
  * Sent once, when an order is placed. Status changes use sendOrderStatusEmail.
  * Never throws - a mail failure must not affect an order that already exists.
  */
-async function sendOrderConfirmationEmail(email, order, items, receiptUrl) {
+async function sendOrderConfirmationEmail(email, order, items, receiptUrl, stage) {
     if (!email) return;
+
+    // stage: "placed" (order received) or "paid" (payment settled).
+    // Defaults to placed so the checkout call site needs no change.
+    const isPaid = stage === "paid";
 
     const rows = (items || []).map(function (i) {
         return `<tr>
@@ -153,34 +157,43 @@ async function sendOrderConfirmationEmail(email, order, items, receiptUrl) {
     }).join("");
 
     const body = `
-<p style="margin:0 0 12px">Hi ${escHtml(order.customer_name)},</p>
+<p style="margin:0 0 12px">Hi ${escHtml(order.customer_name || order.customer_email || "Customer")},</p>
 <p style="margin:0 0 12px">Thank you for shopping with Lizimas Store.</p>
-<p style="margin:0 0 12px">We're pleased to confirm that we've received your order successfully. Your order is now being reviewed and processed by our team.</p>
+${isPaid
+  ? `<p style="margin:0 0 12px">We've received your payment in full. Your order is now confirmed and moving into preparation.</p>`
+  : `<p style="margin:0 0 12px">We're pleased to confirm that we've received your order successfully. Your order is now being reviewed and processed by our team.</p>`}
 
 <h3 style="color:${BRAND.navy};font-size:13px;letter-spacing:.6px;border-bottom:2px solid ${BRAND.gold};padding-bottom:4px;display:inline-block;margin:18px 0 10px">ORDER DETAILS</h3>
 <p style="margin:3px 0"><strong>Order Number:</strong> #${order.id}</p>
 <p style="margin:3px 0"><strong>Order Total:</strong> ${ugxFmt(order.total)}</p>
+${isPaid ? `<p style="margin:3px 0"><strong>Amount Paid:</strong> ${ugxFmt(order.amount_paid || order.total)}</p>${order.receipt_number ? `<p style="margin:3px 0"><strong>Receipt Number:</strong> ${escHtml(order.receipt_number)}</p>` : ""}` : ""}
 
 ${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:14px 0 4px;font-size:14px">${rows}</table>` : ""}
 
-<p style="margin:16px 0 12px">We'll keep you updated as your order moves through the next stage. Once your order has been approved and prepared, you'll receive another notification with the relevant delivery or collection information.</p>
+${isPaid
+  ? `<p style="margin:16px 0 12px">Your payment is confirmed and nothing further is needed from you. We'll be in touch with delivery or collection details once your order has been prepared.</p>`
+  : `<p style="margin:16px 0 12px">We'll keep you updated as your order moves through the next stage. Once your order has been approved and prepared, you'll receive another notification with the relevant delivery or collection information.</p>`}
 <p style="margin:0 0 12px">If you have any questions regarding your order, please contact our support team and have your order number <strong>#${order.id}</strong> ready.</p>
 <p style="margin:0 0 4px">Thank you for choosing Lizimas Store. We truly appreciate your business and look forward to serving you again.</p>`;
 
     const html = renderCustomerEmail({
-        title: "Order Confirmed &#127881;",
+        title: isPaid ? "Payment Received &#127881;" : "Order Confirmed &#127881;",
         bodyHtml: body,
         ctaText: receiptUrl ? "View Your Receipt" : null,
         ctaUrl: receiptUrl || null
     });
 
     const text = renderCustomerText([
-        "Order Confirmed", "",
-        `Hi ${order.customer_name},`, "",
+        isPaid ? "Payment Received" : "Order Confirmed", "",
+        `Hi ${order.customer_name || order.customer_email || "Customer"},`, "",
         "Thank you for shopping with Lizimas Store.",
-        "We've received your order successfully and it is being reviewed.", "",
+        isPaid
+            ? "We've received your payment in full. Your order is confirmed."
+            : "We've received your order successfully and it is being reviewed.", "",
         `Order Number: #${order.id}`,
         `Order Total: ${ugxFmt(order.total)}`,
+        isPaid ? `Amount Paid: ${ugxFmt(order.amount_paid || order.total)}` : null,
+        isPaid && order.receipt_number ? `Receipt Number: ${order.receipt_number}` : null,
         receiptUrl ? `` : null,
         receiptUrl ? `View your receipt: ${receiptUrl}` : null,
         "",
@@ -191,7 +204,9 @@ ${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0
         await transporter.sendMail({
             from: `"Lizimas Store" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
             to: email,
-            subject: `Order #${order.id} Confirmed - Lizimas Store`,
+            subject: isPaid
+                ? `Payment Received for Order #${order.id} - Lizimas Store`
+                : `Order #${order.id} Confirmed - Lizimas Store`,
             text: text,
             html: html
         });

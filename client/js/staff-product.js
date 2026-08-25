@@ -1,3 +1,13 @@
+let staffCategories = [];
+
+// Rebuilds the product form's category dropdown, grouped parent > child.
+// Call with a category id to preselect it when editing.
+function renderCategorySelect(selectedId) {
+    const select = document.getElementById("product-category");
+    if (!select || !staffCategories) return;
+    select.innerHTML = buildGroupedCategoryOptions(staffCategories, selectedId);
+}
+
 const API_URL = "";
 
 function getStaffToken() {
@@ -288,9 +298,8 @@ async function loadProductOptionsIntoForm(productId) {
 async function loadCategories() {
     try {
         const response = await fetch(`${API_URL}/api/products/categories`);
-        const categories = await response.json();
-        const select = document.getElementById("product-category");
-        select.innerHTML = categories.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+        staffCategories = await response.json();
+        renderCategorySelect();
     } catch (error) {
         console.error("Load categories error:", error);
     }
@@ -341,7 +350,7 @@ async function loadMyProducts() {
 function loadProductIntoForm(product) {
     document.getElementById("product-id").value = product.id;
     document.getElementById("product-name").value = product.name;
-    document.getElementById("product-category").value = product.category_id || "";
+    renderCategorySelect(product.category_id);
     document.getElementById("product-description").value = product.description || "";
     document.getElementById("product-price").value = product.price;
     document.getElementById("product-stock").value = product.stock;

@@ -4,6 +4,12 @@ const { sendOrderStatusEmail, sendOrderConfirmationEmail } = require("../utils/m
 const { sign: signReceipt } = require("../routes/receipt");
 const { priceOrder } = require("../utils/deliveryPricing");
 
+// Base URL for links that leave the app (emails, receipts). Hardcoding the
+// production domain makes locally generated links unusable, since they resolve
+// against production where the local order does not exist.
+const PUBLIC_BASE_URL =
+    String(process.env.PUBLIC_BASE_URL || "https://lizimasstore.com").replace(/\/+$/, "");
+
 exports.checkout = async (req, res) => {
     const { items, payment_method, delivery_address, customer_name, phone, alt_phone, delivery_fee, delivery_method } = req.body;
 
@@ -303,7 +309,7 @@ exports.checkout = async (req, res) => {
                 [order.id]
             )
                 .then(function (r) {
-                    const receiptUrl = `https://lizimasstore.com/receipt/${order.id}?t=${signReceipt(order.id)}`;
+                    const receiptUrl = `${PUBLIC_BASE_URL}/receipt/${order.id}?t=${signReceipt(order.id)}`;
                     return sendOrderConfirmationEmail(order.customer_email, order, r.rows, receiptUrl);
                 })
                 .catch(err => console.error("Confirmation email error:", err));

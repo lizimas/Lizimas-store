@@ -5,7 +5,7 @@ const morgan = require("morgan");
 const path = require("path");
 require("dotenv").config();
 
-const { generalLimiter } = require("./middleware/rateLimiter");
+const { generalLimiter, webhookLimiter } = require("./middleware/rateLimiter");
 const logVisitor = require("./middleware/visitorLogger");
 
 const app = express();
@@ -39,6 +39,15 @@ app.use(cors({
     },
     credentials: true
 }));
+// Payment provider callbacks. Mounted ABOVE express.json() on purpose: the
+// route parses its own raw body with express.raw() so it can verify the
+// provider's signature over the exact bytes sent. Once express.json() consumes
+// the stream those bytes are gone and verification cannot work.
+//
+// This also places it above generalLimiter, morgan and logVisitor - provider
+// retries are not site visitors and should not consume a browser's bucket.
+app.use("/webhooks/payments", webhookLimiter, require("./routes/paymentWebhook"));
+
 app.use(express.json());
 app.use(morgan("dev"));
 app.use(generalLimiter);

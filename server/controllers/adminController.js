@@ -4,6 +4,12 @@ const { sendOrderStatusEmail } = require("../utils/mailer");
 const XLSX = require("xlsx");
 const { parse } = require("csv-parse/sync");
 
+// Base URL for links that leave the app (emails, receipts). Hardcoding the
+// production domain makes locally generated links unusable, since they resolve
+// against production where the local order does not exist.
+const PUBLIC_BASE_URL =
+    String(process.env.PUBLIC_BASE_URL || "https://lizimasstore.com").replace(/\/+$/, "");
+
 exports.getDashboardStats = async (req, res) => {
     try {
         const totalRevenueResult = await pool.query(
@@ -33,7 +39,7 @@ exports.getDashboardStats = async (req, res) => {
         );
 
         const pendingPaymentsResult = await pool.query(
-            `SELECT COUNT(*) AS pending_payments FROM payments WHERE status = 'pending'`
+            `SELECT COUNT(*) AS pending_payments FROM payments_legacy WHERE status = 'pending'`
         );
 
         const lowStockResult = await pool.query(
@@ -109,7 +115,7 @@ exports.getReceiptLink = async (req, res) => {
         const id = parseInt(req.params.id, 10);
         if (!id) return res.status(400).json({ error: "Bad order id." });
         const { sign } = require("../routes/receipt");
-        res.json({ url: `https://lizimasstore.com/receipt/${id}?t=${sign(id)}` });
+        res.json({ url: `${PUBLIC_BASE_URL}/receipt/${id}?t=${sign(id)}` });
     } catch (error) {
         console.error("Receipt link error:", error);
         res.status(500).json({ error: "Something went wrong." });

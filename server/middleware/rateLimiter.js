@@ -117,4 +117,21 @@ const generalLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-module.exports = { loginLimiter, otpLimiter, authLimiter, generalLimiter, chatStartLimiter, chatMessageLimiter, chatPollLimiter, reportLimiter };
+// Payment provider callbacks. Public unauthenticated POST, so it needs a
+// ceiling - but a low one is worse than none here. MTN retries dropped
+// callbacks and every retry arrives from the same handful of gateway
+// addresses, so a tight per-IP bucket would reject genuine settlement
+// notifications during a promo and leave those payments hanging until the
+// reconciler catches them. Duplicate deliveries are already absorbed by the
+// payment_events_dedupe_uq index, so this is purely a flood backstop.
+const webhookLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  store: new PostgresStore("webhook"),
+  keyGenerator: (req, res) => clientIp(req),
+  message: "Too many requests.",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+module.exports = { loginLimiter, otpLimiter, authLimiter, generalLimiter, chatStartLimiter, chatMessageLimiter, chatPollLimiter, reportLimiter, webhookLimiter };
