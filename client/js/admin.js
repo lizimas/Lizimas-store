@@ -4314,14 +4314,15 @@ function setupDashboardClicks() {
     const cards = statsGrid.querySelectorAll('.stat-card');
     console.log('Found', cards.length, 'stat cards');
     
-    const routes = [
-        '/admin/orders',
-        '/admin/orders',
-        '/admin/orders?status=pending',
-        '/admin/customers',
-        '/admin/users?deleted=true',
-        '/admin/users?role=guest',
-        '/admin/payments?status=pending'
+    // Map each card to a tab name (from your sidebar)
+    const tabMap = [
+        'orders',     // Total Revenue → Orders tab
+        'orders',     // Total Orders → Orders tab
+        'orders',     // Pending Orders → Orders tab
+        'customers',  // Total Registered Customers → Customers tab
+        'customers',  // Total Deleted Accounts → Customers tab
+        'customers',  // Total Guest Customers → Customers tab
+        'orders'      // Pending Payments → Orders tab
     ];
     
     cards.forEach((card, index) => {
@@ -4339,13 +4340,34 @@ function setupDashboardClicks() {
         });
         
         card.addEventListener('click', function() {
-            const url = routes[index] || '/admin';
-            console.log('Navigating to:', url);
-            window.location.href = url;
+            const tabName = tabMap[index] || 'overview';
+            console.log('Looking for tab:', tabName);
+            
+            // Find the tab button with this data-tab
+            const tabButton = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+            
+            if (tabButton) {
+                console.log('Clicking tab:', tabName);
+                tabButton.click();
+                
+                // Also update the active state
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                tabButton.classList.add('active');
+            } else {
+                console.log('Tab not found:', tabName);
+                // Fallback: show the section name
+                const label = this.querySelector('.label')?.textContent || 'Card';
+                alert(`Go to: ${label}\n(Tab: ${tabName})`);
+            }
         });
     });
 }
 
+// ============================================
+// VISITOR STATS CLICK HANDLERS
+// ============================================
 function setupVisitorClicks() {
     const container = document.getElementById('visitor-analytics-grid');
     if (!container) return;
@@ -4366,7 +4388,17 @@ function setupVisitorClicks() {
         });
         
         card.addEventListener('click', function() {
-            window.location.href = '/admin/analytics';
+            // Visitor stats go to Orders tab
+            const tabButton = document.querySelector('.tab-btn[data-tab="orders"]');
+            if (tabButton) {
+                tabButton.click();
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                tabButton.classList.add('active');
+            } else {
+                alert('Go to Analytics section');
+            }
         });
     });
 }
