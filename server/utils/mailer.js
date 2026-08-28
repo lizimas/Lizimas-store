@@ -81,6 +81,47 @@ function renderCustomerEmail(opts) {
 </body></html>`;
 }
 
+function renderInternalEmail(opts) {
+    const title = opts.title || "";
+    const intro = opts.introHtml || "";
+    const rows = (opts.rows || []).map(function (r) {
+        return `<tr>
+          <td style="padding:6px 12px 6px 0;color:#666;white-space:nowrap;vertical-align:top">${escHtml(r[0])}</td>
+          <td style="padding:6px 0;color:#111;word-break:break-word">${escHtml(r[1] == null ? "" : r[1])}</td>
+        </tr>`;
+    }).join("");
+    const note = opts.noteHtml
+        ? `<p style="margin:16px 0 0;font-size:13px;color:#555">${opts.noteHtml}</p>`
+        : "";
+
+    return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f5f7">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:18px 10px">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+
+  <tr><td style="background:${BRAND.navy};padding:14px 20px">
+    <span style="color:${BRAND.gold};font-size:14px;font-weight:800;letter-spacing:.5px">LIZIMAS STORE</span>
+    <span style="color:#8b93a7;font-size:12px;margin-left:8px">internal notification</span>
+  </td></tr>
+
+  <tr><td style="padding:22px 24px 6px">
+    ${title ? `<h2 style="margin:0 0 12px;color:${BRAND.navy};font-size:18px">${escHtml(title)}</h2>` : ""}
+    ${intro ? `<div style="font-size:14.5px;line-height:1.6;color:#333;margin:0 0 14px">${intro}</div>` : ""}
+    ${rows ? `<table role="presentation" cellpadding="0" cellspacing="0" style="font-size:13.5px;border-top:1px solid #eee;margin-top:4px;width:100%">${rows}</table>` : ""}
+    ${note}
+  </td></tr>
+
+  <tr><td style="padding:14px 24px 20px;border-top:1px dashed #ddd;font-size:12px;color:#888">
+    Sent automatically by ${BRAND.name}. No action is required unless stated above.
+  </td></tr>
+
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
 function renderCustomerText(lines) {
     return lines.concat([
         "",
@@ -96,7 +137,24 @@ async function sendAdminLoginAlert(details) {
         from: process.env.EMAIL_USER,
         to: process.env.ADMIN_ALERT_EMAIL,
         subject: "Admin Login - Lizimas Store",
-        text: `Admin login detected.\nName: ${details.name}\nEmail: ${details.email}\nTime: ${details.time}\nIP: ${details.ip}`
+        text: renderCustomerText([
+            "Admin login detected.",
+            "",
+            `Name:  ${details.name}`,
+            `Email: ${details.email}`,
+            `Time:  ${details.time}`,
+            `IP:    ${details.ip}`
+        ]),
+        html: renderInternalEmail({
+            title: "Admin login detected",
+            introHtml: "An administrator signed in to the dashboard.",
+            rows: [
+                ["Name", details.name],
+                ["Email", details.email],
+                ["Time", details.time],
+                ["IP", details.ip]
+            ]
+        })
     });
 }
 
@@ -121,11 +179,34 @@ async function sendOrderStatusEmail(email, order, status) {
     const statusMessage = ORDER_STATUS_MESSAGES[status] || `Your order status is now: ${status}`;
 
     try {
+        const name = order.customer_name || order.customer_email || "Customer";
+        const orderUrl = `${BRAND.site}/orders.html`;
+
         await transporter.sendMail({
             from: process.env.EMAIL_USER,
             to: email,
             subject: `Order #${order.id} Update - Lizimas Store`,
-            text: `Hi ${order.customer_name || order.customer_email || "Customer"},\n\n${statusMessage}\n\nOrder ID: ${order.id}\nTotal: UGX ${order.total}\n\nThank you for shopping with Lizimas Store.`
+            text: renderCustomerText([
+                `Hi ${name},`,
+                "",
+                statusMessage,
+                "",
+                `Order Number: #${order.id}`,
+                `Order Total:  ${ugxFmt(order.total)}`,
+                "",
+                `View your orders: ${orderUrl}`
+            ]),
+            html: renderCustomerEmail({
+                title: `Order #${order.id} Update`,
+                bodyHtml: `
+<p style="margin:0 0 12px">Hi ${escHtml(name)},</p>
+<p style="margin:0 0 12px">${escHtml(statusMessage)}</p>
+<h3 style="color:${BRAND.navy};font-size:13px;letter-spacing:.6px;border-bottom:2px solid ${BRAND.gold};padding-bottom:4px;display:inline-block;margin:18px 0 10px">ORDER DETAILS</h3>
+<p style="margin:3px 0"><strong>Order Number:</strong> #${order.id}</p>
+<p style="margin:3px 0"><strong>Order Total:</strong> ${ugxFmt(order.total)}</p>`,
+                ctaUrl: orderUrl,
+                ctaText: status === "delivered" ? "Review your purchase" : "View your order"
+            })
         });
     } catch (error) {
         console.error("Order status email error:", error);
@@ -221,7 +302,25 @@ async function sendPasswordResetEmail(email, resetLink, validMinutes = 15) {
             from: process.env.EMAIL_USER,
             to: email,
             subject: "Reset Your Password - Lizimas Store",
-            text: `We received a request to reset your password.\n\nClick the link below to set a new password (valid for ${validMinutes} minutes):\n${resetLink}\n\nThis link can only be used once.\n\nIf you didn't request this, you can safely ignore this email - your password will remain unchanged.`
+            text: renderCustomerText([
+                "We received a request to reset your password.",
+                "",
+                `Open this link to set a new password (valid for ${validMinutes} minutes):`,
+                resetLink,
+                "",
+                "This link can only be used once.",
+                "",
+                "If you didn't request this, you can safely ignore this email - your password will remain unchanged."
+            ]),
+            html: renderCustomerEmail({
+                title: "Reset your password",
+                bodyHtml: `
+<p style="margin:0 0 12px">We received a request to reset your Lizimas Store password.</p>
+<p style="margin:0 0 12px">Use the button below to set a new one. The link is valid for <strong>${validMinutes} minutes</strong> and can only be used once.</p>
+<p style="margin:16px 0 0;font-size:13px;color:#666">If you didn't request this, you can safely ignore this email - your password will remain unchanged.</p>`,
+                ctaUrl: resetLink,
+                ctaText: "Set a new password"
+            })
         });
         return true;
     } catch (error) {
@@ -238,7 +337,23 @@ async function sendTwoFactorCodeEmail(email, code) {
             from: process.env.EMAIL_USER,
             to: email,
             subject: "Your Login Code - Lizimas Store",
-            text: `Your login verification code is:\n\n${code}\n\nThis code expires in 10 minutes and can only be used once.\n\nIf you didn't try to log in, someone may have your password. Change it immediately.`
+            text: renderCustomerText([
+                "Your login verification code is:",
+                "",
+                String(code),
+                "",
+                "This code expires in 10 minutes and can only be used once.",
+                "",
+                "If you didn't try to log in, someone may have your password. Change it immediately."
+            ]),
+            html: renderCustomerEmail({
+                title: "Your login code",
+                bodyHtml: `
+<p style="margin:0 0 14px">Enter this code to finish signing in:</p>
+<p style="margin:0 0 14px;font-size:30px;font-weight:800;letter-spacing:7px;color:${BRAND.navy}">${escHtml(code)}</p>
+<p style="margin:0 0 12px">The code expires in 10 minutes and can only be used once.</p>
+<p style="margin:16px 0 0;font-size:13px;color:#b23b3b">If you didn't try to log in, someone may have your password. Change it immediately.</p>`
+            })
         });
     } catch (error) {
         console.error("Two-factor code email error:", error);
@@ -298,7 +413,23 @@ async function sendStaffActivationEmail(email, name) {
             from: process.env.EMAIL_USER,
             to: email,
             subject: "Your Staff Account Has Been Approved - Lizimas Store",
-            text: `Hi ${name},\n\nYour staff account has been approved and is now active. You can log in to the staff dashboard anytime.\n\nWelcome to the team!\n\nLizimas Store`
+            text: renderCustomerText([
+                `Hi ${name},`,
+                "",
+                "Your staff account has been approved and is now active.",
+                "You can log in to the staff dashboard anytime.",
+                "",
+                "Welcome to the team!"
+            ]),
+            html: renderCustomerEmail({
+                title: "Your staff account is active",
+                bodyHtml: `
+<p style="margin:0 0 12px">Hi ${escHtml(name)},</p>
+<p style="margin:0 0 12px">Your staff account has been approved and is now active. You can sign in to the staff dashboard at any time.</p>
+<p style="margin:0 0 12px">Welcome to the team.</p>`,
+                ctaUrl: `${BRAND.site}/staff-login.html`,
+                ctaText: "Go to staff login"
+            })
         });
     } catch (error) {
         console.error("Staff activation email error:", error);
@@ -311,7 +442,20 @@ async function sendAccountBlockedEmail(email, name) {
             from: process.env.EMAIL_USER,
             to: email,
             subject: "Your Account Has Been Blocked - Lizimas Store",
-            text: `Hi ${name},\n\nYour account has been blocked due to repeated unauthorized attempts to access the admin panel.\n\nPlease stop trying to log in and contact the administrator to have your account reviewed and reactivated.\n\nLizimas Store`
+            text: renderCustomerText([
+                `Hi ${name},`,
+                "",
+                "Your account has been blocked due to repeated unauthorized attempts to access the admin panel.",
+                "",
+                "Please stop trying to log in and contact the administrator to have your account reviewed and reactivated."
+            ]),
+            html: renderCustomerEmail({
+                title: "Your account has been blocked",
+                bodyHtml: `
+<p style="margin:0 0 12px">Hi ${escHtml(name)},</p>
+<p style="margin:0 0 12px">Your account has been blocked following repeated unauthorized attempts to access the admin panel.</p>
+<p style="margin:0 0 12px">Please stop trying to sign in and contact the administrator to have your account reviewed and reactivated.</p>`
+            })
         });
     } catch (error) {
         console.error("Account blocked email error:", error);
@@ -324,7 +468,25 @@ async function sendAdminBlockAlert(details) {
             from: process.env.EMAIL_USER,
             to: process.env.ADMIN_ALERT_EMAIL,
             subject: "Staff Account Auto-Blocked - Lizimas Store",
-            text: `A staff account was automatically blocked after 3 unauthorized admin panel access attempts.\n\nName: ${details.name}\nEmail: ${details.email}\nTime: ${details.time}\n\nYou can review and reactivate this account from the Staff & Approvals tab in your admin dashboard.`
+            text: renderCustomerText([
+                "A staff account was automatically blocked after 3 unauthorized admin panel access attempts.",
+                "",
+                `Name:  ${details.name}`,
+                `Email: ${details.email}`,
+                `Time:  ${details.time}`,
+                "",
+                "Review and reactivate from the Staff & Approvals tab in your admin dashboard."
+            ]),
+            html: renderInternalEmail({
+                title: "Staff account auto-blocked",
+                introHtml: "A staff account was automatically blocked after 3 unauthorized admin panel access attempts.",
+                rows: [
+                    ["Name", details.name],
+                    ["Email", details.email],
+                    ["Time", details.time]
+                ],
+                noteHtml: "Review and reactivate this account from the Staff &amp; Approvals tab in your admin dashboard."
+            })
         });
     } catch (error) {
         console.error("Admin block alert email error:", error);
@@ -337,7 +499,35 @@ async function sendScopeViolationAlert(details) {
             from: process.env.EMAIL_USER,
             to: process.env.ADMIN_ALERT_EMAIL,
             subject: "BLOCKED LOGIN - Wrong Portal - Lizimas Store",
-            text: `A login attempt with a CORRECT email and password was refused because it was made from the wrong login portal.\n\nNo session was created. No token was issued. No two-factor enrolment was allowed.\n\nAccount: ${details.email}\nRole: ${details.role}\nPortal used: ${details.surface}\nStatus: BLOCKED\nReason: Account not permitted on this login portal\nIP: ${details.ip}\nBrowser: ${details.userAgent}\nTime: ${details.time}\n\nIf this was not the account holder, treat the password as compromised and reset it immediately from the admin dashboard.`
+            text: renderCustomerText([
+                "A login attempt with a CORRECT email and password was refused because it was made from the wrong login portal.",
+                "",
+                "No session was created. No token was issued. No two-factor enrolment was allowed.",
+                "",
+                `Account:     ${details.email}`,
+                `Role:        ${details.role}`,
+                `Portal used: ${details.surface}`,
+                "Status:      BLOCKED",
+                `IP:          ${details.ip}`,
+                `Browser:     ${details.userAgent}`,
+                `Time:        ${details.time}`,
+                "",
+                "If this was not the account holder, treat the password as compromised and reset it immediately."
+            ]),
+            html: renderInternalEmail({
+                title: "Blocked login - wrong portal",
+                introHtml: "A login attempt with a <strong>correct</strong> email and password was refused because it came from the wrong login portal.<br>No session was created, no token was issued, and no two-factor enrolment was allowed.",
+                rows: [
+                    ["Account", details.email],
+                    ["Role", details.role],
+                    ["Portal used", details.surface],
+                    ["Status", "BLOCKED"],
+                    ["IP", details.ip],
+                    ["Browser", details.userAgent],
+                    ["Time", details.time]
+                ],
+                noteHtml: "If this was not the account holder, treat the password as compromised and reset it immediately from the admin dashboard."
+            })
         });
     } catch (error) {
         console.error("Scope violation alert email error:", error);
@@ -374,7 +564,20 @@ async function sendSecurityLockAlert(details) {
             from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
             to: recipients,
             subject,
-            text: body
+            text: renderCustomerText(body.split("\n")),
+            html: renderInternalEmail({
+                title: "Account locked - unrecognised device",
+                introHtml: "An attempt was made to sign in from a device that has not been used before. The sign-in was refused and the account has been locked pending review.",
+                rows: [
+                    ["Account", details.email],
+                    ["Role", details.role],
+                    ["Portal", details.surface],
+                    ["IP", details.ip],
+                    ["Device", details.userAgent],
+                    ["Time", details.time]
+                ],
+                noteHtml: "If this was you, contact the administrator to unlock the account. If it was not, the password should be treated as compromised and changed once access is restored."
+            })
         });
     } catch (error) {
         console.error("sendSecurityLockAlert failed:", error);
@@ -416,7 +619,35 @@ async function sendAccountReportAlert(details) {
             from: process.env.EMAIL_USER,
             to: process.env.ADMIN_ALERT_EMAIL,
             subject: "Account Issue Report #" + details.id + " - Lizimas Store",
-            text: `A customer submitted an account issue report from the website footer.\n\nReport ID: ${details.id}\nType: ${details.reportType}\nEmail given: ${details.email}\nMatches an account: ${details.hasAccount ? "yes" : "no"}\nIP: ${details.ip}\nTime: ${details.time}\n\nMessage:\n${details.message}\n\nReview and action this from the Security tab in your admin dashboard.`
+            text: renderCustomerText([
+                "A customer submitted an account issue report from the website footer.",
+                "",
+                `Report ID:          ${details.id}`,
+                `Type:               ${details.reportType}`,
+                `Email given:        ${details.email}`,
+                `Matches an account: ${details.hasAccount ? "yes" : "no"}`,
+                `IP:                 ${details.ip}`,
+                `Time:               ${details.time}`,
+                "",
+                "Message:",
+                details.message,
+                "",
+                "Review and action this from the Security tab in your admin dashboard."
+            ]),
+            html: renderInternalEmail({
+                title: "Account issue report #" + escHtml(details.id),
+                introHtml: "A customer submitted an account issue report from the website footer.",
+                rows: [
+                    ["Report ID", details.id],
+                    ["Type", details.reportType],
+                    ["Email given", details.email],
+                    ["Matches an account", details.hasAccount ? "yes" : "no"],
+                    ["IP", details.ip],
+                    ["Time", details.time],
+                    ["Message", details.message]
+                ],
+                noteHtml: "Review and action this from the Security tab in your admin dashboard."
+            })
         });
     } catch (error) {
         console.error("Account report alert email error:", error);
