@@ -346,17 +346,24 @@ exports.getMyOrders = async (req, res) => {
 
         // Line items, with the caller's own review attached where one exists,
         // so the orders page can show Review or Edit review per item.
+        // LEFT JOIN on products so a removed item still lists from the
+        // order_items snapshot. product_live mirrors routes/product-page.js -
+        // when it is false there is no page to review against, so the client
+        // hides the Review button.
         const items = await pool.query(
             `SELECT oi.order_id,
                     oi.product_id,
                     oi.quantity,
                     oi.price,
-                    p.name AS product_name,
+                    COALESCE(oi.product_name, p.name) AS product_name,
+                    (p.id IS NOT NULL
+                     AND p.status = 'approved'
+                     AND p.deleted_at IS NULL) AS product_live,
                     r.id      AS review_id,
                     r.rating  AS review_rating,
                     r.comment AS review_comment
              FROM order_items oi
-             JOIN products p ON p.id = oi.product_id
+             LEFT JOIN products p ON p.id = oi.product_id
              LEFT JOIN product_reviews r
                     ON r.product_id = oi.product_id AND r.user_id = $1
              WHERE oi.order_id = ANY($2)`,

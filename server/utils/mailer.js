@@ -191,6 +191,12 @@ async function sendOrderStatusEmail(email, order, status, items) {
         const isDelivered = status === "delivered";
         const list = Array.isArray(items) ? items : [];
 
+        // Only invite a review when at least one item still has a product
+        // page. Otherwise the call to action leads nowhere.
+        const anyReviewable = isDelivered && list.some(function (i) {
+            return i.product_live;
+        });
+
         // Delivered mail names what arrived and links each item back to its
         // product page. Reviews are written from the orders page, so the CTA
         // points there rather than at the product.
@@ -231,7 +237,7 @@ async function sendOrderStatusEmail(email, order, status, items) {
                 `Order Total:  ${ugxFmt(order.total)}`
             ].concat(itemLinesText).concat([
                 "",
-                isDelivered
+                anyReviewable
                     ? `Tell other shoppers what you think - review your purchase: ${orderUrl}`
                     : `View your orders: ${orderUrl}`
             ])),
@@ -244,9 +250,9 @@ async function sendOrderStatusEmail(email, order, status, items) {
 <p style="margin:3px 0"><strong>Order Number:</strong> #${order.id}</p>
 <p style="margin:3px 0"><strong>Order Total:</strong> ${ugxFmt(order.total)}</p>
 ${itemRowsHtml ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:14px 0 4px;font-size:14px">${itemRowsHtml}</table>` : ""}
-${isDelivered ? `<p style="margin:16px 0 0">If everything arrived as expected, a short review helps other shoppers decide - and takes less than a minute.</p>` : ""}`,
+${anyReviewable ? `<p style="margin:16px 0 0">If everything arrived as expected, a short review helps other shoppers decide - and takes less than a minute.</p>` : ""}`,
                 ctaUrl: orderUrl,
-                ctaText: status === "delivered" ? "Review your purchase" : "View your order"
+                ctaText: anyReviewable ? "Review your purchase" : "View your order"
             })
         });
     } catch (error) {

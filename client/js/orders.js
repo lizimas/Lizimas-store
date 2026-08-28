@@ -55,7 +55,9 @@ function renderOrderItems(order) {
         const qty = Number(item.quantity) || 1;
         let action = "";
 
-        if (reviewable) {
+        // No product page means nothing to review against, so the control
+        // is hidden - but the item still lists, since it was bought.
+        if (reviewable && item.product_live) {
             const hasReview = item.review_id != null;
             const label = hasReview ? "Edit review" : "Review";
             action =
@@ -68,12 +70,16 @@ function renderOrderItems(order) {
                     : "");
         }
 
+        const retired = reviewable && !item.product_live
+            ? '<span class="ord-item-gone">No longer sold</span>'
+            : "";
+
         return '<div class="ord-item">' +
             '<div class="ord-item-row">' +
-                '<span class="ord-item-name">' + name + " &times; " + qty + "</span>" +
+                '<span class="ord-item-name">' + name + " &times; " + qty + retired + "</span>" +
                 action +
             "</div>" +
-            (reviewable ? renderReviewForm(item) : "") +
+            (reviewable && item.product_live ? renderReviewForm(item) : "") +
         "</div>";
     }).join("") + "</div>";
 }
