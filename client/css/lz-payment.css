@@ -16,6 +16,15 @@
    ========================================================================== */
 
 .lz-pay {
+    /* Brand values come from style.css :root. The state colours below are
+       specific to payment outcomes, so they're scoped here rather than
+       added to the global palette. */
+    --lz-pay-success: #067647;
+    --lz-pay-danger: #b23b3b;
+    --lz-pay-warning: #9a6b12;
+    --lz-pay-muted: #5b6478;
+    --lz-pay-border: #d7dced;
+
     text-align: center;
     padding: 26px 20px 22px;
     font-family: inherit;
@@ -27,8 +36,8 @@
     width: 38px;
     height: 38px;
     margin: 0 auto 18px;
-    border: 3px solid #e5e7eb;
-    border-top-color: #f5c518;
+    border: 3px solid var(--lz-line, #e5e7eb);
+    border-top-color: var(--lz-gold, #f5c518);
     border-radius: 50%;
     animation: lz-pay-spin 0.9s linear infinite;
 }
@@ -51,7 +60,7 @@
     margin: 0 0 8px;
     font-size: 18px;
     font-weight: 700;
-    color: #0f1b3d;
+    color: var(--lz-navy, #0f1b3d);
     line-height: 1.35;
 }
 
@@ -59,7 +68,7 @@
     margin: 0;
     font-size: 14.5px;
     line-height: 1.6;
-    color: #5b6478;
+    color: var(--lz-pay-muted, #5b6478);
 }
 
 .lz-pay__detail:empty {
@@ -71,19 +80,19 @@
 /* Waiting on the customer's PIN. Neutral - nothing has gone wrong yet. */
 .lz-pay--pending .lz-pay__headline,
 .lz-pay--initiated .lz-pay__headline {
-    color: #0f1b3d;
+    color: var(--lz-navy, #0f1b3d);
 }
 
-.lz-pay--succeeded .lz-pay__headline { color: #067647; }
+.lz-pay--succeeded .lz-pay__headline { color: var(--lz-pay-success); }
 
 .lz-pay--failed .lz-pay__headline,
-.lz-pay--cancelled .lz-pay__headline { color: #b23b3b; }
+.lz-pay--cancelled .lz-pay__headline { color: var(--lz-pay-danger); }
 
 /* Expired is not a failure - the prompt simply timed out and they can retry,
    so it reads as a neutral amber rather than an error. */
-.lz-pay--expired .lz-pay__headline { color: #9a6b12; }
+.lz-pay--expired .lz-pay__headline { color: var(--lz-pay-warning); }
 
-.lz-pay--refunded .lz-pay__headline { color: #5b6478; }
+.lz-pay--refunded .lz-pay__headline { color: var(--lz-pay-muted); }
 
 /* A settled state adds a status dot above the headline in place of the
    spinner, so the outcome is legible without reading the text. */
@@ -134,22 +143,23 @@
 }
 
 .lz-pay__cta {
-    background: #f5c518;
-    color: #0f1b3d;
+    background: var(--lz-gold, #f5c518);
+    color: var(--lz-navy, #0f1b3d);
     border: 0;
 }
 
 .lz-pay__retry {
     background: #ffffff;
-    color: #0f1b3d;
-    border: 1px solid #d7dced;
+    color: var(--lz-navy, #0f1b3d);
+    border: 1px solid var(--lz-pay-border);
 }
 
+.lz-pay__cta:hover { background: #e8ba14; }
 .lz-pay__retry:hover { background: #f7f8fc; }
 
 .lz-pay__cta:focus-visible,
 .lz-pay__retry:focus-visible {
-    outline: 2px solid #0f1b3d;
+    outline: 2px solid var(--lz-navy, #0f1b3d);
     outline-offset: 2px;
 }
 
