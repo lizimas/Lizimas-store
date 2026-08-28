@@ -196,9 +196,13 @@ async function sendOrderStatusEmail(email, order, status, items) {
         // points there rather than at the product.
         const itemRowsHtml = (isDelivered && list.length)
             ? list.map(function (i) {
+                const label = escHtml(i.product_name);
+                const nameHtml = i.product_live
+                    ? `<a href="${productUrl(i.product_id, i.product_name)}" style="font-weight:600;color:${BRAND.navy};text-decoration:none">${label}</a>`
+                    : `<span style="font-weight:600;color:${BRAND.navy}">${label}</span>`;
                 return `<tr>
           <td style="padding:9px 0;border-bottom:1px solid #eee">
-            <a href="${productUrl(i.product_id, i.product_name)}" style="font-weight:600;color:${BRAND.navy};text-decoration:none">${escHtml(i.product_name)}</a>
+            ${nameHtml}
             <div style="font-size:12px;color:#888">Qty ${Number(i.quantity)}</div>
           </td>
         </tr>`;
@@ -207,7 +211,10 @@ async function sendOrderStatusEmail(email, order, status, items) {
 
         const itemLinesText = (isDelivered && list.length)
             ? [""].concat(list.map(function (i) {
-                return `- ${i.product_name} (x${Number(i.quantity)})\n  ${productUrl(i.product_id, i.product_name)}`;
+                const line = `- ${i.product_name} (x${Number(i.quantity)})`;
+                return i.product_live
+                    ? `${line}\n  ${productUrl(i.product_id, i.product_name)}`
+                    : line;
               }))
             : [];
 

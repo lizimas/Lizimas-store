@@ -178,10 +178,19 @@ exports.updateOrderStatus = async (req, res) => {
         let deliveredItems = [];
         if (status === "delivered") {
             try {
+                // LEFT JOIN so a removed product still lists from the
+                // order_items snapshot. product_live mirrors the condition in
+                // routes/product-page.js - if it is false the page 404s, so
+                // the mail must not link it.
                 const itemsResult = await pool.query(
-                    `SELECT oi.product_id, oi.quantity, p.name AS product_name
+                    `SELECT oi.product_id,
+                            oi.quantity,
+                            COALESCE(oi.product_name, p.name) AS product_name,
+                            (p.id IS NOT NULL
+                             AND p.status = 'approved'
+                             AND p.deleted_at IS NULL) AS product_live
                      FROM order_items oi
-                     JOIN products p ON p.id = oi.product_id
+                     LEFT JOIN products p ON p.id = oi.product_id
                      WHERE oi.order_id = $1
                      ORDER BY oi.id`,
                     [updatedOrder.id]
