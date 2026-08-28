@@ -324,3 +324,166 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 
 /* A heading that introduces a tick list stays left-aligned with its list. */
 .pd-desc-blocks .pdb-heading:has(+ .pdb-text ul.lzbe-check) { text-align: left; }
+
+
+
+/* ------------------------------------------------------------------
+   Inline detail column. Reviews, description and specifications stack
+   in one scroll instead of hiding behind tabs.
+   ------------------------------------------------------------------ */
+
+.pd-section {
+    border-top: 1px solid #e5e7eb;
+    padding-top: 22px;
+    margin-top: 28px;
+}
+
+.pd-section:first-child {
+    border-top: 0;
+    padding-top: 0;
+    margin-top: 0;
+}
+
+.pd-section-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #0f1b3d;
+    margin: 0 0 14px;
+}
+
+/* Rating line in the buy box, fed by the reviews summary. */
+.pd-rating {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0 10px;
+    font-size: 14px;
+}
+
+.pd-rating-value { font-weight: 700; color: #0f1b3d; }
+.pd-rating-count { color: #6b7280; text-decoration: underline; }
+.pd-rating-empty { color: #9ca3af; font-size: 13px; }
+
+.pd-star { color: #d1d5db; letter-spacing: 1px; }
+.pd-star.filled { color: #E8B33A; }
+
+/* Summary block: big average on the left, star breakdown on the right. */
+.pd-review-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 28px;
+    padding: 18px;
+    background: #fafafa;
+    border-radius: 12px;
+    margin-bottom: 22px;
+}
+
+.pd-review-average {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 120px;
+}
+
+.pd-review-average-value {
+    font-size: 38px;
+    font-weight: 700;
+    line-height: 1;
+    color: #0f1b3d;
+}
+
+.pd-review-average-stars { margin-top: 6px; letter-spacing: 2px; }
+
+.pd-review-average-count {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.pd-review-breakdown {
+    flex: 1 1 240px;
+    min-width: 0;
+}
+
+.pd-breakdown-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 6px;
+}
+
+.pd-breakdown-label { width: 30px; flex-shrink: 0; }
+
+.pd-breakdown-track {
+    flex: 1;
+    height: 7px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.pd-breakdown-fill {
+    display: block;
+    height: 100%;
+    background: #E8B33A;
+}
+
+.pd-breakdown-count { width: 26px; text-align: right; flex-shrink: 0; }
+
+/* Individual reviews. */
+.pd-review-list { list-style: none; margin: 0; padding: 0; }
+
+.pd-review-item {
+    padding: 16px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.pd-review-item:last-child { border-bottom: 0; }
+
+.pd-review-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.pd-review-stars { letter-spacing: 1px; }
+
+.pd-review-author {
+    font-weight: 600;
+    font-size: 13px;
+    color: #0f1b3d;
+}
+
+.pd-review-verified {
+    font-size: 11px;
+    font-weight: 600;
+    color: #067647;
+    background: #e7f5ec;
+    padding: 2px 8px;
+    border-radius: 999px;
+}
+
+.pd-review-date {
+    font-size: 12px;
+    color: #9ca3af;
+    margin-top: 4px;
+}
+
+.pd-review-comment {
+    margin: 8px 0 0;
+    font-size: 14px;
+    line-height: 1.55;
+    color: #374151;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.pd-reviews-empty {
+    color: #6b7280;
+    font-size: 14px;
+    margin: 0;
+}

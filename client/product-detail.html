@@ -7,7 +7,7 @@
 
 <meta name="description" content="Shop quality products at Lizimas Store with fast delivery across Uganda and Mobile Money payment options.">
 <link rel="stylesheet" href="/css/style.css?v=60">
-<link rel="stylesheet" href="/css/product-detail.css?v=23">
+<link rel="stylesheet" href="/css/product-detail.css?v=24">
 </head>
 <body>
 
@@ -55,25 +55,29 @@
 </div>
 
 <div class="pd-tabs-col">
-    <div class="pd-tabs">
-        <button type="button" class="pd-tab active" data-pd-tab="desc" onclick="pdSwitchTab('desc')">Description</button>
-        <button type="button" class="pd-tab" data-pd-tab="specs" onclick="pdSwitchTab('specs')">Specifications</button>
-    </div>
 
-    <div class="pd-tab-panel active" id="pd-panel-desc">
+    <section class="pd-section" id="pd-reviews-section">
+        <h2 class="pd-section-title">Customer Reviews</h2>
+        <div id="pd-reviews" class="pd-reviews"></div>
+    </section>
+
+    <section class="pd-section" id="pd-desc-section">
+        <h2 class="pd-section-title">Description</h2>
         <div id="pd-desc-blocks" class="pd-desc-blocks"></div>
         <p id="pd-description"></p>
-    </div>
+    </section>
 
-    <div class="pd-tab-panel" id="pd-panel-specs">
+    <section class="pd-section" id="pd-specs-section">
+        <h2 class="pd-section-title">Specifications</h2>
         <table id="pd-specs-table" class="pd-specs-table"></table>
-    </div>
+    </section>
+
 </div>
 </div>
 
 <script src="/js/api.js"></script>
 <script src="/js/cart.js?v=6"></script>
-<script src="/js/product-detail.js?v=18"></script>
+<script src="/js/product-detail.js?v=19"></script>
 <script src="/js/description-blocks.js?v=5"></script>
 
 </body>

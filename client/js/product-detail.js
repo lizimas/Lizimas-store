@@ -37,6 +37,8 @@ async function loadProductDetail() {
             : "";
         document.getElementById("pd-description").textContent = product.description || "No description available.";
 
+        loadReviews(id);
+
         const warrantyEl = document.getElementById("pd-warranty");
         if (warrantyEl) {
             if (product.warranty_months) {
@@ -628,19 +630,133 @@ function renderSpecs(specs, sizes) {
         sizeRow;
 }
 
-function pdSwitchTab(name) {
-    document.querySelectorAll(".pd-tab").forEach(function (t) {
-        t.classList.toggle("active", t.dataset.pdTab === name);
-    });
-    document.querySelectorAll(".pd-tab-panel").forEach(function (p) {
-        p.classList.toggle("active", p.id === "pd-panel-" + name);
-    });
+function openAllDetails() {
+    const panel = document.getElementById("pd-specs-section");
+    if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function openAllDetails() {
-    pdSwitchTab("specs");
-    const panel = document.getElementById("pd-panel-specs");
-    if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+function pdEscapeHtml(value) {
+    return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function pdStars(rating) {
+    const filled = Math.round(Number(rating) || 0);
+    let out = "";
+    for (let i = 1; i <= 5; i++) {
+        out += '<span class="pd-star' + (i <= filled ? " filled" : "") + '">\u2605</span>';
+    }
+    return out;
+}
+
+function pdReviewDate(value) {
+    if (!value) return "";
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function pdRenderRatingSummary(summary) {
+    const el = document.getElementById("pd-rating");
+    if (!el) return;
+
+    const total = Number(summary && summary.total) || 0;
+    if (!total) {
+        el.innerHTML = '<span class="pd-rating-empty">No reviews yet</span>';
+        return;
+    }
+
+    const average = Number(summary.average) || 0;
+    el.innerHTML =
+        '<span class="pd-rating-stars">' + pdStars(average) + "</span>" +
+        '<span class="pd-rating-value">' + average.toFixed(1) + "</span>" +
+        '<a class="pd-rating-count" href="#pd-reviews-section">' +
+            total + (total === 1 ? " review" : " reviews") +
+        "</a>";
+}
+
+function pdRenderBreakdown(summary) {
+    const total = Number(summary.total) || 0;
+    const keys = [["five", 5], ["four", 4], ["three", 3], ["two", 2], ["one", 1]];
+
+    return '<div class="pd-review-breakdown">' + keys.map(function (pair) {
+        const count = Number(summary[pair[0]]) || 0;
+        const pct = total ? Math.round((count / total) * 100) : 0;
+        return '<div class="pd-breakdown-row">' +
+            '<span class="pd-breakdown-label">' + pair[1] + "\u2605</span>" +
+            '<span class="pd-breakdown-track">' +
+                '<span class="pd-breakdown-fill" style="width:' + pct + '%"></span>' +
+            "</span>" +
+            '<span class="pd-breakdown-count">' + count + "</span>" +
+        "</div>";
+    }).join("") + "</div>";
+}
+
+function pdRenderReviewList(reviews) {
+    return '<ul class="pd-review-list">' + reviews.map(function (r) {
+        const badge = r.verified_purchase
+            ? '<span class="pd-review-verified">Verified purchase</span>'
+            : "";
+        const comment = r.comment
+            ? '<p class="pd-review-comment">' + pdEscapeHtml(r.comment) + "</p>"
+            : "";
+        return '<li class="pd-review-item">' +
+            '<div class="pd-review-head">' +
+                '<span class="pd-review-stars">' + pdStars(r.rating) + "</span>" +
+                '<span class="pd-review-author">' + pdEscapeHtml(r.reviewer_name || "Customer") + "</span>" +
+                badge +
+            "</div>" +
+            '<div class="pd-review-date">' + pdReviewDate(r.created_at) + "</div>" +
+            comment +
+        "</li>";
+    }).join("") + "</ul>";
+}
+
+async function loadReviews(id) {
+    const wrap = document.getElementById("pd-reviews");
+
+    try {
+        const res = await fetch(`/api/reviews/product/${id}`);
+        if (!res.ok) throw new Error("Reviews unavailable");
+
+        const data = await res.json();
+        const summary = data.summary || {};
+        const reviews = Array.isArray(data.reviews) ? data.reviews : [];
+
+        pdRenderRatingSummary(summary);
+
+        if (!wrap) return;
+
+        if (!reviews.length) {
+            wrap.innerHTML =
+                '<p class="pd-reviews-empty">No reviews yet. Be the first to review this product.</p>';
+            return;
+        }
+
+        wrap.innerHTML =
+            '<div class="pd-review-summary">' +
+                '<div class="pd-review-average">' +
+                    '<span class="pd-review-average-value">' +
+                        (Number(summary.average) || 0).toFixed(1) +
+                    "</span>" +
+                    '<span class="pd-review-average-stars">' + pdStars(summary.average) + "</span>" +
+                    '<span class="pd-review-average-count">' +
+                        (Number(summary.total) || 0) + " reviews" +
+                    "</span>" +
+                "</div>" +
+                pdRenderBreakdown(summary) +
+            "</div>" +
+            pdRenderReviewList(reviews);
+    } catch (err) {
+        pdRenderRatingSummary({});
+        if (wrap) {
+            wrap.innerHTML = '<p class="pd-reviews-empty">Reviews could not be loaded.</p>';
+        }
+    }
 }
 
 function closeAllDetails() {
