@@ -745,7 +745,7 @@ async function loadReviews(id) {
                     "</span>" +
                     '<span class="pd-review-average-stars">' + pdStars(summary.average) + "</span>" +
                     '<span class="pd-review-average-count">' +
-                        (Number(summary.total) || 0) + " reviews" +
+                        (Number(summary.total) || 0) + ((Number(summary.total) || 0) === 1 ? " review" : " reviews") +
                     "</span>" +
                 "</div>" +
                 pdRenderBreakdown(summary) +
