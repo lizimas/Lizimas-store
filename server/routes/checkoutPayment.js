@@ -228,9 +228,20 @@ router.get('/:id/status', async (req, res) => {
 /* ------------------------------------------------------------------ */
 
 function ownsOrder(req, order) {
-  if (req.user && req.user.id && Number(order.customer_id) === Number(req.user.id)) return true;
-  // Adjust to whatever your guest checkout already issues.
-  if (order.guest_token && req.get('X-Guest-Token') === order.guest_token) return true;
+  // Logged-in customer: orders.user_id is the owning column. There is no
+  // customer_id on this table - reading one silently produced NaN and made
+  // this branch unreachable.
+  if (req.user && req.user.id && order.user_id != null
+      && Number(order.user_id) === Number(req.user.id)) {
+    return true;
+  }
+
+  // Guest: prove possession of the number the order was placed with. Both
+  // sides go through the same normaliser, so stored '+256...' matches a
+  // submitted '0...' or bare 9-digit.
+  const claimed = normaliseUgandanMsisdn(req.get('X-Guest-Phone') || (req.body && req.body.phone));
+  const onOrder = normaliseUgandanMsisdn(order.phone);
+  if (claimed && onOrder && claimed === onOrder) return true;
   return false;
 }
 
