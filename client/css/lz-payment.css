@@ -1,0 +1,173 @@
+/* ==========================================================================
+   lz-payment.js status widget
+   --------------------------------------------------------------------------
+   Rendered into whatever element is passed as `mount`. The markup comes from
+   LzPaymentSession.prototype.render, so class names here must match it:
+
+     .lz-pay                     wrapper, plus .lz-pay--<state>
+     .lz-pay__spinner            shown while a poll cycle is running
+     .lz-pay__headline           server-supplied headline
+     .lz-pay__detail             server-supplied detail or failure reason
+     .lz-pay__cta                receipt link, success only
+     .lz-pay__retry              retry button, non-success outcomes
+
+   States come straight from the payments table CHECK constraint:
+   pending, initiated, succeeded, failed, expired, cancelled, refunded.
+   ========================================================================== */
+
+.lz-pay {
+    text-align: center;
+    padding: 26px 20px 22px;
+    font-family: inherit;
+}
+
+/* Spinner ---------------------------------------------------------------- */
+
+.lz-pay__spinner {
+    width: 38px;
+    height: 38px;
+    margin: 0 auto 18px;
+    border: 3px solid #e5e7eb;
+    border-top-color: #f5c518;
+    border-radius: 50%;
+    animation: lz-pay-spin 0.9s linear infinite;
+}
+
+@keyframes lz-pay-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Respect reduced-motion: the spinner is decorative, the headline carries
+   the actual status. */
+@media (prefers-reduced-motion: reduce) {
+    .lz-pay__spinner {
+        animation-duration: 2.4s;
+    }
+}
+
+/* Text ------------------------------------------------------------------- */
+
+.lz-pay__headline {
+    margin: 0 0 8px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f1b3d;
+    line-height: 1.35;
+}
+
+.lz-pay__detail {
+    margin: 0;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: #5b6478;
+}
+
+.lz-pay__detail:empty {
+    display: none;
+}
+
+/* Outcome states --------------------------------------------------------- */
+
+/* Waiting on the customer's PIN. Neutral - nothing has gone wrong yet. */
+.lz-pay--pending .lz-pay__headline,
+.lz-pay--initiated .lz-pay__headline {
+    color: #0f1b3d;
+}
+
+.lz-pay--succeeded .lz-pay__headline { color: #067647; }
+
+.lz-pay--failed .lz-pay__headline,
+.lz-pay--cancelled .lz-pay__headline { color: #b23b3b; }
+
+/* Expired is not a failure - the prompt simply timed out and they can retry,
+   so it reads as a neutral amber rather than an error. */
+.lz-pay--expired .lz-pay__headline { color: #9a6b12; }
+
+.lz-pay--refunded .lz-pay__headline { color: #5b6478; }
+
+/* A settled state adds a status dot above the headline in place of the
+   spinner, so the outcome is legible without reading the text. */
+.lz-pay--succeeded::before,
+.lz-pay--failed::before,
+.lz-pay--expired::before,
+.lz-pay--cancelled::before,
+.lz-pay--refunded::before {
+    content: "";
+    display: block;
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+}
+
+.lz-pay--succeeded::before {
+    background: #e7f5ec url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23067647' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 13 4 4L19 7'/%3E%3C/svg%3E") center / 22px 22px no-repeat;
+}
+
+.lz-pay--failed::before,
+.lz-pay--cancelled::before {
+    background: #fbeaea url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b23b3b' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
+}
+
+.lz-pay--expired::before {
+    background: #fdf3e0 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239a6b12' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E") center / 22px 22px no-repeat;
+}
+
+.lz-pay--refunded::before {
+    background: #eef0f6 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b6478' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 1 0 3-6.7'/%3E%3Cpath d='M3 4v5h5'/%3E%3C/svg%3E") center / 22px 22px no-repeat;
+}
+
+/* Actions ---------------------------------------------------------------- */
+
+.lz-pay__cta,
+.lz-pay__retry {
+    display: inline-block;
+    margin-top: 20px;
+    padding: 12px 26px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 14.5px;
+    font-weight: 700;
+    line-height: 1.2;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.lz-pay__cta {
+    background: #f5c518;
+    color: #0f1b3d;
+    border: 0;
+}
+
+.lz-pay__retry {
+    background: #ffffff;
+    color: #0f1b3d;
+    border: 1px solid #d7dced;
+}
+
+.lz-pay__retry:hover { background: #f7f8fc; }
+
+.lz-pay__cta:focus-visible,
+.lz-pay__retry:focus-visible {
+    outline: 2px solid #0f1b3d;
+    outline-offset: 2px;
+}
+
+/* When both appear, the receipt link is the primary action and sits first. */
+.lz-pay__cta + .lz-pay__retry {
+    margin-left: 10px;
+}
+
+@media (max-width: 420px) {
+    .lz-pay { padding: 22px 16px 18px; }
+    .lz-pay__headline { font-size: 17px; }
+
+    .lz-pay__cta,
+    .lz-pay__retry {
+        display: block;
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .lz-pay__cta + .lz-pay__retry { margin-top: 10px; }
+}
