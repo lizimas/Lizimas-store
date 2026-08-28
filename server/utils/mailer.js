@@ -158,6 +158,13 @@ async function sendAdminLoginAlert(details) {
     });
 }
 
+const { slugify } = require("./slugify");
+
+// Canonical product URL - must match the /product/:slug-:id route.
+function productUrl(id, name) {
+    return `${BRAND.site}/product/${slugify(name)}-${id}`;
+}
+
 const ORDER_STATUS_MESSAGES = {
     pending: "We've received your order and it's being reviewed.",
     paid: "Your payment has been confirmed. We're preparing your order.",
@@ -173,7 +180,7 @@ const ORDER_STATUS_MESSAGES = {
  * @param {object} order - order row (needs id, customer_name, total)
  * @param {string} status - one of pending/paid/shipped/delivered/cancelled
  */
-async function sendOrderStatusEmail(email, order, status) {
+async function sendOrderStatusEmail(email, order, status, items) {
     if (!email) return;
 
     const statusMessage = ORDER_STATUS_MESSAGES[status] || `Your order status is now: ${status}`;
@@ -181,6 +188,28 @@ async function sendOrderStatusEmail(email, order, status) {
     try {
         const name = order.customer_name || order.customer_email || "Customer";
         const orderUrl = `${BRAND.site}/orders.html`;
+        const isDelivered = status === "delivered";
+        const list = Array.isArray(items) ? items : [];
+
+        // Delivered mail names what arrived and links each item back to its
+        // product page. Reviews are written from the orders page, so the CTA
+        // points there rather than at the product.
+        const itemRowsHtml = (isDelivered && list.length)
+            ? list.map(function (i) {
+                return `<tr>
+          <td style="padding:9px 0;border-bottom:1px solid #eee">
+            <a href="${productUrl(i.product_id, i.product_name)}" style="font-weight:600;color:${BRAND.navy};text-decoration:none">${escHtml(i.product_name)}</a>
+            <div style="font-size:12px;color:#888">Qty ${Number(i.quantity)}</div>
+          </td>
+        </tr>`;
+              }).join("")
+            : "";
+
+        const itemLinesText = (isDelivered && list.length)
+            ? [""].concat(list.map(function (i) {
+                return `- ${i.product_name} (x${Number(i.quantity)})\n  ${productUrl(i.product_id, i.product_name)}`;
+              }))
+            : [];
 
         await transporter.sendMail({
             from: process.env.EMAIL_USER,
@@ -192,10 +221,13 @@ async function sendOrderStatusEmail(email, order, status) {
                 statusMessage,
                 "",
                 `Order Number: #${order.id}`,
-                `Order Total:  ${ugxFmt(order.total)}`,
+                `Order Total:  ${ugxFmt(order.total)}`
+            ].concat(itemLinesText).concat([
                 "",
-                `View your orders: ${orderUrl}`
-            ]),
+                isDelivered
+                    ? `Tell other shoppers what you think - review your purchase: ${orderUrl}`
+                    : `View your orders: ${orderUrl}`
+            ])),
             html: renderCustomerEmail({
                 title: `Order #${order.id} Update`,
                 bodyHtml: `
@@ -203,7 +235,9 @@ async function sendOrderStatusEmail(email, order, status) {
 <p style="margin:0 0 12px">${escHtml(statusMessage)}</p>
 <h3 style="color:${BRAND.navy};font-size:13px;letter-spacing:.6px;border-bottom:2px solid ${BRAND.gold};padding-bottom:4px;display:inline-block;margin:18px 0 10px">ORDER DETAILS</h3>
 <p style="margin:3px 0"><strong>Order Number:</strong> #${order.id}</p>
-<p style="margin:3px 0"><strong>Order Total:</strong> ${ugxFmt(order.total)}</p>`,
+<p style="margin:3px 0"><strong>Order Total:</strong> ${ugxFmt(order.total)}</p>
+${itemRowsHtml ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:14px 0 4px;font-size:14px">${itemRowsHtml}</table>` : ""}
+${isDelivered ? `<p style="margin:16px 0 0">If everything arrived as expected, a short review helps other shoppers decide - and takes less than a minute.</p>` : ""}`,
                 ctaUrl: orderUrl,
                 ctaText: status === "delivered" ? "Review your purchase" : "View your order"
             })

@@ -2,17 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 
-function slugify(name) {
-  return String(name || "")
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[^\w\s-]/g, "")
-    .trim()
-    .replace(/[\s_-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80)
-    .replace(/-+$/, "") || "product";
-}
+const { slugify } = require("../utils/slugify");
 
 router.get('/sitemap.xml', async (req, res) => {
   try {

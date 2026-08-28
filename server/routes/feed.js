@@ -4,17 +4,7 @@ const pool = require("../config/database");
 
 const BASE_URL = "https://lizimasstore.com";
 
-function slugify(name) {
-  return String(name || "")
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[^\w\s-]/g, "")
-    .trim()
-    .replace(/[\s_-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80)
-    .replace(/-+$/, "") || "product";
-}
+const { slugify } = require("../utils/slugify");
 
 function esc(s) {
   return String(s == null ? "" : s)

@@ -173,14 +173,35 @@ exports.updateOrderStatus = async (req, res) => {
         // Status change notifications - best-effort, never block the response
         sendOrderStatusSms(updatedOrder.phone, updatedOrder, status).catch(err => console.error("SMS notify error:", err));
 
+        // Delivered mail lists what arrived and links each item back to its
+        // product page. Other statuses don't need the line items.
+        let deliveredItems = [];
+        if (status === "delivered") {
+            try {
+                const itemsResult = await pool.query(
+                    `SELECT oi.product_id, oi.quantity, p.name AS product_name
+                     FROM order_items oi
+                     JOIN products p ON p.id = oi.product_id
+                     WHERE oi.order_id = $1
+                     ORDER BY oi.id`,
+                    [updatedOrder.id]
+                );
+                deliveredItems = itemsResult.rows;
+            } catch (itemsError) {
+                // A missing item list must not stop the status update or the
+                // email - the mail just goes out without the product section.
+                console.error("Delivered items lookup error:", itemsError);
+            }
+        }
+
         if (updatedOrder.customer_email) {
-            sendOrderStatusEmail(updatedOrder.customer_email, updatedOrder, status)
+            sendOrderStatusEmail(updatedOrder.customer_email, updatedOrder, status, deliveredItems)
                 .catch(err => console.error("Email notify error:", err));
         } else if (updatedOrder.user_id) {
             pool.query("SELECT email FROM users WHERE id = $1", [updatedOrder.user_id])
                 .then(userResult => {
                     if (userResult.rows.length > 0) {
-                        sendOrderStatusEmail(userResult.rows[0].email, updatedOrder, status)
+                        sendOrderStatusEmail(userResult.rows[0].email, updatedOrder, status, deliveredItems)
                             .catch(err => console.error("Email notify error:", err));
                     }
                 })
