@@ -487,3 +487,12 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
     font-size: 14px;
     margin: 0;
 }
+
+
+/* The fixed Add To Cart bar overlays the end of the page below 900px.
+   Reserve its height so the last section can scroll clear of it. */
+@media (max-width: 899px) {
+    body {
+        padding-bottom: 84px;
+    }
+}
