@@ -1,3 +1,12 @@
+// Older order_items rows store a repo-relative path (no leading slash), which
+// breaks on nested routes like /receipt/:id. Absolute URLs pass through.
+function receiptImageSrc(value) {
+  const src = String(value || "").trim();
+  if (!src) return "";
+  if (/^https?:\/\//i.test(src) || src.startsWith("/")) return src;
+  return "/" + src.replace(/^\.?\//, "");
+}
+
 const express = require("express");
 const crypto = require("crypto");
 const router = express.Router();
@@ -76,7 +85,7 @@ function renderReceipt(o, items, qr) {
   const rows = items.map(function (i) {
     const bits = [i.variant_color, i.variant_size].filter(Boolean).join(" / ");
     return `<tr>
-      <td class="p-img">${i.image_url ? `<img src="${esc(i.image_url)}" alt="">` : ""}</td>
+      <td class="p-img">${i.image_url ? `<img src="${esc(receiptImageSrc(i.image_url))}" alt="">` : ""}</td>
       <td><div class="p-name">${esc(i.product_name)}</div>
           ${bits ? `<div class="p-var">${esc(bits)}</div>` : ""}
           ${i.sku ? `<div class="p-var">SKU: ${esc(i.sku)}</div>` : ""}</td>
