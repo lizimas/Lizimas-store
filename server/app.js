@@ -71,12 +71,17 @@ app.use(express.static(path.join(__dirname, "../client")));
 
 // Upload and multipart errors must return JSON, not an HTML crash page,
 // or the admin panel shows a raw stack trace to the user.
-// Test route
-app.get("/", (req, res) => {
-    res.json({
-        message: "Lizimas Store API is running"
-    });
-});
+// Nothing matched a route or a static file. API callers get JSON so admin
+// fetch() calls can parse the failure; everyone else gets the branded page.
+// Must stay after the static mounts and before the error handler.
+function notFoundHandler(req, res) {
+    if (req.path.startsWith("/api/")) {
+        return res.status(404).json({ message: "Not found." });
+    }
+    return res.status(404).sendFile(path.join(__dirname, "../client/404.html"));
+}
+
+app.use(notFoundHandler);
 
 app.use((err, req, res, next) => {
     if (err && err.code === "INVALID_FILE_TYPE") {
