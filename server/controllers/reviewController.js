@@ -1,6 +1,6 @@
 const pool = require("../config/database");
 
-const PURCHASED_STATUSES = ["paid", "delivered", "completed"];
+const PURCHASED_STATUSES = ["delivered"];
 
 // GET /api/reviews/product/:id
 exports.getProductReviews = async (req, res) => {
@@ -56,6 +56,12 @@ exports.upsertReview = async (req, res) => {
             [userId, id, PURCHASED_STATUSES]
         );
         const verified = purchased.rowCount > 0;
+
+        if (!verified) {
+            return res.status(403).json({
+                error: "Only customers who have received this item can review it"
+            });
+        }
 
         const result = await pool.query(
             `INSERT INTO product_reviews (product_id, user_id, rating, comment, verified_purchase)

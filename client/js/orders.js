@@ -25,6 +25,129 @@ function formatDate(dateString) {
     return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
+function ordEscape(value) {
+    return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function ordStars(rating) {
+    const filled = Math.round(Number(rating) || 0);
+    let out = "";
+    for (let i = 1; i <= 5; i++) {
+        out += '<span class="ord-star' + (i <= filled ? " filled" : "") + '">\u2605</span>';
+    }
+    return out;
+}
+
+// Only delivered orders can be reviewed - this mirrors the server gate in
+// reviewController. Anything else renders as a plain line item.
+function renderOrderItems(order) {
+    if (!Array.isArray(order.items) || order.items.length === 0) return "";
+
+    const reviewable = order.status === "delivered";
+
+    return '<div class="ord-items">' + order.items.map(function (item) {
+        const name = ordEscape(item.product_name);
+        const qty = Number(item.quantity) || 1;
+        let action = "";
+
+        if (reviewable) {
+            const hasReview = item.review_id != null;
+            const label = hasReview ? "Edit review" : "Review";
+            action =
+                '<button type="button" class="ord-review-btn" ' +
+                        'onclick="toggleReviewForm(' + item.product_id + ')">' +
+                    label +
+                "</button>" +
+                (hasReview
+                    ? '<span class="ord-review-current">' + ordStars(item.review_rating) + "</span>"
+                    : "");
+        }
+
+        return '<div class="ord-item">' +
+            '<div class="ord-item-row">' +
+                '<span class="ord-item-name">' + name + " &times; " + qty + "</span>" +
+                action +
+            "</div>" +
+            (reviewable ? renderReviewForm(item) : "") +
+        "</div>";
+    }).join("") + "</div>";
+}
+
+function renderReviewForm(item) {
+    const pid = item.product_id;
+    const rating = Number(item.review_rating) || 0;
+    const comment = ordEscape(item.review_comment || "");
+
+    let stars = "";
+    for (let i = 1; i <= 5; i++) {
+        stars +=
+            '<button type="button" class="ord-rate-star' + (i <= rating ? " filled" : "") + '" ' +
+                    'data-value="' + i + '" ' +
+                    'onclick="setReviewRating(' + pid + ", " + i + ')">\u2605</button>';
+    }
+
+    return '<div class="ord-review-form" id="ord-review-form-' + pid + '" hidden ' +
+                'data-rating="' + rating + '">' +
+        '<div class="ord-rate-row" id="ord-rate-row-' + pid + '">' + stars + "</div>" +
+        '<textarea class="ord-review-text" id="ord-review-text-' + pid + '" rows="3" ' +
+                  'placeholder="Tell other shoppers what you think">' + comment + "</textarea>" +
+        '<div class="ord-review-actions">' +
+            '<button type="button" class="ord-review-submit" ' +
+                    'onclick="submitReview(' + pid + ')">Submit</button>' +
+            '<span class="ord-review-status" id="ord-review-status-' + pid + '"></span>' +
+        "</div>" +
+    "</div>";
+}
+
+function toggleReviewForm(productId) {
+    const form = document.getElementById("ord-review-form-" + productId);
+    if (form) form.hidden = !form.hidden;
+}
+
+function setReviewRating(productId, value) {
+    const form = document.getElementById("ord-review-form-" + productId);
+    if (!form) return;
+
+    form.dataset.rating = String(value);
+
+    const row = document.getElementById("ord-rate-row-" + productId);
+    if (!row) return;
+
+    row.querySelectorAll(".ord-rate-star").forEach(function (star) {
+        star.classList.toggle("filled", Number(star.dataset.value) <= value);
+    });
+}
+
+async function submitReview(productId) {
+    const form = document.getElementById("ord-review-form-" + productId);
+    const statusEl = document.getElementById("ord-review-status-" + productId);
+    if (!form) return;
+
+    const rating = Number(form.dataset.rating) || 0;
+    if (rating < 1) {
+        if (statusEl) statusEl.textContent = "Pick a star rating first.";
+        return;
+    }
+
+    const textEl = document.getElementById("ord-review-text-" + productId);
+    const comment = textEl ? textEl.value.trim() : "";
+
+    if (statusEl) statusEl.textContent = "Saving...";
+
+    try {
+        await apiPostAuth("/reviews/product/" + productId, { rating: rating, comment: comment });
+        if (statusEl) statusEl.textContent = "Thanks - your review is live.";
+        setTimeout(loadMyOrders, 900);
+    } catch (error) {
+        if (statusEl) statusEl.textContent = error.message || "Could not save your review.";
+    }
+}
+
 function renderOrderCard(order) {
     return `
         <div style="border:1px solid #E5E7EB; border-radius:14px; padding:16px; margin-bottom:12px;">
@@ -35,6 +158,7 @@ function renderOrderCard(order) {
             <p style="font-size:13px; color:#666666; margin:4px 0;">${formatDate(order.created_at)}</p>
             <p style="font-size:14px; color:#111827; margin:4px 0;">Total: UGX ${Number(order.total).toLocaleString()}</p>
             <p style="font-size:13px; color:#666666; margin:4px 0;">${order.delivery_method === "pickup" ? "Self Pickup" : "Home Delivery"}</p>
+            ${renderOrderItems(order)}
         </div>
     `;
 }

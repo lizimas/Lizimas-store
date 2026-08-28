@@ -340,7 +340,38 @@ exports.getMyOrders = async (req, res) => {
             [userId]
         );
 
-        res.json(orders.rows);
+        if (orders.rows.length === 0) {
+            return res.json([]);
+        }
+
+        // Line items, with the caller's own review attached where one exists,
+        // so the orders page can show Review or Edit review per item.
+        const items = await pool.query(
+            `SELECT oi.order_id,
+                    oi.product_id,
+                    oi.quantity,
+                    oi.price,
+                    p.name AS product_name,
+                    r.id      AS review_id,
+                    r.rating  AS review_rating,
+                    r.comment AS review_comment
+             FROM order_items oi
+             JOIN products p ON p.id = oi.product_id
+             LEFT JOIN product_reviews r
+                    ON r.product_id = oi.product_id AND r.user_id = $1
+             WHERE oi.order_id = ANY($2)`,
+            [userId, orders.rows.map(function (o) { return o.id; })]
+        );
+
+        const byOrder = {};
+        items.rows.forEach(function (row) {
+            (byOrder[row.order_id] = byOrder[row.order_id] || []).push(row);
+        });
+
+        res.json(orders.rows.map(function (order) {
+            order.items = byOrder[order.id] || [];
+            return order;
+        }));
 
     } catch (error) {
         console.error("Get my orders error:", error);
