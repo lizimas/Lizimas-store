@@ -39,6 +39,9 @@ async function requireAuth(req, res, next) {
         }
 
         req.user = decoded;
+        if (req.user && req.user.id == null && req.user.userId != null) {
+            req.user.id = req.user.userId;
+        }
         next();
     } catch (error) {
         return res.status(401).json({ error: "Invalid or expired token. Please log in again." });
@@ -64,6 +67,9 @@ async function requireAuthOrSetup(req, res, next) {
         }
 
         req.user = decoded;
+        if (req.user && req.user.id == null && req.user.userId != null) {
+            req.user.id = req.user.userId;
+        }
         req.isSetupToken = !!decoded.pendingSetup;
         next();
     } catch (error) {
@@ -84,6 +90,9 @@ async function optionalAuth(req, res, next) {
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
         req.user = decoded;
+        if (req.user && req.user.id == null && req.user.userId != null) {
+            req.user.id = req.user.userId;
+        }
     } catch (error) {
         req.user = null;
     }

@@ -40,7 +40,7 @@ exports.getProductReviews = async (req, res) => {
 exports.upsertReview = async (req, res) => {
     try {
         const { id } = req.params;
-        const userId = req.user.id;
+        const userId = req.user.userId;
         const { rating, comment } = req.body;
 
         const numeric = Number(rating);
@@ -83,7 +83,7 @@ exports.deleteReview = async (req, res) => {
 
         const result = isAdmin
             ? await pool.query(`DELETE FROM product_reviews WHERE id = $1 RETURNING id`, [reviewId])
-            : await pool.query(`DELETE FROM product_reviews WHERE id = $1 AND user_id = $2 RETURNING id`, [reviewId, req.user.id]);
+            : await pool.query(`DELETE FROM product_reviews WHERE id = $1 AND user_id = $2 RETURNING id`, [reviewId, req.user.userId]);
 
         if (result.rowCount === 0) {
             return res.status(404).json({ error: "Review not found or not yours" });
