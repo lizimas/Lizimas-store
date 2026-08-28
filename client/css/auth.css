@@ -437,8 +437,9 @@
 
 .auth-page .checkout-logo-badge {
     background: transparent;
-    width: auto;
-    height: auto;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
 }
 
 .auth-page .checkout-secure-badge { color: #9fb8ab; }
