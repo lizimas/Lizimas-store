@@ -20,7 +20,7 @@
 // Mobile prefixes, without the leading 0.
 // Deliberately conservative: only ranges that actually carry mobile money.
 // Ranges like 020, 031 and 041 exist in Uganda but are not MoMo-capable.
-const MTN_PREFIXES    = ['77', '78', '76', '39'];
+const MTN_PREFIXES    = ['77', '78', '76', '79', '39'];
 const AIRTEL_PREFIXES = ['70', '75', '74'];
 
 const ALL_PREFIXES = [...MTN_PREFIXES, ...AIRTEL_PREFIXES];
