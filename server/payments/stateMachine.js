@@ -18,7 +18,11 @@ const STATUS = Object.freeze({
 });
 
 const TRANSITIONS = Object.freeze({
-  [STATUS.PENDING]:   new Set([STATUS.INITIATED, STATUS.FAILED, STATUS.CANCELLED]),
+  // EXPIRED is reachable from PENDING because a payment can sit here
+  // without ever reaching the provider - a failed initiate leaves no
+  // provider_ref and no prompt. Without this the reconciler expires it,
+  // canTransition refuses, and the row is re-claimed forever.
+  [STATUS.PENDING]:   new Set([STATUS.INITIATED, STATUS.FAILED, STATUS.EXPIRED, STATUS.CANCELLED]),
   [STATUS.INITIATED]: new Set([STATUS.SUCCEEDED, STATUS.FAILED, STATUS.EXPIRED, STATUS.CANCELLED]),
   [STATUS.SUCCEEDED]: new Set([STATUS.REFUNDED]),
   [STATUS.FAILED]:    new Set(),

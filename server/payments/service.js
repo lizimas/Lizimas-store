@@ -145,6 +145,16 @@ async function recordPaymentOutcome(client, { paymentId, outcome, source, eventK
   const move = canTransition(from, to);
   if (!move.ok) {
     await record(false, move.reason);
+    // Silence is right for a replayed webhook - the event row is the record.
+    // It is wrong for a poll: the reconciler will retry the same refused move
+    // every tick, and ON CONFLICT DO NOTHING means the events table shows one
+    // row no matter how many times it happens. Log so a stuck payment is
+    // visible rather than costing an afternoon of tracing.
+    if (source === 'poll') {
+      console.warn(
+        `[payments] transition refused for payment ${payment.id}: ${move.reason}`
+      );
+    }
     return { applied: false, reason: move.reason, effects: [] };
   }
 
