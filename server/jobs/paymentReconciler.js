@@ -104,6 +104,7 @@ async function scheduleNextPoll(client, payment) {
 }
 
 async function tick() {
+  console.log('[reconciler] tick');
   const pendingEffects = [];
 
   // Acquiring the client is itself failable - the pool can be exhausted or
@@ -120,6 +121,7 @@ async function tick() {
   try {
     await client.query('BEGIN');
     const batch = await claimDueBatch(client);
+    console.log('[reconciler] claimed', batch.length);
 
     for (const payment of batch) {
       try {
