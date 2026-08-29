@@ -6,6 +6,12 @@ const { getProvider } = require('./providers');
 
 // Your existing helpers — adjust paths to match the repo.
 const { assignReceiptNumber } = require('../utils/receiptNumber');
+
+// In sandbox the provider deliberately sends EUR while the payment is stored
+// in its real currency, so the two will never match. Skipping the comparison
+// is correct there and wrong anywhere else - this must stay tied to the
+// target environment rather than becoming a general escape hatch.
+const SANDBOX_SKIPS_CURRENCY = process.env.MOMO_TARGET_ENVIRONMENT === 'sandbox';
 const { sendOrderConfirmationEmail } = require('../utils/mailer');
 const { logActivity } = require('../utils/activityLog');
 const { sign: signReceipt } = require('../routes/receipt');
@@ -163,8 +169,17 @@ async function recordPaymentOutcome(client, { paymentId, outcome, source, eventK
   if (to === STATUS.SUCCEEDED) {
     const amountOk = outcome.amountMinor != null
       && String(outcome.amountMinor) === String(payment.amount_minor);
-    const currencyOk = !outcome.currency
+    let currencyOk = !outcome.currency
       || outcome.currency.toUpperCase() === payment.currency.toUpperCase();
+
+    if (!currencyOk && SANDBOX_SKIPS_CURRENCY) {
+      console.warn(
+        `[payments] sandbox: accepting ${outcome.currency} against stored ` +
+        `${payment.currency} for payment ${payment.id}. This check is live ` +
+        `in production.`
+      );
+      currencyOk = true;
+    }
 
     if (!amountOk || !currencyOk) {
       await record(false, 'amount_mismatch');

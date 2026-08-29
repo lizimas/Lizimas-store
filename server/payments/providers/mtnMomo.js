@@ -17,11 +17,18 @@ const { STATUS } = require('../stateMachine');
  */
 
 const BASE_URL = process.env.MOMO_BASE_URL;                 // https://sandbox.momodeveloper.mtn.com | https://proxy.momoapi.mtn.com
-const SUB_KEY = process.env.MOMO_COLLECTION_SUBSCRIPTION_KEY;
+const SUB_KEY = process.env.MOMO_COLLECTION_SUBSCRIPTION_KEY || process.env.MOMO_SUBSCRIPTION_KEY;
 const API_USER = process.env.MOMO_API_USER;
 const API_KEY = process.env.MOMO_API_KEY;
 const TARGET_ENV = process.env.MOMO_TARGET_ENVIRONMENT;     // 'sandbox' | 'mtnuganda'
-const CALLBACK_URL = process.env.MOMO_CALLBACK_URL;         // https://lizimasstore.com/webhooks/payments/mtn_momo
+const CALLBACK_URL = process.env.MOMO_CALLBACK_URL;
+
+// The sandbox is not connected to a market and prices everything in EUR.
+// Sending UGX there is rejected at MTN's edge with an HTML error page, not
+// an API error, which is confusing to debug. Production takes the real
+// currency.
+const IS_SANDBOX = TARGET_ENV === 'sandbox';
+const SANDBOX_CURRENCY = 'EUR';         // https://lizimasstore.com/webhooks/payments/mtn_momo
 
 let tokenCache = { value: null, expiresAt: 0 };
 
@@ -104,7 +111,7 @@ async function initiate({ externalRef, amountMinor, currency, msisdn, payerMessa
 
   const body = {
     amount: String(amountMinor),
-    currency,
+    currency: IS_SANDBOX ? SANDBOX_CURRENCY : currency,
     externalId: String(orderId),
     payer: {
       partyIdType: 'MSISDN',
