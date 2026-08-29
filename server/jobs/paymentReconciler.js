@@ -104,8 +104,18 @@ async function scheduleNextPoll(client, payment) {
 }
 
 async function tick() {
-  const client = await pool.connect();
   const pendingEffects = [];
+
+  // Acquiring the client is itself failable - the pool can be exhausted or
+  // the database briefly unreachable. Previously this sat outside the try,
+  // so a failed connect rejected tick() before any handler could see it.
+  let client;
+  try {
+    client = await pool.connect();
+  } catch (err) {
+    console.error('[reconciler] could not acquire a database client', err);
+    return;
+  }
 
   try {
     await client.query('BEGIN');
@@ -134,13 +144,44 @@ async function tick() {
 }
 
 let timer = null;
+let consecutiveFailures = 0;
+
+// Back off when ticks keep failing so an outage doesn't hammer the database
+// every 5 seconds. The ceiling stays low: this loop is how payments settle,
+// so it has to recover quickly once the problem clears.
+const MAX_BACKOFF_MS = 60000;
+
+function backoffFor(failures) {
+  if (failures === 0) return TICK_MS;
+  return Math.min(TICK_MS * Math.pow(2, failures), MAX_BACKOFF_MS);
+}
 
 function start() {
   if (timer) return;
+
+  // The reschedule is in finally deliberately. Without it a single rejected
+  // tick ends the loop for the life of the process, and payments stop
+  // settling with no further signal. An occasional failed tick is expected;
+  // a stopped reconciler needs a redeploy to notice.
   const loop = async () => {
-    await tick();
-    timer = setTimeout(loop, TICK_MS);
+    try {
+      await tick();
+      consecutiveFailures = 0;
+    } catch (err) {
+      consecutiveFailures += 1;
+      console.error(
+        `[reconciler] tick threw (${consecutiveFailures} consecutive)`,
+        err
+      );
+    } finally {
+      // timer is nulled by stop(); don't resurrect a loop that was stopped
+      // while a tick was in flight.
+      if (timer !== null) {
+        timer = setTimeout(loop, backoffFor(consecutiveFailures));
+      }
+    }
   };
+
   timer = setTimeout(loop, TICK_MS);
   console.log('[reconciler] started');
 }
@@ -148,6 +189,7 @@ function start() {
 function stop() {
   if (timer) clearTimeout(timer);
   timer = null;
+  consecutiveFailures = 0;
 }
 
 module.exports = { start, stop, tick };

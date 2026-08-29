@@ -16,6 +16,17 @@ const server = app.listen(PORT, () => {
 const reconcilerEnabled =
     String(process.env.PAYMENT_RECONCILER_ENABLED || "").toLowerCase() !== "false";
 
+// An unhandled rejection used to vanish without a trace, which is how the
+// reconciler could stop dead and leave no log line. Log loudly; don't exit,
+// since killing the web process over a background failure is worse.
+process.on("unhandledRejection", (reason) => {
+    console.error("[process] unhandled rejection:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+    console.error("[process] uncaught exception:", err);
+});
+
 const reconciler = require("./jobs/paymentReconciler");
 
 if (reconcilerEnabled) {
