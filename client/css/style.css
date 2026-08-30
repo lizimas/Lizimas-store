@@ -4860,3 +4860,49 @@ body.sheet-open {
     color: #0f1b3d;
     white-space: nowrap;
 }
+
+/* Tick lists in description blocks. Two authoring routes reach here: the
+   editor's check-list control emits <ul class="lzbe-check">, and inline
+   <span class="tick"> survives the sanitiser. Palette matches the
+   announcement strip: pale red field, deep red mark. */
+.pdb-text ul.lzbe-check {
+    list-style: none;
+    padding-left: 0;
+    margin: 0 0 12px;
+}
+.pdb-text ul.lzbe-check li {
+    position: relative;
+    padding-left: 30px;
+    margin-bottom: 8px;
+    line-height: 1.55;
+}
+.pdb-text ul.lzbe-check li::before {
+    content: "\2713";
+    position: absolute;
+    left: 0;
+    top: 0.15em;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    background: #fbeaea;
+    color: #c0392b;
+    font-size: 13px;
+    font-weight: 700;
+}
+.pdb-text .tick {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+    border-radius: 5px;
+    background: #fbeaea;
+    color: #c0392b;
+    font-size: 13px;
+    font-weight: 700;
+    vertical-align: -0.2em;
+}
