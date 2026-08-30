@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Signing you in — Lizimas Store</title>
+<link rel="stylesheet" href="css/style.css?v=60">
+<link rel="stylesheet" href="css/auth.css?v=10">
+</head>
+<body class="auth-page">
+<p id="oauth-complete-status" style="padding:40px;text-align:center;">Signing you in...</p>
+
+<script>
+// The server puts the result in the fragment because fragments are never sent
+// to a server: it stays out of access logs and Referer headers. Read it, store
+// it, then strip it from the URL so a back button does not resurface a token.
+(function () {
+    const statusEl = document.getElementById("oauth-complete-status");
+    const raw = window.location.hash.slice(1);
+
+    history.replaceState(null, "", window.location.pathname);
+
+    if (!raw) {
+        window.location.replace("login.html?e=oauth");
+        return;
+    }
+
+    let data;
+    try {
+        data = JSON.parse(decodeURIComponent(raw));
+    } catch (err) {
+        window.location.replace("login.html?e=oauth");
+        return;
+    }
+
+    if (data.t && data.u) {
+        localStorage.setItem("userToken", data.t);
+        localStorage.setItem("userInfo", JSON.stringify(data.u));
+        window.location.replace("orders.html");
+        return;
+    }
+
+    // Anything else is a gate the server declined to pass: 2FA, a forced
+    // password reset, a device approval. Those flows live on the login page,
+    // so hand the pending token back to it rather than reimplementing here.
+    if (data.pendingToken) {
+        sessionStorage.setItem("lzOauthPending", JSON.stringify(data));
+        window.location.replace("login.html?oauth=pending");
+        return;
+    }
+
+    window.location.replace("login.html?e=oauth");
+})();
+</script>
+</body>
+</html>

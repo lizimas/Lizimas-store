@@ -158,4 +158,59 @@ async function googleSignIn(req, res) {
     }
 }
 
-module.exports = { googleSignIn };
+
+// Redirect-mode entry point. Google submits a form POST here rather than
+// handing the credential to JavaScript, which is the only flow that survives
+// mobile browsers turning the sign-in popup into a navigation.
+//
+// Identity handling is deliberately not duplicated: this verifies CSRF, then
+// falls through to the same googleSignIn body via a shaped request.
+async function googleCallback(req, res) {
+    const cookieToken = req.cookies && req.cookies.g_csrf_token;
+    const bodyToken = req.body && req.body.g_csrf_token;
+
+    // Double-submit: a forged cross-site POST cannot read the cookie, so it
+    // cannot make the two halves match.
+    if (!cookieToken || !bodyToken || cookieToken !== bodyToken) {
+        await logLoginAttempt(null, req, false, {
+            surface: "oauth_google",
+            failureReason: "csrf_mismatch"
+        });
+        return res.redirect("/login.html?e=csrf");
+    }
+
+    // completeLogin answers with JSON. Capture it rather than letting it reach
+    // the browser, then translate to the redirect this flow needs.
+    const captured = {};
+    const shim = {
+        status(code) { captured.code = code; return shim; },
+        json(body) { captured.body = body; return shim; },
+        redirect(url) { captured.redirect = url; return shim; },
+        cookie(...args) { return res.cookie(...args); },
+        clearCookie(...args) { return res.clearCookie(...args); },
+        set(...args) { return res.set(...args); },
+        setHeader(...args) { return res.setHeader(...args); },
+        getHeader(...args) { return res.getHeader(...args); }
+    };
+
+    await googleSignIn({ ...req, body: { credential: req.body.credential } }, shim);
+
+    const out = captured.body || {};
+
+    if (out.token) {
+        // Fragment, not query: fragments are never sent to a server, so the
+        // token stays out of access logs and Referer headers. It does land in
+        // browser history, which is why PENDING.md carries the cookie migration.
+        const payload = encodeURIComponent(JSON.stringify({ t: out.token, u: out.user }));
+        return res.redirect(`/oauth-complete.html#${payload}`);
+    }
+
+    if (out.requires2FA || out.requiresPasswordReset || out.requiresDeviceApproval) {
+        const payload = encodeURIComponent(JSON.stringify(out));
+        return res.redirect(`/oauth-complete.html#${payload}`);
+    }
+
+    return res.redirect("/login.html?e=oauth");
+}
+
+module.exports = { googleSignIn, googleCallback };
