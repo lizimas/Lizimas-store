@@ -1322,6 +1322,11 @@ exports.disable2FA = async (req, res) => {
 module.exports = {
     registerUser,
     loginUser,
+    // Exported for federated sign-in, which proves identity by other means and
+    // then runs the same gates. Do not export a session issuer alongside these.
+    completeLogin,
+    logLoginAttempt,
+    CUSTOMER_LOGIN_ROLES,
     staffLogin,
     forgotPassword,
     resetPassword,

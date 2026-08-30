@@ -35,10 +35,16 @@ const { requireAuth, requireAuthOrSetup } = require("../middleware/authMiddlewar
 const upload = require("../middleware/upload");
 
 router.post("/register", registerUser);
+const { googleSignIn } = require("../controllers/oauthController");
+
 router.post("/login", loginLimiter, loginUser);
 router.post("/admin-login", loginLimiter, adminLogin);
 router.post("/staff-login", loginLimiter, staffLogin);
 router.post("/login/2fa", otpLimiter, verifyLogin2FA);
+
+// Federated sign-in. Same rate limiter as password login: the endpoint is
+// public and unauthenticated, so it needs the same protection.
+router.post("/oauth/google", loginLimiter, googleSignIn);
 router.post("/login/2fa/email", otpLimiter, requestEmail2FACode);
 
 // Device approval (phase 4c). No auth: the tokens are the credential.
