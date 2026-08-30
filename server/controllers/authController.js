@@ -262,6 +262,28 @@ async function handleLogin(req, res, allowedRoles, surface) {
             return res.status(401).json({ error: "Invalid email or password." });
         }
 
+        return completeLogin(user, req, res, {
+            allowedRoles: allowedRoles,
+            surface: surface,
+            attemptedEmail: email
+        });
+
+    } catch (error) {
+        console.error("Login error:", error);
+        res.status(500).json({ error: "Something went wrong while logging in." });
+    }
+}
+
+// Every gate that runs once identity is proven, shared by password login and
+// by federated sign-in. The caller is responsible for proving who the user is
+// and for nothing else: scope, lock, block, activation, device, reset and 2FA
+// all run here, in this order, whatever the proof was.
+async function completeLogin(user, req, res, opts) {
+    const allowedRoles = opts.allowedRoles;
+    const surface = opts.surface;
+    const email = opts.attemptedEmail || user.email;
+
+    try {
         // Portal scope gate. Runs before blocked_at, before must_reset_password
         // and before either 2FA branch, so a wrong-portal attempt can never mint
         // a pendingToken, reach 2FA enrolment, or write a secret to the account.
