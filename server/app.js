@@ -41,16 +41,24 @@ app.use(require("cookie-parser")());
 // establishes the POST belongs to a sign-in this browser started, and the ID
 // token is signature-verified against Google's public keys before it is
 // trusted. A browser that ignored CORS entirely would still get past neither.
-app.use("/api/auth/oauth/google/callback", cors({ origin: true, credentials: true }));
+const GOOGLE_CALLBACK_PATH = "/api/auth/oauth/google/callback";
 
-app.use(cors({
+const globalCors = cors({
     origin: function (origin, callback) {
         if (!origin) return callback(null, true);
         if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
         return callback(new Error("Not allowed by CORS"));
     },
     credentials: true
-}));
+});
+
+// The callback is skipped rather than merely preceded by a permissive policy:
+// mounting one above does not stop the global check also running on the same
+// request, which is what kept rejecting Google's POST.
+app.use((req, res, next) => {
+    if (req.path === GOOGLE_CALLBACK_PATH) return next();
+    return globalCors(req, res, next);
+});
 // Payment provider callbacks. Mounted ABOVE express.json() on purpose: the
 // route parses its own raw body with express.raw() so it can verify the
 // provider's signature over the exact bytes sent. Once express.json() consumes
