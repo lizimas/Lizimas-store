@@ -34,6 +34,28 @@ async function loginAccount() {
     }
 }
 
+// Initialised through the JS API rather than data-* attributes: the
+// declarative form did not put the rendered button into redirect mode, and a
+// popup cannot survive a mobile browser turning it into a navigation. With
+// ux_mode redirect Google form-POSTs the credential straight to login_uri, so
+// no JavaScript handoff exists to fail.
+function lzInitGoogleSignIn() {
+    if (!window.google || !google.accounts || !google.accounts.id) return;
+
+    google.accounts.id.initialize({
+        client_id: "336325275087-ik8jcdf930foejlrb4her19m5p4r6h2s.apps.googleusercontent.com",
+        login_uri: "https://lizimasstore.com/api/auth/oauth/google/callback",
+        ux_mode: "redirect",
+        auto_select: false
+    });
+
+    google.accounts.id.renderButton(
+        document.getElementById("google-signin-button"),
+        { type: "standard", theme: "outline", size: "large",
+          text: "signin_with", shape: "rectangular", width: 280 }
+    );
+}
+
 // Called by Google Identity Services with a signed ID token. The token is
 // proof of an email address only; the server decides everything else, and
 // answers in the same shape as password login so both paths land here.
