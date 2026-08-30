@@ -5,7 +5,12 @@
     const mount = document.getElementById("pd-desc-blocks");
     if (!mount) return;
 
-    const productId = new URLSearchParams(location.search).get("id");
+    // Canonical URLs are /product/<slug>-<id>; legacy links use ?id=<id>.
+    let productId = new URLSearchParams(location.search).get("id");
+    if (!productId) {
+        const m = location.pathname.match(/-(\d+)\/?$/);
+        if (m) productId = m[1];
+    }
     if (!productId) return;
 
     // Cloudinary transform: resize + auto format/quality, skipped for any
