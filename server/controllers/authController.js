@@ -235,7 +235,7 @@ async function handleLogin(req, res, allowedRoles, surface) {
 
     try {
         const result = await pool.query(
-            "SELECT id, name, email, password, phone, role, two_factor_enabled, is_active, blocked_at, must_reset_password, security_locked_at, device_grace_until FROM users WHERE email = $1",
+            "SELECT id, name, email, password, phone, role, two_factor_enabled, is_active, blocked_at, must_reset_password, security_locked_at, device_grace_until, deleted_at FROM users WHERE email = $1",
             [email]
         );
 
@@ -307,6 +307,18 @@ async function completeLogin(user, req, res, opts) {
             // Deliberately identical to a wrong-password response: same status,
             // same wording. Reveals nothing about whether the account exists,
             // whether the password was right, or which portal would work.
+            return res.status(401).json({ error: "Invalid email or password." });
+        }
+
+        // A soft-deleted account is gone as far as sign-in is concerned. Checked
+        // here rather than in the lookup so the attempt is still logged, and
+        // answered like a wrong password so deletion is not discoverable.
+        if (user.deleted_at) {
+            await logLoginAttempt(user.id, req, false, {
+                surface: surface,
+                failureReason: "deleted_account",
+                attemptedEmail: email
+            });
             return res.status(401).json({ error: "Invalid email or password." });
         }
 
