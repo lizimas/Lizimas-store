@@ -434,7 +434,10 @@ async function completeLogin(user, req, res, opts) {
             }).catch(err => console.error("Admin login alert failed:", err));
         }
 
-        await logLoginAttempt(user.id, req, true);
+        await logLoginAttempt(user.id, req, true, {
+            surface: surface,
+            attemptedEmail: email
+        });
 
         res.json({
             message: "Login successful.",
