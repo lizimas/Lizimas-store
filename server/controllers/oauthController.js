@@ -193,7 +193,10 @@ async function googleCallback(req, res) {
         getHeader(...args) { return res.getHeader(...args); }
     };
 
-    await googleSignIn({ ...req, body: { credential: req.body.credential } }, shim);
+    const shapedReq = Object.create(req);
+    shapedReq.body = { credential: req.body.credential };
+
+    await googleSignIn(shapedReq, shim);
 
     const out = captured.body || {};
 
