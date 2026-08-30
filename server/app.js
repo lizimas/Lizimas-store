@@ -31,6 +31,18 @@ app.use(helmet({
 
 app.use(require("cookie-parser")());
 
+// Google's redirect-mode sign-in form-POSTs from accounts.google.com, so the
+// request carries an Origin the list below will never contain. Mounted above
+// the global policy and scoped to the single callback path by Express itself,
+// rather than by widening ALLOWED_ORIGINS - that list governs which sites may
+// make credentialed requests to the whole API, and Google does not belong in it.
+//
+// CORS is not what protects this route. The g_csrf_token double submit
+// establishes the POST belongs to a sign-in this browser started, and the ID
+// token is signature-verified against Google's public keys before it is
+// trusted. A browser that ignored CORS entirely would still get past neither.
+app.use("/api/auth/oauth/google/callback", cors({ origin: true, credentials: true }));
+
 app.use(cors({
     origin: function (origin, callback) {
         if (!origin) return callback(null, true);
