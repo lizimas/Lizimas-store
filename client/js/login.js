@@ -34,6 +34,35 @@ async function loginAccount() {
     }
 }
 
+// Called by Google Identity Services with a signed ID token. The token is
+// proof of an email address only; the server decides everything else, and
+// answers in the same shape as password login so both paths land here.
+async function handleGoogleCredential(response) {
+    const statusEl = document.getElementById("login-status");
+    statusEl.textContent = "Signing you in...";
+
+    try {
+        const result = await apiPost("/auth/oauth/google", { credential: response.credential });
+
+        if (result.requires2FA) {
+            pendingLoginToken = result.pendingToken;
+            document.getElementById("login-form-card").style.display = "none";
+            document.getElementById("twofa-form-card").style.display = "block";
+            return;
+        }
+
+        localStorage.setItem("userToken", result.token);
+        localStorage.setItem("userInfo", JSON.stringify(result.user));
+
+        statusEl.textContent = "Login successful! Redirecting...";
+        window.location.href = "orders.html";
+
+    } catch (error) {
+        console.error("Google sign-in error:", error);
+        statusEl.textContent = "Google sign-in failed. Please try again.";
+    }
+}
+
 async function verifyTwoFactor() {
     const code = document.getElementById("twofa-code").value.trim();
     const statusEl = document.getElementById("twofa-status");

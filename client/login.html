@@ -6,7 +6,7 @@
 <meta charset="UTF-8">
 <title>Login - Lizimas Store</title>
 <link rel="stylesheet" href="css/style.css?v=60">
-<link rel="stylesheet" href="css/auth.css?v=8">
+<link rel="stylesheet" href="css/auth.css?v=9">
 </head>
 
 <body>
@@ -73,6 +73,22 @@
             <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#1A1608" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/></svg>
             Sign in
         </button>
+
+        <div class="auth-divider"><span>or</span></div>
+
+        <div id="g_id_onload"
+             data-client_id="336325275087-ik8jcdf930foejlrb4her19m5p4r6h2s.apps.googleusercontent.com"
+             data-callback="handleGoogleCredential"
+             data-auto_prompt="false"></div>
+
+        <div class="g_id_signin"
+             data-type="standard"
+             data-theme="outline"
+             data-size="large"
+             data-text="signin_with"
+             data-shape="rectangular"
+             data-logo_alignment="left"
+             data-width="280"></div>
 
         <div class="auth-social" aria-hidden="true">
             <p class="auth-social-sep"><span>Or continue with</span></p>
@@ -145,7 +161,8 @@
 </div>
 
 <script src="js/api.js?v=1"></script>
-<script src="js/login.js?v=2"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="js/login.js?v=3"></script>
 
 <script src="js/password-toggle.js?v=2"></script>
 <footer class="site-footer">

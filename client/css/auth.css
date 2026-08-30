@@ -566,3 +566,34 @@
     min-height: 0;
     margin: 0;
 }
+
+/* Divider between password sign-in and federated sign-in. Rule either side of
+   a centred label, drawn with a flex row so it needs no fixed widths. */
+.auth-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 18px 0 14px;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 13px;
+    text-transform: lowercase;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.18);
+}
+
+/* Google renders its button into a fixed-width iframe, which would otherwise
+   sit hard against the left edge of the card. */
+.g_id_signin {
+    display: flex;
+    justify-content: center;
+}
+
+.g_id_signin > div {
+    color-scheme: light;
+}
