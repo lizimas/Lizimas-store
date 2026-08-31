@@ -631,11 +631,61 @@ exports.getProductOptions = async (req, res) => {
             [id]
         );
 
+        // Attribute columns double as specs. They are already captured for the
+        // Google Shopping feed, so surfacing them saves re-typing the same
+        // facts into product_specifications by hand. package_size is excluded
+        // deliberately: it is a delivery tier, defaults to 'Small', and would
+        // otherwise print a meaningless row on every product. warranty_months
+        // is excluded because the page already shows it beside the price.
+        const attrRow = await pool.query(
+            `SELECT brand, material, color, sleeve, style, length, fit,
+                    pattern, occasion, care_instructions, product_weight_kg
+             FROM products WHERE id = $1`,
+            [id]
+        );
+
+        const DERIVED = [
+            ["brand", "Brand"],
+            ["material", "Material"],
+            ["color", "Colour"],
+            ["sleeve", "Sleeve"],
+            ["style", "Style"],
+            ["length", "Length"],
+            ["fit", "Fit"],
+            ["pattern", "Pattern"],
+            ["occasion", "Occasion"],
+            ["product_weight_kg", "Weight"],
+            ["care_instructions", "Care Instructions"]
+        ];
+
+        const merged = specs.rows.slice();
+        const taken = new Set(
+            merged.map((s) => String(s.label || "").trim().toLowerCase())
+        );
+        const attrs = attrRow.rows[0] || {};
+        let order = merged.length;
+
+        DERIVED.forEach(([col, label]) => {
+            const raw = attrs[col];
+            if (raw === null || raw === undefined) return;
+            const value = String(raw).trim();
+            if (value === "") return;
+            // A hand-entered spec always wins over the column, so staff can
+            // override the derived wording without producing a duplicate row.
+            if (taken.has(label.toLowerCase())) return;
+            merged.push({
+                id: null,
+                label: label,
+                value: col === "product_weight_kg" ? value + " kg" : value,
+                display_order: order++
+            });
+        });
+
         res.json({
             colors: colors.rows,
             sizes: sizes.rows,
             variants: variants.rows,
-            specs: specs.rows
+            specs: merged
         });
 
     } catch (error) {
