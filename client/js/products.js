@@ -31,6 +31,23 @@ async function loadProducts() {
             return;
         }
 
+        // A brand link on a product page arrives here with ?brand=Name. Same
+        // shape as the category branch above: the server does the matching so
+        // an unknown brand yields an empty grid rather than the full catalogue.
+        const requestedBrand = new URLSearchParams(window.location.search).get("brand");
+        if (requestedBrand) {
+            let branded = [];
+            try {
+                const r = await fetch(`${API_URL}/api/products?brand=${encodeURIComponent(requestedBrand)}`);
+                if (r.ok) branded = await r.json();
+            } catch (error) {
+                console.error("Brand load failed:", error);
+            }
+            displayProducts(branded);
+            renderCategoryHeading(requestedBrand, branded.length);
+            return;
+        }
+
         // Arriving from the header search: seed the existing input and let
         // searchProducts() do the matching, so behaviour is identical to
         // typing the term here directly.
