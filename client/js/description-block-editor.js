@@ -302,10 +302,33 @@
     // Shared by the top-level Text block and a grid column's description,
     // since both use the same rich-paste editor.
     function applyTickToggle(el) {
-        const lists = el.querySelectorAll("ul");
+        let lists = el.querySelectorAll("ul");
         if (!lists.length) {
-            alert("This block has no bulleted list to tick.");
-            return null;
+            // Typed straight into the editor: no <ul> was ever built, since
+            // normalizeWordLists only fires on Word-pasted markup. Promote the
+            // plain lines to a real list so the toggle below has something to
+            // work with. Blank lines and bare headings are kept as separate
+            // list items -- the author can unpick them if that isn't wanted.
+            const lines = el.innerHTML
+                .replace(/<br\s*\/?>/gi, "\n")
+                .replace(/<\/(p|div)>/gi, "\n")
+                .replace(/<[^>]+>/g, "")
+                .split("\n")
+                .map((s) => s.trim())
+                .filter((s) => s !== "" && s !== "&nbsp;");
+            if (!lines.length) {
+                alert("This block has no text to turn into a tick list.");
+                return null;
+            }
+            const ul = document.createElement("ul");
+            lines.forEach((line) => {
+                const li = document.createElement("li");
+                li.innerHTML = line;
+                ul.appendChild(li);
+            });
+            el.innerHTML = "";
+            el.appendChild(ul);
+            lists = el.querySelectorAll("ul");
         }
         const on = !lists[0].classList.contains("lzbe-check");
         lists.forEach((ul) => {
