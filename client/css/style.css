@@ -4876,22 +4876,7 @@ body.sheet-open {
     margin-bottom: 8px;
     line-height: 1.55;
 }
-.pdb-text ul.lzbe-check li::before {
-    content: "\2713";
-    position: absolute;
-    left: 0;
-    top: 0.15em;
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 5px;
-    background: #fbeaea;
-    color: #c0392b;
-    font-size: 13px;
-    font-weight: 700;
-}
+
 .pdb-text .tick {
     display: inline-flex;
     align-items: center;

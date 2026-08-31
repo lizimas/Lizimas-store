@@ -170,6 +170,16 @@
                 }
                 if (n.nodeType !== 1) return;
                 if (ALLOWED_TAGS.indexOf(n.tagName) === -1) {
+                    // Chrome on Android wraps each new line in a <div>. Plain
+                    // unwrapping kept the words but dropped the line boundary,
+                    // so every line after the first ran together. Emit a <br>
+                    // in place of the block element before unwrapping it.
+                    // P is in ALLOWED_TAGS, so it never lands here.
+                    const BLOCKY = ["DIV","SECTION","ARTICLE","H1","H2","H3","H4","H5","H6"];
+                    if (BLOCKY.indexOf(n.tagName) !== -1 && to.lastChild &&
+                        !(to.lastChild.nodeType === 1 && to.lastChild.tagName === "BR")) {
+                        to.appendChild(document.createElement("br"));
+                    }
                     walk(n, to);              // unwrap, keep the words
                     return;
                 }
