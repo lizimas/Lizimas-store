@@ -580,13 +580,16 @@ function renderSpecs(specs, sizes) {
         }
     });
 
+    // Nothing to show is not worth a heading and an apology. Hide the whole
+    // section rather than printing an empty-state row at the customer.
+    var specsSection = document.getElementById("pd-specs-section");
+    if (specsSection) specsSection.style.display = rows.length ? "" : "none";
+
     if (table) {
-        table.innerHTML = rows.length
-            ? rows.map(function (r) {
-                return '<tr><td class="pd-spec-label">' + pdEscape(r[0]) +
-                       '</td><td class="pd-spec-value">' + pdEscape(r[1]) + '</td></tr>';
-              }).join('')
-            : '<tr><td colspan="2">No specifications listed for this product.</td></tr>';
+        table.innerHTML = rows.map(function (r) {
+            return '<tr><td class="pd-spec-label">' + pdEscape(r[0]) +
+                   '</td><td class="pd-spec-value">' + pdEscape(r[1]) + '</td></tr>';
+        }).join('');
     }
 
     if (!card) return;
