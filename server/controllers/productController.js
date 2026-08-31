@@ -93,6 +93,15 @@ exports.getProducts = async (req, res) => {
             filter = ` AND (products.name ILIKE $${params.length} OR categories.name ILIKE $${params.length})`;
         }
 
+        // Exact brand match, case-insensitive. Separate from q because q also
+        // searches category names, so "Apple" there would drag in anything
+        // filed under a category with that word in it.
+        const brand = (req.query.brand || "").trim();
+        if (brand) {
+            params.push(brand);
+            filter += ` AND lower(products.brand) = lower($${params.length})`;
+        }
+
         // Navigation links point at parent categories while every product is
         // filed on a leaf, so a parent has to match its entire subtree.
         const categoryName = (req.query.category || "").trim();
