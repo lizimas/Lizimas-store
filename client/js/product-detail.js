@@ -37,7 +37,7 @@ async function loadProductDetail() {
         if (brandEl) {
             var brandName = (product.brand || "").trim();
             if (brandName) {
-                brandEl.href = "/?brand=" + encodeURIComponent(brandName);
+                brandEl.href = "/products.html?brand=" + encodeURIComponent(brandName);
                 brandEl.innerHTML = 'View all products from <span>' +
                     pdEscape(brandName) + '</span>';
                 brandEl.hidden = false;
