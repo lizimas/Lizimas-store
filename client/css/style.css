@@ -4891,3 +4891,18 @@ body.sheet-open {
     font-weight: 700;
     vertical-align: -0.2em;
 }
+
+/* Brand line above the product title. Grey lead-in, brand in the accent so
+   it reads as the tappable part without an underline shouting for attention. */
+.pd-brand {
+    display: block;
+    margin: 0 0 6px;
+    font-size: 14px;
+    color: #6b7280;
+    text-decoration: none;
+}
+.pd-brand span {
+    color: #c0392b;
+    font-weight: 600;
+}
+.pd-brand:hover span { text-decoration: underline; }

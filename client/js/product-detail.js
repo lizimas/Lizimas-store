@@ -30,6 +30,21 @@ async function loadProductDetail() {
         const product = await res.json();
 
         document.getElementById("pd-name").textContent = product.name || "";
+
+        // Brands are free text on products, so the filter matches
+        // case-insensitively server-side and no slug table is needed.
+        var brandEl = document.getElementById("pd-brand");
+        if (brandEl) {
+            var brandName = (product.brand || "").trim();
+            if (brandName) {
+                brandEl.href = "/?brand=" + encodeURIComponent(brandName);
+                brandEl.innerHTML = 'View all products from <span>' +
+                    pdEscape(brandName) + '</span>';
+                brandEl.hidden = false;
+            } else {
+                brandEl.hidden = true;
+            }
+        }
         await loadGallery(id, product);
         await loadOptions(id, product);
         document.getElementById("pd-price").textContent = product.price
