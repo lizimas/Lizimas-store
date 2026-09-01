@@ -640,6 +640,129 @@ function searchProducts() {
 
 // Homepage product rows: one horizontal carousel per level-2 category that
 // has stock. Replaces the old single "Featured Products" grid.
+// Slot 4 tiles, keyed by the level-2 category they are pinned to.
+// Fetched once per page load alongside the rows themselves.
+async function loadRowTiles() {
+    try {
+        const response = await fetch("/api/promotions");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const all = await response.json();
+        // Every tile pinned to a category becomes a slide in that row, in
+        // display_order. One tile is simply a carousel of length one.
+        const byCategory = new Map();
+        for (const p of all) {
+            if (p.layout !== "row_tile" || !p.category_id || !p.image_url) continue;
+            if (!byCategory.has(p.category_id)) byCategory.set(p.category_id, []);
+            byCategory.get(p.category_id).push(p);
+        }
+        return byCategory;
+    } catch (error) {
+        console.error("Load row tiles:", error);
+        return new Map();
+    }
+}
+
+// A tile eats two card slots, so a thin row would be mostly advert.
+const LS_ROW_TILE_MIN_ITEMS = 4;
+
+// Cards to place before the tile. Two rows, so column N is card N*2.
+const LS_ROW_TILE_OFFSET = 3;
+
+// Slides advance every 5 seconds and can be swiped or tapped through, matching
+// the banner carousels in categories.js so the page has one timing everywhere.
+const LS_TILE_INTERVAL = 5000;
+
+function buildRowTile(slides, side) {
+    const box = document.createElement("div");
+    box.className = "ls-row-promo" + (side === "left" ? " ls-row-promo--left" : "");
+
+    const track = document.createElement("div");
+    track.className = "ls-row-promo-track";
+
+    for (const slide of slides) {
+        const cell = slide.link_url
+            ? document.createElement("a")
+            : document.createElement("span");
+        cell.className = "ls-row-promo-slide";
+        if (slide.link_url) cell.href = slide.link_url;
+        cell.setAttribute("aria-label", slide.title || "Promotion");
+        const img = document.createElement("img");
+        img.src = slide.image_url;
+        img.alt = slide.title || "";
+        img.loading = "lazy";
+        cell.appendChild(img);
+        track.appendChild(cell);
+    }
+    box.appendChild(track);
+
+    if (slides.length > 1) {
+        const dots = document.createElement("div");
+        dots.className = "ls-row-promo-dots";
+        slides.forEach((_, i) => {
+            const dot = document.createElement("button");
+            dot.className = "ls-row-promo-dot" + (i === 0 ? " active" : "");
+            dot.dataset.i = String(i);
+            dot.setAttribute("aria-label", `Slide ${i + 1}`);
+            dots.appendChild(dot);
+        });
+        box.appendChild(dots);
+        startTileCarousel(box, track, dots, slides.length);
+    }
+
+    return box;
+}
+
+function startTileCarousel(box, track, dots, count) {
+    let index = 0;
+    let timer = null;
+
+    const show = i => {
+        index = (i + count) % count;
+        track.style.transform = `translateX(-${index * 100}%)`;
+        dots.querySelectorAll(".ls-row-promo-dot").forEach((d, n) =>
+            d.classList.toggle("active", n === index));
+    };
+
+    const restart = () => {
+        clearInterval(timer);
+        timer = setInterval(() => show(index + 1), LS_TILE_INTERVAL);
+    };
+    restart();
+
+    dots.addEventListener("click", e => {
+        const dot = e.target.closest(".ls-row-promo-dot");
+        if (!dot) return;
+        show(Number(dot.dataset.i));
+        restart();
+    });
+
+    // Horizontal swipe moves a slide. The threshold keeps a sloppy vertical
+    // page scroll from counting as a swipe.
+    let startX = null;
+    let startY = null;
+    box.addEventListener("touchstart", e => {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+    }, { passive: true });
+
+    box.addEventListener("touchend", e => {
+        if (startX === null) return;
+        const dx = e.changedTouches[0].clientX - startX;
+        const dy = e.changedTouches[0].clientY - startY;
+        if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+            show(index + (dx < 0 ? 1 : -1));
+            restart();
+        }
+        startX = null;
+        startY = null;
+    }, { passive: true });
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) clearInterval(timer);
+        else restart();
+    });
+}
+
 async function displayFeaturedProducts(products) {
     const host = document.getElementById("ls-product-rows");
     if (!host) return;
@@ -675,8 +798,10 @@ async function displayFeaturedProducts(products) {
     }
 
     const ordered = [...groups.values()].sort((a, b) => b.items.length - a.items.length);
+    const rowTiles = await loadRowTiles();
 
     host.innerHTML = "";
+    let tileIndex = 0;
     for (const { category, items } of ordered) {
         const section = document.createElement("section");
         section.className = "ls-row";
@@ -688,13 +813,33 @@ async function displayFeaturedProducts(products) {
                        href="products.html?category=${encodeURIComponent(category.name)}">View all &#8594;</a>
                 </div>
             </div>
-            <div class="ls-row-scroll"></div>`;
+            <div class="ls-row-body">
+                <div class="ls-row-scroll"></div>
+            </div>`;
 
         const scroll = section.querySelector(".ls-row-scroll");
         items.forEach(product => scroll.appendChild(buildProductCard(product)));
+
+        const slides = rowTiles.get(category.id);
+        const hasTile = Boolean(slides && slides.length
+            && items.length >= LS_ROW_TILE_MIN_ITEMS);
+        if (hasTile) {
+            // Sides alternate across rows that actually carry a tile, so the
+            // zig-zag holds even when tiled categories are not adjacent.
+            const side = tileIndex % 2 === 0 ? "right" : "left";
+            // The tile is a sibling of the scroller, not a child: products
+            // slide past underneath while the tile itself stays put.
+            scroll.classList.add("ls-row-scroll--split");
+            section.querySelector(".ls-row-body")
+                .appendChild(buildRowTile(slides, side));
+            tileIndex++;
+        }
+
         host.appendChild(section);
 
-        autoScrollRow(scroll);
+        // A tiled row already has one thing moving on its own. Drifting the
+        // products as well reads as clutter, so they wait for a swipe.
+        if (!hasTile) autoScrollRow(scroll);
     }
 }
 

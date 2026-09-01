@@ -3680,6 +3680,7 @@ function openPromoForm() {
     document.getElementById("promo-link").value = "";
     document.getElementById("promo-order").value = "";
     document.getElementById("promo-layout").value = "image";
+    renderPromoCategorySelect();
     document.getElementById("promo-headline").value = "";
     document.getElementById("promo-subtext").value = "";
     document.getElementById("promo-cta").value = "";
@@ -3704,6 +3705,7 @@ function editPromo(id) {
     document.getElementById("promo-link").value = p.link_url || "";
     document.getElementById("promo-order").value = p.display_order;
     document.getElementById("promo-layout").value = p.layout || "image";
+    renderPromoCategorySelect(p.category_id || null);
     document.getElementById("promo-headline").value = p.headline || "";
     document.getElementById("promo-subtext").value = p.subtext || "";
     document.getElementById("promo-cta").value = p.cta_label || "";
@@ -3747,8 +3749,37 @@ const PROMO_LAYOUT_RULES = {
         copy: false,
         imageHeading: "Icon (120\u00d7120)",
         linkHint: "Required \u2014 https://... or a page such as /faq.html"
+    },
+    row_tile: {
+        copy: false,
+        category: true,
+        imageHeading: "Tile image (portrait, ~2:3)",
+        linkHint: "Link, e.g. /products.html?category=Electronics"
     }
 };
+
+// Level-2 categories only: a row tile pins to the same level the homepage
+// groups its product rows by, so anything else would never render.
+function renderPromoCategorySelect(selectedId) {
+    const select = document.getElementById("promo-category");
+    if (!select) return;
+    const topIds = new Set(allCategories.filter(c => !c.parent_id).map(c => c.id));
+    const level2 = allCategories.filter(c => topIds.has(c.parent_id));
+    // Built as nodes rather than markup: textContent escapes the name for
+    // us, so a category with an ampersand or quote cannot break the list.
+    select.replaceChildren();
+    const blank = document.createElement("option");
+    blank.value = "";
+    blank.textContent = "Select a category\u2026";
+    select.appendChild(blank);
+    for (const c of level2) {
+        const opt = document.createElement("option");
+        opt.value = String(c.id);
+        opt.textContent = c.name;
+        select.appendChild(opt);
+    }
+    if (selectedId) select.value = String(selectedId);
+}
 
 // Background colour swatches. The field stays a text input so a brand hex can
 // still be pasted; the swatches just fill it in.
@@ -3859,6 +3890,13 @@ function togglePromoLayout() {
     document.getElementById("promo-copy-section").classList.toggle("hidden", !rules.copy);
     document.getElementById("promo-image-heading").textContent = rules.imageHeading;
 
+    const catGroup = document.getElementById("promo-category-group");
+    if (catGroup) {
+        catGroup.classList.toggle("hidden", !rules.category);
+        if (rules.category) renderPromoCategorySelect(
+            document.getElementById("promo-category").value || null);
+    }
+
     const link = document.getElementById("promo-link");
     if (link) {
         link.placeholder = rules.linkHint;
@@ -3871,8 +3909,11 @@ function togglePromoLayout() {
     const slot = document.getElementById("promo-slot");
     if (slot) {
         const isStrip = layout === "strip_text" || layout === "strip_link";
+        const isRowTile = layout === "row_tile";
         if (isStrip && slot.value !== "3") slot.value = "3";
+        if (isRowTile && slot.value !== "4") slot.value = "4";
         if (!isStrip && slot.value === "3") slot.value = "1";
+        if (!isRowTile && slot.value === "4") slot.value = "1";
     }
 }
 
@@ -3923,6 +3964,14 @@ async function savePromo() {
         errorEl.textContent = "This layout needs a headline.";
         return;
     }
+    if (layout === "row_tile" && !document.getElementById("promo-category").value) {
+        errorEl.textContent = "A row tile needs a pinned category.";
+        return;
+    }
+    if (layout === "row_tile" && !id && !promoPickedFile) {
+        errorEl.textContent = "A row tile needs an image.";
+        return;
+    }
     if (layout === "strip_link" && !link) {
         errorEl.textContent = "A strip tile needs a link.";
         return;
@@ -3945,6 +3994,8 @@ async function savePromo() {
     formData.append("link_url", document.getElementById("promo-link").value.trim());
     formData.append("display_order", document.getElementById("promo-order").value || 0);
     formData.append("layout", layout);
+    formData.append("category_id",
+        layout === "row_tile" ? document.getElementById("promo-category").value : "");
     formData.append("headline", headline);
     formData.append("subtext", document.getElementById("promo-subtext").value.trim());
     formData.append("cta_label", document.getElementById("promo-cta").value.trim());

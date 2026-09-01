@@ -3828,6 +3828,98 @@ body.sheet-open {
     .ls-row-scroll > * { flex-basis: 152px; max-width: 152px; }
 }
 
+/* ---------- Promo tile beside a category rail (slot 4) ---------- */
+
+.ls-row-body {
+    display: flex;
+    gap: 14px;
+    align-items: stretch;
+}
+
+.ls-row-body > .ls-row-scroll {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.ls-row-scroll--split {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(2, auto);
+    grid-auto-columns: 190px;
+    align-items: stretch;
+}
+
+.ls-row-scroll--split > * {
+    flex: none;
+    max-width: none;
+}
+
+.ls-row-promo {
+    flex: 0 0 300px;
+    align-self: stretch;
+    display: block;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.ls-row-promo {
+    position: relative;
+}
+
+.ls-row-promo-track {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.4s ease;
+}
+
+.ls-row-promo-slide {
+    flex: 0 0 100%;
+    display: block;
+    height: 100%;
+}
+
+.ls-row-promo img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    /* Product cutouts are the common case here, so the whole image is shown
+       rather than cropped to fill. */
+    object-fit: contain;
+    background: #ffffff;
+}
+
+.ls-row-promo-dots {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 10px;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+}
+
+.ls-row-promo-dot {
+    width: 22px;
+    height: 3px;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.55);
+    cursor: pointer;
+}
+
+.ls-row-promo-dot.active {
+    background: #ffffff;
+}
+
+.ls-row-promo--left { order: -1; }
+
+@media (max-width: 720px) {
+    .ls-row-scroll--split { grid-auto-columns: 152px; }
+    .ls-row-promo { flex-basis: 210px; }
+}
+
 /* ---------- Category drawer ---------- */
 
 .ls-drawer-backdrop {

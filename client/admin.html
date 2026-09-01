@@ -333,6 +333,12 @@
                             <span class="pst-note">Narrow banner, right</span>
                             <span class="pst-count" data-count="2">0</span>
                         </button>
+                        <button type="button" class="promo-slot-tile" data-slot="4"
+                                onclick="setPromoSlotFilter('4')">
+                            <span class="pst-count"></span>
+                            <strong>Slot 4</strong>
+                            <span>Category row tiles</span>
+                        </button>
                         <button type="button" class="promo-slot-tile" data-slot="3"
                                 onclick="setPromoSlotFilter('3')">
                             <span class="pst-name">Slot 3</span>
@@ -356,12 +362,14 @@
                                         <option value="text">Text banner &mdash; typed copy</option>
                                         <option value="strip_text">Strip announcement &mdash; scrolling text</option>
                                         <option value="strip_link">Strip tile &mdash; icon and link</option>
+                                        <option value="row_tile">Category row tile &mdash; pinned to a category</option>
                                     </select>
                                     <input type="text" id="promo-title" placeholder="Title (optional, for your reference)">
                                     <select id="promo-slot">
                                         <option value="1">Slot 1 &mdash; left banner</option>
                                         <option value="2">Slot 2 &mdash; right banner</option>
                                         <option value="3">Slot 3 &mdash; announcement strip</option>
+                                        <option value="4">Slot 4 &mdash; category row tile</option>
                                     </select>
                                     <input type="text" id="promo-link" placeholder="Link, e.g. /product/68">
                                     <input type="number" id="promo-order" placeholder="Display order (lower shows first)">
@@ -412,6 +420,14 @@
                             </div>
 
                             <div class="product-form-section">
+                                <div class="form-group hidden" id="promo-category-group">
+                                    <label for="promo-category">Pinned category</label>
+                                    <select id="promo-category">
+                                        <option value="">Select a category…</option>
+                                    </select>
+                                    <small>The tile shows inside this category’s product row.</small>
+                                </div>
+
                                 <h4 id="promo-image-heading">Image</h4>
                                 <div class="drag-drop-zone" id="promo-image-dropzone">
                                     Tap to choose a promotional image
@@ -674,7 +690,7 @@
 <script src="js/prepare-picked-file.js?v=9"></script>
 <script src="js/description-block-editor.js?v=13"></script>
 <script src="js/category-select.js?v=2"></script>
-    <script src="js/admin.js?v=43"></script>
+    <script src="js/admin.js?v=44"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

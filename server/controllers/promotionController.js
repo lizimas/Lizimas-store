@@ -1,7 +1,8 @@
 // Slot 3 is the announcement strip. strip_text scrolls and carries no link;
 // strip_link is a static tile. Kept in sync with migration 034's constraints.
-const PROMO_SLOTS = [1, 2, 3];
-const PROMO_LAYOUTS = ["image", "text", "strip_text", "strip_link"];
+// Slot 4 is a tile pinned inside a category product rail (migration 047).
+const PROMO_SLOTS = [1, 2, 3, 4];
+const PROMO_LAYOUTS = ["image", "text", "strip_text", "strip_link", "row_tile"];
 
 const LINK_ERROR = "Link must be an https:// address, a site path starting " +
     "with /, or a mailto: or tel: link.";
@@ -47,7 +48,8 @@ exports.listPromotions = async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT id, image_url, link_url, title, slot, display_order,
-                    headline, subtext, cta_label, bg_color, text_color, layout
+                    headline, subtext, cta_label, bg_color, text_color, layout,
+                    category_id
              FROM promotions
              WHERE is_active = true
              ORDER BY slot ASC, display_order ASC, id ASC`
@@ -64,7 +66,8 @@ exports.listAllPromotions = async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT id, image_url, link_url, title, slot, display_order, is_active, created_at,
-                    headline, subtext, cta_label, bg_color, text_color, layout
+                    headline, subtext, cta_label, bg_color, text_color, layout,
+                    category_id
              FROM promotions
              ORDER BY slot ASC, display_order ASC, id ASC`
         );
@@ -91,6 +94,11 @@ exports.createPromotion = async (req, res) => {
 
         const layout = PROMO_LAYOUTS.includes(req.body.layout)
             ? req.body.layout : "image";
+        // Only a row tile pins to a category; anything else stores null so
+        // a stale field left in the form cannot bind an unrelated slot.
+        const parsedCategory = parseInt(req.body.category_id, 10);
+        const categoryId = layout === "row_tile" && Number.isInteger(parsedCategory)
+            ? parsedCategory : null;
         const headline = (req.body.headline || "").trim() || null;
         const subtext = (req.body.subtext || "").trim() || null;
         const ctaLabel = (req.body.cta_label || "").trim() || null;
@@ -114,6 +122,12 @@ exports.createPromotion = async (req, res) => {
         if (layout === "strip_link" && !title && !req.file) {
             return res.status(400).json({ message: "A strip link needs a label or an icon." });
         }
+        if (layout === "row_tile" && !categoryId) {
+            return res.status(400).json({ message: "A row tile needs a category." });
+        }
+        if (layout === "row_tile" && !req.file) {
+            return res.status(400).json({ message: "A row tile needs an image." });
+        }
 
         const imageUrl = req.file
             ? await uploadBufferToCloudinary(req.file.buffer)
@@ -122,12 +136,13 @@ exports.createPromotion = async (req, res) => {
         const result = await pool.query(
             `INSERT INTO promotions (image_url, link_url, title, slot, display_order,
                                      headline, subtext, cta_label, bg_color, layout,
-                                     text_color)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                                     text_color, category_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
              RETURNING id, image_url, link_url, title, slot, display_order, is_active,
-                       headline, subtext, cta_label, bg_color, text_color, layout`,
+                       headline, subtext, cta_label, bg_color, text_color, layout,
+                       category_id`,
             [imageUrl, linkUrl, title, slot, displayOrder,
-                headline, subtext, ctaLabel, bgColor, layout, textColor]
+                headline, subtext, ctaLabel, bgColor, layout, textColor, categoryId]
         );
 
         await logActivity(req.user.id, "create_promotion", "promotion",
@@ -174,6 +189,14 @@ exports.updatePromotion = async (req, res) => {
             ? (PROMO_LAYOUTS.includes(req.body.layout)
                 ? req.body.layout : "image")
             : current.layout;
+        // Switching away from row_tile clears the pin, so an old category
+        // cannot linger on a row that no longer renders in a rail.
+        const sentCategory = parseInt(req.body.category_id, 10);
+        const categoryId = layout !== "row_tile"
+            ? null
+            : (req.body.category_id !== undefined
+                ? (Number.isInteger(sentCategory) ? sentCategory : null)
+                : current.category_id);
         const headline = req.body.headline !== undefined
             ? ((req.body.headline || "").trim() || null) : current.headline;
         const subtext = req.body.subtext !== undefined
@@ -195,6 +218,9 @@ exports.updatePromotion = async (req, res) => {
         if (layout === "strip_link" && !linkUrl) {
             return res.status(400).json({ message: "A strip link needs a link URL." });
         }
+        if (layout === "row_tile" && !categoryId) {
+            return res.status(400).json({ message: "A row tile needs a category." });
+        }
 
         let imageUrl = current.image_url;
         if (req.file) imageUrl = await uploadBufferToCloudinary(req.file.buffer);
@@ -203,12 +229,14 @@ exports.updatePromotion = async (req, res) => {
             `UPDATE promotions
              SET image_url = $1, link_url = $2, title = $3, slot = $4, display_order = $5,
                      headline = $7, subtext = $8, cta_label = $9,
-                     bg_color = $10, layout = $11, text_color = $12
+                     bg_color = $10, layout = $11, text_color = $12,
+                     category_id = $13
              WHERE id = $6
              RETURNING id, image_url, link_url, title, slot, display_order, is_active,
-                       headline, subtext, cta_label, bg_color, text_color, layout`,
+                       headline, subtext, cta_label, bg_color, text_color, layout,
+                       category_id`,
             [imageUrl, linkUrl, title, slot, displayOrder, id,
-                headline, subtext, ctaLabel, bgColor, layout, textColor]
+                headline, subtext, ctaLabel, bgColor, layout, textColor, categoryId]
         );
 
         await logActivity(req.user.id, "update_promotion", "promotion", id, "Updated promotion");
