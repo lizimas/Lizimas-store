@@ -3884,9 +3884,11 @@ body.sheet-open {
     display: block;
     width: 100%;
     height: 100%;
-    /* Product cutouts are the common case here, so the whole image is shown
-       rather than cropped to fill. */
-    object-fit: contain;
+    /* Tiles are purpose-designed artwork sized to the slot, so they fill it
+       edge to edge. Anything not built at the tile ratio gets cropped from
+       the edges rather than letterboxed onto white. */
+    object-fit: cover;
+    object-position: center;
     background: #ffffff;
 }
 

@@ -3753,7 +3753,7 @@ const PROMO_LAYOUT_RULES = {
     row_tile: {
         copy: false,
         category: true,
-        imageHeading: "Tile image or video (portrait, ~2:3, video max 30s / 30MB)",
+        imageHeading: "Tile image or video (600\u00d71300, video max 30s / 30MB)",
         linkHint: "Link, e.g. /products.html?category=Electronics"
     }
 };
