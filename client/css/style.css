@@ -3879,7 +3879,8 @@ body.sheet-open {
     height: 100%;
 }
 
-.ls-row-promo img {
+.ls-row-promo img,
+.ls-row-promo video {
     display: block;
     width: 100%;
     height: 100%;

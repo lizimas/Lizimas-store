@@ -3753,7 +3753,7 @@ const PROMO_LAYOUT_RULES = {
     row_tile: {
         copy: false,
         category: true,
-        imageHeading: "Tile image (portrait, ~2:3)",
+        imageHeading: "Tile image or video (portrait, ~2:3, video max 30s / 30MB)",
         linkHint: "Link, e.g. /products.html?category=Electronics"
     }
 };
@@ -3917,10 +3917,18 @@ function togglePromoLayout() {
     }
 }
 
+// Mirrors PROMO_MEDIA_MAX_BYTES in server/middleware/upload.js.
+const PROMO_VIDEO_MAX_BYTES = 30 * 1024 * 1024;
+
 function setupPromoImagePicker() {
     const zone = document.getElementById("promo-image-dropzone");
     const input = document.getElementById("promo-image");
     if (!zone || !input) return;
+
+    // Set here rather than in the markup so the picker and the server
+    // filter cannot drift apart across two files.
+    input.setAttribute("accept",
+        "image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm");
 
     zone.addEventListener("click", () => input.click());
 
@@ -3931,18 +3939,56 @@ function setupPromoImagePicker() {
         const preview = document.getElementById("promo-image-preview");
         const errorEl = document.getElementById("promo-form-error");
         errorEl.textContent = "";
-        preview.innerHTML = "Preparing image…";
 
-        const result = await preparePickedFile(file);
+        const isVideo = /^video\//i.test(file.type || "")
+            || /\.(mp4|mov|webm)$/i.test(file.name || "");
+
+        // Only a row tile has the timing logic to play a clip; every other
+        // layout would render it into a slot that never starts it.
+        const layout = document.getElementById("promo-layout").value;
+        if (isVideo && layout !== "row_tile") {
+            promoPickedFile = null;
+            preview.innerHTML = "";
+            errorEl.textContent = "Video is only supported on a category row tile.";
+            input.value = "";
+            return;
+        }
+
+        // Checked here as well as on the server: rejecting a 40MB file after
+        // it has crawled up a mobile connection is a poor way to find out.
+        if (isVideo && file.size > PROMO_VIDEO_MAX_BYTES) {
+            promoPickedFile = null;
+            preview.innerHTML = "";
+            errorEl.textContent = `That video is ${(file.size / 1048576).toFixed(1)}MB. The limit is 30MB \u2014 compress it and try again.`;
+            input.value = "";
+            return;
+        }
+
+        preview.innerHTML = isVideo ? "Reading video\u2026" : "Preparing image\u2026";
+
+        const result = isVideo
+            ? await preparePickedVideo(file)
+            : await preparePickedFile(file);
+
         if (!result.ok) {
             promoPickedFile = null;
             preview.innerHTML = "";
-            errorEl.textContent = `Could not read ${result.name} (${result.reason}). Re-select it, or pick from Files rather than a cloud gallery.`;
+            input.value = "";
+            errorEl.textContent = result.fatal
+                ? `${result.name} is ${result.reason}. Trim it and try again.`
+                : `Could not read ${result.name} (${result.reason}). Re-select it, or pick from Files rather than a cloud gallery.`;
             return;
         }
 
         promoPickedFile = result.file;
-        preview.innerHTML = `<img src="${URL.createObjectURL(result.file)}" class="drag-drop-preview" style="max-width:220px; border-radius:8px;">`;
+        if (isVideo) {
+            // muted and playsinline so the preview behaves the same way the
+            // storefront tile will.
+            preview.innerHTML = `<video src="${URL.createObjectURL(result.file)}" class="drag-drop-preview" style="max-width:220px; border-radius:8px;" muted playsinline controls loop></video>
+                <div class="promo-media-note" style="margin-top:6px; font-size:12px; opacity:0.75;">Video \u00b7 ${result.duration.toFixed(1)}s \u00b7 ${(result.file.size / 1048576).toFixed(1)}MB</div>`;
+        } else {
+            preview.innerHTML = `<img src="${URL.createObjectURL(result.file)}" class="drag-drop-preview" style="max-width:220px; border-radius:8px;">`;
+        }
     });
 }
 
@@ -3969,7 +4015,7 @@ async function savePromo() {
         return;
     }
     if (layout === "row_tile" && !id && !promoPickedFile) {
-        errorEl.textContent = "A row tile needs an image.";
+        errorEl.textContent = "A row tile needs an image or a video.";
         return;
     }
     if (layout === "strip_link" && !link) {
@@ -4001,7 +4047,13 @@ async function savePromo() {
     formData.append("cta_label", document.getElementById("promo-cta").value.trim());
     formData.append("bg_color", document.getElementById("promo-bg").value.trim() || "#ffffff");
     formData.append("text_color", document.getElementById("promo-text-color").value.trim());
-    if (promoPickedFile) formData.append("image", promoPickedFile);
+    if (promoPickedFile) {
+        formData.append("image", promoPickedFile);
+        // Derived from the file being sent rather than tracked in a separate
+        // flag, so the two cannot drift apart.
+        formData.append("media_type",
+            /^video\//i.test(promoPickedFile.type || "") ? "video" : "image");
+    }
 
     try {
         await authorizedFetch(id ? `/api/promotions/${id}` : "/api/promotions",

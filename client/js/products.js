@@ -651,7 +651,10 @@ async function loadRowTiles() {
         // display_order. One tile is simply a carousel of length one.
         const byCategory = new Map();
         for (const p of all) {
-            if (p.layout !== "row_tile" || !p.category_id || !p.image_url) continue;
+            // A video tile has no image_url, so the presence check has to
+            // follow media_type rather than assuming a still.
+            const hasMedia = p.media_type === "video" ? !!p.video_url : !!p.image_url;
+            if (p.layout !== "row_tile" || !p.category_id || !hasMedia) continue;
             if (!byCategory.has(p.category_id)) byCategory.set(p.category_id, []);
             byCategory.get(p.category_id).push(p);
         }
@@ -672,6 +675,11 @@ const LS_ROW_TILE_OFFSET = 3;
 // the banner carousels in categories.js so the page has one timing everywhere.
 const LS_TILE_INTERVAL = 5000;
 
+// A video slide is not on a clock: it holds until the clip ends. This is only
+// a backstop, so a clip that stalls or never fires "ended" cannot pin the row
+// on one tile indefinitely.
+const LS_TILE_VIDEO_MAX = 60000;
+
 function buildRowTile(slides, side) {
     const box = document.createElement("div");
     box.className = "ls-row-promo" + (side === "left" ? " ls-row-promo--left" : "");
@@ -686,11 +694,29 @@ function buildRowTile(slides, side) {
         cell.className = "ls-row-promo-slide";
         if (slide.link_url) cell.href = slide.link_url;
         cell.setAttribute("aria-label", slide.title || "Promotion");
-        const img = document.createElement("img");
-        img.src = slide.image_url;
-        img.alt = slide.title || "";
-        img.loading = "lazy";
-        cell.appendChild(img);
+        if (slide.media_type === "video" && slide.video_url) {
+            // muted and playsinline are both required or iOS refuses to
+            // autoplay at all. preload none keeps the clip off the wire
+            // until the row is actually scrolled into view.
+            const video = document.createElement("video");
+            video.src = slide.video_url;
+            video.muted = true;
+            video.defaultMuted = true;
+            video.playsInline = true;
+            video.controls = false;
+            video.preload = "none";
+            video.setAttribute("muted", "");
+            video.setAttribute("playsinline", "");
+            video.setAttribute("webkit-playsinline", "");
+            if (slide.poster_url) video.poster = slide.poster_url;
+            cell.appendChild(video);
+        } else {
+            const img = document.createElement("img");
+            img.src = slide.image_url;
+            img.alt = slide.title || "";
+            img.loading = "lazy";
+            cell.appendChild(img);
+        }
         track.appendChild(cell);
     }
     box.appendChild(track);
@@ -707,33 +733,110 @@ function buildRowTile(slides, side) {
         });
         box.appendChild(dots);
         startTileCarousel(box, track, dots, slides.length);
+    } else {
+        // A single slide never gets a carousel, but a lone video still has to
+        // be told when to run: loop while on screen, pause when it is not.
+        startSoloVideo(box, track);
     }
 
     return box;
 }
 
+function startSoloVideo(box, track) {
+    const video = track.querySelector("video");
+    if (!video) return;
+    video.loop = true;
+
+    const play = () => {
+        const played = video.play();
+        if (played && typeof played.catch === "function") played.catch(() => {});
+    };
+
+    if (typeof IntersectionObserver === "function") {
+        new IntersectionObserver(entries => {
+            for (const entry of entries) {
+                if (entry.isIntersecting && !document.hidden) play();
+                else video.pause();
+            }
+        }, { threshold: 0.25 }).observe(box);
+    } else {
+        play();
+    }
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) video.pause();
+    });
+}
+
 function startTileCarousel(box, track, dots, count) {
     let index = 0;
     let timer = null;
+    let onScreen = false;
+
+    const cells = track.querySelectorAll(".ls-row-promo-slide");
+    const videoAt = i => (cells[i] ? cells[i].querySelector("video") : null);
+
+    // Arms the wait for whatever slide is showing. An image gets the fixed
+    // 5 seconds. A video gets no clock of its own: it advances on "ended",
+    // and the timer here is only a backstop against a clip that stalls.
+    const arm = fromStart => {
+        clearTimeout(timer);
+        if (!onScreen || document.hidden) return;
+
+        const video = videoAt(index);
+        if (!video) {
+            timer = setTimeout(() => show(index + 1), LS_TILE_INTERVAL);
+            return;
+        }
+
+        if (fromStart) video.currentTime = 0;
+        const played = video.play();
+        if (played && typeof played.catch === "function") {
+            // Autoplay refused (data saver, low power mode). Treat the clip
+            // as a still so the row keeps moving instead of sitting dead.
+            played.catch(() => {
+                clearTimeout(timer);
+                timer = setTimeout(() => show(index + 1), LS_TILE_INTERVAL);
+            });
+        }
+        timer = setTimeout(() => show(index + 1), LS_TILE_VIDEO_MAX);
+    };
+
+    // Pausing rather than resetting: scrolling back should pick the clip up
+    // where it left off, not restart it.
+    const halt = () => {
+        clearTimeout(timer);
+        const video = videoAt(index);
+        if (video) video.pause();
+    };
 
     const show = i => {
+        const leaving = videoAt(index);
+        if (leaving) {
+            leaving.pause();
+            leaving.currentTime = 0;
+        }
         index = (i + count) % count;
         track.style.transform = `translateX(-${index * 100}%)`;
         dots.querySelectorAll(".ls-row-promo-dot").forEach((d, n) =>
             d.classList.toggle("active", n === index));
+        arm(true);
     };
 
-    const restart = () => {
-        clearInterval(timer);
-        timer = setInterval(() => show(index + 1), LS_TILE_INTERVAL);
-    };
-    restart();
+    // Guarded on the index so a clip that ends after the user has already
+    // swiped past it cannot advance the row a second time.
+    cells.forEach((cell, n) => {
+        const video = cell.querySelector("video");
+        if (!video) return;
+        video.addEventListener("ended", () => {
+            if (n === index) show(index + 1);
+        });
+    });
 
     dots.addEventListener("click", e => {
         const dot = e.target.closest(".ls-row-promo-dot");
         if (!dot) return;
         show(Number(dot.dataset.i));
-        restart();
     });
 
     // Horizontal swipe moves a slide. The threshold keeps a sloppy vertical
@@ -751,15 +854,29 @@ function startTileCarousel(box, track, dots, count) {
         const dy = e.changedTouches[0].clientY - startY;
         if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
             show(index + (dx < 0 ? 1 : -1));
-            restart();
         }
         startX = null;
         startY = null;
     }, { passive: true });
 
+    // Nothing rotates and no video downloads until the row is on screen,
+    // which matters most for a shopper on mobile data.
+    if (typeof IntersectionObserver === "function") {
+        new IntersectionObserver(entries => {
+            for (const entry of entries) {
+                onScreen = entry.isIntersecting;
+                if (onScreen) arm(false);
+                else halt();
+            }
+        }, { threshold: 0.25 }).observe(box);
+    } else {
+        onScreen = true;
+        arm(true);
+    }
+
     document.addEventListener("visibilitychange", () => {
-        if (document.hidden) clearInterval(timer);
-        else restart();
+        if (document.hidden) halt();
+        else arm(false);
     });
 }
 

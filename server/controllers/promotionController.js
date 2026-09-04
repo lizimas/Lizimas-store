@@ -30,13 +30,37 @@ const pool = require("../config/database");
 const cloudinary = require("../config/cloudinary");
 const { logActivity } = require("../utils/activityLog");
 
-function uploadBufferToCloudinary(fileBuffer) {
+// The transform lives in the delivery URL rather than in an eager
+// derivative. Every clip is under the 30MB upload cap, which is inside
+// Cloudinary's on-the-fly video ceiling, so the compressed file is built on
+// first request and there is never a window where the URL points at nothing.
+function promoVideoUrls(secureUrl) {
+    if (!secureUrl) return { url: null, poster: null };
+    const url = secureUrl.replace("/upload/",
+        "/upload/w_720,c_limit,q_auto,f_auto/");
+    // Cloudinary derives a still from any frame of a video, so the poster
+    // costs no second upload. so_0 takes the opening frame.
+    const poster = secureUrl
+        .replace("/upload/", "/upload/so_0,w_720,c_limit,q_auto/")
+        .replace(/\.[a-z0-9]+$/i, ".jpg");
+    return { url, poster };
+}
+
+// resource_type must be "video" or Cloudinary tries to parse the buffer as an
+// image and rejects it outright.
+function uploadBufferToCloudinary(fileBuffer, kind) {
+    const isVideo = kind === "video";
+    const options = isVideo
+        ? { folder: "lizimas-store/promotions", resource_type: "video" }
+        : { folder: "lizimas-store/promotions" };
+
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-            { folder: "lizimas-store/promotions" },
+            options,
             (error, result) => {
                 if (error) return reject(error);
-                resolve(result.secure_url);
+                if (!isVideo) return resolve({ url: result.secure_url, poster: null });
+                resolve(promoVideoUrls(result.secure_url));
             }
         );
         stream.end(fileBuffer);
@@ -49,7 +73,7 @@ exports.listPromotions = async (req, res) => {
         const result = await pool.query(
             `SELECT id, image_url, link_url, title, slot, display_order,
                     headline, subtext, cta_label, bg_color, text_color, layout,
-                    category_id
+                    category_id, media_type, video_url, poster_url
              FROM promotions
              WHERE is_active = true
              ORDER BY slot ASC, display_order ASC, id ASC`
@@ -67,7 +91,7 @@ exports.listAllPromotions = async (req, res) => {
         const result = await pool.query(
             `SELECT id, image_url, link_url, title, slot, display_order, is_active, created_at,
                     headline, subtext, cta_label, bg_color, text_color, layout,
-                    category_id
+                    category_id, media_type, video_url, poster_url
              FROM promotions
              ORDER BY slot ASC, display_order ASC, id ASC`
         );
@@ -126,23 +150,41 @@ exports.createPromotion = async (req, res) => {
             return res.status(400).json({ message: "A row tile needs a category." });
         }
         if (layout === "row_tile" && !req.file) {
-            return res.status(400).json({ message: "A row tile needs an image." });
+            return res.status(400).json({ message: "A row tile needs an image or a video." });
         }
 
-        const imageUrl = req.file
-            ? await uploadBufferToCloudinary(req.file.buffer)
+        // The middleware has already vetted the type; this only decides which
+        // Cloudinary path the buffer takes.
+        const isVideo = !!req.file && /^video\//i.test(req.file.mimetype || "");
+        // Only a row tile is built to play anything. A banner or strip would
+        // render a video into a layout that has no timing logic for it.
+        if (isVideo && layout !== "row_tile") {
+            return res.status(400).json({
+                message: "Only a category row tile can use a video."
+            });
+        }
+
+        const mediaType = isVideo ? "video" : "image";
+        const uploaded = req.file
+            ? await uploadBufferToCloudinary(req.file.buffer, mediaType)
             : null;
+        const imageUrl = uploaded && !isVideo ? uploaded.url : null;
+        const videoUrl = uploaded && isVideo ? uploaded.url : null;
+        const posterUrl = uploaded && isVideo ? uploaded.poster : null;
 
         const result = await pool.query(
             `INSERT INTO promotions (image_url, link_url, title, slot, display_order,
                                      headline, subtext, cta_label, bg_color, layout,
-                                     text_color, category_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                                     text_color, category_id,
+                                     media_type, video_url, poster_url)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                     $13, $14, $15)
              RETURNING id, image_url, link_url, title, slot, display_order, is_active,
                        headline, subtext, cta_label, bg_color, text_color, layout,
-                       category_id`,
+                       category_id, media_type, video_url, poster_url`,
             [imageUrl, linkUrl, title, slot, displayOrder,
-                headline, subtext, ctaLabel, bgColor, layout, textColor, categoryId]
+                headline, subtext, ctaLabel, bgColor, layout, textColor, categoryId,
+                mediaType, videoUrl, posterUrl]
         );
 
         await logActivity(req.user.id, "create_promotion", "promotion",
@@ -223,20 +265,50 @@ exports.updatePromotion = async (req, res) => {
         }
 
         let imageUrl = current.image_url;
-        if (req.file) imageUrl = await uploadBufferToCloudinary(req.file.buffer);
+        let videoUrl = current.video_url;
+        let posterUrl = current.poster_url;
+        let mediaType = current.media_type || "image";
+
+        if (req.file) {
+            const isVideo = /^video\//i.test(req.file.mimetype || "");
+            if (isVideo && layout !== "row_tile") {
+                return res.status(400).json({
+                    message: "Only a category row tile can use a video."
+                });
+            }
+            const uploaded = await uploadBufferToCloudinary(
+                req.file.buffer, isVideo ? "video" : "image");
+            mediaType = isVideo ? "video" : "image";
+            // Swapping one kind for the other clears the old source, so a
+            // leftover image cannot outrank the new video in the renderer.
+            imageUrl = isVideo ? null : uploaded.url;
+            videoUrl = isVideo ? uploaded.url : null;
+            posterUrl = isVideo ? uploaded.poster : null;
+        }
+
+        // Moving a tile off row_tile takes its video with it: no other layout
+        // knows how to play one, and the check constraint would reject a
+        // video row with no source anyway.
+        if (mediaType === "video" && layout !== "row_tile") {
+            mediaType = "image";
+            videoUrl = null;
+            posterUrl = null;
+        }
 
         const result = await pool.query(
             `UPDATE promotions
              SET image_url = $1, link_url = $2, title = $3, slot = $4, display_order = $5,
                      headline = $7, subtext = $8, cta_label = $9,
                      bg_color = $10, layout = $11, text_color = $12,
-                     category_id = $13
+                     category_id = $13, media_type = $14, video_url = $15,
+                     poster_url = $16
              WHERE id = $6
              RETURNING id, image_url, link_url, title, slot, display_order, is_active,
                        headline, subtext, cta_label, bg_color, text_color, layout,
-                       category_id`,
+                       category_id, media_type, video_url, poster_url`,
             [imageUrl, linkUrl, title, slot, displayOrder, id,
-                headline, subtext, ctaLabel, bgColor, layout, textColor, categoryId]
+                headline, subtext, ctaLabel, bgColor, layout, textColor, categoryId,
+                mediaType, videoUrl, posterUrl]
         );
 
         await logActivity(req.user.id, "update_promotion", "promotion", id, "Updated promotion");

@@ -54,3 +54,79 @@ async function preparePickedFile(file, attempt) {
         return { ok: false, name: file.name, reason: err.message };
     }
 }
+
+// Video counterpart. Same first guard as above -- read the bytes now so a
+// cloud-gallery provider cannot hand back a lazy stub that fails at upload
+// time -- but the image decode is replaced by a metadata load, which also
+// gives us the duration without a second pass over the file.
+const PICKED_VIDEO_MAX_SECONDS = 30;
+
+async function preparePickedVideo(file, attempt) {
+    attempt = attempt || 1;
+    let url = null;
+    try {
+        const buf = await file.arrayBuffer();
+        if (buf.byteLength !== file.size) throw new Error("size mismatch");
+        const bytes = new Uint8Array(buf);
+        if (bytes.length < 32) throw new Error("file too small");
+
+        // mp4 and mov both carry an "ftyp" box near the start. A file that
+        // lacks it is either truncated or not the container it claims to be.
+        // webm uses a different magic number, so it skips this check.
+        const isWebm = bytes[0] === 0x1A && bytes[1] === 0x45
+            && bytes[2] === 0xDF && bytes[3] === 0xA3;
+        if (!isWebm) {
+            const ftyp = bytes[4] === 0x66 && bytes[5] === 0x74
+                && bytes[6] === 0x79 && bytes[7] === 0x70;
+            if (!ftyp) throw new Error("not a readable mp4 or mov");
+        }
+
+        const blob = new Blob([buf], { type: file.type || "video/mp4" });
+        url = URL.createObjectURL(blob);
+
+        const duration = await new Promise((resolve, reject) => {
+            const probe = document.createElement("video");
+            probe.preload = "metadata";
+            // A file the browser cannot decode never fires either event, so
+            // the wait is bounded rather than left hanging on the form.
+            const bail = setTimeout(() => reject(new Error("could not read video")), 15000);
+            probe.onloadedmetadata = () => {
+                clearTimeout(bail);
+                resolve(probe.duration);
+            };
+            probe.onerror = () => {
+                clearTimeout(bail);
+                reject(new Error("could not decode video"));
+            };
+            probe.src = url;
+        });
+
+        if (!duration || !isFinite(duration)) throw new Error("no duration");
+        if (duration > PICKED_VIDEO_MAX_SECONDS + 0.5) {
+            // Not retried: a long clip is not a read failure, and a second
+            // attempt would give the same answer.
+            URL.revokeObjectURL(url);
+            return {
+                ok: false,
+                name: file.name,
+                fatal: true,
+                reason: `${Math.round(duration)}s long, limit is ${PICKED_VIDEO_MAX_SECONDS}s`
+            };
+        }
+
+        URL.revokeObjectURL(url);
+        return {
+            ok: true,
+            duration: duration,
+            file: new File([blob], file.name,
+                { type: blob.type, lastModified: file.lastModified })
+        };
+    } catch (err) {
+        if (url) URL.revokeObjectURL(url);
+        if (attempt === 1) {
+            await new Promise(r => setTimeout(r, 300));
+            return preparePickedVideo(file, 2);
+        }
+        return { ok: false, name: file.name, reason: err.message };
+    }
+}

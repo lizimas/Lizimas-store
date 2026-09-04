@@ -18,8 +18,10 @@ router.get("/", listPromotions);
 
 // Admin only
 router.get("/manage", requireAuth, requireAdmin, listAllPromotions);
-router.post("/", requireAuth, requireAdmin, upload.single("image"), createPromotion);
-router.put("/:id", requireAuth, requireAdmin, upload.single("image"), updatePromotion);
+router.post("/", requireAuth, requireAdmin,
+    upload.promoMedia.single("image"), createPromotion);
+router.put("/:id", requireAuth, requireAdmin,
+    upload.promoMedia.single("image"), updatePromotion);
 router.patch("/:id/status", requireAuth, requireAdmin, setPromotionStatus);
 router.delete("/:id", requireAuth, requireAdmin, deletePromotion);
 
