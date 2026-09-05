@@ -46,6 +46,35 @@ exports.updateMyVendorProfile = async (req, res) => {
             return res.status(400).json({ error: "National ID number cannot be blank." });
         }
 
+        // One account per business: a registration number or national ID
+        // that's already tied to another APPROVED vendor can't be reused.
+        // Pending/rejected vendors don't block this - only an approved
+        // account counts as "this business already has an account". The
+        // partial unique index in migration 054 is the final authority;
+        // this is just an earlier, friendlier version of the same check.
+        if (registration_number) {
+            const dupe = await pool.query(
+                "SELECT id FROM vendors WHERE status = 'approved' AND id != $1 AND LOWER(TRIM(registration_number)) = LOWER(TRIM($2))",
+                [vendor.id, registration_number]
+            );
+            if (dupe.rows.length > 0) {
+                return res.status(409).json({
+                    error: "This registration number is already associated with another approved vendor account."
+                });
+            }
+        }
+        if (national_id_number) {
+            const dupe = await pool.query(
+                "SELECT id FROM vendors WHERE status = 'approved' AND id != $1 AND LOWER(TRIM(national_id_number)) = LOWER(TRIM($2))",
+                [vendor.id, national_id_number]
+            );
+            if (dupe.rows.length > 0) {
+                return res.status(409).json({
+                    error: "This national ID is already associated with another approved vendor account."
+                });
+            }
+        }
+
         const result = await pool.query(
             `UPDATE vendors SET
                 registration_number = COALESCE($1, registration_number),
@@ -139,6 +168,17 @@ exports.approveVendor = async (req, res) => {
         }
         res.json({ message: "Vendor approved.", vendor: result.rows[0] });
     } catch (error) {
+        // One account per business, enforced at the DB level (migration 054):
+        // approving this vendor would create a second APPROVED account
+        // sharing a shop name, registration number, or national ID with an
+        // already-approved vendor. The soft checks at registration/
+        // verification catch most of these earlier, but this is the final,
+        // race-condition-safe authority.
+        if (error.code === "23505") {
+            return res.status(409).json({
+                error: "Cannot approve: another approved vendor already uses the same shop name, registration number, or national ID. Reject this application or resolve the conflict first."
+            });
+        }
         res.status(500).json({ error: error.message });
     }
 };

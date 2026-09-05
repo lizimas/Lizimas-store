@@ -274,6 +274,23 @@ async function registerVendor(req, res) {
             return res.status(409).json({ error: "An account with this email already exists." });
         }
 
+        // One account per business: block registering under a shop name
+        // that's already an approved, active vendor. Pending/rejected
+        // applications don't block a new registration - only an approved
+        // account counts as "this business already has an account". The
+        // partial unique index in migration 054 is the final authority;
+        // this is just an earlier, friendlier version of the same check.
+        const existingApprovedBusiness = await client.query(
+            "SELECT id FROM vendors WHERE status = 'approved' AND LOWER(TRIM(business_name)) = LOWER(TRIM($1))",
+            [business_name]
+        );
+
+        if (existingApprovedBusiness.rows.length > 0) {
+            return res.status(409).json({
+                error: "An approved vendor already exists with this shop name. If this is your business, please contact support instead of registering again."
+            });
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const usernameBase = email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "").toLowerCase() || "vendor";
