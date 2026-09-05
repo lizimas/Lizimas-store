@@ -75,6 +75,9 @@
                     <button class="tab-btn" data-tab="staff">
                         <span class="sidebar-icon">&#128100;</span> Staff & Approvals
                     </button>
+                    <button class="tab-btn" data-tab="vendors">
+                        <span class="sidebar-icon">&#127970;</span> Vendors
+                    </button>
                     <button class="tab-btn" data-tab="security">
                         <span class="sidebar-icon">&#128274;</span> Security
                     </button>
@@ -557,6 +560,45 @@
                     </div>
                 </section>
 
+                <section id="tab-vendors" class="tab-content hidden">
+                    <h2 class="admin-page-title">Vendors</h2>
+                    <p class="admin-page-subtitle">Vendor applications, drop-off points, handover inspection and returns collection.</p>
+
+                    <div class="panel">
+                        <h2>Pending Vendor Applications</h2>
+                        <div id="pending-vendors-list">Loading...</div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Drop-off Points</h2>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
+                            <div>
+                                <label style="font-size:12px; font-weight:600; display:block;">Name</label>
+                                <input type="text" id="dropoff-name" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
+                            </div>
+                            <div>
+                                <label style="font-size:12px; font-weight:600; display:block;">Address</label>
+                                <input type="text" id="dropoff-address" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
+                            </div>
+                            <label style="font-size:13px; display:flex; align-items:center; gap:6px;">
+                                <input type="checkbox" id="dropoff-is-hub"> Central hub
+                            </label>
+                            <button onclick="createDropoffPoint()" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:9px 14px; cursor:pointer;">Add</button>
+                        </div>
+                        <div id="dropoff-points-list">Loading...</div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Handovers Awaiting Inspection</h2>
+                        <div id="pending-handovers-list">Loading...</div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Returns Awaiting Collection</h2>
+                        <div id="pending-returns-list">Loading...</div>
+                    </div>
+                </section>
+
                 <section id="tab-security" class="tab-content hidden">
                     <h2 class="admin-page-title">Security</h2>
                     <p class="admin-page-subtitle">Login attempts grouped by the email used, split by which portal was tried. Red rows contain failures.</p>
@@ -697,7 +739,7 @@
 <script src="js/prepare-picked-file.js?v=10"></script>
 <script src="js/description-block-editor.js?v=13"></script>
 <script src="js/category-select.js?v=2"></script>
-    <script src="js/admin.js?v=46"></script>
+    <script src="js/admin.js?v=48"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

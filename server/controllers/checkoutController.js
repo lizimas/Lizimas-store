@@ -59,7 +59,7 @@ exports.checkout = async (req, res) => {
 
             if (variantId) {
                 const variantResult = await client.query(
-                    "SELECT v.id, v.product_id, v.variant_name, v.price, v.stock, p.name AS product_name, COALESCE(v.image_path, p.image) AS image_url, c.name AS color_name, s.name AS size_name FROM product_variants v JOIN products p ON p.id = v.product_id LEFT JOIN product_colors c ON c.id = v.color_id LEFT JOIN product_sizes s ON s.id = v.size_id WHERE v.id = $1 AND v.product_id = $2",
+                    "SELECT v.id, v.product_id, v.variant_name, v.price, v.stock, p.name AS product_name, p.vendor_id, COALESCE(v.image_path, p.image) AS image_url, c.name AS color_name, s.name AS size_name FROM product_variants v JOIN products p ON p.id = v.product_id LEFT JOIN product_colors c ON c.id = v.color_id LEFT JOIN product_sizes s ON s.id = v.size_id WHERE v.id = $1 AND v.product_id = $2",
                     [variantId, productId]
                 );
 
@@ -83,6 +83,7 @@ exports.checkout = async (req, res) => {
                 validatedItems.push({
                     productId,
                     variantId,
+                    vendorId: variant.vendor_id,
                     productName: variant.product_name, imageUrl: variant.image_url, variantColor: variant.color_name || variant.variant_name, variantSize: variant.size_name || null,
                     quantity,
                     price: itemPrice
@@ -90,7 +91,7 @@ exports.checkout = async (req, res) => {
 
             } else {
                 const productResult = await client.query(
-                    "SELECT id, name, price, stock, COALESCE(image, (SELECT image_path FROM product_images WHERE product_id = products.id ORDER BY COALESCE(display_order, 999999), id LIMIT 1)) AS image FROM products WHERE id = $1",
+                    "SELECT id, name, price, stock, vendor_id, COALESCE(image, (SELECT image_path FROM product_images WHERE product_id = products.id ORDER BY COALESCE(display_order, 999999), id LIMIT 1)) AS image FROM products WHERE id = $1",
                     [productId]
                 );
 
@@ -130,6 +131,7 @@ exports.checkout = async (req, res) => {
                 validatedItems.push({
                     productId,
                     variantId: null,
+                    vendorId: product.vendor_id,
                     productName: product.name, imageUrl: product.image, variantColor: colorName, variantSize: sizeName,
                     quantity,
                     price: itemPrice
@@ -278,10 +280,15 @@ exports.checkout = async (req, res) => {
         const order = orderResult.rows[0];
 
         for (const item of validatedItems) {
+            // Vendor-sourced items start their own handover/inspection/returns
+            // lifecycle (see 052_vendor_fulfilment.sql); staff-stocked items
+            // (vendorId null) leave handover_status null - not applicable.
+            const handoverStatus = item.vendorId ? "pending_handover" : null;
+
             await client.query(
-                `INSERT INTO order_items (order_id, product_id, quantity, price, product_name, image_url, variant_color, variant_size)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                [order.id, item.productId, item.quantity, item.price, item.productName, item.imageUrl, item.variantColor, item.variantSize]
+                `INSERT INTO order_items (order_id, product_id, quantity, price, product_name, image_url, variant_color, variant_size, handover_status)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                [order.id, item.productId, item.quantity, item.price, item.productName, item.imageUrl, item.variantColor, item.variantSize, handoverStatus]
             );
 
             if (item.variantId) {

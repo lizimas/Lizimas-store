@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<title>Vendor Login - Lizimas Store</title>
+<link rel="stylesheet" href="css/style.css?v=66">
+<link rel="stylesheet" href="css/auth.css?v=9">
+</head>
+
+<body>
+
+<div class="checkout-page auth-page">
+
+    <header class="checkout-header">
+        <div class="checkout-logo-row">
+            <div class="checkout-logo-badge"><img src="https://res.cloudinary.com/ag407tk0/image/upload/whatsapp-gold.jpg" alt="Lizimas Store" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block"></div>
+            <h1 class="checkout-brand-name">Lizimas Store</h1>
+        </div>
+        <div class="checkout-secure-badge">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#067647" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+            Vendor Login
+        </div>
+    </header>
+
+    <nav class="checkout-nav-links">
+        <a href="index.html">Home</a>
+        <a href="vendor-policies.html">Vendor Policies</a>
+        <a href="vendor-register.html">Become a Vendor</a>
+    </nav>
+
+    <div class="auth-card" id="login-form-card">
+
+        <div class="auth-card-head">
+            <div class="auth-icon-badge">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#E8B33A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/></svg>
+            </div>
+            <h2 class="auth-title">Vendor sign in</h2>
+            <p class="auth-subtitle">Manage your listings, orders, and application status.</p>
+        </div>
+
+        <p id="registered-banner" class="auth-error is-ok hidden">Application submitted! Log in to finish setting up your shop.</p>
+
+        <div class="auth-field">
+            <label class="auth-label" for="login-email">Email Address</label>
+            <span class="auth-input-wrap">
+                <input id="login-email" type="email" placeholder="Enter your email address" autocomplete="email">
+            </span>
+        </div>
+
+        <div class="auth-field">
+            <label class="auth-label" for="login-password">Password</label>
+            <span class="auth-input-wrap">
+                <input id="login-password" type="password" placeholder="Enter your password" autocomplete="current-password">
+            </span>
+        </div>
+
+        <input type="text" id="login-2fa-code" class="hidden auth-input-wrap" placeholder="Enter 6-digit code">
+        <button id="login-2fa-btn" class="hidden auth-submit" onclick="submitVendorLogin2FA()">Verify Code</button>
+        <button id="login-2fa-email-btn" class="hidden" onclick="requestVendorEmailLoginCode()" style="background:none; border:none; color:#C9A227; text-decoration:underline; cursor:pointer; font-size:14px; padding:8px 0;">Email me a code instead</button>
+
+        <input type="password" id="login-reset-password" class="hidden auth-input-wrap" placeholder="New password">
+        <input type="password" id="login-reset-password-confirm" class="hidden auth-input-wrap" placeholder="Confirm new password">
+        <button id="login-reset-btn" class="hidden auth-submit" onclick="submitVendorForcedReset()">Set New Password</button>
+
+        <div id="login-setup-block" class="hidden">
+            <p class="auth-hint">Scan this with your authenticator app, then enter the code below.</p>
+            <img id="login-setup-qr" alt="2FA QR Code" style="max-width:200px; display:block; margin:12px auto;">
+            <p style="font-size:13px; word-break:break-all;">Manual key: <code id="login-setup-key"></code></p>
+            <input type="text" id="login-setup-code" placeholder="Enter 6-digit code" inputmode="numeric" class="auth-input-wrap">
+            <button id="login-setup-btn" onclick="submitVendor2FASetup()" class="auth-submit">Verify &amp; Continue</button>
+        </div>
+
+        <p id="login-error" class="auth-error"></p>
+
+        <button id="login-btn" class="auth-submit" onclick="handleVendorLogin()">Sign in</button>
+
+        <p class="auth-foot">
+            Not a vendor yet? <a href="vendor-register.html">Apply here</a>
+        </p>
+
+    </div>
+
+</div>
+
+<script src="js/vendor-auth.js?v=2"></script>
+</body>
+</html>

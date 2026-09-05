@@ -29,6 +29,23 @@ const {
 const { createStaffAccount, activateStaffAccount, blockStaffAccount, forcePasswordReset, logoutAllDevices, resetStaff2FA, getLoginHistory } = require("../controllers/authController");
 
 const { requireAuth, requireAdmin } = require("./../middleware/authMiddleware");
+const {
+    listDropoffPoints,
+    createDropoffPoint,
+    updateDropoffPoint,
+    getPendingHandovers,
+    acceptHandover,
+    rejectHandover,
+    markReturned,
+    getPendingReturns,
+    markCollected,
+    markForfeited
+} = require("../controllers/fulfilmentController");
+const {
+    getPendingVendors,
+    approveVendor,
+    rejectVendor
+} = require("../controllers/vendorController");
 const csvUpload = require("../middleware/csvUpload");
 const { getSecurityLogins, unlockAccount, getAccountReports, updateAccountReport } = require("../controllers/adminController");
 
@@ -76,4 +93,24 @@ router.patch("/security/reports/:id", updateAccountReport);
 router.patch("/orders/:id/status", updateOrderStatus);
 
 router.post("/products/import", csvUpload.single("file"), require("../controllers/adminController").importProducts);
+
+// Vendor fulfilment: drop-off points, handover inspection, returns collection
+// Vendor KYC review
+router.get("/vendors/pending", getPendingVendors);
+router.patch("/vendors/:id/approve", approveVendor);
+router.patch("/vendors/:id/reject", rejectVendor);
+
+router.get("/dropoff-points", listDropoffPoints);
+router.post("/dropoff-points", createDropoffPoint);
+router.patch("/dropoff-points/:id", updateDropoffPoint);
+
+router.get("/handovers/pending", getPendingHandovers);
+router.patch("/handovers/:orderItemId/accept", acceptHandover);
+router.patch("/handovers/:orderItemId/reject", rejectHandover);
+router.patch("/handovers/:orderItemId/return", markReturned);
+
+router.get("/returns/pending", getPendingReturns);
+router.patch("/returns/:orderItemId/collect", markCollected);
+router.patch("/returns/:orderItemId/forfeit", markForfeited);
+
 module.exports = router;

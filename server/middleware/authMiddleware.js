@@ -129,4 +129,16 @@ function requireSupportOrAdmin(req, res, next) {
     next();
 }
 
-module.exports = { requireAuth, requireAuthOrSetup, requireAdmin, requireStaffOrAdmin, requireSupportOrAdmin, optionalAuth };
+// Third-party marketplace sellers. Kept separate from requireStaffOrAdmin:
+// vendors are external accounts and must never fall into a role check meant
+// for internal staff. Ownership of a given product/order is still checked
+// inside the controllers (a vendor role alone does not imply access to a
+// specific row).
+function requireVendor(req, res, next) {
+    if (!req.user || req.user.role !== "vendor") {
+        return res.status(403).json({ error: "Vendor access required." });
+    }
+    next();
+}
+
+module.exports = { requireAuth, requireAuthOrSetup, requireAdmin, requireStaffOrAdmin, requireSupportOrAdmin, requireVendor, optionalAuth };

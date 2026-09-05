@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<title>Lizimas Store — Vendor Dashboard</title>
+<link rel="stylesheet" href="../css/admin.css?v=14">
+</head>
+<body>
+
+    <div id="dashboard-screen" class="dashboard-screen">
+
+        <div class="admin-shell">
+
+            <aside class="admin-sidebar">
+                <div class="sidebar-brand">
+                    <span class="sidebar-brand-icon">L</span>
+                    <span>Vendor Portal</span>
+                </div>
+
+                <nav class="sidebar-nav">
+                    <button class="tab-btn active" data-tab="overview">
+                        <span class="sidebar-icon">&#9635;</span> Overview
+                    </button>
+                    <button class="tab-btn" data-tab="products">
+                        <span class="sidebar-icon">&#128230;</span> My Products
+                    </button>
+                    <button class="tab-btn" data-tab="add-product">
+                        <span class="sidebar-icon">&#10133;</span> Add Product
+                    </button>
+                    <button class="tab-btn" data-tab="handovers">
+                        <span class="sidebar-icon">&#128230;</span> Handover
+                    </button>
+                    <button class="tab-btn" data-tab="returns">
+                        <span class="sidebar-icon">&#8634;</span> Returns
+                    </button>
+                    <button class="tab-btn" data-tab="account">
+                        <span class="sidebar-icon">&#9881;</span> Account
+                    </button>
+                </nav>
+            </aside>
+
+            <main class="admin-main">
+
+                <section id="tab-overview" class="tab-content">
+                    <h2 class="admin-page-title">Overview</h2>
+                    <p class="admin-page-subtitle">Your vendor application and business profile.</p>
+
+                    <div class="panel" id="vendor-status-panel">
+                        <div id="vendor-status-banner">Loading...</div>
+                    </div>
+
+                    <div class="panel hidden" id="vendor-verification-panel">
+                        <h2>Complete Verification</h2>
+                        <p class="admin-page-subtitle" id="vendor-verification-intro">Just one more step to finish setting up your shop.</p>
+
+                        <div style="display:flex; flex-direction:column; gap:12px; max-width:420px;">
+
+                            <div class="hidden" id="vendor-verification-regnum-group">
+                                <label style="font-size:13px; font-weight:600; color:#333;">URSB Business Registration Number</label>
+                                <input type="text" id="vendor-verification-regnum" placeholder="Your registered business number" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+
+                            <div class="hidden" id="vendor-verification-natid-group">
+                                <label style="font-size:13px; font-weight:600; color:#333;">National ID Number</label>
+                                <input type="text" id="vendor-verification-natid" placeholder="For identity verification (KYC)" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+
+                            <div>
+                                <label style="font-size:13px; font-weight:600; color:#333;">Mobile Money Payout Number</label>
+                                <input type="tel" id="vendor-verification-momo" placeholder="Where your payouts will be sent" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+
+                            <p id="vendor-verification-status" style="color:#DC2626; font-size:13px; margin:0;"></p>
+
+                            <button onclick="submitVendorVerification()" style="background:#16264f; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; width:fit-content;">Save</button>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Business Profile</h2>
+                        <div id="vendor-profile-details">Loading...</div>
+                    </div>
+                </section>
+
+                <section id="tab-products" class="tab-content hidden">
+                    <h2 class="admin-page-title">My Products</h2>
+                    <p class="admin-page-subtitle">Products you've listed. New listings need admin approval before they go live.</p>
+                    <div class="panel">
+                        <div id="vendor-products-list">Loading...</div>
+                    </div>
+                </section>
+
+                <section id="tab-add-product" class="tab-content hidden">
+                    <h2 class="admin-page-title">Add Product</h2>
+                    <p class="admin-page-subtitle">
+                        Follow the <a href="../vendor-policies.html#content-images" target="_blank">Content &amp; Image Guidelines</a>:
+                        use an accurate name and description, list everything included, price in UGX, and at least
+                        three clear photos that show the actual item. New listings are reviewed before they go live.
+                    </p>
+
+                    <div class="panel">
+                        <input type="hidden" id="product-id">
+                        <div style="display:flex; flex-direction:column; gap:12px; max-width:560px;">
+
+                            <div>
+                                <label style="font-size:13px; font-weight:600; color:#333;">Product Name</label>
+                                <input type="text" id="product-name" placeholder="Accurate, specific name (include colour/size/spec if relevant)" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+
+                            <div>
+                                <label style="font-size:13px; font-weight:600; color:#333;">Category</label>
+                                <select id="product-category" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%;"></select>
+                            </div>
+
+                            <div>
+                                <label style="font-size:13px; font-weight:600; color:#333;">Description</label>
+                                <textarea id="product-description" rows="4" placeholder="Features, condition, intended use, and everything included in the box" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;"></textarea>
+                            </div>
+
+                            <div style="display:flex; gap:12px;">
+                                <div style="flex:1;">
+                                    <label style="font-size:13px; font-weight:600; color:#333;">Price (UGX)</label>
+                                    <input type="number" id="product-price" min="0" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                </div>
+                                <div style="flex:1;">
+                                    <label style="font-size:13px; font-weight:600; color:#333;">Stock</label>
+                                    <input type="number" id="product-stock" min="0" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style="font-size:13px; font-weight:600; color:#333;">Package Size (delivery tier)</label>
+                                <select id="product-package-size" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%;">
+                                    <option value="Small">Small — fits in a boda rider's bag</option>
+                                    <option value="Medium">Medium — boda, strapped or on the seat</option>
+                                    <option value="Large">Large — van or special hire, one person</option>
+                                    <option value="Extra Large">Extra Large — pickup or truck, two people</option>
+                                </select>
+                            </div>
+
+                            <div style="display:flex; gap:12px;">
+                                <div style="flex:1;">
+                                    <label style="font-size:13px; font-weight:600; color:#333;">Brand <span style="font-weight:400; color:#888;">(if applicable)</span></label>
+                                    <input type="text" id="product-brand" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                </div>
+                                <div style="flex:1;">
+                                    <label style="font-size:13px; font-weight:600; color:#333;">Warranty (months)</label>
+                                    <input type="number" id="product-warranty-months" min="0" placeholder="Leave blank if none" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                </div>
+                            </div>
+
+                            <div style="display:flex; gap:12px;">
+                                <div style="flex:1;">
+                                    <label style="font-size:13px; font-weight:600; color:#333;">GTIN <span style="font-weight:400; color:#888;">(barcode, optional)</span></label>
+                                    <input type="text" id="product-gtin" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                </div>
+                                <div style="flex:1;">
+                                    <label style="font-size:13px; font-weight:600; color:#333;">MPN <span style="font-weight:400; color:#888;">(manufacturer part no., optional)</span></label>
+                                    <input type="text" id="product-mpn" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style="font-size:13px; font-weight:600; color:#333;">Photos <span style="font-weight:400; color:#888;">(at least 3 recommended — clear, well lit, no watermarks)</span></label>
+                                <input type="file" id="product-images" accept="image/*" multiple style="padding:6px 0;">
+                            </div>
+
+                            <label style="font-size:13px; display:flex; gap:8px; align-items:flex-start; background:#FFF8E1; padding:10px; border-radius:8px;">
+                                <input type="checkbox" id="product-authenticity-confirm" style="margin-top:3px;">
+                                <span>I confirm this product is authentic, accurately described, and that I can provide invoices/supplier documentation if Lizimas Store requests proof of authenticity (<a href="../vendor-policies.html#anti-counterfeit" target="_blank">Anti-Counterfeit Policy</a>).</span>
+                            </label>
+
+                            <button id="product-submit-btn" onclick="submitVendorProductForm()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:12px; cursor:pointer; font-weight:600;">Submit for Approval</button>
+                            <p id="product-form-status" style="font-size:13px; color:#666;"></p>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-handovers" class="tab-content hidden">
+                    <h2 class="admin-page-title">Handover to Lizimas Store</h2>
+                    <p class="admin-page-subtitle">
+                        Prepare each item per the
+                        <a href="../vendor-policies.html#packaging" target="_blank">Packaging Guidelines</a> and
+                        <a href="../vendor-policies.html#fulfilment" target="_blank">Fulfilment Guidelines</a>,
+                        then mark it handed over once you've dropped it at the chosen location. Lizimas Store
+                        inspects each item before accepting it.
+                    </p>
+                    <div class="panel">
+                        <div id="vendor-handovers-list">Loading...</div>
+                    </div>
+                </section>
+
+                <section id="tab-returns" class="tab-content hidden">
+                    <h2 class="admin-page-title">Returns Awaiting Collection</h2>
+                    <p class="admin-page-subtitle">
+                        Failed deliveries and customer returns come back here. Collect within 7 days from the
+                        original drop-off point, or within 21 days total once moved to the central hub — after
+                        that the item may be forfeited.
+                    </p>
+                    <div class="panel">
+                        <div id="vendor-returns-list">Loading...</div>
+                    </div>
+                </section>
+
+                <section id="tab-account" class="tab-content hidden">
+                    <h2 class="admin-page-title">Account</h2>
+                    <div class="panel">
+                        <button onclick="vendorLogout()" style="background:#DC2626; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Log Out</button>
+                    </div>
+                </section>
+
+            </main>
+
+        </div>
+
+    </div>
+
+    <script src="../js/category-select.js?v=1"></script>
+    <script src="../js/vendor-dashboard.js?v=2"></script>
+</body>
+</html>

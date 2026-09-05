@@ -1656,6 +1656,13 @@ function setupTabs() {
                 loadActivityLog();
                 loadStaffSessions();
             }
+
+            if (button.dataset.tab === "vendors") {
+                loadPendingVendors();
+                loadDropoffPoints();
+                loadPendingHandovers();
+                loadPendingReturns();
+            }
         });
     });
 }
@@ -4511,3 +4518,286 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(setupDashboardClicks, 1500);
     setTimeout(setupVisitorClicks, 1800);
 });
+
+// --- Vendors tab: applications, drop-off points, handovers, returns ------
+
+async function loadPendingVendors() {
+    try {
+        const vendors = await authorizedFetch("/api/admin/vendors/pending");
+        const container = document.getElementById("pending-vendors-list");
+
+        if (!vendors || vendors.length === 0) {
+            container.innerHTML = `<p class="no-data">No vendor applications awaiting review.</p>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Business</th><th>Type</th><th>Owner</th><th>Phone</th><th>Applied</th><th>Actions</th></tr></thead>
+                <tbody>
+                    ${vendors.map(v => {
+                        const idLabel = v.account_type === "company" ? "Reg. No." : "National ID";
+                        const idValue = v.account_type === "company" ? v.registration_number : v.national_id_number;
+                        return `
+                        <tr>
+                            <td data-label="Business">${v.business_name}</td>
+                            <td data-label="Type">${v.account_type === "company" ? "Company" : v.account_type === "individual" ? "Individual" : "-"}${idValue ? ` <span style="color:#888; font-size:12px;">(${idLabel}: ${idValue})</span>` : ` <span style="color:#B45309; font-size:12px;">(${idLabel} pending)</span>`}</td>
+                            <td data-label="Owner">${v.owner_name}<br><span style="color:#888; font-size:12px;">${v.owner_email}</span></td>
+                            <td data-label="Phone">${v.phone}</td>
+                            <td data-label="Applied">${new Date(v.submitted_at).toLocaleDateString()}</td>
+                            <td data-label="Actions">
+                                <button onclick="approvePendingVendor(${v.id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Approve</button>
+                                <button onclick="rejectPendingVendor(${v.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Reject</button>
+                            </td>
+                        </tr>
+                    `; }).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load pending vendors error:", error);
+    }
+}
+
+async function approvePendingVendor(id) {
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/vendors/${id}/approve`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        loadPendingVendors();
+    } catch (error) {
+        console.error("Approve vendor error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function rejectPendingVendor(id) {
+    const reason = prompt("Reason for rejecting this vendor application:");
+    if (!reason) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/vendors/${id}/reject`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ reason })
+        });
+        loadPendingVendors();
+    } catch (error) {
+        console.error("Reject vendor error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function loadDropoffPoints() {
+    try {
+        const points = await authorizedFetch("/api/admin/dropoff-points");
+        const container = document.getElementById("dropoff-points-list");
+
+        if (!points || points.length === 0) {
+            container.innerHTML = `<p class="no-data">No drop-off points yet.</p>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Name</th><th>Address</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody>
+                    ${points.map(p => `
+                        <tr>
+                            <td data-label="Name">${p.name}</td>
+                            <td data-label="Address">${p.address}</td>
+                            <td data-label="Type">${p.is_hub ? "Central hub" : "Drop-off point"}</td>
+                            <td data-label="Status">${p.is_active ? '<span class="status-badge status-paid">Active</span>' : '<span class="status-badge status-cancelled">Inactive</span>'}</td>
+                            <td data-label="Actions">
+                                <button onclick="toggleDropoffPoint(${p.id}, ${p.is_active})" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">${p.is_active ? "Deactivate" : "Activate"}</button>
+                            </td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load dropoff points error:", error);
+    }
+}
+
+async function createDropoffPoint() {
+    const name = document.getElementById("dropoff-name").value.trim();
+    const address = document.getElementById("dropoff-address").value.trim();
+    const is_hub = document.getElementById("dropoff-is-hub").checked;
+
+    if (!name || !address) {
+        alert("Name and address are required.");
+        return;
+    }
+
+    try {
+        const token = getToken();
+        const response = await fetch(`${API_URL}/api/admin/dropoff-points`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ name, address, is_hub })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.error || "Could not create drop-off point.");
+            return;
+        }
+        document.getElementById("dropoff-name").value = "";
+        document.getElementById("dropoff-address").value = "";
+        document.getElementById("dropoff-is-hub").checked = false;
+        loadDropoffPoints();
+    } catch (error) {
+        console.error("Create dropoff point error:", error);
+        alert("Could not connect to server.");
+    }
+}
+
+async function toggleDropoffPoint(id, currentlyActive) {
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/dropoff-points/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ is_active: !currentlyActive })
+        });
+        loadDropoffPoints();
+    } catch (error) {
+        console.error("Toggle dropoff point error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function loadPendingHandovers() {
+    try {
+        const items = await authorizedFetch("/api/admin/handovers/pending");
+        const container = document.getElementById("pending-handovers-list");
+
+        if (!items || items.length === 0) {
+            container.innerHTML = `<p class="no-data">Nothing awaiting inspection.</p>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Product</th><th>Vendor</th><th>Qty</th><th>Drop-off Point</th><th>Handed Over</th><th>Actions</th></tr></thead>
+                <tbody>
+                    ${items.map(i => `
+                        <tr>
+                            <td data-label="Product">${i.product_name}</td>
+                            <td data-label="Vendor">${i.vendor_business_name || "-"}</td>
+                            <td data-label="Qty">${i.quantity}</td>
+                            <td data-label="Drop-off Point">${i.dropoff_point_name || "-"}</td>
+                            <td data-label="Handed Over">${i.handed_over_at ? new Date(i.handed_over_at).toLocaleString() : "-"}</td>
+                            <td data-label="Actions">
+                                <button onclick="acceptHandoverItem(${i.order_item_id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Accept</button>
+                                <button onclick="rejectHandoverItem(${i.order_item_id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Reject</button>
+                            </td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load pending handovers error:", error);
+    }
+}
+
+async function acceptHandoverItem(orderItemId) {
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/handovers/${orderItemId}/accept`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        loadPendingHandovers();
+    } catch (error) {
+        console.error("Accept handover error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function rejectHandoverItem(orderItemId) {
+    const reason = prompt("Reason for rejecting this handover:");
+    if (!reason) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/handovers/${orderItemId}/reject`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ reason })
+        });
+        loadPendingHandovers();
+    } catch (error) {
+        console.error("Reject handover error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function loadPendingReturns() {
+    try {
+        const items = await authorizedFetch("/api/admin/returns/pending");
+        const container = document.getElementById("pending-returns-list");
+
+        if (!items || items.length === 0) {
+            container.innerHTML = `<p class="no-data">Nothing awaiting return collection.</p>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Product</th><th>Vendor</th><th>Reason</th><th>Where</th><th>Deadline</th><th>Actions</th></tr></thead>
+                <tbody>
+                    ${items.map(i => {
+                        const deadline = new Date(i.collection_deadline);
+                        return `
+                            <tr>
+                                <td data-label="Product">${i.product_name}</td>
+                                <td data-label="Vendor">${i.vendor_business_name || "-"}</td>
+                                <td data-label="Reason">${(i.return_reason || "").replace(/_/g, " ")}</td>
+                                <td data-label="Where">${i.moved_to_hub ? "Central hub" : (i.dropoff_point_name || "-")}</td>
+                                <td data-label="Deadline"><span class="status-badge ${i.overdue ? "status-cancelled" : "status-pending"}">${i.overdue ? "Overdue" : deadline.toLocaleDateString()}</span></td>
+                                <td data-label="Actions">
+                                    <button onclick="markReturnCollected(${i.order_item_id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Collected</button>
+                                    ${i.overdue ? `<button onclick="forfeitReturnItem(${i.order_item_id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Forfeit</button>` : ""}
+                                </td>
+                            </tr>`;
+                    }).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load pending returns error:", error);
+    }
+}
+
+async function markReturnCollected(orderItemId) {
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/returns/${orderItemId}/collect`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        loadPendingReturns();
+    } catch (error) {
+        console.error("Mark collected error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function forfeitReturnItem(orderItemId) {
+    if (!confirm("Forfeit this item? This cannot be undone.")) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/returns/${orderItemId}/forfeit`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        loadPendingReturns();
+    } catch (error) {
+        console.error("Forfeit error:", error);
+        alert("Something went wrong.");
+    }
+}

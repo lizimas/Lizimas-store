@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<title>Become a Vendor - Lizimas Store</title>
+<link rel="stylesheet" href="css/style.css?v=66">
+<link rel="stylesheet" href="css/auth.css?v=9">
+</head>
+
+<body>
+
+<div class="checkout-page auth-page">
+
+    <header class="checkout-header">
+        <div class="checkout-logo-row">
+            <div class="checkout-logo-badge"><img src="https://res.cloudinary.com/ag407tk0/image/upload/whatsapp-gold.jpg" alt="Lizimas Store" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block"></div>
+            <h1 class="checkout-brand-name">Lizimas Store</h1>
+        </div>
+        <div class="checkout-secure-badge">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#067647" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+            Vendor Application
+        </div>
+    </header>
+
+    <nav class="checkout-nav-links">
+        <a href="index.html">Home</a>
+        <a href="vendor-policies.html">Vendor Policies</a>
+        <a href="vendor-login.html">Vendor Login</a>
+    </nav>
+
+    <div class="auth-card">
+
+        <div class="vendor-wizard-illustration">
+            <svg viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="18" y="46" width="124" height="58" rx="4" fill="#FEF3D8"/>
+                <rect x="18" y="46" width="124" height="16" fill="#E8B33A"/>
+                <rect x="18" y="46" width="124" height="16" fill="url(#stripes)" opacity="0.35"/>
+                <defs>
+                    <pattern id="stripes" width="14" height="16" patternUnits="userSpaceOnUse" patternTransform="skewX(-20)">
+                        <rect width="7" height="16" fill="#ffffff"/>
+                    </pattern>
+                </defs>
+                <rect x="30" y="70" width="30" height="34" rx="2" fill="#fff" stroke="#E8B33A" stroke-width="2"/>
+                <rect x="68" y="70" width="26" height="18" rx="2" fill="#fff" stroke="#1c2333" stroke-width="1.5"/>
+                <circle cx="81" cy="79" r="4" fill="#E8B33A"/>
+                <rect x="100" y="70" width="30" height="34" rx="2" fill="#1c2333" opacity="0.06"/>
+                <rect x="106" y="76" width="18" height="22" rx="2" fill="#fff" stroke="#1c2333" stroke-width="1.5"/>
+                <circle cx="115" cy="87" r="3" fill="#C9A227"/>
+                <rect x="10" y="104" width="140" height="4" rx="2" fill="#1c2333" opacity="0.08"/>
+                <circle cx="24" cy="102" r="6" fill="#DFF3E3"/>
+                <circle cx="136" cy="102" r="6" fill="#DFF3E3"/>
+            </svg>
+        </div>
+
+        <div class="vendor-wizard-dots" id="wizard-dots">
+            <div class="vendor-wizard-dot is-active" data-dot="1"></div>
+            <div class="vendor-wizard-line"></div>
+            <div class="vendor-wizard-dot" data-dot="2"></div>
+        </div>
+
+        <div class="auth-card-head" style="padding-top:2px;">
+            <h2 class="auth-title" id="wizard-title">Create Your Account</h2>
+            <p class="auth-subtitle" id="wizard-subtitle">Let's start with a few details about you.</p>
+        </div>
+
+        <!-- Step 1: Account -->
+        <div id="wizard-step-1" class="wizard-step">
+
+            <div class="auth-field">
+                <label class="auth-label" for="reg-name">Your Full Name</label>
+                <span class="auth-input-wrap">
+                    <input id="reg-name" type="text" placeholder="Enter your full name" autocomplete="name">
+                </span>
+            </div>
+
+            <div class="auth-field">
+                <label class="auth-label" for="reg-email">Email Address</label>
+                <span class="auth-input-wrap">
+                    <input id="reg-email" type="email" placeholder="Enter your email address" autocomplete="email">
+                </span>
+            </div>
+
+            <div class="auth-field">
+                <label class="auth-label" for="reg-phone">Phone Number</label>
+                <span class="auth-input-wrap">
+                    <input id="reg-phone" type="tel" placeholder="+256 7XX XXX XXX" autocomplete="tel">
+                </span>
+            </div>
+
+            <div class="auth-field">
+                <label class="auth-label" for="reg-password">Password</label>
+                <span class="auth-input-wrap">
+                    <input id="reg-password" type="password" placeholder="Create a strong password" autocomplete="new-password">
+                </span>
+                <p class="auth-hint">Use 8+ characters with a mix of letters, numbers &amp; symbols.</p>
+            </div>
+
+            <p id="step1-status" class="auth-error"></p>
+
+            <button class="auth-submit" onclick="vendorWizardGoToStep2()">Continue</button>
+
+            <p class="auth-foot">
+                Already applied? <a href="vendor-login.html">Sign in</a>
+            </p>
+
+        </div>
+
+        <!-- Step 2: Shop Information -->
+        <div id="wizard-step-2" class="wizard-step hidden">
+
+            <div class="auth-field">
+                <label class="auth-label">Account Type</label>
+                <div class="account-type-cards">
+                    <div class="account-type-card" id="account-type-company" onclick="vendorSelectAccountType('company')">
+                        <span class="account-type-card-icon">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="1"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        </span>
+                        <span class="account-type-card-label">Company</span>
+                        <span class="account-type-card-radio"></span>
+                    </div>
+                    <div class="account-type-card" id="account-type-individual" onclick="vendorSelectAccountType('individual')">
+                        <span class="account-type-card-icon">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg>
+                        </span>
+                        <span class="account-type-card-label">Individual</span>
+                        <span class="account-type-card-radio"></span>
+                    </div>
+                </div>
+                <p class="auth-hint" id="account-type-hint">Company applicants will later confirm a URSB registration number; individuals will confirm a national ID. Either way, this is only needed after you log in.</p>
+            </div>
+
+            <div class="auth-field">
+                <label class="auth-label" for="reg-business-name">Shop Name</label>
+                <span class="auth-input-wrap">
+                    <input id="reg-business-name" type="text" placeholder="Your shop or business name">
+                </span>
+                <p class="auth-hint">If you already have your own brand, avoid using its exact name as your shop name.</p>
+            </div>
+
+            <div class="auth-field">
+                <label class="auth-label" for="reg-address">Location</label>
+                <span class="auth-input-wrap">
+                    <input id="reg-address" type="text" placeholder="District, area, street">
+                </span>
+            </div>
+
+            <div class="auth-field">
+                <label class="auth-label" for="reg-referral">How did you hear about Lizimas Store? <span class="auth-optional">(optional)</span></label>
+                <span class="auth-input-wrap">
+                    <select id="reg-referral" style="border:none; background:transparent; width:100%; font-size:15px; color:inherit; outline:none;">
+                        <option value="">Select an option</option>
+                        <option value="social_media">Social Media</option>
+                        <option value="friend_family">Friend or Family</option>
+                        <option value="search_engine">Search Engine</option>
+                        <option value="radio_tv">Radio / TV</option>
+                        <option value="existing_customer">Already a Lizimas Store customer</option>
+                        <option value="other">Other</option>
+                    </select>
+                </span>
+            </div>
+
+            <div class="auth-field auth-consent">
+                <label class="auth-consent-label">
+                    <input type="checkbox" id="reg-policies-consent">
+                    <span>I hereby confirm that I have read and agree to the
+                        <a href="vendor-policies.html" target="_blank" rel="noopener">Lizimas Store Vendor Policies</a>
+                        (Anti-Counterfeit, Content &amp; Image, Delivery, Fulfilment, Packaging and Vendor Data Protection) referenced therein.</span>
+                </label>
+            </div>
+
+            <p id="register-status" class="auth-error"></p>
+
+            <div class="auth-wizard-nav">
+                <button class="auth-back-btn" onclick="vendorWizardGoToStep1()">Back</button>
+                <button class="auth-submit" style="flex:1 1 auto;" onclick="registerVendor()">Submit</button>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script src="js/vendor-auth.js?v=2"></script>
+</body>
+</html>

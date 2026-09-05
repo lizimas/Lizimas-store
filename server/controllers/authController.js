@@ -226,6 +226,107 @@ async function staffLogin(req, res) {
     return handleLogin(req, res, STAFF_LOGIN_ROLES, "staff");
 }
 
+const VENDOR_LOGIN_ROLES = ["vendor"];
+
+async function vendorLogin(req, res) {
+    return handleLogin(req, res, VENDOR_LOGIN_ROLES, "vendor");
+}
+
+// Vendor self-registration. Unlike staff (invited by an admin), a vendor
+// creates their own account, then waits for KYC review before they can list
+// products - the users row and the vendors row are created together so an
+// account can never exist without its (pending) vendor profile.
+// Bump this when the vendor policy set (Anti-Counterfeit, Content & Image,
+// Packaging, Delivery, Fulfilment, Vendor Data Protection) materially changes,
+// so existing vendors' recorded acceptance stays tied to the version they saw.
+const VENDOR_POLICY_VERSION = "2026-09";
+
+async function registerVendor(req, res) {
+    const { name, email, password, phone, business_name, account_type,
+            physical_address, referral_source, accept_policies } = req.body;
+
+    if (!name || !email || !password || !phone || !business_name) {
+        return res.status(400).json({
+            error: "Name, email, password, phone, and shop name are required."
+        });
+    }
+
+    if (account_type !== "individual" && account_type !== "company") {
+        return res.status(400).json({
+            error: "Please choose whether you're registering as an Individual or a Company."
+        });
+    }
+
+    if (accept_policies !== true && accept_policies !== "true") {
+        return res.status(400).json({
+            error: "You must accept the Lizimas Store vendor policies to register."
+        });
+    }
+
+    const client = await pool.connect();
+    try {
+        const existingUser = await client.query(
+            "SELECT id FROM users WHERE email = $1",
+            [email]
+        );
+
+        if (existingUser.rows.length > 0) {
+            return res.status(409).json({ error: "An account with this email already exists." });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const usernameBase = email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "").toLowerCase() || "vendor";
+        let username = usernameBase;
+        let usernameSuffix = 0;
+
+        while (true) {
+            const existingUsername = await client.query(
+                "SELECT id FROM users WHERE username = $1",
+                [username]
+            );
+            if (existingUsername.rows.length === 0) break;
+            usernameSuffix += 1;
+            username = `${usernameBase}${usernameSuffix}`;
+        }
+
+        await client.query("BEGIN");
+
+        const userResult = await client.query(
+            "INSERT INTO users (name, email, password, phone, username, role) VALUES ($1, $2, $3, $4, $5, 'vendor') RETURNING id, name, email, phone, role",
+            [name, email, hashedPassword, phone, username]
+        );
+        const newUser = userResult.rows[0];
+
+        const vendorResult = await client.query(
+            `INSERT INTO vendors (user_id, business_name, phone, physical_address, account_type, referral_source, policies_accepted_at, policies_version)
+             VALUES ($1, $2, $3, $4, $5, $6, now(), $7) RETURNING id, status`,
+            [newUser.id, business_name, phone, physical_address || null, account_type,
+                referral_source || null, VENDOR_POLICY_VERSION]
+        );
+        const newVendor = vendorResult.rows[0];
+
+        await client.query("COMMIT");
+
+        // No token issued here on purpose: the applicant is sent to the
+        // vendor login page next, and completes KYC verification
+        // (registration number or national ID, depending on account_type)
+        // from inside the dashboard after signing in.
+        res.status(201).json({
+            message: "Vendor application submitted. Please log in to finish setting up your shop.",
+            user: { id: newUser.id, name: newUser.name, email: newUser.email, phone: newUser.phone, role: newUser.role },
+            vendor: { id: newVendor.id, status: newVendor.status }
+        });
+
+    } catch (error) {
+        try { await client.query("ROLLBACK"); } catch (e2) {}
+        console.error("Vendor register error:", error);
+        res.status(500).json({ error: "Something went wrong while creating your vendor account." });
+    } finally {
+        client.release();
+    }
+}
+
 async function handleLogin(req, res, allowedRoles, surface) {
     const { email, password } = req.body;
 
@@ -1331,6 +1432,8 @@ module.exports = {
     logLoginAttempt,
     CUSTOMER_LOGIN_ROLES,
     staffLogin,
+    vendorLogin,
+    registerVendor,
     forgotPassword,
     resetPassword,
     forcePasswordReset,

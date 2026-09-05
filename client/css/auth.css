@@ -597,3 +597,142 @@
 .g_id_signin > div {
     color-scheme: light;
 }
+
+/* --- Generic hidden utility (used by multi-step / conditional fields) --- */
+.hidden { display: none !important; }
+
+/* --- Vendor registration wizard --------------------------------------- */
+
+.vendor-wizard-illustration {
+    display: flex;
+    justify-content: center;
+    padding: 22px 0 6px;
+}
+
+.vendor-wizard-illustration svg { width: 132px; height: auto; }
+
+.vendor-wizard-dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 0 4px;
+}
+
+.vendor-wizard-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #e3d9be;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.vendor-wizard-dot.is-active {
+    background: #E8B33A;
+    transform: scale(1.2);
+}
+
+.vendor-wizard-dot.is-done { background: #C9A227; }
+
+.vendor-wizard-line {
+    width: 30px;
+    height: 2px;
+    background: #e3d9be;
+}
+
+.vendor-wizard-step-label {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #C9A227;
+    margin: 0 0 2px;
+}
+
+.account-type-cards {
+    display: flex;
+    gap: 12px;
+    margin: 4px 0 4px;
+}
+
+.account-type-card {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 14px;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 10px;
+    cursor: pointer;
+    background: #fff;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.account-type-card:hover { border-color: #d8c48a; }
+
+.account-type-card.is-selected {
+    border-color: #E8B33A;
+    background: #FEF9EC;
+}
+
+.account-type-card-icon {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: #f3ede0;
+    color: #C9A227;
+}
+
+.account-type-card-label {
+    flex: 1 1 auto;
+    font-weight: 600;
+    font-size: 14px;
+    color: #1c2333;
+}
+
+.account-type-card-radio {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid #c7c7c7;
+    flex: 0 0 auto;
+    position: relative;
+}
+
+.account-type-card.is-selected .account-type-card-radio {
+    border-color: #E8B33A;
+}
+
+.account-type-card.is-selected .account-type-card-radio::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: 50%;
+    background: #E8B33A;
+}
+
+.auth-wizard-nav {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.auth-wizard-nav .auth-submit { margin-top: 0; }
+
+.auth-back-btn {
+    flex: 0 0 auto;
+    background: #fff;
+    color: #1c2333;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 0 18px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.auth-back-btn:hover { border-color: #c7c7c7; }

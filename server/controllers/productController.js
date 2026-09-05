@@ -35,7 +35,22 @@ exports.addProduct = async (req, res) => {
         const packageSize = safePackageSize(package_size);
         const warrantyMonths = warranty_months ? Number(warranty_months) : null;
 
-        const status = req.user.role === "product_staff" ? "pending" : "approved";
+        const status = ["product_staff", "vendor"].includes(req.user.role) ? "pending" : "approved";
+
+        // Vendor-submitted products carry a vendor_id so they can be scoped to
+        // that vendor's own listings/orders/payouts, separately from created_by
+        // (which just records who clicked "add").
+        let vendorId = null;
+        if (req.user.role === "vendor") {
+            const vendorRow = await pool.query(
+                "SELECT id FROM vendors WHERE user_id = $1",
+                [req.user.userId]
+            );
+            if (vendorRow.rows.length === 0) {
+                return res.status(403).json({ error: "No vendor profile found for this account." });
+            }
+            vendorId = vendorRow.rows[0].id;
+        }
 
         const uploadedFiles = req.files || [];
         const imagePaths = await Promise.all(
@@ -46,13 +61,13 @@ exports.addProduct = async (req, res) => {
         const product = await pool.query(
             `INSERT INTO products (name,category_id,description,price,stock,image,status,created_by,
                 material,color,sleeve,style,length,fit,pattern,care_instructions,occasion,package_size,warranty_months,
-              brand,gtin,mpn)
-             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING *`,
+              brand,gtin,mpn,vendor_id)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING *`,
             [name, category_id, description, price, stock, mainImage, status, req.user.userId,
                 material || null, color || null, sleeve || null, style || null, length || null,
                 fit || null, pattern || null, care_instructions || null, occasion || null,
                 packageSize, warrantyMonths,
-                brand || null, gtin || null, mpn || null]
+                brand || null, gtin || null, mpn || null, vendorId]
         );
 
         const newProduct = product.rows[0];
@@ -723,7 +738,7 @@ exports.updateProduct = async (req, res) => {
             uploadedFiles.map(f => uploadBufferToCloudinary(f.buffer))
         );
 
-        const statusClause = req.user.role === "product_staff" ? `, status='pending'` : "";
+        const statusClause = ["product_staff", "vendor"].includes(req.user.role) ? `, status='pending'` : "";
 
         let updateQuery = `UPDATE products SET name=$1, category_id=$2, description=$3, price=$4, stock=$5,
             material=$6, color=$7, sleeve=$8, style=$9, length=$10, fit=$11, pattern=$12, care_instructions=$13, occasion=$14,
@@ -762,7 +777,7 @@ exports.updateProduct = async (req, res) => {
 
         logActivity(req.user.userId, "edited_product", "product", Number(id), `Edited "${name}"`);
 
-        const message = req.user.role === "product_staff"
+        const message = ["product_staff", "vendor"].includes(req.user.role)
             ? "Product updated and is pending admin approval."
             : "Product updated successfully";
 
@@ -858,6 +873,16 @@ exports.deleteProduct = async (req, res) => {
             return res.status(403).json({ error: "Product Staff cannot delete products. Ask a Store Manager or Admin." });
         }
 
+        if (role === "vendor") {
+            const owned = await pool.query(
+                `SELECT id FROM products WHERE id = $1 AND created_by = $2 AND deleted_at IS NULL`,
+                [id, req.user.userId]
+            );
+            if (owned.rows.length === 0) {
+                return res.status(403).json({ error: "You can only delete your own products." });
+            }
+        }
+
         if (role === "store_manager") {
             const existing = await pool.query(
                 `SELECT id FROM product_deletion_requests WHERE product_id = $1 AND status = 'pending'`,
@@ -912,9 +937,10 @@ exports.getCategories = async (req, res) => {
 exports.getPendingProducts = async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT p.*, u.name AS submitted_by_name
+            `SELECT p.*, u.name AS submitted_by_name, v.business_name AS vendor_business_name
              FROM products p
              LEFT JOIN users u ON u.id = p.created_by
+             LEFT JOIN vendors v ON v.id = p.vendor_id
              WHERE p.status = 'pending' AND p.deleted_at IS NULL
              ORDER BY p.created_at DESC`
         );
