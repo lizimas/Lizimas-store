@@ -3,6 +3,7 @@ const { sendOrderStatusSms } = require("../utils/sms");
 const { sendOrderStatusEmail, sendOrderConfirmationEmail } = require("../utils/mailer");
 const { sign: signReceipt } = require("../routes/receipt");
 const { priceOrder } = require("../utils/deliveryPricing");
+const { DiscountError, resolveDiscountCode, recordDiscountCodeUsage } = require("../utils/discounts");
 
 // Base URL for links that leave the app (emails, receipts). Hardcoding the
 // production domain makes locally generated links unusable, since they resolve
@@ -11,7 +12,7 @@ const PUBLIC_BASE_URL =
     String(process.env.PUBLIC_BASE_URL || "https://lizimasstore.com").replace(/\/+$/, "");
 
 exports.checkout = async (req, res) => {
-    const { items, payment_method, delivery_address, customer_name, phone, alt_phone, delivery_fee, delivery_method } = req.body;
+    const { items, payment_method, delivery_address, customer_name, phone, alt_phone, delivery_fee, delivery_method, discount_code } = req.body;
 
     // Structured address parts. delivery_division / delivery_area are also
     // sent by the client but are display strings only - the zone and the
@@ -125,7 +126,24 @@ exports.checkout = async (req, res) => {
                     );
                     sizeName = sr.rows.length ? sr.rows[0].name : null;
                 }
-                const itemPrice = Number(product.price);
+
+                // A currently-running flash sale on this product wins over the
+                // regular price - flash_sale_items only pins to a plain
+                // product (no variant), which is why this check lives here
+                // rather than in the variant branch above.
+                const flashPrice = await client.query(
+                    `SELECT fsi.sale_price FROM flash_sale_items fsi
+                     JOIN flash_sales fs ON fs.id = fsi.flash_sale_id
+                     WHERE fsi.product_id = $1
+                       AND fs.is_active = true
+                       AND fs.ends_at >= now()
+                       AND (fs.starts_at IS NULL OR fs.starts_at <= now())
+                     LIMIT 1`,
+                    [productId]
+                );
+                const itemPrice = flashPrice.rows.length
+                    ? Number(flashPrice.rows[0].sale_price)
+                    : Number(product.price);
                 total += itemPrice * quantity;
 
                 validatedItems.push({
@@ -258,26 +276,44 @@ exports.checkout = async (req, res) => {
             customerEmail = null;
         }
 
-        const finalTotal = total + effectiveDeliveryFee;
+        let resolvedDiscount = { id: null, code: null, amount: 0 };
+        try {
+            resolvedDiscount = await resolveDiscountCode(client, discount_code, total);
+        } catch (err) {
+            if (err instanceof DiscountError) {
+                await client.query("ROLLBACK");
+                return res.status(400).json({ error: err.message });
+            }
+            throw err;
+        }
+
+        const finalTotal = total + effectiveDeliveryFee - resolvedDiscount.amount;
 
         const orderResult = await client.query(
             `INSERT INTO orders
                 (user_id, customer_name, phone, alt_phone, total, payment_method, delivery_address, status, delivery_fee, delivery_method,
                  delivery_location_id, delivery_location_path, delivery_zone_id, delivery_zone_name,
                  delivery_village, delivery_street, delivery_building, delivery_landmark,
-                 delivery_recipient, delivery_phone, delivery_phone_alt, customer_email, subtotal)
+                 delivery_recipient, delivery_phone, delivery_phone_alt, customer_email, subtotal,
+                 discount_code, discount_amount)
              VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9,
                      $10, $11, $12, $13,
                      $14, $15, $16, $17,
-                     $18, $19, $20, $21, $22)
+                     $18, $19, $20, $21, $22,
+                     $23, $24)
              RETURNING *`,
             [userId, customer_name, phone, alt_phone || null, finalTotal, payment_method, delivery_address, effectiveDeliveryFee, safeDeliveryMethod,
              resolvedLocationId, locationPath, zoneId, zoneName,
              deliveryVillage, deliveryStreet, deliveryBuilding, deliveryLandmark,
-             customer_name, phone, alt_phone || null, customerEmail, total]
+             customer_name, phone, alt_phone || null, customerEmail, total,
+             resolvedDiscount.code, resolvedDiscount.amount]
         );
 
         const order = orderResult.rows[0];
+
+        if (resolvedDiscount.id) {
+            await recordDiscountCodeUsage(client, resolvedDiscount.id);
+        }
 
         for (const item of validatedItems) {
             // Vendor-sourced items start their own handover/inspection/returns

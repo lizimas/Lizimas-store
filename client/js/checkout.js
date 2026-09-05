@@ -11,6 +11,11 @@ let currentDeliveryFee = null;
 let currentDeliveryMethod = "delivery";
 let lastKnownZone = null;
 
+// Set once a code is validated against the current cart subtotal via
+// /api/discounts/preview. Cleared whenever the cart contents could have
+// changed the subtotal it was checked against.
+let appliedDiscount = null;
+
 function getCartTotal() {
     const cart = JSON.parse(localStorage.getItem("cart")) || [];
     return cart.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
@@ -20,23 +25,59 @@ function renderOrderSummary() {
     const productTotal = getCartTotal();
     document.getElementById("order-product-total").textContent = "UGX " + productTotal.toLocaleString();
 
+    const discountRow = document.getElementById("discount-amount-row");
+    const discountAmount = appliedDiscount ? appliedDiscount.amount : 0;
+    if (discountRow) {
+        // Matches this file's existing show/hide convention (style.display),
+        // not the "hidden" class - .order-summary-row has no such CSS rule.
+        discountRow.style.display = appliedDiscount ? "flex" : "none";
+        if (appliedDiscount) {
+            document.getElementById("order-discount-amount").textContent =
+                "-UGX " + discountAmount.toLocaleString();
+        }
+    }
+
     const feeEl = document.getElementById("order-delivery-fee");
     const totalEl = document.getElementById("order-total-amount");
 
     if (currentDeliveryMethod === "pickup") {
         feeEl.textContent = "Free";
-        totalEl.textContent = "UGX " + productTotal.toLocaleString();
+        totalEl.textContent = "UGX " + Math.max(0, productTotal - discountAmount).toLocaleString();
         return;
     }
 
     if (currentDeliveryFee === null) {
         feeEl.textContent = "Enter address";
-        totalEl.textContent = "UGX " + productTotal.toLocaleString();
+        totalEl.textContent = "UGX " + Math.max(0, productTotal - discountAmount).toLocaleString();
         return;
     }
 
     feeEl.textContent = "UGX " + currentDeliveryFee.toLocaleString();
-    totalEl.textContent = "UGX " + (productTotal + currentDeliveryFee).toLocaleString();
+    totalEl.textContent = "UGX " +
+        Math.max(0, productTotal + currentDeliveryFee - discountAmount).toLocaleString();
+}
+
+async function applyDiscountCode() {
+    const input = document.getElementById("discount-code-input");
+    const status = document.getElementById("discount-code-status");
+    const code = input.value.trim();
+
+    if (!code) {
+        status.textContent = "Enter a code first.";
+        return;
+    }
+
+    status.textContent = "Checking...";
+    try {
+        const result = await apiPost("/discounts/preview", { code, subtotal: getCartTotal() });
+        appliedDiscount = { code: result.code, amount: Number(result.discount_amount) };
+        status.textContent = `"${result.code}" applied - you save UGX ${appliedDiscount.amount.toLocaleString()}.`;
+        renderOrderSummary();
+    } catch (error) {
+        appliedDiscount = null;
+        status.textContent = error.message || "That code is not valid.";
+        renderOrderSummary();
+    }
 }
 
 function onDeliveryMethodChange() {
@@ -278,7 +319,8 @@ function placeOrder() {
         delivery_method: deliveryMethod,
         delivery_fee: deliveryFee,
         payment_method: payment,
-        total: total,
+        discount_code: appliedDiscount ? appliedDiscount.code : null,
+        total: Math.max(0, total - (appliedDiscount ? appliedDiscount.amount : 0)),
         items: items
     };
 
@@ -316,6 +358,7 @@ function showConfirmModal() {
         <div class="modal-item-list">${itemRows}</div>
         <div class="modal-detail-row"><span>Delivery</span><span>${pendingOrder.delivery_method === "pickup" ? "Self pickup" : "UGX " + pendingOrder.delivery_fee.toLocaleString()}</span></div>
         <div class="modal-detail-row"><span>Payment Method</span><span>${pendingOrder.payment_method}</span></div>
+        ${appliedDiscount ? `<div class="modal-detail-row"><span>Discount (${esc(appliedDiscount.code)})</span><span>-UGX ${appliedDiscount.amount.toLocaleString()}</span></div>` : ""}
         <div class="modal-detail-row modal-detail-total"><span>Total</span><span>UGX ${pendingOrder.total.toLocaleString()}</span></div>
     `;
 

@@ -177,6 +177,19 @@
             <span id="order-delivery-fee">Enter address</span>
         </div>
 
+        <div class="order-summary-row" style="gap:8px;">
+            <input type="text" id="discount-code-input" placeholder="Discount code"
+                   style="flex:1; padding:8px 10px; border:1px solid #ccc; border-radius:8px; text-transform:uppercase;">
+            <button type="button" onclick="applyDiscountCode()"
+                    style="padding:8px 14px; border:none; border-radius:8px; background:#0f1b3d; color:#fff; cursor:pointer;">Apply</button>
+        </div>
+        <p id="discount-code-status" class="delivery-fee-status"></p>
+
+        <div class="order-summary-row" id="discount-amount-row" style="display:none;">
+            <div class="order-summary-icon-label"><span>Discount</span></div>
+            <span id="order-discount-amount">-UGX 0</span>
+        </div>
+
         <div class="order-summary-total-row">
             <span>Total Amount</span>
             <span id="order-total-amount">UGX 0</span>
@@ -247,7 +260,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/api.js?v=1"></script>
 <script src="js/lz-location-picker.js?v=5"></script>
-<script src="js/checkout.js?v=10"></script>
+<script src="js/checkout.js?v=11"></script>
 
 
 <a href="https://wa.me/256792363104" target="_blank" rel="noopener" class="whatsapp-float" aria-label="Chat with us on WhatsApp">

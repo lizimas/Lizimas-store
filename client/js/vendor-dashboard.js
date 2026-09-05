@@ -501,6 +501,77 @@ async function loadVendorReturns() {
     }
 }
 
+// --- Active promotions (read-only) -----------------------------------
+// Admin-only to create; vendors just get to see what is currently running.
+// Both endpoints are public and unauthenticated - no vendor token needed.
+
+function vendorFmtUgx(n) {
+    return "UGX " + Number(n || 0).toLocaleString();
+}
+
+// Escapes admin-entered free text (flash sale title/subtitle, discount code
+// description) before it goes into innerHTML - none of it is restricted to
+// a safe character set server-side, unlike the code itself.
+const vendorEsc = s => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+async function loadVendorPromotions() {
+    const box = document.getElementById("vendor-promotions-panel");
+    if (!box) return;
+
+    let codes = [];
+    let flashSale = null;
+    try {
+        const [codesRes, flashRes] = await Promise.all([
+            fetch("/api/discounts/active"),
+            fetch("/api/flash-sales/active")
+        ]);
+        if (codesRes.ok) codes = await codesRes.json();
+        if (flashRes.ok) flashSale = await flashRes.json();
+    } catch (error) {
+        console.error("Load vendor promotions error:", error);
+        box.innerHTML = `<p style="color:#6b7280">Could not load current promotions.</p>`;
+        return;
+    }
+
+    if (codes.length === 0 && !flashSale) {
+        box.innerHTML = `<p style="color:#6b7280">No store-wide promotions are running right now.</p>`;
+        return;
+    }
+
+    let html = "";
+
+    if (flashSale) {
+        html += `<div style="margin-bottom:16px; padding:12px; background:#fef3d8; border-radius:8px;">
+            <strong>${vendorEsc(flashSale.title || "Flash Sale")}</strong>
+            ${flashSale.subtitle ? `<p style="margin:4px 0 0; font-size:13px; color:#4a5568;">${vendorEsc(flashSale.subtitle)}</p>` : ""}
+            <p style="margin:4px 0 0; font-size:13px; color:#4a5568;">
+                Ends ${new Date(flashSale.ends_at).toLocaleString()} &middot;
+                ${(flashSale.items || []).length} product${(flashSale.items || []).length === 1 ? "" : "s"}
+            </p>
+        </div>`;
+    }
+
+    if (codes.length > 0) {
+        html += `<table class="admin-table"><thead><tr>
+                <th>Code</th><th>Discount</th><th>Min Order</th><th>Ends</th>
+            </tr></thead><tbody>` +
+            codes.map(c => {
+                const value = c.discount_type === "percent" ? `${Number(c.value)}%` : vendorFmtUgx(c.value);
+                return `<tr>
+                    <td data-label="Code"><strong>${vendorEsc(c.code)}</strong>${c.description ? ` <span style="color:#6b7280; font-size:12px;">${vendorEsc(c.description)}</span>` : ""}</td>
+                    <td data-label="Discount">${value}</td>
+                    <td data-label="Min Order">${c.min_order_amount ? vendorFmtUgx(c.min_order_amount) : "—"}</td>
+                    <td data-label="Ends">${c.ends_at ? new Date(c.ends_at).toLocaleDateString() : "No end date"}</td>
+                </tr>`;
+            }).join("") +
+            `</tbody></table>`;
+    }
+
+    box.innerHTML = html;
+}
+
 // --- Init -----------------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -511,4 +582,5 @@ document.addEventListener("DOMContentLoaded", () => {
     setupVendorTabs();
     loadVendorStatus();
     loadVendorCategories();
+    loadVendorPromotions();
 });

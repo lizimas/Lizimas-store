@@ -3,10 +3,39 @@ const API_URL = "";
 
 let allProducts = [];
 
+// A running flash sale wins over the regular price wherever a product is
+// looked up by id (quick add, the product modal, cart) - not just on its own
+// homepage card - so the price a customer adds to cart at always matches
+// what the flash-deals section showed them. allProducts stays the full
+// catalogue even on a scoped category/brand/search view (see below), so
+// patching it once here covers every lookup path.
+async function applyActiveFlashSalePricing() {
+    try {
+        const response = await fetch(`${API_URL}/api/flash-sales/active`);
+        if (!response.ok) return;
+        const sale = await response.json();
+        if (!sale || !sale.items) return;
+
+        const saleByProductId = new Map(sale.items.map(item => [item.id, item]));
+        allProducts.forEach(product => {
+            const item = saleByProductId.get(product.id);
+            if (!item) return;
+            const salePrice = Number(item.sale_price);
+            if (!(salePrice < Number(product.price))) return;
+            product.originalPrice = product.price;
+            product.discount = Math.round((1 - salePrice / product.originalPrice) * 100);
+            product.price = salePrice;
+        });
+    } catch (error) {
+        console.error("Apply flash sale pricing error:", error);
+    }
+}
+
 async function loadProducts() {
     try {
         const response = await fetch(`${API_URL}/api/products`);
         allProducts = await response.json();
+        await applyActiveFlashSalePricing();
         console.log("Lizimas Products Loaded:", allProducts);
 
         // A category tile on the homepage links here with ?category=Name.
@@ -1626,3 +1655,89 @@ function renderCategoryHeading(name, count) {
     row.innerHTML = `<h2 class="category-section-title">${name}</h2>
         <span class="category-section-count">${count} item${count === 1 ? "" : "s"}</span>`;
 }
+
+// ---------------------------------------------------------------------------
+// Flash deals ("Grab Or Gone!"): a single time-boxed campaign (flash_sales)
+// with a shared countdown over a curated set of specially-priced products
+// (flash_sale_items). Reuses buildProductCard/buildPriceHtml/buildBadge by
+// shaping each item into the same product fields they already expect.
+let flashCountdownTimer = null;
+
+function flashSaleProductCard(item) {
+    const originalPrice = Number(item.original_price);
+    const salePrice = Number(item.sale_price);
+    const discount = originalPrice > salePrice
+        ? Math.round((1 - salePrice / originalPrice) * 100) : 0;
+
+    return buildProductCard({
+        id: item.id,
+        name: item.name,
+        image: item.image,
+        price: salePrice,
+        originalPrice: originalPrice > salePrice ? originalPrice : undefined,
+        discount: discount > 0 ? discount : undefined,
+        stock: item.stock
+    });
+}
+
+function startFlashCountdown(endsAt) {
+    const section = document.getElementById("ls-flash");
+    const endTime = new Date(endsAt).getTime();
+
+    const tick = () => {
+        const remaining = endTime - Date.now();
+        if (remaining <= 0) {
+            clearInterval(flashCountdownTimer);
+            if (section) section.hidden = true;
+            return;
+        }
+        const totalSeconds = Math.floor(remaining / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        const pad = n => String(n).padStart(2, "0");
+
+        const h = document.querySelector('#ls-flash-countdown [data-unit="h"]');
+        const m = document.querySelector('#ls-flash-countdown [data-unit="m"]');
+        const s = document.querySelector('#ls-flash-countdown [data-unit="s"]');
+        if (h) h.textContent = pad(hours);
+        if (m) m.textContent = pad(minutes);
+        if (s) s.textContent = pad(seconds);
+    };
+
+    tick();
+    clearInterval(flashCountdownTimer);
+    flashCountdownTimer = setInterval(tick, 1000);
+}
+
+async function loadFlashSale() {
+    const section = document.getElementById("ls-flash");
+    if (!section) return;
+
+    try {
+        const response = await fetch("/api/flash-sales/active");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const sale = await response.json();
+
+        if (!sale || !sale.items || sale.items.length === 0) {
+            section.hidden = true;
+            return;
+        }
+
+        document.getElementById("ls-flash-title").textContent = sale.title || "Grab Or Gone!";
+        const sub = document.getElementById("ls-flash-sub");
+        if (sub) sub.textContent = sale.subtitle || "";
+
+        const scroll = document.getElementById("ls-flash-scroll");
+        scroll.innerHTML = "";
+        sale.items.forEach(item => scroll.appendChild(flashSaleProductCard(item)));
+
+        startFlashCountdown(sale.ends_at);
+        section.hidden = false;
+    } catch (error) {
+        console.error("Load flash sale error:", error);
+        section.hidden = true;
+    }
+}
+
+document.addEventListener("DOMContentLoaded", loadFlashSale);

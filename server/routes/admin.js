@@ -46,6 +46,23 @@ const {
     approveVendor,
     rejectVendor
 } = require("../controllers/vendorController");
+
+const {
+    generateCode,
+    listDiscountCodes,
+    createDiscountCode,
+    setDiscountCodeActive,
+    deleteDiscountCode
+} = require("../controllers/discountController");
+
+const {
+    listFlashSales,
+    getFlashSale,
+    createFlashSale,
+    updateFlashSale,
+    setFlashSaleActive,
+    deleteFlashSale
+} = require("../controllers/flashSaleController");
 const csvUpload = require("../middleware/csvUpload");
 const { getSecurityLogins, unlockAccount, getAccountReports, updateAccountReport } = require("../controllers/adminController");
 
@@ -112,5 +129,19 @@ router.patch("/handovers/:orderItemId/return", markReturned);
 router.get("/returns/pending", getPendingReturns);
 router.patch("/returns/:orderItemId/collect", markCollected);
 router.patch("/returns/:orderItemId/forfeit", markForfeited);
+
+
+router.get("/discount-codes", listDiscountCodes);
+router.post("/discount-codes/generate-code", generateCode);
+router.post("/discount-codes", createDiscountCode);
+router.patch("/discount-codes/:id/active", setDiscountCodeActive);
+router.delete("/discount-codes/:id", deleteDiscountCode);
+
+router.get("/flash-sales", listFlashSales);
+router.get("/flash-sales/:id", getFlashSale);
+router.post("/flash-sales", createFlashSale);
+router.put("/flash-sales/:id", updateFlashSale);
+router.patch("/flash-sales/:id/active", setFlashSaleActive);
+router.delete("/flash-sales/:id", deleteFlashSale);
 
 module.exports = router;

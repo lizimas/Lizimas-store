@@ -12,6 +12,8 @@ router.use("/vendors", require("./vendors"));
 router.use("/momo", require("./momo"));
 router.use("/categories", require("./categories"));
 router.use("/promotions", require("./promotions"));
+router.use("/discounts", require("./discounts"));
+router.use("/flash-sales", require("./flashSales"));
 router.use("/chat", require("./chat"));
 router.use("/products", require("./products"));
 router.use("/variants", require("./variants"));

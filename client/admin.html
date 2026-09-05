@@ -63,6 +63,12 @@
                     <button class="tab-btn" data-tab="promotions">
                         Promotions
                     </button>
+                    <button class="tab-btn" data-tab="discounts">
+                        Discount Codes
+                    </button>
+                    <button class="tab-btn" data-tab="flash-sales">
+                        Flash Sales
+                    </button>
                     <button class="tab-btn" data-tab="orders">
                         <span class="sidebar-icon">&#128203;</span> Orders
                     </button>
@@ -324,6 +330,13 @@
                        edges crop. Video is allowed here only: 30 seconds and 30MB maximum, .mp4,
                        .mov or .webm. A video plays right through; a still holds for 5 seconds
                        before the next tile.</p>
+                    <p class="promo-hint">Slots 5 and 6 are curated homepage category grids, each
+                       tile pinned to a category and labelled with its title. Slot 5 renders as a
+                       row of small square tiles (upload square, e.g. 400&times;400) &mdash; good for
+                       browsing sub-categories at a glance. Slot 6 renders as a row of larger cards
+                       with the label overlaid at the bottom (upload at 800&times;1000) &mdash; good
+                       for a handful of broad departments. Neither needs a link URL: tapping a tile
+                       goes straight to its pinned category.</p>
 
                     <div class="promo-slot-tiles" id="promo-slot-tiles">
                         <button type="button" class="promo-slot-tile selected" data-slot="all"
@@ -355,6 +368,18 @@
                             <span class="pst-note">Announcement strip</span>
                             <span class="pst-count" data-count="3">0</span>
                         </button>
+                        <button type="button" class="promo-slot-tile" data-slot="5"
+                                onclick="setPromoSlotFilter('5')">
+                            <span class="pst-name">Slot 5</span>
+                            <span class="pst-note">Category tile grid</span>
+                            <span class="pst-count" data-count="5">0</span>
+                        </button>
+                        <button type="button" class="promo-slot-tile" data-slot="6"
+                                onclick="setPromoSlotFilter('6')">
+                            <span class="pst-name">Slot 6</span>
+                            <span class="pst-note">Category banner grid</span>
+                            <span class="pst-count" data-count="6">0</span>
+                        </button>
                     </div>
 
                     <button class="add-btn" onclick="openPromoForm()">+ Add Promotion</button>
@@ -373,6 +398,7 @@
                                         <option value="strip_text">Strip announcement &mdash; scrolling text</option>
                                         <option value="strip_link">Strip tile &mdash; icon and link</option>
                                         <option value="row_tile">Category row tile &mdash; pinned to a category</option>
+                                        <option value="category_grid">Category grid tile &mdash; slot 5 or 6</option>
                                     </select>
                                     <input type="text" id="promo-title" placeholder="Title (optional, for your reference)">
                                     <select id="promo-slot">
@@ -380,6 +406,8 @@
                                         <option value="2">Slot 2 &mdash; right banner</option>
                                         <option value="3">Slot 3 &mdash; announcement strip</option>
                                         <option value="4">Slot 4 &mdash; category row tile</option>
+                                        <option value="5">Slot 5 &mdash; category tile grid</option>
+                                        <option value="6">Slot 6 &mdash; category banner grid</option>
                                     </select>
                                     <input type="text" id="promo-link" placeholder="Link, e.g. /product/68">
                                     <input type="number" id="promo-order" placeholder="Display order (lower shows first)">
@@ -467,6 +495,134 @@
                                 </tr>
                             </thead>
                             <tbody id="promotions-table-body"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section id="tab-discounts" class="tab-content hidden">
+                    <h2 class="admin-page-title">Discount Codes</h2>
+                    <p class="admin-page-sub">One memorable code per campaign, e.g. SAVE-K7M4 &mdash;
+                       not a batch of single-use codes. Customers enter it at checkout.</p>
+
+                    <button class="add-btn" onclick="openDiscountForm()">+ Add Discount Code</button>
+
+                    <div id="discount-form-container" class="hidden panel">
+                        <h3 id="discount-form-title">Add Discount Code</h3>
+                        <input type="hidden" id="discount-id">
+
+                        <div class="field-row">
+                            <input type="text" id="discount-code" maxlength="30"
+                                   placeholder="Code, e.g. SAVE25 (leave blank to auto-generate)">
+                            <button type="button" onclick="generateDiscountCode()">Generate</button>
+                            <select id="discount-type">
+                                <option value="percent">Percent off</option>
+                                <option value="fixed">Fixed amount off (UGX)</option>
+                            </select>
+                            <input type="number" id="discount-value" min="0" step="0.01"
+                                   placeholder="Value, e.g. 25">
+                        </div>
+                        <div class="field-row">
+                            <input type="text" id="discount-description" maxlength="200"
+                                   placeholder="Description (optional, for your reference)">
+                            <input type="number" id="discount-min-order" min="0"
+                                   placeholder="Minimum order amount, UGX (optional)">
+                            <input type="number" id="discount-usage-limit" min="1"
+                                   placeholder="Usage limit (optional)">
+                        </div>
+                        <div class="field-row">
+                            <label>Starts<br><input type="datetime-local" id="discount-starts"></label>
+                            <label>Ends<br><input type="datetime-local" id="discount-ends"></label>
+                        </div>
+
+                        <p id="discount-form-error" class="form-error"></p>
+                        <div class="form-actions">
+                            <button class="save-btn" onclick="saveDiscountCode()">Save Discount Code</button>
+                            <button class="cancel-btn" onclick="closeDiscountForm()">Cancel</button>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Type</th>
+                                    <th>Value</th>
+                                    <th>Min Order</th>
+                                    <th>Usage</th>
+                                    <th>Window</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="discounts-table-body"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section id="tab-flash-sales" class="tab-content hidden">
+                    <h2 class="admin-page-title">Flash Sales</h2>
+                    <p class="admin-page-sub">A time-boxed "Grab Or Gone" campaign with a homepage
+                       countdown over a set of specially-priced products. Only one active campaign
+                       shows at a time on the homepage &mdash; whichever ends soonest.</p>
+
+                    <button class="add-btn" onclick="openFlashSaleForm()">+ Add Flash Sale</button>
+
+                    <div id="flash-sale-form-container" class="hidden panel">
+                        <h3 id="flash-sale-form-title">Add Flash Sale</h3>
+                        <input type="hidden" id="flash-sale-id">
+
+                        <div class="field-row">
+                            <input type="text" id="flash-sale-title-input" maxlength="120"
+                                   placeholder="Title, e.g. Grab Or Gone!">
+                            <input type="text" id="flash-sale-subtitle" maxlength="200"
+                                   placeholder="Subtitle (optional)">
+                        </div>
+                        <div class="field-row">
+                            <label>Starts (optional)<br><input type="datetime-local" id="flash-sale-starts"></label>
+                            <label>Ends &mdash; drives the countdown<br><input type="datetime-local" id="flash-sale-ends"></label>
+                        </div>
+
+                        <h4>Products</h4>
+                        <div class="field-row">
+                            <select id="flash-item-product"></select>
+                            <input type="number" id="flash-item-price" min="0" step="0.01"
+                                   placeholder="Sale price (UGX)">
+                            <button type="button" onclick="addFlashSaleItem()">Add Product</button>
+                        </div>
+                        <div class="table-wrapper">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th>Original Price</th>
+                                        <th>Sale Price</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="flash-sale-items-body"></tbody>
+                            </table>
+                        </div>
+
+                        <p id="flash-sale-form-error" class="form-error"></p>
+                        <div class="form-actions">
+                            <button class="save-btn" onclick="saveFlashSale()">Save Flash Sale</button>
+                            <button class="cancel-btn" onclick="closeFlashSaleForm()">Cancel</button>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Ends</th>
+                                    <th>Items</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="flash-sales-table-body"></tbody>
                         </table>
                     </div>
                 </section>
@@ -739,7 +895,7 @@
 <script src="js/prepare-picked-file.js?v=10"></script>
 <script src="js/description-block-editor.js?v=13"></script>
 <script src="js/category-select.js?v=2"></script>
-    <script src="js/admin.js?v=48"></script>
+    <script src="js/admin.js?v=49"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

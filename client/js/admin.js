@@ -1663,6 +1663,14 @@ function setupTabs() {
                 loadPendingHandovers();
                 loadPendingReturns();
             }
+
+            if (button.dataset.tab === "discounts") {
+                loadAdminDiscounts();
+            }
+
+            if (button.dataset.tab === "flash-sales") {
+                loadAdminFlashSales();
+            }
         });
     });
 }
@@ -3614,7 +3622,9 @@ const PROMO_LAYOUT_NAMES = {
     image: "Image banner",
     text: "Text banner",
     strip_text: "Announcement",
-    strip_link: "Strip tile"
+    strip_link: "Strip tile",
+    row_tile: "Category row tile",
+    category_grid: "Category grid tile"
 };
 
 function renderPromoSlotTiles() {
@@ -3762,6 +3772,12 @@ const PROMO_LAYOUT_RULES = {
         category: true,
         imageHeading: "Tile image or video (600\u00d71300, video max 30s / 30MB)",
         linkHint: "Link, e.g. /products.html?category=Electronics"
+    },
+    category_grid: {
+        copy: false,
+        category: true,
+        imageHeading: "Tile image (square for slot 5, 800\u00d71000 for slot 6)",
+        linkHint: "Optional \u2014 leave blank to link to the pinned category automatically"
     }
 };
 
@@ -3783,6 +3799,28 @@ function renderPromoCategorySelect(selectedId) {
         const opt = document.createElement("option");
         opt.value = String(c.id);
         opt.textContent = c.name;
+        select.appendChild(opt);
+    }
+    if (selectedId) select.value = String(selectedId);
+}
+
+// Any category, not just level-2: slot 6 in particular links out to whole
+// departments (e.g. "Furniture"), which the row_tile list above would exclude
+// since those sit at the top level rather than under one.
+function renderPromoCategorySelectAllCategories(selectedId) {
+    const select = document.getElementById("promo-category");
+    if (!select) return;
+    const byId = new Map(allCategories.map(c => [c.id, c]));
+    select.replaceChildren();
+    const blank = document.createElement("option");
+    blank.value = "";
+    blank.textContent = "Select a category\u2026";
+    select.appendChild(blank);
+    for (const c of allCategories) {
+        const opt = document.createElement("option");
+        opt.value = String(c.id);
+        const parent = c.parent_id ? byId.get(c.parent_id) : null;
+        opt.textContent = parent ? `${parent.name} > ${c.name}` : c.name;
         select.appendChild(opt);
     }
     if (selectedId) select.value = String(selectedId);
@@ -3900,8 +3938,20 @@ function togglePromoLayout() {
     const catGroup = document.getElementById("promo-category-group");
     if (catGroup) {
         catGroup.classList.toggle("hidden", !rules.category);
-        if (rules.category) renderPromoCategorySelect(
-            document.getElementById("promo-category").value || null);
+        if (rules.category) {
+            const selected = document.getElementById("promo-category").value || null;
+            if (layout === "category_grid") {
+                renderPromoCategorySelectAllCategories(selected);
+            } else {
+                renderPromoCategorySelect(selected);
+            }
+        }
+        const hint = catGroup.querySelector("small");
+        if (hint) {
+            hint.textContent = layout === "category_grid"
+                ? "The tile links to this category's products."
+                : "The tile shows inside this category\u2019s product row.";
+        }
     }
 
     const link = document.getElementById("promo-link");
@@ -3911,16 +3961,29 @@ function togglePromoLayout() {
         if (link.disabled) link.value = "";
     }
 
+    const title = document.getElementById("promo-title");
+    if (title) {
+        title.placeholder = layout === "category_grid"
+            ? "Label shown on the tile (required)"
+            : "Title (optional, for your reference)";
+    }
+
     // Picking a strip layout from either banner slot is almost always a
-    // mis-set slot, so move it rather than letting the save fail.
+    // mis-set slot, so move it rather than letting the save fail. A category
+    // grid tile can go in either slot 5 or 6, so it only gets nudged to 5 (the
+    // more common small-tile case) when it is not already in one of the two -
+    // never forced, so switching to slot 6 for the banner style sticks.
     const slot = document.getElementById("promo-slot");
     if (slot) {
         const isStrip = layout === "strip_text" || layout === "strip_link";
         const isRowTile = layout === "row_tile";
+        const isCategoryGrid = layout === "category_grid";
         if (isStrip && slot.value !== "3") slot.value = "3";
         if (isRowTile && slot.value !== "4") slot.value = "4";
+        if (isCategoryGrid && slot.value !== "5" && slot.value !== "6") slot.value = "5";
         if (!isStrip && slot.value === "3") slot.value = "1";
         if (!isRowTile && slot.value === "4") slot.value = "1";
+        if (!isCategoryGrid && (slot.value === "5" || slot.value === "6")) slot.value = "1";
     }
 }
 
@@ -4034,6 +4097,18 @@ async function savePromo() {
         errorEl.textContent = "A strip tile needs a label or an icon.";
         return;
     }
+    if (layout === "category_grid" && !document.getElementById("promo-category").value) {
+        errorEl.textContent = "A category tile needs a pinned category.";
+        return;
+    }
+    if (layout === "category_grid" && !id && !promoPickedFile) {
+        errorEl.textContent = "A category tile needs an image.";
+        return;
+    }
+    if (layout === "category_grid" && !document.getElementById("promo-title").value.trim()) {
+        errorEl.textContent = "A category tile needs a label.";
+        return;
+    }
     // Same allowlist the server enforces, shown here so a bad paste is caught
     // before the upload rather than after it.
     if (link && !/^(?:https:\/\/|mailto:|tel:|\/(?!\/))/i.test(link)) {
@@ -4048,7 +4123,8 @@ async function savePromo() {
     formData.append("display_order", document.getElementById("promo-order").value || 0);
     formData.append("layout", layout);
     formData.append("category_id",
-        layout === "row_tile" ? document.getElementById("promo-category").value : "");
+        (layout === "row_tile" || layout === "category_grid")
+            ? document.getElementById("promo-category").value : "");
     formData.append("headline", headline);
     formData.append("subtext", document.getElementById("promo-subtext").value.trim());
     formData.append("cta_label", document.getElementById("promo-cta").value.trim());
@@ -4094,6 +4170,405 @@ async function deletePromo(id) {
         await loadAdminPromos();
     } catch (error) {
         console.error("Delete promotion error:", error);
+        alert("Could not delete.");
+    }
+}
+
+
+// ---------------------------------------------------------------------------
+// Discount codes. One memorable code per campaign - a code the customer types
+// at checkout, not a batch of single-use ones.
+let adminDiscounts = [];
+
+async function loadAdminDiscounts() {
+    try {
+        adminDiscounts = await authorizedFetch("/api/admin/discount-codes");
+        renderDiscountsTable();
+    } catch (error) {
+        console.error("Load discount codes error:", error);
+    }
+}
+
+function fmtUgx(n) {
+    return "UGX " + Number(n || 0).toLocaleString();
+}
+
+// Escapes free text before it goes into innerHTML - a flash sale title is
+// admin-entered with no character restriction server-side.
+const adminEsc = s => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+function renderDiscountsTable() {
+    const tbody = document.getElementById("discounts-table-body");
+    if (!tbody) return;
+
+    if (adminDiscounts.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="padding:18px; color:#6b7280">
+            No discount codes yet.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = adminDiscounts.map(d => {
+        const status = d.is_active
+            ? `<span class="badge badge-active">Live</span>`
+            : `<span class="badge badge-hidden">Hidden</span>`;
+        const toggle = d.is_active
+            ? `<button onclick="setDiscountActive(${d.id}, false)">Disable</button>`
+            : `<button onclick="setDiscountActive(${d.id}, true)">Enable</button>`;
+        const value = d.discount_type === "percent" ? `${Number(d.value)}%` : fmtUgx(d.value);
+        const usage = d.usage_limit ? `${d.times_used} / ${d.usage_limit}` : `${d.times_used} / ∞`;
+        const window = [
+            d.starts_at ? new Date(d.starts_at).toLocaleDateString() : null,
+            d.ends_at ? new Date(d.ends_at).toLocaleDateString() : null
+        ].filter(Boolean).join(" → ") || "No limit";
+
+        return `<tr>
+            <td data-label="Code"><strong>${d.code}</strong></td>
+            <td data-label="Type">${d.discount_type === "percent" ? "Percent" : "Fixed"}</td>
+            <td data-label="Value">${value}</td>
+            <td data-label="Min Order">${d.min_order_amount ? fmtUgx(d.min_order_amount) : "—"}</td>
+            <td data-label="Usage">${usage}</td>
+            <td data-label="Window">${window}</td>
+            <td data-label="Status">${status}</td>
+            <td data-label="Actions">
+                ${toggle}
+                <button onclick="deleteDiscountCode(${d.id})">Delete</button>
+            </td>
+        </tr>`;
+    }).join("");
+}
+
+// A <input type="datetime-local"> value (e.g. "2026-09-05T14:30") carries no
+// timezone of its own - the browser treats it as local wall-clock time, but
+// sent to the server as-is it would be ambiguous (Postgres would interpret it
+// against the DB session's timezone, not the admin's). Date's own parsing of
+// that exact "no offset" form treats it as local time, so routing it through
+// Date and back out as an offset-bearing ISO string pins down the instant the
+// admin actually meant, regardless of what timezone the database runs in.
+function toIsoOrNull(datetimeLocalValue) {
+    if (!datetimeLocalValue) return null;
+    const d = new Date(datetimeLocalValue);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+// The reverse: an ISO instant back into the local wall-clock string the
+// datetime-local input expects, so editing shows the time the admin
+// originally set rather than its UTC-shifted equivalent.
+function toDatetimeLocal(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const pad = n => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function openDiscountForm() {
+    document.getElementById("discount-form-title").textContent = "Add Discount Code";
+    document.getElementById("discount-id").value = "";
+    document.getElementById("discount-code").value = "";
+    document.getElementById("discount-type").value = "percent";
+    document.getElementById("discount-value").value = "";
+    document.getElementById("discount-description").value = "";
+    document.getElementById("discount-min-order").value = "";
+    document.getElementById("discount-usage-limit").value = "";
+    document.getElementById("discount-starts").value = "";
+    document.getElementById("discount-ends").value = "";
+    document.getElementById("discount-form-error").textContent = "";
+    document.getElementById("discount-form-container").classList.remove("hidden");
+}
+
+function closeDiscountForm() {
+    document.getElementById("discount-form-container").classList.add("hidden");
+}
+
+async function generateDiscountCode() {
+    try {
+        const { code } = await authorizedFetch("/api/admin/discount-codes/generate-code", { method: "POST" });
+        document.getElementById("discount-code").value = code;
+    } catch (error) {
+        console.error("Generate discount code error:", error);
+    }
+}
+
+async function saveDiscountCode() {
+    const errorEl = document.getElementById("discount-form-error");
+    errorEl.textContent = "";
+
+    const value = Number(document.getElementById("discount-value").value);
+    if (!Number.isFinite(value) || value <= 0) {
+        errorEl.textContent = "Enter a value greater than zero.";
+        return;
+    }
+
+    const body = {
+        code: document.getElementById("discount-code").value.trim(),
+        discount_type: document.getElementById("discount-type").value,
+        value,
+        description: document.getElementById("discount-description").value.trim(),
+        min_order_amount: document.getElementById("discount-min-order").value || undefined,
+        usage_limit: document.getElementById("discount-usage-limit").value || undefined,
+        starts_at: toIsoOrNull(document.getElementById("discount-starts").value),
+        ends_at: toIsoOrNull(document.getElementById("discount-ends").value)
+    };
+
+    try {
+        await authorizedFetch("/api/admin/discount-codes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+        closeDiscountForm();
+        await loadAdminDiscounts();
+    } catch (error) {
+        console.error("Save discount code error:", error);
+        errorEl.textContent = error.message || "Save failed.";
+    }
+}
+
+async function setDiscountActive(id, isActive) {
+    try {
+        await authorizedFetch(`/api/admin/discount-codes/${id}/active`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ is_active: isActive })
+        });
+        await loadAdminDiscounts();
+    } catch (error) {
+        console.error("Set discount code active error:", error);
+        alert("Could not update status.");
+    }
+}
+
+async function deleteDiscountCode(id) {
+    if (!confirm("Delete this discount code permanently?")) return;
+    try {
+        await authorizedFetch(`/api/admin/discount-codes/${id}`, { method: "DELETE" });
+        await loadAdminDiscounts();
+    } catch (error) {
+        console.error("Delete discount code error:", error);
+        alert("Could not delete.");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Flash sales. A time-boxed campaign with a shared countdown over a curated
+// set of specially-priced products.
+let adminFlashSales = [];
+let flashFormItems = [];
+
+async function loadAdminFlashSales() {
+    try {
+        adminFlashSales = await authorizedFetch("/api/admin/flash-sales");
+        renderFlashSalesTable();
+    } catch (error) {
+        console.error("Load flash sales error:", error);
+    }
+}
+
+function renderFlashSalesTable() {
+    const tbody = document.getElementById("flash-sales-table-body");
+    if (!tbody) return;
+
+    if (adminFlashSales.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="padding:18px; color:#6b7280">
+            No flash sales yet.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = adminFlashSales.map(s => {
+        const status = s.is_active
+            ? `<span class="badge badge-active">Live</span>`
+            : `<span class="badge badge-hidden">Hidden</span>`;
+        const toggle = s.is_active
+            ? `<button onclick="setFlashSaleActive(${s.id}, false)">Disable</button>`
+            : `<button onclick="setFlashSaleActive(${s.id}, true)">Enable</button>`;
+
+        return `<tr>
+            <td data-label="Title">${adminEsc(s.title)}</td>
+            <td data-label="Ends">${s.ends_at ? new Date(s.ends_at).toLocaleString() : "—"}</td>
+            <td data-label="Items">${s.item_count}</td>
+            <td data-label="Status">${status}</td>
+            <td data-label="Actions">
+                <button onclick="editFlashSale(${s.id})">Edit</button>
+                ${toggle}
+                <button onclick="deleteFlashSale(${s.id})">Delete</button>
+            </td>
+        </tr>`;
+    }).join("");
+}
+
+function renderFlashItemProductSelect() {
+    const select = document.getElementById("flash-item-product");
+    if (!select) return;
+    select.innerHTML = adminProducts.map(p =>
+        `<option value="${p.id}" data-price="${p.price}">${adminEsc(p.name)} — ${fmtUgx(p.price)}</option>`
+    ).join("");
+}
+
+function renderFlashSaleItemsTable() {
+    const tbody = document.getElementById("flash-sale-items-body");
+    if (!tbody) return;
+
+    if (flashFormItems.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="padding:10px; color:#6b7280">
+            No products added yet.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = flashFormItems.map((item, index) => `<tr>
+        <td data-label="Product">${adminEsc(item.name)}</td>
+        <td data-label="Original Price">${fmtUgx(item.original_price)}</td>
+        <td data-label="Sale Price">${fmtUgx(item.sale_price)}</td>
+        <td><button type="button" onclick="removeFlashSaleItem(${index})">Remove</button></td>
+    </tr>`).join("");
+}
+
+function addFlashSaleItem() {
+    const errorEl = document.getElementById("flash-sale-form-error");
+    errorEl.textContent = "";
+
+    const select = document.getElementById("flash-item-product");
+    const priceInput = document.getElementById("flash-item-price");
+    const productId = parseInt(select.value, 10);
+    const salePrice = Number(priceInput.value);
+
+    if (!productId) {
+        errorEl.textContent = "Pick a product first.";
+        return;
+    }
+    if (!Number.isFinite(salePrice) || salePrice < 0) {
+        errorEl.textContent = "Enter a valid sale price.";
+        return;
+    }
+    if (flashFormItems.some(item => item.product_id === productId)) {
+        errorEl.textContent = "That product is already in this campaign.";
+        return;
+    }
+
+    const product = adminProducts.find(p => p.id === productId);
+    flashFormItems.push({
+        product_id: productId,
+        name: product ? product.name : `Product ${productId}`,
+        original_price: product ? product.price : null,
+        sale_price: salePrice
+    });
+    priceInput.value = "";
+    renderFlashSaleItemsTable();
+}
+
+function removeFlashSaleItem(index) {
+    flashFormItems.splice(index, 1);
+    renderFlashSaleItemsTable();
+}
+
+function openFlashSaleForm() {
+    document.getElementById("flash-sale-form-title").textContent = "Add Flash Sale";
+    document.getElementById("flash-sale-id").value = "";
+    document.getElementById("flash-sale-title-input").value = "";
+    document.getElementById("flash-sale-subtitle").value = "";
+    document.getElementById("flash-sale-starts").value = "";
+    document.getElementById("flash-sale-ends").value = "";
+    document.getElementById("flash-sale-form-error").textContent = "";
+    flashFormItems = [];
+    renderFlashItemProductSelect();
+    renderFlashSaleItemsTable();
+    document.getElementById("flash-sale-form-container").classList.remove("hidden");
+}
+
+async function editFlashSale(id) {
+    document.getElementById("flash-sale-form-error").textContent = "";
+    try {
+        const sale = await authorizedFetch(`/api/admin/flash-sales/${id}`);
+        document.getElementById("flash-sale-form-title").textContent = "Edit Flash Sale";
+        document.getElementById("flash-sale-id").value = sale.id;
+        document.getElementById("flash-sale-title-input").value = sale.title || "";
+        document.getElementById("flash-sale-subtitle").value = sale.subtitle || "";
+        document.getElementById("flash-sale-starts").value = toDatetimeLocal(sale.starts_at);
+        document.getElementById("flash-sale-ends").value = toDatetimeLocal(sale.ends_at);
+        flashFormItems = (sale.items || []).map(item => ({
+            product_id: item.product_id,
+            name: item.name,
+            original_price: item.original_price,
+            sale_price: Number(item.sale_price)
+        }));
+        renderFlashItemProductSelect();
+        renderFlashSaleItemsTable();
+        document.getElementById("flash-sale-form-container").classList.remove("hidden");
+    } catch (error) {
+        console.error("Load flash sale error:", error);
+        alert("Could not load this flash sale.");
+    }
+}
+
+function closeFlashSaleForm() {
+    document.getElementById("flash-sale-form-container").classList.add("hidden");
+}
+
+async function saveFlashSale() {
+    const errorEl = document.getElementById("flash-sale-form-error");
+    errorEl.textContent = "";
+
+    const id = document.getElementById("flash-sale-id").value;
+    const title = document.getElementById("flash-sale-title-input").value.trim();
+    const endsAt = toIsoOrNull(document.getElementById("flash-sale-ends").value);
+
+    if (!title) {
+        errorEl.textContent = "A title is required.";
+        return;
+    }
+    if (!endsAt) {
+        errorEl.textContent = "An end time is required to drive the countdown.";
+        return;
+    }
+    if (flashFormItems.length === 0) {
+        errorEl.textContent = "Add at least one product.";
+        return;
+    }
+
+    const body = {
+        title,
+        subtitle: document.getElementById("flash-sale-subtitle").value.trim(),
+        starts_at: toIsoOrNull(document.getElementById("flash-sale-starts").value),
+        ends_at: endsAt,
+        items: flashFormItems.map(item => ({ product_id: item.product_id, sale_price: item.sale_price }))
+    };
+
+    try {
+        await authorizedFetch(id ? `/api/admin/flash-sales/${id}` : "/api/admin/flash-sales", {
+            method: id ? "PUT" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+        closeFlashSaleForm();
+        await loadAdminFlashSales();
+    } catch (error) {
+        console.error("Save flash sale error:", error);
+        errorEl.textContent = error.message || "Save failed.";
+    }
+}
+
+async function setFlashSaleActive(id, isActive) {
+    try {
+        await authorizedFetch(`/api/admin/flash-sales/${id}/active`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ is_active: isActive })
+        });
+        await loadAdminFlashSales();
+    } catch (error) {
+        console.error("Set flash sale active error:", error);
+        alert("Could not update status.");
+    }
+}
+
+async function deleteFlashSale(id) {
+    if (!confirm("Delete this flash sale permanently?")) return;
+    try {
+        await authorizedFetch(`/api/admin/flash-sales/${id}`, { method: "DELETE" });
+        await loadAdminFlashSales();
+    } catch (error) {
+        console.error("Delete flash sale error:", error);
         alert("Could not delete.");
     }
 }

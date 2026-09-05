@@ -389,6 +389,77 @@ async function loadPromoStrip() {
 
 document.addEventListener("DOMContentLoaded", loadPromoStrip);
 
+// ---------------------------------------------------------------------------
+// Curated category grids (promotions slots 5 & 6). Both are admin-managed
+// tiles that link into a pinned category, styled after a small square tile
+// grid (slot 5) and a larger banner-card grid (slot 6). Distinct from the
+// auto-generated "Explore Categories" rail above, which lists every level-2
+// category rather than a hand-picked set.
+function categoryTileLink(p) {
+    if (p.link_url && stripSafeHref(p.link_url)) return stripSafeHref(p.link_url);
+    if (p.category_name) return `products.html?category=${encodeURIComponent(p.category_name)}`;
+    return "";
+}
+
+async function loadCategoryGrids() {
+    const tilesSection = document.getElementById("ls-cat-tiles");
+    const bannersSection = document.getElementById("ls-cat-banners");
+    if (!tilesSection && !bannersSection) return;
+
+    let promos = [];
+    try {
+        const response = await fetch("/api/promotions");
+        if (response.ok) promos = await response.json();
+    } catch (error) {
+        console.error("Load category grids error:", error);
+    }
+
+    const mine = promos.filter(p => p.layout === "category_grid");
+
+    if (tilesSection) {
+        const items = mine.filter(p => Number(p.slot) === 5);
+        const grid = document.getElementById("ls-cat-tiles-grid");
+        if (items.length && grid) {
+            grid.innerHTML = items.map(p => {
+                const href = categoryTileLink(p);
+                const img = p.image_url
+                    ? `<img src="${esc(p.image_url)}" alt="" loading="lazy">` : "";
+                const inner = `<span class="ls-cat-tile-thumb">${img}</span>` +
+                    `<span class="ls-cat-tile-name">${esc(p.title || "")}</span>`;
+                return href
+                    ? `<a class="ls-cat-tile" href="${esc(href)}">${inner}</a>`
+                    : `<span class="ls-cat-tile">${inner}</span>`;
+            }).join("");
+            tilesSection.hidden = false;
+        } else {
+            tilesSection.hidden = true;
+        }
+    }
+
+    if (bannersSection) {
+        const items = mine.filter(p => Number(p.slot) === 6);
+        const grid = document.getElementById("ls-cat-banners-grid");
+        if (items.length && grid) {
+            grid.innerHTML = items.map(p => {
+                const href = categoryTileLink(p);
+                const img = p.image_url
+                    ? `<img src="${esc(p.image_url)}" alt="" loading="lazy">` : "";
+                const label = p.title
+                    ? `<span class="ls-cat-banner-label">${esc(p.title)}</span>` : "";
+                const inner = `${img}${label}`;
+                return href
+                    ? `<a class="ls-cat-banner" href="${esc(href)}">${inner}</a>`
+                    : `<span class="ls-cat-banner">${inner}</span>`;
+            }).join("");
+            bannersSection.hidden = false;
+        } else {
+            bannersSection.hidden = true;
+        }
+    }
+}
+
+document.addEventListener("DOMContentLoaded", loadCategoryGrids);
+
 // ---------- Category drawer and header parent nav ----------
 
 let drawerTree = null;

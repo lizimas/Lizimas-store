@@ -11,7 +11,7 @@
 Lizimas Store | Online Shopping in Uganda
 </title>
 
-<link rel="stylesheet" href="css/style.css?v=66">
+<link rel="stylesheet" href="css/style.css?v=67">
 
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -150,6 +150,43 @@ Lizimas Store | Online Shopping in Uganda
   <div class="ls-strip-links"></div>
 </section>
 
+<!-- Flash deals: promotions/flash_sales-driven countdown carousel.
+     Hidden until an admin-created campaign is currently active. -->
+<section class="ls-flash" id="ls-flash" hidden>
+  <div class="ls-flash-head">
+    <div class="ls-flash-heading">
+      <h2 class="ls-flash-title" id="ls-flash-title">Grab Or Gone!</h2>
+      <p class="ls-flash-sub" id="ls-flash-sub"></p>
+    </div>
+    <div class="ls-flash-countdown" id="ls-flash-countdown" aria-live="polite">
+      <div class="ls-flash-unit"><span class="ls-flash-num" data-unit="h">00</span><span class="ls-flash-lbl">Hrs</span></div>
+      <span class="ls-flash-sep">:</span>
+      <div class="ls-flash-unit"><span class="ls-flash-num" data-unit="m">00</span><span class="ls-flash-lbl">Min</span></div>
+      <span class="ls-flash-sep">:</span>
+      <div class="ls-flash-unit"><span class="ls-flash-num" data-unit="s">00</span><span class="ls-flash-lbl">Sec</span></div>
+    </div>
+  </div>
+  <div class="ls-row-scroll" id="ls-flash-scroll"></div>
+</section>
+
+<!-- Curated category tile grid (promotions slot 5). Small square tiles,
+     admin-managed. Hidden until at least one is published. -->
+<section class="ls-cat-grid ls-cat-grid--tiles" id="ls-cat-tiles" hidden>
+  <div class="ls-row-head">
+    <h2 class="ls-row-title">Shop by Category</h2>
+  </div>
+  <div class="ls-cat-tiles-grid" id="ls-cat-tiles-grid"></div>
+</section>
+
+<!-- Curated category banner grid (promotions slot 6). Larger cards with an
+     overlaid label. Hidden until at least one is published. -->
+<section class="ls-cat-grid ls-cat-grid--banners" id="ls-cat-banners" hidden>
+  <div class="ls-row-head">
+    <h2 class="ls-row-title">Explore More Categories</h2>
+  </div>
+  <div class="ls-cat-banners-grid" id="ls-cat-banners-grid"></div>
+</section>
+
 
 
 
@@ -284,11 +321,11 @@ Lizimas Store | Online Shopping in Uganda
 <script src="js/api.js?v=1"></script>
 <script src="js/hero.js?v=1"></script>
 <script src="js/lz-image.js?v=2"></script>
-<script src="js/categories.js?v=21"></script>
+<script src="js/categories.js?v=22"></script>
 
 <script src="js/cart.js?v=6"></script>
 
-<script src="js/products.js?v=15"></script>
+<script src="js/products.js?v=16"></script>
 
 <script src="js/lz-chat.js?v=17"></script>
 

@@ -1,8 +1,11 @@
 // Slot 3 is the announcement strip. strip_text scrolls and carries no link;
 // strip_link is a static tile. Kept in sync with migration 034's constraints.
 // Slot 4 is a tile pinned inside a category product rail (migration 047).
-const PROMO_SLOTS = [1, 2, 3, 4];
-const PROMO_LAYOUTS = ["image", "text", "strip_text", "strip_link", "row_tile"];
+// Slots 5 and 6 are standalone homepage category-browsing grids (migration
+// 055): 5 renders as small square tiles, 6 as large banner cards. Both share
+// the category_grid layout - the frontend picks tile size from the slot.
+const PROMO_SLOTS = [1, 2, 3, 4, 5, 6];
+const PROMO_LAYOUTS = ["image", "text", "strip_text", "strip_link", "row_tile", "category_grid"];
 
 const LINK_ERROR = "Link must be an https:// address, a site path starting " +
     "with /, or a mailto: or tel: link.";
@@ -71,12 +74,14 @@ function uploadBufferToCloudinary(fileBuffer, kind) {
 exports.listPromotions = async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT id, image_url, link_url, title, slot, display_order,
+            `SELECT promotions.id, image_url, link_url, title, slot, display_order,
                     headline, subtext, cta_label, bg_color, text_color, layout,
-                    category_id, media_type, video_url, poster_url
+                    category_id, media_type, video_url, poster_url,
+                    categories.name AS category_name
              FROM promotions
+             LEFT JOIN categories ON categories.id = promotions.category_id
              WHERE is_active = true
-             ORDER BY slot ASC, display_order ASC, id ASC`
+             ORDER BY slot ASC, display_order ASC, promotions.id ASC`
         );
         res.json(result.rows);
     } catch (error) {
@@ -89,11 +94,13 @@ exports.listPromotions = async (req, res) => {
 exports.listAllPromotions = async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT id, image_url, link_url, title, slot, display_order, is_active, created_at,
+            `SELECT promotions.id, image_url, link_url, title, slot, display_order, is_active, created_at,
                     headline, subtext, cta_label, bg_color, text_color, layout,
-                    category_id, media_type, video_url, poster_url
+                    category_id, media_type, video_url, poster_url,
+                    categories.name AS category_name
              FROM promotions
-             ORDER BY slot ASC, display_order ASC, id ASC`
+             LEFT JOIN categories ON categories.id = promotions.category_id
+             ORDER BY slot ASC, display_order ASC, promotions.id ASC`
         );
         res.json(result.rows);
     } catch (error) {
@@ -118,10 +125,11 @@ exports.createPromotion = async (req, res) => {
 
         const layout = PROMO_LAYOUTS.includes(req.body.layout)
             ? req.body.layout : "image";
-        // Only a row tile pins to a category; anything else stores null so
-        // a stale field left in the form cannot bind an unrelated slot.
+        // A row tile or a category grid tile pins to a category; anything
+        // else stores null so a stale field left in the form cannot bind an
+        // unrelated slot.
         const parsedCategory = parseInt(req.body.category_id, 10);
-        const categoryId = layout === "row_tile" && Number.isInteger(parsedCategory)
+        const categoryId = (layout === "row_tile" || layout === "category_grid") && Number.isInteger(parsedCategory)
             ? parsedCategory : null;
         const headline = (req.body.headline || "").trim() || null;
         const subtext = (req.body.subtext || "").trim() || null;
@@ -151,6 +159,15 @@ exports.createPromotion = async (req, res) => {
         }
         if (layout === "row_tile" && !req.file) {
             return res.status(400).json({ message: "A row tile needs an image or a video." });
+        }
+        if (layout === "category_grid" && !categoryId) {
+            return res.status(400).json({ message: "A category tile needs a category." });
+        }
+        if (layout === "category_grid" && !req.file) {
+            return res.status(400).json({ message: "A category tile needs an image." });
+        }
+        if (layout === "category_grid" && !title) {
+            return res.status(400).json({ message: "A category tile needs a label." });
         }
 
         // The middleware has already vetted the type; this only decides which
@@ -231,10 +248,11 @@ exports.updatePromotion = async (req, res) => {
             ? (PROMO_LAYOUTS.includes(req.body.layout)
                 ? req.body.layout : "image")
             : current.layout;
-        // Switching away from row_tile clears the pin, so an old category
-        // cannot linger on a row that no longer renders in a rail.
+        // Switching away from row_tile or category_grid clears the pin, so an
+        // old category cannot linger on a slot that no longer uses one.
         const sentCategory = parseInt(req.body.category_id, 10);
-        const categoryId = layout !== "row_tile"
+        const pinsCategory = layout === "row_tile" || layout === "category_grid";
+        const categoryId = !pinsCategory
             ? null
             : (req.body.category_id !== undefined
                 ? (Number.isInteger(sentCategory) ? sentCategory : null)
@@ -262,6 +280,12 @@ exports.updatePromotion = async (req, res) => {
         }
         if (layout === "row_tile" && !categoryId) {
             return res.status(400).json({ message: "A row tile needs a category." });
+        }
+        if (layout === "category_grid" && !categoryId) {
+            return res.status(400).json({ message: "A category tile needs a category." });
+        }
+        if (layout === "category_grid" && !title) {
+            return res.status(400).json({ message: "A category tile needs a label." });
         }
 
         let imageUrl = current.image_url;

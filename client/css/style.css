@@ -3923,6 +3923,199 @@ body.sheet-open {
     .ls-row-promo { flex-basis: 210px; }
 }
 
+/* ---------- Flash deals (Grab Or Gone) ---------- */
+
+.ls-flash {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 26px 18px 6px;
+}
+
+.ls-flash[hidden] { display: none; }
+
+.ls-flash-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.ls-flash-title {
+    font-size: 24px;
+    font-weight: 800;
+    color: #111827;
+    margin: 0;
+}
+
+.ls-flash-sub {
+    font-size: 14px;
+    color: #6b7280;
+    margin: 4px 0 0;
+}
+
+.ls-flash-countdown {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ls-flash-unit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #1a1a2e;
+    color: #fff;
+    border-radius: 8px;
+    min-width: 46px;
+    padding: 6px 8px;
+}
+
+.ls-flash-num {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.ls-flash-lbl {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #d1d5db;
+    margin-top: 2px;
+}
+
+.ls-flash-sep {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1a1a2e;
+}
+
+@media (max-width: 720px) {
+    .ls-flash { padding: 20px 12px 4px; }
+    .ls-flash-title { font-size: 19px; }
+    .ls-flash-unit { min-width: 38px; padding: 5px 6px; }
+    .ls-flash-num { font-size: 15px; }
+}
+
+/* ---------- Curated category grids (promotions slots 5 & 6) ---------- */
+
+.ls-cat-grid {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 26px 18px 6px;
+}
+
+.ls-cat-grid[hidden] { display: none; }
+
+/* Slot 5: small square tiles, label below - "Tech Store" style */
+.ls-cat-tiles-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 16px;
+}
+
+.ls-cat-tile {
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.ls-cat-tile-thumb {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #eaf3fb;
+    border: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ls-cat-tile-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.ls-cat-tile-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+    text-align: center;
+    line-height: 1.25;
+}
+
+@media (max-width: 900px) {
+    .ls-cat-tiles-grid { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .ls-cat-tile-name { font-size: 12px; }
+}
+
+@media (max-width: 520px) {
+    .ls-cat-tiles-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+}
+
+/* Slot 6: larger banner cards, label overlaid - "Explore More Categories" style */
+.ls-cat-banners-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+}
+
+.ls-cat-banner {
+    position: relative;
+    display: block;
+    border-radius: 12px;
+    overflow: hidden;
+    aspect-ratio: 3 / 4;
+    text-decoration: none;
+    background: #f3f4f6;
+}
+
+.ls-cat-banner img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.ls-cat-banner::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 55%;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0));
+    pointer-events: none;
+}
+
+.ls-cat-banner-label {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+    z-index: 1;
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.2;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+@media (max-width: 900px) {
+    .ls-cat-banners-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .ls-cat-banner-label { font-size: 14px; }
+}
+
+@media (max-width: 520px) {
+    .ls-cat-banners-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+}
+
 /* ---------- Category drawer ---------- */
 
 .ls-drawer-backdrop {
