@@ -401,64 +401,82 @@ function categoryTileLink(p) {
     return "";
 }
 
-async function loadCategoryGrids() {
-    const tilesSection = document.getElementById("ls-cat-tiles");
-    const bannersSection = document.getElementById("ls-cat-banners");
-    if (!tilesSection && !bannersSection) return;
-
-    let promos = [];
+// Both the fixed slot-5 tile grid and the interleaved slot-6 banner blocks
+// (built in products.js) start from this one fetch, so it's shared rather
+// than each caller hitting /api/promotions on its own.
+async function fetchCategoryGridPromos() {
     try {
         const response = await fetch("/api/promotions");
-        if (response.ok) promos = await response.json();
+        if (response.ok) return (await response.json()).filter(p => p.layout === "category_grid");
     } catch (error) {
         console.error("Load category grids error:", error);
     }
+    return [];
+}
 
-    const mine = promos.filter(p => p.layout === "category_grid");
+function buildCategoryBannerTile(p) {
+    const href = categoryTileLink(p);
+    const img = p.image_url
+        ? `<img src="${esc(p.image_url)}" alt="" loading="lazy">` : "";
+    const label = p.title
+        ? `<span class="ls-cat-banner-label">${esc(p.title)}</span>` : "";
+    const inner = `${img}${label}`;
+    return href
+        ? `<a class="ls-cat-banner" href="${esc(href)}">${inner}</a>`
+        : `<span class="ls-cat-banner">${inner}</span>`;
+}
 
-    if (tilesSection) {
-        const items = mine.filter(p => Number(p.slot) === 5);
-        const grid = document.getElementById("ls-cat-tiles-grid");
-        if (items.length && grid) {
-            grid.innerHTML = items.map(p => {
-                const href = categoryTileLink(p);
-                const img = p.image_url
-                    ? `<img src="${esc(p.image_url)}" alt="" loading="lazy">` : "";
-                const inner = `<span class="ls-cat-tile-thumb">${img}</span>` +
-                    `<span class="ls-cat-tile-name">${esc(p.title || "")}</span>`;
-                return href
-                    ? `<a class="ls-cat-tile" href="${esc(href)}">${inner}</a>`
-                    : `<span class="ls-cat-tile">${inner}</span>`;
-            }).join("");
-            tilesSection.hidden = false;
-        } else {
-            tilesSection.hidden = true;
-        }
-    }
+async function loadCategoryGrids() {
+    const tilesSection = document.getElementById("ls-cat-tiles");
+    if (!tilesSection) return;
 
-    if (bannersSection) {
-        const items = mine.filter(p => Number(p.slot) === 6);
-        const grid = document.getElementById("ls-cat-banners-grid");
-        if (items.length && grid) {
-            grid.innerHTML = items.map(p => {
-                const href = categoryTileLink(p);
-                const img = p.image_url
-                    ? `<img src="${esc(p.image_url)}" alt="" loading="lazy">` : "";
-                const label = p.title
-                    ? `<span class="ls-cat-banner-label">${esc(p.title)}</span>` : "";
-                const inner = `${img}${label}`;
-                return href
-                    ? `<a class="ls-cat-banner" href="${esc(href)}">${inner}</a>`
-                    : `<span class="ls-cat-banner">${inner}</span>`;
-            }).join("");
-            bannersSection.hidden = false;
-        } else {
-            bannersSection.hidden = true;
-        }
+    const mine = await fetchCategoryGridPromos();
+    const items = mine.filter(p => Number(p.slot) === 5);
+    const grid = document.getElementById("ls-cat-tiles-grid");
+    if (items.length && grid) {
+        grid.innerHTML = items.map(p => {
+            const href = categoryTileLink(p);
+            const img = p.image_url
+                ? `<img src="${esc(p.image_url)}" alt="" loading="lazy">` : "";
+            const inner = `<span class="ls-cat-tile-thumb">${img}</span>` +
+                `<span class="ls-cat-tile-name">${esc(p.title || "")}</span>`;
+            return href
+                ? `<a class="ls-cat-tile" href="${esc(href)}">${inner}</a>`
+                : `<span class="ls-cat-tile">${inner}</span>`;
+        }).join("");
+        tilesSection.hidden = false;
+    } else {
+        tilesSection.hidden = true;
     }
 }
 
 document.addEventListener("DOMContentLoaded", loadCategoryGrids);
+
+// Slot 6 ("Explore More Categories"). Rather than one flat grid of
+// everything the admin has published, these render as repeating blocks of
+// five - two tall side tiles, a wide top-middle tile, two small
+// bottom-middle tiles - interleaved between the category product rows
+// further down the page. products.js calls this to get the batches and
+// appendChild's the built sections itself, alongside its own rows.
+async function loadExploreCategoryBatches() {
+    const mine = await fetchCategoryGridPromos();
+    const items = mine.filter(p => Number(p.slot) === 6)
+        .sort((a, b) => (a.display_order - b.display_order) || (a.id - b.id));
+    const batches = [];
+    for (let i = 0; i < items.length; i += 5) batches.push(items.slice(i, i + 5));
+    return batches;
+}
+
+function buildExploreCategoryBlock(batch) {
+    const section = document.createElement("section");
+    section.className = "ls-explore-block";
+    const gridClass = "ls-explore-block-grid" +
+        (batch.length < 5 ? " ls-explore-block-grid--plain" : "");
+    section.innerHTML =
+        `<div class="ls-row-head"><h2 class="ls-row-title">Explore More Categories</h2></div>` +
+        `<div class="${gridClass}">${batch.map(buildCategoryBannerTile).join("")}</div>`;
+    return section;
+}
 
 // ---------- Category drawer and header parent nav ----------
 

@@ -945,6 +945,13 @@ async function displayFeaturedProducts(products) {
 
     const ordered = [...groups.values()].sort((a, b) => b.items.length - a.items.length);
     const rowTiles = await loadRowTiles();
+    // Batches of 5 slot-6 tiles, each rendered as one "Explore More
+    // Categories" block and dropped in after every few rows below - see
+    // loadExploreCategoryBatches in categories.js (loaded before this file).
+    const exploreBatches = await loadExploreCategoryBatches();
+    const LS_ROWS_BETWEEN_EXPLORE = 3;
+    let exploreBatchIndex = 0;
+    let rowsSinceExplore = 0;
 
     host.innerHTML = "";
     let tileIndex = 0;
@@ -986,6 +993,13 @@ async function displayFeaturedProducts(products) {
         // A tiled row already has one thing moving on its own. Drifting the
         // products as well reads as clutter, so they wait for a swipe.
         if (!hasTile) autoScrollRow(scroll);
+
+        rowsSinceExplore++;
+        if (rowsSinceExplore >= LS_ROWS_BETWEEN_EXPLORE && exploreBatchIndex < exploreBatches.length) {
+            host.appendChild(buildExploreCategoryBlock(exploreBatches[exploreBatchIndex]));
+            exploreBatchIndex++;
+            rowsSinceExplore = 0;
+        }
     }
 }
 

@@ -11,7 +11,7 @@
 Lizimas Store | Online Shopping in Uganda
 </title>
 
-<link rel="stylesheet" href="css/style.css?v=67">
+<link rel="stylesheet" href="css/style.css?v=68">
 
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -178,14 +178,10 @@ Lizimas Store | Online Shopping in Uganda
   <div class="ls-cat-tiles-grid" id="ls-cat-tiles-grid"></div>
 </section>
 
-<!-- Curated category banner grid (promotions slot 6). Larger cards with an
-     overlaid label. Hidden until at least one is published. -->
-<section class="ls-cat-grid ls-cat-grid--banners" id="ls-cat-banners" hidden>
-  <div class="ls-row-head">
-    <h2 class="ls-row-title">Explore More Categories</h2>
-  </div>
-  <div class="ls-cat-banners-grid" id="ls-cat-banners-grid"></div>
-</section>
+<!-- Slot 6 ("Explore More Categories") no longer renders here as a single
+     fixed block - it's built in batches of 5 and interleaved between the
+     per-category product rows further down (see products.js), matching
+     the reference design's repeating banner-grid breaks. -->
 
 
 
@@ -321,11 +317,11 @@ Lizimas Store | Online Shopping in Uganda
 <script src="js/api.js?v=1"></script>
 <script src="js/hero.js?v=1"></script>
 <script src="js/lz-image.js?v=2"></script>
-<script src="js/categories.js?v=22"></script>
+<script src="js/categories.js?v=23"></script>
 
 <script src="js/cart.js?v=6"></script>
 
-<script src="js/products.js?v=16"></script>
+<script src="js/products.js?v=17"></script>
 
 <script src="js/lz-chat.js?v=17"></script>
 
