@@ -1764,6 +1764,16 @@ function startFlashCountdown(endsAt) {
     flashCountdownTimer = setInterval(tick, 1000);
 }
 
+(function initFlashArrows() {
+    const scroll = document.getElementById("ls-flash-scroll");
+    const prev = document.getElementById("ls-flash-prev");
+    const next = document.getElementById("ls-flash-next");
+    if (!scroll || !prev || !next) return;
+    const step = () => Math.round(scroll.clientWidth * 0.9) || 300;
+    prev.addEventListener("click", () => scroll.scrollBy({ left: -step(), behavior: "smooth" }));
+    next.addEventListener("click", () => scroll.scrollBy({ left: step(), behavior: "smooth" }));
+})();
+
 async function loadFlashSale() {
     const section = document.getElementById("ls-flash");
     if (!section) return;

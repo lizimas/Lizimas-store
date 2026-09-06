@@ -3923,13 +3923,16 @@ body.sheet-open {
     .ls-row-promo { flex-basis: 210px; }
 }
 
-/* ---------- Flash deals (Grab Or Gone) ---------- */
+/* ---------- Flash deals (Grab Or Gone) ----------
+   Solid red card matching the LuLu Hypermarket reference: deep red fill,
+   white title/countdown chips, white "view all" link and round scroll
+   arrows straddling the card's edges. */
 
 .ls-flash {
     max-width: 1400px;
     margin: 0 auto;
     padding: 22px 20px 22px;
-    border: 2px solid #c0392b;
+    background: #a72d1e;
     border-radius: 14px;
 }
 
@@ -3947,28 +3950,37 @@ body.sheet-open {
 .ls-flash-title {
     font-size: 24px;
     font-weight: 800;
-    color: #111827;
+    color: #fff;
     margin: 0;
 }
 
 .ls-flash-sub {
     font-size: 14px;
-    color: #6b7280;
+    color: rgba(255, 255, 255, 0.8);
     margin: 4px 0 0;
 }
 
 .ls-flash-countdown {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+}
+
+.ls-flash-ends {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #fff;
+    margin-right: 4px;
 }
 
 .ls-flash-unit {
     display: flex;
     flex-direction: column;
     align-items: center;
-    background: #1a1a2e;
-    color: #fff;
+    background: #fff;
+    color: #a72d1e;
     border-radius: 8px;
     min-width: 46px;
     padding: 6px 8px;
@@ -3985,21 +3997,59 @@ body.sheet-open {
     font-size: 9px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: #d1d5db;
+    color: rgba(167, 45, 30, 0.65);
     margin-top: 2px;
 }
 
 .ls-flash-sep {
     font-size: 18px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: #fff;
 }
+
+.ls-flash-viewall {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.ls-flash-viewall:hover { color: #F5C518; }
+
+.ls-flash-viewport { position: relative; }
+
+.ls-flash-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    border: none;
+    background: #fff;
+    color: #a72d1e;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    z-index: 2;
+}
+
+.ls-flash-arrow:hover { background: #f3f4f6; }
+.ls-flash-arrow--prev { left: -18px; }
+.ls-flash-arrow--next { right: -18px; }
 
 @media (max-width: 720px) {
     .ls-flash { padding: 16px 14px 16px; border-radius: 10px; }
     .ls-flash-title { font-size: 19px; }
     .ls-flash-unit { min-width: 38px; padding: 5px 6px; }
     .ls-flash-num { font-size: 15px; }
+    .ls-flash-ends { font-size: 11px; }
+    .ls-flash-viewall { font-size: 12px; }
+    .ls-flash-arrow { width: 30px; height: 30px; font-size: 16px; }
+    .ls-flash-arrow--prev { left: -10px; }
+    .ls-flash-arrow--next { right: -10px; }
 }
 
 /* ---------- Curated category grids (promotions slots 5 & 6) ---------- */

@@ -11,7 +11,7 @@
 Lizimas Store | Online Shopping in Uganda
 </title>
 
-<link rel="stylesheet" href="css/style.css?v=73">
+<link rel="stylesheet" href="css/style.css?v=74">
 
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -159,14 +159,20 @@ Lizimas Store | Online Shopping in Uganda
       <p class="ls-flash-sub" id="ls-flash-sub"></p>
     </div>
     <div class="ls-flash-countdown" id="ls-flash-countdown" aria-live="polite">
+      <span class="ls-flash-ends">Ends in</span>
       <div class="ls-flash-unit"><span class="ls-flash-num" data-unit="h">00</span><span class="ls-flash-lbl">Hrs</span></div>
       <span class="ls-flash-sep">:</span>
       <div class="ls-flash-unit"><span class="ls-flash-num" data-unit="m">00</span><span class="ls-flash-lbl">Min</span></div>
       <span class="ls-flash-sep">:</span>
       <div class="ls-flash-unit"><span class="ls-flash-num" data-unit="s">00</span><span class="ls-flash-lbl">Sec</span></div>
     </div>
+    <a class="ls-flash-viewall" href="products.html">View all &#8594;</a>
   </div>
-  <div class="ls-row-scroll" id="ls-flash-scroll"></div>
+  <div class="ls-flash-viewport">
+    <button class="ls-flash-arrow ls-flash-arrow--prev" id="ls-flash-prev" aria-label="Previous">&#8249;</button>
+    <div class="ls-row-scroll" id="ls-flash-scroll"></div>
+    <button class="ls-flash-arrow ls-flash-arrow--next" id="ls-flash-next" aria-label="Next">&#8250;</button>
+  </div>
 </section>
 
 <!-- Curated category tile grid (promotions slot 5). Small square tiles,
@@ -321,7 +327,7 @@ Lizimas Store | Online Shopping in Uganda
 
 <script src="js/cart.js?v=6"></script>
 
-<script src="js/products.js?v=18"></script>
+<script src="js/products.js?v=19"></script>
 
 <script src="js/lz-chat.js?v=17"></script>
 
