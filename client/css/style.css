@@ -4061,13 +4061,8 @@ body.sheet-open {
     .ls-cat-tiles-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
 }
 
-/* Slot 6: larger banner cards, label overlaid - "Explore More Categories" style */
-.ls-cat-banners-grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 16px;
-}
-
+/* Slot 6 tile. The single flat grid this used to sit in is gone (see the
+   repeating .ls-explore-block-grid below); the tile itself is unchanged. */
 .ls-cat-banner {
     position: relative;
     display: block;
@@ -4108,12 +4103,7 @@ body.sheet-open {
 }
 
 @media (max-width: 900px) {
-    .ls-cat-banners-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; }
     .ls-cat-banner-label { font-size: 14px; }
-}
-
-@media (max-width: 520px) {
-    .ls-cat-banners-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
 }
 
 /* Repeating "Explore More Categories" block, interleaved between the
