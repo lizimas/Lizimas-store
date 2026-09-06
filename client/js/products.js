@@ -38,6 +38,45 @@ async function loadProducts() {
         await applyActiveFlashSalePricing();
         console.log("Lizimas Products Loaded:", allProducts);
 
+        // The flash-deals "View all" link arrives here with ?flash=1. Shows
+        // every item in the currently active campaign, themed to match its
+        // red card on the homepage rather than the plain grey heading the
+        // category/brand/search views below use.
+        const requestedFlash = new URLSearchParams(window.location.search).get("flash");
+        if (requestedFlash) {
+            let saleItems = [];
+            let saleMeta = null;
+            try {
+                const r = await fetch(`${API_URL}/api/flash-sales/active`);
+                if (r.ok) {
+                    const sale = await r.json();
+                    if (sale && sale.items) {
+                        saleMeta = sale;
+                        saleItems = sale.items.map(item => {
+                            const originalPrice = Number(item.original_price);
+                            const salePrice = Number(item.sale_price);
+                            const discount = originalPrice > salePrice
+                                ? Math.round((1 - salePrice / originalPrice) * 100) : 0;
+                            return {
+                                id: item.id,
+                                name: item.name,
+                                image: item.image,
+                                price: salePrice,
+                                originalPrice: originalPrice > salePrice ? originalPrice : undefined,
+                                discount: discount > 0 ? discount : undefined,
+                                stock: item.stock
+                            };
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error("Flash sale load failed:", error);
+            }
+            displayProducts(saleItems);
+            renderFlashHeading(saleMeta, saleItems.length);
+            return;
+        }
+
         // A category tile on the homepage links here with ?category=Name.
         // Applied before the first render so the filtered view is what paints.
         const requestedCategory = new URLSearchParams(window.location.search).get("category");
@@ -1708,6 +1747,22 @@ function renderCategoryHeading(name, count) {
     if (!row) return;
     row.innerHTML = `<h2 class="category-section-title">${name}</h2>
         <span class="category-section-count">${count} item${count === 1 ? "" : "s"}</span>`;
+}
+
+// Red banner for the flash-deals "View all" page (products.html?flash=1),
+// coloured to match the card it was linked from rather than the plain
+// grey heading renderCategoryHeading draws for every other filtered view.
+function renderFlashHeading(sale, count) {
+    const row = document.getElementById("category-chips");
+    if (!row) return;
+    const title = (sale && sale.title) || "Grab Or Gone!";
+    const sub = (sale && sale.subtitle) || "Today's Top Deals";
+    row.innerHTML = `
+        <div class="ls-flash-page-banner">
+            <h2 class="ls-flash-page-title">${title}</h2>
+            <p class="ls-flash-page-sub">${sub}</p>
+            <span class="ls-flash-page-count">${count} item${count === 1 ? "" : "s"}</span>
+        </div>`;
 }
 
 // ---------------------------------------------------------------------------

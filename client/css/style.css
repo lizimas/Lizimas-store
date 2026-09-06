@@ -2563,6 +2563,41 @@ width:90%;
     white-space: nowrap;
 }
 
+/* Flash-deals "view all" banner (products.html?flash=1) - same red as the
+   homepage flash card so the two pages read as one continuous flow. */
+.ls-flash-page-banner {
+    width: 100%;
+    background: #a72d1e;
+    border-radius: 14px;
+    padding: 20px 22px;
+    margin: 4px 0 10px;
+}
+
+.ls-flash-page-title {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+}
+
+.ls-flash-page-sub {
+    margin: 6px 0 0;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.82);
+}
+
+.ls-flash-page-count {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+@media (max-width: 480px) {
+    .ls-flash-page-title { font-size: 18px; }
+    .ls-flash-page-banner { padding: 16px 18px; }
+}
+
 /* Scoped-search empty state */
 .search-widen {
     text-align: center;
