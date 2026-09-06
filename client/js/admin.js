@@ -69,6 +69,7 @@ function showDashboard() {
     document.getElementById("login-screen").classList.add("hidden");
     document.getElementById("dashboard-screen").classList.remove("hidden");
     loadAllDashboardData();
+    initAnalyticsAndPerformance();
 }
 
 function showLogin(errorMessage) {
@@ -1670,6 +1671,12 @@ function setupTabs() {
 
             if (button.dataset.tab === "flash-sales") {
                 loadAdminFlashSales();
+            }
+
+            if (button.dataset.tab === "analytics" && lzAnalyticsChart) {
+                // The canvas was width:0 while the tab sat behind .hidden -
+                // Chart.js needs an explicit resize once it's actually visible.
+                lzAnalyticsChart.resize();
             }
         });
     });
@@ -5275,4 +5282,518 @@ async function forfeitReturnItem(orderItemId) {
         console.error("Forfeit error:", error);
         alert("Something went wrong.");
     }
+}
+
+// =============================================================================
+// Analytics + Performance Reports
+// =============================================================================
+
+function lzEscapeHtml(value) {
+    return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
+function exportTableAsCsv(filename, headers, rows) {
+    const escapeCsv = (v) => {
+        const s = String(v == null ? "" : v);
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = [headers.map(escapeCsv).join(",")]
+        .concat(rows.map(row => row.map(escapeCsv).join(",")));
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function lzRenderMiniTable(containerId, rows) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    if (!rows.length) {
+        el.innerHTML = `<p class="no-data">No data for this range.</p>`;
+        return;
+    }
+    el.innerHTML = `<table class="lz-mini-table">${rows.map(([label, value]) =>
+        `<tr><td>${lzEscapeHtml(label)}</td><td>${Number(value).toLocaleString()}</td></tr>`
+    ).join("")}</table>`;
+}
+
+// ---------------------------------------------------------------------------
+// Cloudflare-style date range picker. Mounts into the element with id
+// `containerId` and calls onApply({start, end, label}) whenever a preset is
+// clicked or a custom calendar range is applied - both "YYYY-MM-DD" strings.
+// Fires onApply once immediately on creation so the caller's first load
+// doesn't need a separate bootstrap call.
+function createDateRangePicker(containerId, onApply, initialPresetKey) {
+    const el = document.getElementById(containerId);
+    if (!el) return null;
+
+    const PRESETS = [
+        { key: "today", label: "Today" },
+        { key: "yesterday", label: "Yesterday" },
+        { key: "7d", label: "Last 7 days", days: 7 },
+        { key: "30d", label: "Last 30 days", days: 30 },
+        { key: "90d", label: "Last 3 months", days: 90 },
+        { key: "365d", label: "Last 12 months", days: 365 },
+        { key: "custom", label: "Custom range" }
+    ];
+
+    let activeKey = initialPresetKey || "30d";
+    const viewMonth = new Date();
+    viewMonth.setDate(1);
+    let rangeStart = null;
+    let rangeEnd = null;
+
+    function fmt(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+    }
+
+    function presetRange(preset) {
+        const end = new Date();
+        let start;
+        if (preset.key === "today") {
+            start = new Date(end);
+        } else if (preset.key === "yesterday") {
+            end.setDate(end.getDate() - 1);
+            start = new Date(end);
+        } else {
+            start = new Date(end.getTime() - preset.days * 86400000);
+        }
+        return { start, end };
+    }
+
+    function monthLabel(d) {
+        return d.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+    }
+
+    el.innerHTML = `
+        <button type="button" class="lz-dr-trigger">
+            <span class="lz-dr-label">Loading...</span>
+            <span class="lz-dr-caret">&#9662;</span>
+        </button>
+        <div class="lz-dr-pop hidden">
+            <div class="lz-dr-presets"></div>
+            <div class="lz-dr-calendars">
+                <div class="lz-dr-cal-nav">
+                    <button type="button" class="lz-dr-cal-prev">&#8249;</button>
+                    <span class="lz-dr-cal-title"></span>
+                    <button type="button" class="lz-dr-cal-next">&#8250;</button>
+                </div>
+                <div class="lz-dr-cal-grids">
+                    <table class="lz-dr-cal"></table>
+                    <table class="lz-dr-cal"></table>
+                </div>
+                <div class="lz-dr-actions">
+                    <span class="lz-dr-range-preview"></span>
+                    <button type="button" class="lz-dr-apply">Apply</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const trigger = el.querySelector(".lz-dr-trigger");
+    const pop = el.querySelector(".lz-dr-pop");
+    const presetsEl = el.querySelector(".lz-dr-presets");
+    const calTitle = el.querySelector(".lz-dr-cal-title");
+    const calGrids = el.querySelectorAll("table.lz-dr-cal");
+    const preview = el.querySelector(".lz-dr-range-preview");
+
+    function renderPresetButtons() {
+        presetsEl.innerHTML = PRESETS.map(p =>
+            `<button type="button" data-key="${p.key}" class="${p.key === activeKey ? "active" : ""}">${p.label}</button>`
+        ).join("");
+    }
+
+    function renderMonthTable(monthDate) {
+        const year = monthDate.getFullYear();
+        const month = monthDate.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const startOffset = (firstDay.getDay() + 6) % 7; // Monday-first
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        const cells = [];
+        for (let i = 0; i < startOffset; i++) cells.push("<td></td>");
+        for (let day = 1; day <= daysInMonth; day++) {
+            const d = new Date(year, month, day);
+            const iso = fmt(d);
+            let cls = "lz-dr-day";
+            if (rangeStart && iso === fmt(rangeStart)) cls += " is-start";
+            if (rangeEnd && iso === fmt(rangeEnd)) cls += " is-end";
+            if (rangeStart && rangeEnd && d > rangeStart && d < rangeEnd) cls += " in-range";
+            cells.push(`<td><span class="${cls}" data-date="${iso}">${day}</span></td>`);
+        }
+        while (cells.length % 7 !== 0) cells.push("<td></td>");
+
+        let rowsHtml = "";
+        for (let i = 0; i < cells.length; i += 7) {
+            rowsHtml += `<tr>${cells.slice(i, i + 7).join("")}</tr>`;
+        }
+        const headHtml = `<tr>${["M", "T", "W", "T", "F", "S", "S"].map(d => `<th>${d}</th>`).join("")}</tr>`;
+        return `<caption>${monthLabel(monthDate)}</caption>${headHtml}${rowsHtml}`;
+    }
+
+    function renderCalendars() {
+        const rightMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1);
+        calTitle.textContent = `${monthLabel(viewMonth)} – ${monthLabel(rightMonth)}`;
+        calGrids[0].innerHTML = renderMonthTable(viewMonth);
+        calGrids[1].innerHTML = renderMonthTable(rightMonth);
+        el.querySelectorAll(".lz-dr-day[data-date]").forEach(dayEl => {
+            dayEl.addEventListener("click", () => onDayClick(dayEl.dataset.date));
+        });
+    }
+
+    function updatePreview() {
+        if (rangeStart && rangeEnd) {
+            preview.textContent = `${fmt(rangeStart)}  to  ${fmt(rangeEnd)}`;
+        } else if (rangeStart) {
+            preview.textContent = `${fmt(rangeStart)} – pick an end date`;
+        } else {
+            preview.textContent = "";
+        }
+    }
+
+    function onDayClick(iso) {
+        const clicked = new Date(iso + "T00:00:00");
+        if (!rangeStart || (rangeStart && rangeEnd)) {
+            rangeStart = clicked;
+            rangeEnd = null;
+        } else if (clicked < rangeStart) {
+            rangeEnd = rangeStart;
+            rangeStart = clicked;
+        } else {
+            rangeEnd = clicked;
+        }
+        activeKey = "custom";
+        presetsEl.querySelectorAll("button").forEach(b => b.classList.toggle("active", b.dataset.key === "custom"));
+        updatePreview();
+        renderCalendars();
+    }
+
+    function apply(label) {
+        const end = rangeEnd || rangeStart;
+        trigger.querySelector(".lz-dr-label").textContent = label;
+        pop.classList.add("hidden");
+        onApply({ start: fmt(rangeStart), end: fmt(end), label });
+    }
+
+    presetsEl.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-key]");
+        if (!btn) return;
+        const key = btn.dataset.key;
+        activeKey = key;
+        presetsEl.querySelectorAll("button").forEach(b => b.classList.toggle("active", b === btn));
+
+        if (key === "custom") {
+            rangeStart = null;
+            rangeEnd = null;
+            updatePreview();
+            renderCalendars();
+            return;
+        }
+
+        const preset = PRESETS.find(p => p.key === key);
+        const r = presetRange(preset);
+        rangeStart = r.start;
+        rangeEnd = r.end;
+        updatePreview();
+        renderCalendars();
+        apply(preset.label);
+    });
+
+    el.querySelector(".lz-dr-apply").addEventListener("click", () => {
+        if (!rangeStart) return;
+        const preset = PRESETS.find(p => p.key === activeKey);
+        apply(preset && preset.key !== "custom" ? preset.label : `${fmt(rangeStart)} to ${fmt(rangeEnd || rangeStart)}`);
+    });
+
+    trigger.addEventListener("click", (e) => {
+        e.stopPropagation();
+        pop.classList.toggle("hidden");
+    });
+
+    document.addEventListener("click", (e) => {
+        if (!el.contains(e.target)) pop.classList.add("hidden");
+    });
+
+    el.querySelector(".lz-dr-cal-prev").addEventListener("click", () => {
+        viewMonth.setMonth(viewMonth.getMonth() - 1);
+        renderCalendars();
+    });
+    el.querySelector(".lz-dr-cal-next").addEventListener("click", () => {
+        viewMonth.setMonth(viewMonth.getMonth() + 1);
+        renderCalendars();
+    });
+
+    renderPresetButtons();
+    renderCalendars();
+
+    const initialPreset = PRESETS.find(p => p.key === activeKey) || PRESETS[3];
+    const initialRange = presetRange(initialPreset);
+    rangeStart = initialRange.start;
+    rangeEnd = initialRange.end;
+    updatePreview();
+    renderCalendars();
+    apply(initialPreset.label);
+
+    return { getRange: () => ({ start: fmt(rangeStart), end: fmt(rangeEnd || rangeStart) }) };
+}
+
+// ---------------------------------------------------------------------------
+// Analytics tab
+let lzAnalyticsChart = null;
+let lzProductAnalyticsData = [];
+let lzProductAnalyticsSort = { key: "views", dir: "desc" };
+
+async function loadAnalyticsOverview(range) {
+    try {
+        const qs = new URLSearchParams({ start: range.start, end: range.end }).toString();
+        const data = await authorizedFetch(`/api/admin/analytics/overview?${qs}`);
+
+        const kpiGrid = document.getElementById("analytics-kpi-grid");
+        if (kpiGrid) {
+            const t = data.totals;
+            kpiGrid.innerHTML = `
+                <div class="stat-card"><div class="label">Total Visits</div><div class="value">${t.totalVisits.toLocaleString()}</div></div>
+                <div class="stat-card"><div class="label">Unique Visitors</div><div class="value">${t.uniqueVisitors.toLocaleString()}</div></div>
+                <div class="stat-card"><div class="label">Cart Adds</div><div class="value">${t.cartAdds.toLocaleString()}</div></div>
+                <div class="stat-card"><div class="label">Orders</div><div class="value">${t.ordersCount.toLocaleString()}</div></div>
+                <div class="stat-card"><div class="label">Revenue (Paid)</div><div class="value">UGX ${Number(t.revenue).toLocaleString()}</div></div>
+                <div class="stat-card"><div class="label">Conversion Rate</div><div class="value">${t.conversionRate}%</div></div>
+            `;
+        }
+
+        renderLzAnalyticsChart(data.dailySeries);
+        lzRenderMiniTable("analytics-top-pages", data.topPages.map(p => [p.page, p.visits]));
+        lzRenderMiniTable("analytics-top-countries", data.topCountries.map(c => [c.country, c.visits]));
+        lzRenderMiniTable("analytics-devices", data.deviceBreakdown.map(d => [d.browser, d.visits]));
+        lzRenderMiniTable("analytics-os", data.osBreakdown.map(o => [o.os, o.visits]));
+    } catch (error) {
+        console.error("Load analytics overview error:", error);
+    }
+}
+
+function renderLzAnalyticsChart(dailySeries) {
+    const canvas = document.getElementById("analytics-chart");
+    if (!canvas || typeof Chart === "undefined") return;
+    const labels = dailySeries.map(d => d.day);
+    const datasets = [
+        { label: "Visits", data: dailySeries.map(d => d.visits), borderColor: "#1a1a2e", backgroundColor: "rgba(26,26,46,0.08)", tension: 0.3, fill: true },
+        { label: "Cart Adds", data: dailySeries.map(d => d.cartAdds), borderColor: "#C9A227", backgroundColor: "rgba(201,162,39,0.12)", tension: 0.3, fill: true },
+        { label: "Orders", data: dailySeries.map(d => d.orders), borderColor: "#1e7e34", backgroundColor: "rgba(30,126,52,0.1)", tension: 0.3, fill: true }
+    ];
+    if (lzAnalyticsChart) {
+        lzAnalyticsChart.data.labels = labels;
+        lzAnalyticsChart.data.datasets = datasets;
+        lzAnalyticsChart.update();
+        return;
+    }
+    lzAnalyticsChart = new Chart(canvas.getContext("2d"), {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: "index", intersect: false },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+}
+
+async function loadProductAnalyticsTable(range) {
+    try {
+        const qs = new URLSearchParams({ start: range.start, end: range.end }).toString();
+        lzProductAnalyticsData = await authorizedFetch(`/api/admin/analytics/products?${qs}`);
+        renderProductAnalyticsTable();
+    } catch (error) {
+        console.error("Load product analytics error:", error);
+    }
+}
+
+function renderProductAnalyticsTable() {
+    const container = document.getElementById("analytics-products-table");
+    if (!container) return;
+    if (!lzProductAnalyticsData.length) {
+        container.innerHTML = `<p class="no-data">No product activity in this range yet.</p>`;
+        return;
+    }
+    const { key, dir } = lzProductAnalyticsSort;
+    const sorted = [...lzProductAnalyticsData].sort((a, b) => (dir === "desc" ? b[key] - a[key] : a[key] - b[key]));
+
+    const cols = [
+        { key: "views", label: "Views" },
+        { key: "cartAdds", label: "Cart Adds" },
+        { key: "unitsSold", label: "Units Sold" },
+        { key: "revenue", label: "Revenue" },
+        { key: "viewToCartRate", label: "View → Cart %" }
+    ];
+
+    container.innerHTML = `
+        <table>
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    ${cols.map(c => `<th class="sortable-th${c.key === key ? " active" : ""}" data-sort="${c.key}">${c.label}<span class="lz-sort-arrow">${c.key === key ? (dir === "desc" ? "▾" : "▴") : "▾"}</span></th>`).join("")}
+                </tr>
+            </thead>
+            <tbody>
+                ${sorted.map(p => `
+                    <tr>
+                        <td data-label="Product">${lzEscapeHtml(p.name)}</td>
+                        <td data-label="Views">${p.views.toLocaleString()}</td>
+                        <td data-label="Cart Adds">${p.cartAdds.toLocaleString()}</td>
+                        <td data-label="Units Sold">${p.unitsSold.toLocaleString()}</td>
+                        <td data-label="Revenue">UGX ${p.revenue.toLocaleString()}</td>
+                        <td data-label="View to Cart">${p.viewToCartRate}%</td>
+                    </tr>
+                `).join("")}
+            </tbody>
+        </table>
+    `;
+
+    container.querySelectorAll(".sortable-th").forEach(th => {
+        th.addEventListener("click", () => {
+            const k = th.dataset.sort;
+            if (lzProductAnalyticsSort.key === k) {
+                lzProductAnalyticsSort.dir = lzProductAnalyticsSort.dir === "desc" ? "asc" : "desc";
+            } else {
+                lzProductAnalyticsSort = { key: k, dir: "desc" };
+            }
+            renderProductAnalyticsTable();
+        });
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Performance Reports tab (vendors + staff)
+let lzVendorPerfData = [];
+let lzStaffPerfData = [];
+
+async function loadPerformanceReports(rangeOrPeriod) {
+    try {
+        const params = new URLSearchParams(rangeOrPeriod).toString();
+        const [vendors, staff] = await Promise.all([
+            authorizedFetch(`/api/admin/performance/vendors?${params}`),
+            authorizedFetch(`/api/admin/performance/staff?${params}`)
+        ]);
+        lzVendorPerfData = vendors;
+        lzStaffPerfData = staff;
+        renderPerformanceTable("performance-vendors-table", lzVendorPerfData, "businessName", "Vendor", false);
+        renderPerformanceTable("performance-staff-table", lzStaffPerfData, "name", "Staff Member", true);
+    } catch (error) {
+        console.error("Load performance reports error:", error);
+    }
+}
+
+function renderPerformanceTable(containerId, data, nameKey, nameLabel, showRole) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    if (!data.length) {
+        container.innerHTML = `<p class="no-data">No data yet.</p>`;
+        return;
+    }
+    container.innerHTML = `
+        <table>
+            <thead>
+                <tr>
+                    <th>${nameLabel}</th>
+                    ${showRole ? "<th>Role</th>" : ""}
+                    <th>Products</th>
+                    <th>Product Views</th>
+                    <th>Units Sold</th>
+                    <th>Orders</th>
+                    <th>Revenue</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${data.map(row => `
+                    <tr>
+                        <td data-label="${nameLabel}">${lzEscapeHtml(row[nameKey] || "—")}</td>
+                        ${showRole ? `<td data-label="Role">${lzEscapeHtml((row.role || "").replace(/_/g, " "))}</td>` : ""}
+                        <td data-label="Products">${row.productCount}</td>
+                        <td data-label="Product Views">${row.productViews.toLocaleString()}</td>
+                        <td data-label="Units Sold">${row.unitsSold.toLocaleString()}</td>
+                        <td data-label="Orders">${row.ordersCount}</td>
+                        <td data-label="Revenue">UGX ${row.revenue.toLocaleString()}</td>
+                    </tr>
+                `).join("")}
+            </tbody>
+        </table>
+    `;
+}
+
+function setupPerformancePeriodToggle() {
+    const toggle = document.getElementById("performance-period-toggle");
+    const drWrap = document.getElementById("performance-daterange");
+    if (!toggle) return;
+    toggle.addEventListener("click", (e) => {
+        const btn = e.target.closest(".lz-period-btn");
+        if (!btn) return;
+        toggle.querySelectorAll(".lz-period-btn").forEach(b => b.classList.toggle("active", b === btn));
+        const period = btn.dataset.period;
+        if (period === "custom") {
+            drWrap.classList.remove("hidden");
+        } else {
+            drWrap.classList.add("hidden");
+            loadPerformanceReports({ period });
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Wires up both tabs' date pickers/toggles and fires their first load. Called
+// once from showDashboard(), same lifecycle point as loadAllDashboardData().
+function initAnalyticsAndPerformance() {
+    if (window.__lzAnalyticsInited) return;
+    window.__lzAnalyticsInited = true;
+
+    createDateRangePicker("analytics-daterange", (range) => {
+        loadAnalyticsOverview(range);
+        loadProductAnalyticsTable(range);
+    }, "30d");
+
+    createDateRangePicker("performance-daterange", (range) => {
+        loadPerformanceReports(range);
+    }, "30d");
+
+    setupPerformancePeriodToggle();
+    // The toggle defaults to "Weekly" - load that instead of leaving the
+    // custom-range picker's own initial fetch as the only performance data.
+    loadPerformanceReports({ period: "week" });
+
+    // Reuses the existing /api/search/stats endpoint (already powering the
+    // Dashboard tab's "Top Searches" panel) so search activity - a strong
+    // signal of what shoppers are browsing for - shows up here too.
+    authorizedFetch("/api/search/stats")
+        .then(stats => lzRenderMiniTable("analytics-top-searches", (stats.topTerms || []).map(t => [t.query, t.count])))
+        .catch(error => console.error("Load top searches error:", error));
+
+    document.getElementById("analytics-products-export")?.addEventListener("click", () => {
+        exportTableAsCsv("product-analytics.csv",
+            ["Product", "Views", "Cart Adds", "Units Sold", "Revenue (UGX)", "View to Cart %"],
+            lzProductAnalyticsData.map(p => [p.name, p.views, p.cartAdds, p.unitsSold, p.revenue, p.viewToCartRate])
+        );
+    });
+    document.getElementById("performance-vendors-export")?.addEventListener("click", () => {
+        exportTableAsCsv("vendor-performance.csv",
+            ["Vendor", "Products", "Product Views", "Units Sold", "Orders", "Revenue (UGX)"],
+            lzVendorPerfData.map(v => [v.businessName, v.productCount, v.productViews, v.unitsSold, v.ordersCount, v.revenue])
+        );
+    });
+    document.getElementById("performance-staff-export")?.addEventListener("click", () => {
+        exportTableAsCsv("staff-performance.csv",
+            ["Staff Member", "Role", "Products", "Product Views", "Units Sold", "Orders", "Revenue (UGX)"],
+            lzStaffPerfData.map(s => [s.name, s.role, s.productCount, s.productViews, s.unitsSold, s.ordersCount, s.revenue])
+        );
+    });
 }

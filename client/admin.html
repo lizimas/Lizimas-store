@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Admin Dashboard</title>
-<link rel="stylesheet" href="css/admin.css?v=14">
+<link rel="stylesheet" href="css/admin.css?v=15">
 </head>
 <body>
 
@@ -53,6 +53,12 @@
                 <nav class="sidebar-nav">
                     <button class="tab-btn active" data-tab="overview">
                         <span class="sidebar-icon">&#9635;</span> Dashboard
+                    </button>
+                    <button class="tab-btn" data-tab="analytics">
+                        <span class="sidebar-icon">&#128202;</span> Analytics
+                    </button>
+                    <button class="tab-btn" data-tab="performance">
+                        <span class="sidebar-icon">&#128200;</span> Performance Reports
                     </button>
                     <button class="tab-btn" data-tab="products">
                         <span class="sidebar-icon">&#128230;</span> Products
@@ -125,6 +131,84 @@
                     <div class="panel">
                         <h2>Top Searches</h2>
                         <div id="top-searches-list">Loading...</div>
+                    </div>
+                </section>
+
+                <section id="tab-analytics" class="tab-content hidden">
+                    <h2 class="admin-page-title">Analytics</h2>
+                    <p class="admin-page-subtitle">Visitors, product engagement, and conversion over any date range.</p>
+
+                    <div id="analytics-daterange" class="lz-dr-wrap"></div>
+
+                    <div class="stats-grid" id="analytics-kpi-grid">
+                        <p>Loading analytics...</p>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Visits Over Time</h2>
+                        <div class="lz-chart-wrap">
+                            <canvas id="analytics-chart" height="90"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="lz-panel-head">
+                            <h2>Product Engagement</h2>
+                            <button class="lz-export-btn" id="analytics-products-export">Export CSV</button>
+                        </div>
+                        <div id="analytics-products-table">Loading...</div>
+                    </div>
+
+                    <div class="lz-analytics-cols">
+                        <div class="panel">
+                            <h2>Top Pages</h2>
+                            <div id="analytics-top-pages">Loading...</div>
+                        </div>
+                        <div class="panel">
+                            <h2>Top Countries</h2>
+                            <div id="analytics-top-countries">Loading...</div>
+                        </div>
+                        <div class="panel">
+                            <h2>Browsers</h2>
+                            <div id="analytics-devices">Loading...</div>
+                        </div>
+                        <div class="panel">
+                            <h2>Top Searches</h2>
+                            <div id="analytics-top-searches">Loading...</div>
+                        </div>
+                        <div class="panel">
+                            <h2>Operating Systems</h2>
+                            <div id="analytics-os">Loading...</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-performance" class="tab-content hidden">
+                    <h2 class="admin-page-title">Performance Reports</h2>
+                    <p class="admin-page-subtitle">Vendor and staff performance: product visits, units sold, and revenue.</p>
+
+                    <div class="lz-period-toggle" id="performance-period-toggle">
+                        <button class="lz-period-btn active" data-period="week">Weekly</button>
+                        <button class="lz-period-btn" data-period="month">Monthly</button>
+                        <button class="lz-period-btn" data-period="year">Annual</button>
+                        <button class="lz-period-btn" data-period="custom">Custom Range</button>
+                    </div>
+                    <div id="performance-daterange" class="lz-dr-wrap hidden"></div>
+
+                    <div class="panel">
+                        <div class="lz-panel-head">
+                            <h2>Vendor Performance</h2>
+                            <button class="lz-export-btn" id="performance-vendors-export">Export CSV</button>
+                        </div>
+                        <div id="performance-vendors-table">Loading...</div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="lz-panel-head">
+                            <h2>Staff Performance</h2>
+                            <button class="lz-export-btn" id="performance-staff-export">Export CSV</button>
+                        </div>
+                        <div id="performance-staff-table">Loading...</div>
                     </div>
                 </section>
 
@@ -895,7 +979,8 @@
 <script src="js/prepare-picked-file.js?v=10"></script>
 <script src="js/description-block-editor.js?v=13"></script>
 <script src="js/category-select.js?v=2"></script>
-    <script src="js/admin.js?v=49"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="js/admin.js?v=50"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>
