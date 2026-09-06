@@ -1,4 +1,6 @@
 const pool = require("../config/database");
+const { buildPerformanceReportPdf } = require("../utils/reportPdf");
+const mailer = require("../utils/mailer");
 
 // ---------------------------------------------------------------------------
 // Shared date-range helpers. Every endpoint below accepts either an explicit
@@ -8,8 +10,8 @@ const pool = require("../config/database");
 // request from a fresh page load still returns something sensible.
 const PERIOD_DAYS = { week: 7, month: 30, year: 365 };
 
-function resolveRange(req) {
-    const { start, end, period } = req.query;
+function resolveRange(params) {
+    const { start, end, period } = params || {};
     const now = new Date();
 
     if (start && end) {
@@ -81,7 +83,7 @@ exports.trackCartAdd = async (req, res) => {
 // the chart, and the top-pages/countries/devices breakdown panels.
 exports.getAnalyticsOverview = async (req, res) => {
     try {
-        const { startDate, endDate } = resolveRange(req);
+        const { startDate, endDate } = resolveRange(req.query);
 
         const totalsResult = await pool.query(
             `WITH v AS (
@@ -211,7 +213,7 @@ exports.getAnalyticsOverview = async (req, res) => {
 // actually browsing, clicking and buying" table.
 exports.getProductAnalytics = async (req, res) => {
     try {
-        const { startDate, endDate } = resolveRange(req);
+        const { startDate, endDate } = resolveRange(req.query);
 
         const result = await pool.query(
             `WITH views AS (
@@ -309,7 +311,7 @@ async function productMetricsForRange(startDate, endDate) {
 // Admin: GET /api/admin/performance/vendors?period=week|month|year (or start=&end=)
 exports.getVendorPerformanceReport = async (req, res) => {
     try {
-        const { startDate, endDate } = resolveRange(req);
+        const { startDate, endDate } = resolveRange(req.query);
 
         const metricsResult = await productMetricsForRange(startDate, endDate);
         const byVendor = new Map();
@@ -340,7 +342,9 @@ exports.getVendorPerformanceReport = async (req, res) => {
         const ordersByVendor = new Map(ordersResult.rows.map(r => [r.vendor_id, Number(r.orders_count)]));
 
         const vendorsResult = await pool.query(
-            `SELECT id, business_name, status FROM vendors WHERE status = 'approved' ORDER BY business_name ASC`
+            `SELECT v.id, v.business_name, v.status, u.email
+             FROM vendors v JOIN users u ON u.id = v.user_id
+             WHERE v.status = 'approved' ORDER BY v.business_name ASC`
         );
 
         res.json(vendorsResult.rows.map(v => {
@@ -348,6 +352,7 @@ exports.getVendorPerformanceReport = async (req, res) => {
             return {
                 vendorId: v.id,
                 businessName: v.business_name,
+                email: v.email,
                 productCount: agg.productCount,
                 productViews: agg.views,
                 unitsSold: agg.unitsSold,
@@ -366,7 +371,7 @@ exports.getVendorPerformanceReport = async (req, res) => {
 // actually manage the catalogue (product_staff, store_manager, admin).
 exports.getStaffPerformanceReport = async (req, res) => {
     try {
-        const { startDate, endDate } = resolveRange(req);
+        const { startDate, endDate } = resolveRange(req.query);
 
         const metricsResult = await productMetricsForRange(startDate, endDate);
         const byStaff = new Map();
@@ -395,7 +400,7 @@ exports.getStaffPerformanceReport = async (req, res) => {
         const ordersByStaff = new Map(ordersResult.rows.map(r => [r.created_by, Number(r.orders_count)]));
 
         const staffResult = await pool.query(
-            `SELECT id, name, role FROM users
+            `SELECT id, name, role, email FROM users
              WHERE role IN ('product_staff', 'store_manager', 'admin') AND deleted_at IS NULL
              ORDER BY name ASC`
         );
@@ -406,6 +411,7 @@ exports.getStaffPerformanceReport = async (req, res) => {
                 staffId: u.id,
                 name: u.name,
                 role: u.role,
+                email: u.email,
                 productCount: agg.productCount,
                 productViews: agg.views,
                 unitsSold: agg.unitsSold,
@@ -416,5 +422,267 @@ exports.getStaffPerformanceReport = async (req, res) => {
     } catch (error) {
         console.error("getStaffPerformanceReport error:", error);
         res.status(500).json({ error: "Failed to load staff performance report." });
+    }
+};
+
+
+// ---------------------------------------------------------------------------
+// Shareable PDF performance reports (admin -> one vendor or one staff member)
+//
+// Reuses productMetricsForRange() (the same source the all-vendor/all-staff
+// tables read from) so a shared report's numbers always match what the admin
+// sees on screen for the same date range - then narrows to just that one
+// vendor's or staff member's own products, both for the summary totals and
+// for the per-product breakdown table in the PDF.
+
+function reportRangeLabel(startDate, endDate) {
+    const fmt = d => d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    return `${fmt(startDate)} - ${fmt(endDate)}`;
+}
+
+// One row per product actually owned by this vendor/staff member, with the
+// same views/cart-adds/units-sold/revenue shape as the admin's own product
+// analytics table - this is what fills the PDF's product breakdown.
+async function productBreakdownForEntity(startDate, endDate, { vendorId, createdBy }) {
+    const column = vendorId != null ? "vendor_id" : "created_by";
+    const value = vendorId != null ? vendorId : createdBy;
+    const result = await pool.query(
+        `WITH views AS (
+            SELECT ${PRODUCT_ID_FROM_PATH_SQL} AS product_id, COUNT(*) AS views
+            FROM visitor_logs
+            WHERE page_visited LIKE '/product/%'
+              AND visited_at >= $1 AND visited_at <= $2
+            GROUP BY 1
+         ),
+         adds AS (
+            SELECT product_id, COUNT(*) AS cart_adds
+            FROM cart_events WHERE created_at >= $1 AND created_at <= $2
+            GROUP BY product_id
+         ),
+         sales AS (
+            SELECT oi.product_id,
+                   SUM(oi.quantity) AS units_sold,
+                   SUM(oi.quantity * oi.price) AS revenue
+            FROM order_items oi
+            JOIN orders o ON o.id = oi.order_id
+            WHERE o.status = 'paid' AND o.created_at >= $1 AND o.created_at <= $2
+            GROUP BY oi.product_id
+         )
+         SELECT p.id, p.name,
+                COALESCE(v.views, 0) AS views,
+                COALESCE(a.cart_adds, 0) AS cart_adds,
+                COALESCE(s.units_sold, 0) AS units_sold,
+                COALESCE(s.revenue, 0) AS revenue
+         FROM products p
+         LEFT JOIN views v ON v.product_id = p.id
+         LEFT JOIN adds a ON a.product_id = p.id
+         LEFT JOIN sales s ON s.product_id = p.id
+         WHERE p.deleted_at IS NULL AND p.${column} = $3
+         ORDER BY revenue DESC, views DESC`,
+        [startDate, endDate, value]
+    );
+    return result.rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        views: Number(r.views),
+        cartAdds: Number(r.cart_adds),
+        unitsSold: Number(r.units_sold),
+        revenue: Number(r.revenue)
+    }));
+}
+
+async function vendorSummaryAndEmail(vendorId, startDate, endDate) {
+    const vendorResult = await pool.query(
+        `SELECT v.id, v.business_name, u.name AS owner_name, u.email
+         FROM vendors v JOIN users u ON u.id = v.user_id
+         WHERE v.id = $1`,
+        [vendorId]
+    );
+    if (!vendorResult.rows.length) return null;
+    const vendor = vendorResult.rows[0];
+
+    const metricsResult = await productMetricsForRange(startDate, endDate);
+    const agg = { productCount: 0, views: 0, unitsSold: 0, revenue: 0 };
+    metricsResult.rows.forEach(r => {
+        if (r.vendor_id !== vendor.id) return;
+        agg.productCount += 1;
+        agg.views += Number(r.views);
+        agg.unitsSold += Number(r.units_sold);
+        agg.revenue += Number(r.revenue);
+    });
+
+    const ordersResult = await pool.query(
+        `SELECT COUNT(DISTINCT o.id) AS orders_count
+         FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id
+         WHERE o.status = 'paid' AND o.created_at >= $1 AND o.created_at <= $2 AND p.vendor_id = $3`,
+        [startDate, endDate, vendor.id]
+    );
+
+    return {
+        id: vendor.id,
+        businessName: vendor.business_name,
+        ownerName: vendor.owner_name,
+        email: vendor.email,
+        productCount: agg.productCount,
+        productViews: agg.views,
+        unitsSold: agg.unitsSold,
+        revenue: agg.revenue,
+        ordersCount: Number(ordersResult.rows[0].orders_count)
+    };
+}
+
+async function staffSummaryAndEmail(staffId, startDate, endDate) {
+    const staffResult = await pool.query(
+        `SELECT id, name, role, email FROM users WHERE id = $1 AND deleted_at IS NULL`,
+        [staffId]
+    );
+    if (!staffResult.rows.length) return null;
+    const staff = staffResult.rows[0];
+
+    const metricsResult = await productMetricsForRange(startDate, endDate);
+    const agg = { productCount: 0, views: 0, unitsSold: 0, revenue: 0 };
+    metricsResult.rows.forEach(r => {
+        if (r.created_by !== staff.id) return;
+        agg.productCount += 1;
+        agg.views += Number(r.views);
+        agg.unitsSold += Number(r.units_sold);
+        agg.revenue += Number(r.revenue);
+    });
+
+    const ordersResult = await pool.query(
+        `SELECT COUNT(DISTINCT o.id) AS orders_count
+         FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id
+         WHERE o.status = 'paid' AND o.created_at >= $1 AND o.created_at <= $2 AND p.created_by = $3`,
+        [startDate, endDate, staff.id]
+    );
+
+    return {
+        id: staff.id,
+        name: staff.name,
+        role: staff.role,
+        email: staff.email,
+        productCount: agg.productCount,
+        productViews: agg.views,
+        unitsSold: agg.unitsSold,
+        revenue: agg.revenue,
+        ordersCount: Number(ordersResult.rows[0].orders_count)
+    };
+}
+
+async function buildVendorEntityPdf(vendorId, startDate, endDate) {
+    const summary = await vendorSummaryAndEmail(vendorId, startDate, endDate);
+    if (!summary) return null;
+    const products = await productBreakdownForEntity(startDate, endDate, { vendorId: summary.id });
+    const pdfBuffer = await buildPerformanceReportPdf({
+        label: summary.businessName,
+        subLabel: summary.ownerName,
+        kind: "Vendor",
+        summary,
+        products
+    }, { start: startDate, end: endDate });
+    return { summary, pdfBuffer };
+}
+
+async function buildStaffEntityPdf(staffId, startDate, endDate) {
+    const summary = await staffSummaryAndEmail(staffId, startDate, endDate);
+    if (!summary) return null;
+    const products = await productBreakdownForEntity(startDate, endDate, { createdBy: summary.id });
+    const pdfBuffer = await buildPerformanceReportPdf({
+        label: summary.name,
+        subLabel: (summary.role || "").replace(/_/g, " "),
+        kind: "Staff Member",
+        summary,
+        products
+    }, { start: startDate, end: endDate });
+    return { summary, pdfBuffer };
+}
+
+function pdfFilenameFor(name) {
+    return `${String(name || "report").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "")}-performance-report.pdf`;
+}
+
+// Admin: GET /api/admin/performance/vendors/:id/pdf?start=&end= (or ?period=)
+// Downloads the PDF directly - no email involved.
+exports.getVendorReportPdf = async (req, res) => {
+    try {
+        const vendorId = parseInt(req.params.id, 10);
+        if (!Number.isInteger(vendorId)) return res.status(400).json({ error: "Invalid vendor id." });
+        const { startDate, endDate } = resolveRange(req.query);
+        const result = await buildVendorEntityPdf(vendorId, startDate, endDate);
+        if (!result) return res.status(404).json({ error: "Vendor not found." });
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${pdfFilenameFor(result.summary.businessName)}"`);
+        res.send(result.pdfBuffer);
+    } catch (error) {
+        console.error("getVendorReportPdf error:", error);
+        res.status(500).json({ error: "Failed to generate vendor report PDF." });
+    }
+};
+
+// Admin: GET /api/admin/performance/staff/:id/pdf?start=&end= (or ?period=)
+exports.getStaffReportPdf = async (req, res) => {
+    try {
+        const staffId = parseInt(req.params.id, 10);
+        if (!Number.isInteger(staffId)) return res.status(400).json({ error: "Invalid staff id." });
+        const { startDate, endDate } = resolveRange(req.query);
+        const result = await buildStaffEntityPdf(staffId, startDate, endDate);
+        if (!result) return res.status(404).json({ error: "Staff member not found." });
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${pdfFilenameFor(result.summary.name)}"`);
+        res.send(result.pdfBuffer);
+    } catch (error) {
+        console.error("getStaffReportPdf error:", error);
+        res.status(500).json({ error: "Failed to generate staff report PDF." });
+    }
+};
+
+// Admin: POST /api/admin/performance/vendors/:id/share  body: {start,end} or {period}
+// Generates the same PDF and emails it straight to the vendor's account email.
+exports.shareVendorReportPdf = async (req, res) => {
+    try {
+        const vendorId = parseInt(req.params.id, 10);
+        if (!Number.isInteger(vendorId)) return res.status(400).json({ error: "Invalid vendor id." });
+        const { startDate, endDate } = resolveRange(req.body);
+        const result = await buildVendorEntityPdf(vendorId, startDate, endDate);
+        if (!result) return res.status(404).json({ error: "Vendor not found." });
+        if (!result.summary.email) return res.status(400).json({ error: "This vendor has no email on file." });
+
+        const sent = await mailer.sendPerformanceReportEmail(
+            result.summary.email,
+            result.summary.ownerName || result.summary.businessName,
+            reportRangeLabel(startDate, endDate),
+            result.pdfBuffer,
+            pdfFilenameFor(result.summary.businessName)
+        );
+        if (!sent) return res.status(502).json({ error: "The report was generated but the email failed to send." });
+        res.json({ ok: true, emailedTo: result.summary.email });
+    } catch (error) {
+        console.error("shareVendorReportPdf error:", error);
+        res.status(500).json({ error: "Failed to share vendor report." });
+    }
+};
+
+// Admin: POST /api/admin/performance/staff/:id/share  body: {start,end} or {period}
+exports.shareStaffReportPdf = async (req, res) => {
+    try {
+        const staffId = parseInt(req.params.id, 10);
+        if (!Number.isInteger(staffId)) return res.status(400).json({ error: "Invalid staff id." });
+        const { startDate, endDate } = resolveRange(req.body);
+        const result = await buildStaffEntityPdf(staffId, startDate, endDate);
+        if (!result) return res.status(404).json({ error: "Staff member not found." });
+        if (!result.summary.email) return res.status(400).json({ error: "This staff member has no email on file." });
+
+        const sent = await mailer.sendPerformanceReportEmail(
+            result.summary.email,
+            result.summary.name,
+            reportRangeLabel(startDate, endDate),
+            result.pdfBuffer,
+            pdfFilenameFor(result.summary.name)
+        );
+        if (!sent) return res.status(502).json({ error: "The report was generated but the email failed to send." });
+        res.json({ ok: true, emailedTo: result.summary.email });
+    } catch (error) {
+        console.error("shareStaffReportPdf error:", error);
+        res.status(500).json({ error: "Failed to share staff report." });
     }
 };

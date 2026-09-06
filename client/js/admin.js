@@ -5699,8 +5699,11 @@ function setupProductAnalyticsFilter() {
 let lzVendorPerfData = [];
 let lzStaffPerfData = [];
 
+let lzPerformanceRangeParams = { period: "week" };
+
 async function loadPerformanceReports(rangeOrPeriod) {
     try {
+        lzPerformanceRangeParams = rangeOrPeriod;
         const params = new URLSearchParams(rangeOrPeriod).toString();
         const [vendors, staff] = await Promise.all([
             authorizedFetch(`/api/admin/performance/vendors?${params}`),
@@ -5708,20 +5711,21 @@ async function loadPerformanceReports(rangeOrPeriod) {
         ]);
         lzVendorPerfData = vendors;
         lzStaffPerfData = staff;
-        renderPerformanceTable("performance-vendors-table", lzVendorPerfData, "businessName", "Vendor", false);
-        renderPerformanceTable("performance-staff-table", lzStaffPerfData, "name", "Staff Member", true);
+        renderPerformanceTable("performance-vendors-table", lzVendorPerfData, "businessName", "Vendor", false, "vendors");
+        renderPerformanceTable("performance-staff-table", lzStaffPerfData, "name", "Staff Member", true, "staff");
     } catch (error) {
         console.error("Load performance reports error:", error);
     }
 }
 
-function renderPerformanceTable(containerId, data, nameKey, nameLabel, showRole) {
+function renderPerformanceTable(containerId, data, nameKey, nameLabel, showRole, entityType) {
     const container = document.getElementById(containerId);
     if (!container) return;
     if (!data.length) {
         container.innerHTML = `<p class="no-data">No data yet.</p>`;
         return;
     }
+    const idKey = entityType === "vendors" ? "vendorId" : "staffId";
     container.innerHTML = `
         <table>
             <thead>
@@ -5733,6 +5737,7 @@ function renderPerformanceTable(containerId, data, nameKey, nameLabel, showRole)
                     <th>Units Sold</th>
                     <th>Orders</th>
                     <th>Revenue</th>
+                    <th>Report</th>
                 </tr>
             </thead>
             <tbody>
@@ -5745,11 +5750,74 @@ function renderPerformanceTable(containerId, data, nameKey, nameLabel, showRole)
                         <td data-label="Units Sold">${row.unitsSold.toLocaleString()}</td>
                         <td data-label="Orders">${row.ordersCount}</td>
                         <td data-label="Revenue">UGX ${row.revenue.toLocaleString()}</td>
+                        <td data-label="Report" class="lz-report-actions">
+                            <button class="lz-report-btn" data-entity-type="${entityType}" data-id="${row[idKey]}"
+                                    data-name="${lzEscapeHtml(row[nameKey] || "")}" data-action="download" title="Download PDF">&#11015;&#65039; PDF</button>
+                            <button class="lz-report-btn" data-entity-type="${entityType}" data-id="${row[idKey]}"
+                                    data-name="${lzEscapeHtml(row[nameKey] || "")}" data-email="${lzEscapeHtml(row.email || "")}"
+                                    data-action="share" title="Share via email"${row.email ? "" : " disabled"}>&#9993;&#65039; Share</button>
+                        </td>
                     </tr>
                 `).join("")}
             </tbody>
         </table>
     `;
+}
+
+// Wires the Download PDF / Share buttons that renderPerformanceTable() draws
+// into each row - delegated on document since the table body is replaced
+// wholesale on every re-render (period toggle, date-range apply, etc.).
+function setupPerformanceReportActions() {
+    document.addEventListener("click", async (e) => {
+        const btn = e.target.closest(".lz-report-btn");
+        if (!btn || btn.disabled) return;
+
+        const entityType = btn.dataset.entityType; // "vendors" | "staff"
+        const id = btn.dataset.id;
+        const name = btn.dataset.name || "this " + (entityType === "vendors" ? "vendor" : "staff member");
+        const action = btn.dataset.action;
+        const qs = new URLSearchParams(lzPerformanceRangeParams).toString();
+
+        if (action === "download") {
+            try {
+                const token = getToken();
+                const response = await fetch(`${API_URL}/api/admin/performance/${entityType}/${id}/pdf?${qs}`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `${name.replace(/[^a-z0-9]+/gi, "-")}-performance-report.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error("Download report PDF error:", error);
+                showToast("Failed to download the report.");
+            }
+            return;
+        }
+
+        if (action === "share") {
+            const email = btn.dataset.email;
+            if (!email) { showToast(`${name} has no email on file.`); return; }
+            if (!confirm(`Email ${name}'s performance report to ${email}?`)) return;
+            try {
+                const data = await authorizedFetch(`/api/admin/performance/${entityType}/${id}/share`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(lzPerformanceRangeParams)
+                });
+                showToast(`Report emailed to ${data.emailedTo}.`);
+            } catch (error) {
+                console.error("Share report PDF error:", error);
+                showToast("Failed to email the report.");
+            }
+        }
+    });
 }
 
 function setupPerformancePeriodToggle() {
@@ -5788,6 +5856,7 @@ function initAnalyticsAndPerformance() {
 
     setupPerformancePeriodToggle();
     setupProductAnalyticsFilter();
+    setupPerformanceReportActions();
     // The toggle defaults to "Weekly" - load that instead of leaving the
     // custom-range picker's own initial fetch as the only performance data.
     loadPerformanceReports({ period: "week" });

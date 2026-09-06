@@ -18,7 +18,11 @@ const {
     getAnalyticsOverview,
     getProductAnalytics,
     getVendorPerformanceReport,
-    getStaffPerformanceReport
+    getStaffPerformanceReport,
+    getVendorReportPdf,
+    getStaffReportPdf,
+    shareVendorReportPdf,
+    shareStaffReportPdf
 } = require("../controllers/analyticsController");
 
 const {
@@ -85,6 +89,10 @@ router.get("/analytics/overview", getAnalyticsOverview);
 router.get("/analytics/products", getProductAnalytics);
 router.get("/performance/vendors", getVendorPerformanceReport);
 router.get("/performance/staff", getStaffPerformanceReport);
+router.get("/performance/vendors/:id/pdf", getVendorReportPdf);
+router.get("/performance/staff/:id/pdf", getStaffReportPdf);
+router.post("/performance/vendors/:id/share", shareVendorReportPdf);
+router.post("/performance/staff/:id/share", shareStaffReportPdf);
 router.get("/orders", getAllOrdersAdmin);
 router.get("/orders/:id/items", getOrderItems);
 router.get("/orders/:id/receipt-link", getReceiptLink);

@@ -701,4 +701,41 @@ async function sendAccountReportAlert(details) {
     }
 }
 
-module.exports = { sendOrderConfirmationEmail, sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert };
+
+/**
+ * Emails a single-recipient performance-report PDF straight to a vendor or
+ * staff member's account email, so they can track their own products
+ * without needing admin-panel access. Never throws - a failed send should
+ * surface as "failed" to the admin caller, not crash the request.
+ */
+async function sendPerformanceReportEmail(email, name, rangeLabel, pdfBuffer, filename) {
+    if (!email) return false;
+    try {
+        await transporter.sendMail({
+            from: `"Lizimas Store" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+            to: email,
+            subject: `Your Performance Report (${rangeLabel}) - Lizimas Store`,
+            text: renderCustomerText([
+                `Hi ${name},`,
+                "",
+                `Attached is your performance report for ${rangeLabel}, covering your own products on Lizimas Store - views, cart adds, units sold and revenue.`,
+                "",
+                "If you have any questions about the numbers, reach out to our support team."
+            ]),
+            html: renderCustomerEmail({
+                title: "Your Performance Report",
+                bodyHtml: `
+<p style="margin:0 0 12px">Hi ${escHtml(name)},</p>
+<p style="margin:0 0 12px">Attached is your performance report for <strong>${escHtml(rangeLabel)}</strong>, covering your own products on Lizimas Store - views, cart adds, units sold and revenue.</p>
+<p style="margin:0 0 12px">If you have any questions about the numbers, reach out to our support team.</p>`
+            }),
+            attachments: [{ filename, content: pdfBuffer, contentType: "application/pdf" }]
+        });
+        return true;
+    } catch (error) {
+        console.error("Performance report email error:", error);
+        return false;
+    }
+}
+
+module.exports = { sendOrderConfirmationEmail, sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert, sendPerformanceReportEmail };

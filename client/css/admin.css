@@ -1680,3 +1680,30 @@ table.lz-dr-cal td {
     }
     .lz-dr-cal-grids { flex-direction: column; gap: 4px; }
 }
+
+/* Report column (Download PDF / Share via email) on the vendor & staff
+   performance tables. */
+.lz-report-actions {
+    white-space: nowrap;
+}
+
+.lz-report-btn {
+    background: #fff;
+    border: 1px solid #d9d9d9;
+    color: #333;
+    border-radius: 6px;
+    padding: 5px 9px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-right: 6px;
+}
+
+.lz-report-btn:last-child { margin-right: 0; }
+
+.lz-report-btn:hover:not(:disabled) { border-color: #1a1a2e; color: #1a1a2e; }
+
+.lz-report-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
