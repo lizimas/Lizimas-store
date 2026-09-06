@@ -4129,17 +4129,19 @@ body.sheet-open {
 
 .ls-explore-block-grid {
     display: grid;
-    grid-template-columns: 1.1fr 0.8fr 0.8fr 1.1fr;
+    /* Column and overall proportions measured directly off the reference
+       (gcc.luluhypermarket.com): tall side tiles ~551x954 (a 0.577 w:h
+       portrait), top-middle tile ~772x468 (~1.65 landscape), bottom-middle
+       tiles ~376x466 each. That puts tall:mid column widths at ~1.47:1 and
+       the whole block at ~2:1 overall. Using aspect-ratio on the container
+       (rather than a fixed pixel height) means it keeps those proportions
+       at any width, instead of drifting shorter/taller as the page's max
+       width or the viewport changes. */
+    grid-template-columns: 1.5fr 1fr 1fr 1.5fr;
     grid-template-rows: 1fr 1fr;
     grid-template-areas: "t1 t2 t2 t3" "t1 t4 t5 t3";
     gap: 14px;
-    /* A definite height, not min-height: the tile's height: 100% below only
-       resolves against a definite ancestor height. Without this, height:
-       100% computes to auto and the <img> (also height: 100% of an auto
-       parent, so auto too) falls back to its own natural aspect ratio -
-       which is how a portrait product photo ended up stretching the whole
-       block to 3x taller than intended. */
-    height: 360px;
+    aspect-ratio: 2 / 1;
 }
 
 .ls-explore-block-grid > *:nth-child(1) { grid-area: t1; }
@@ -4154,6 +4156,7 @@ body.sheet-open {
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     grid-template-areas: none;
     grid-template-rows: none;
+    aspect-ratio: auto;
     height: auto;
 }
 
@@ -4176,6 +4179,7 @@ body.sheet-open {
         grid-template-columns: repeat(2, 1fr);
         grid-template-areas: none;
         grid-template-rows: none;
+        aspect-ratio: auto;
         height: auto;
         gap: 10px;
     }
