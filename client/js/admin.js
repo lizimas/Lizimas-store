@@ -5672,6 +5672,26 @@ function renderProductAnalyticsTable() {
             renderProductAnalyticsTable();
         });
     });
+
+    const filterBox = document.getElementById("analytics-products-filter");
+    if (filterBox) {
+        filterBox.querySelectorAll(".lz-period-btn").forEach(b =>
+            b.classList.toggle("active", b.dataset.filter === key));
+    }
+}
+
+// Quick-filter pills above the Product Engagement table: each just jumps the
+// existing sort to that column (desc), so it reuses the same render/sort
+// path as clicking a column header - one source of truth for "what's sorted".
+function setupProductAnalyticsFilter() {
+    const filterBox = document.getElementById("analytics-products-filter");
+    if (!filterBox) return;
+    filterBox.addEventListener("click", e => {
+        const btn = e.target.closest(".lz-period-btn");
+        if (!btn) return;
+        lzProductAnalyticsSort = { key: btn.dataset.filter, dir: "desc" };
+        renderProductAnalyticsTable();
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -5767,6 +5787,7 @@ function initAnalyticsAndPerformance() {
     }, "30d");
 
     setupPerformancePeriodToggle();
+    setupProductAnalyticsFilter();
     // The toggle defaults to "Weekly" - load that instead of leaving the
     // custom-range picker's own initial fetch as the only performance data.
     loadPerformanceReports({ period: "week" });
