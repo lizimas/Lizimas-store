@@ -35,6 +35,25 @@ function addToCart(id, name, price, image, description, colorId, colorName, size
 
     saveCart(cart);
     alert(name + " added to cart");
+
+    // Fire-and-forget analytics beacon for the admin dashboard's cart-add
+    // metrics. Never blocks or throws into the shopper's add-to-cart flow -
+    // the cart itself is already saved above regardless of what happens here.
+    try {
+        const numericId = parseInt(id, 10);
+        if (Number.isInteger(numericId) && numericId > 0) {
+            const headers = { "Content-Type": "application/json" };
+            const token = localStorage.getItem("userToken");
+            if (token) headers["Authorization"] = "Bearer " + token;
+            fetch("/api/track/cart-add", {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ product_id: numericId })
+            }).catch(() => {});
+        }
+    } catch (e) {
+        // Analytics must never break the cart.
+    }
 }
 
 function updateCartCount() {

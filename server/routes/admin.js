@@ -15,6 +15,13 @@ const {
 } = require("../controllers/adminController");
 
 const {
+    getAnalyticsOverview,
+    getProductAnalytics,
+    getVendorPerformanceReport,
+    getStaffPerformanceReport
+} = require("../controllers/analyticsController");
+
+const {
     getPendingProducts,
     approveProduct,
     rejectProduct,
@@ -70,6 +77,14 @@ router.use(requireAuth, requireAdmin);
 
 router.get("/stats", getDashboardStats);
 router.get("/visitor-stats", getVisitorStats);
+
+// Cloudflare-style analytics dashboard: accepts either ?start=&end= (custom
+// range from the date picker) or ?period=week|month|year (the report tables'
+// preset toggle) - see resolveRange() in analyticsController.js.
+router.get("/analytics/overview", getAnalyticsOverview);
+router.get("/analytics/products", getProductAnalytics);
+router.get("/performance/vendors", getVendorPerformanceReport);
+router.get("/performance/staff", getStaffPerformanceReport);
 router.get("/orders", getAllOrdersAdmin);
 router.get("/orders/:id/items", getOrderItems);
 router.get("/orders/:id/receipt-link", getReceiptLink);

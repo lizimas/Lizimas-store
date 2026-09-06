@@ -22,5 +22,6 @@ router.use("/locations", require("./locations"));
 router.use("/search", require("./search"));
 router.use("/reviews", require("./reviews"));
 router.use("/reports", reportLimiter, require("./reports"));
+router.use("/track", require("./track"));
 
 module.exports = router;
