@@ -4151,7 +4151,18 @@ body.sheet-open {
     min-height: 0;
 }
 
-.ls-explore-block-grid--plain > * { grid-area: auto; }
+/* A plain `> *` reset has lower specificity than the :nth-child(N) rules
+   above (one class vs. one class + a pseudo-class), so the cascade never
+   actually applies it and every tile keeps its named desktop grid-area,
+   piling on top of whichever track that name resolves to once the
+   template that defined it is gone. Matching the same :nth-child(N)
+   selectors here keeps the specificity equal, so source order (these
+   coming after) is what decides it, same as the base rules intend. */
+.ls-explore-block-grid--plain > *:nth-child(1),
+.ls-explore-block-grid--plain > *:nth-child(2),
+.ls-explore-block-grid--plain > *:nth-child(3),
+.ls-explore-block-grid--plain > *:nth-child(4),
+.ls-explore-block-grid--plain > *:nth-child(5) { grid-area: auto; }
 .ls-explore-block-grid--plain .ls-cat-banner { aspect-ratio: 3 / 4; height: auto; }
 
 @media (max-width: 900px) {
@@ -4162,7 +4173,12 @@ body.sheet-open {
         min-height: 0;
         gap: 10px;
     }
-    .ls-explore-block-grid > * { grid-area: auto; }
+    /* Same specificity note as .ls-explore-block-grid--plain above. */
+    .ls-explore-block-grid > *:nth-child(1),
+    .ls-explore-block-grid > *:nth-child(2),
+    .ls-explore-block-grid > *:nth-child(3),
+    .ls-explore-block-grid > *:nth-child(4),
+    .ls-explore-block-grid > *:nth-child(5) { grid-area: auto; }
     .ls-explore-block-grid .ls-cat-banner { aspect-ratio: 3 / 4; height: auto; }
 }
 
