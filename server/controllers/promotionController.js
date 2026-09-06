@@ -74,14 +74,16 @@ function uploadBufferToCloudinary(fileBuffer, kind) {
 exports.listPromotions = async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT promotions.id, image_url, link_url, title, slot, display_order,
-                    headline, subtext, cta_label, bg_color, text_color, layout,
-                    category_id, media_type, video_url, poster_url,
-                    categories.name AS category_name
+            `SELECT promotions.id, promotions.image_url, promotions.link_url,
+                    promotions.title, promotions.slot, promotions.display_order,
+                    promotions.headline, promotions.subtext, promotions.cta_label,
+                    promotions.bg_color, promotions.text_color, promotions.layout,
+                    promotions.category_id, promotions.media_type, promotions.video_url,
+                    promotions.poster_url, categories.name AS category_name
              FROM promotions
              LEFT JOIN categories ON categories.id = promotions.category_id
-             WHERE is_active = true
-             ORDER BY slot ASC, display_order ASC, promotions.id ASC`
+             WHERE promotions.is_active = true
+             ORDER BY promotions.slot ASC, promotions.display_order ASC, promotions.id ASC`
         );
         res.json(result.rows);
     } catch (error) {
@@ -94,13 +96,16 @@ exports.listPromotions = async (req, res) => {
 exports.listAllPromotions = async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT promotions.id, image_url, link_url, title, slot, display_order, is_active, created_at,
-                    headline, subtext, cta_label, bg_color, text_color, layout,
-                    category_id, media_type, video_url, poster_url,
-                    categories.name AS category_name
+            `SELECT promotions.id, promotions.image_url, promotions.link_url,
+                    promotions.title, promotions.slot, promotions.display_order,
+                    promotions.is_active, promotions.created_at,
+                    promotions.headline, promotions.subtext, promotions.cta_label,
+                    promotions.bg_color, promotions.text_color, promotions.layout,
+                    promotions.category_id, promotions.media_type, promotions.video_url,
+                    promotions.poster_url, categories.name AS category_name
              FROM promotions
              LEFT JOIN categories ON categories.id = promotions.category_id
-             ORDER BY slot ASC, display_order ASC, promotions.id ASC`
+             ORDER BY promotions.slot ASC, promotions.display_order ASC, promotions.id ASC`
         );
         res.json(result.rows);
     } catch (error) {
