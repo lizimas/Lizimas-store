@@ -3928,7 +3928,9 @@ body.sheet-open {
 .ls-flash {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 26px 18px 6px;
+    padding: 22px 20px 22px;
+    border: 2px solid #c0392b;
+    border-radius: 14px;
 }
 
 .ls-flash[hidden] { display: none; }
@@ -3994,7 +3996,7 @@ body.sheet-open {
 }
 
 @media (max-width: 720px) {
-    .ls-flash { padding: 20px 12px 4px; }
+    .ls-flash { padding: 16px 14px 16px; border-radius: 10px; }
     .ls-flash-title { font-size: 19px; }
     .ls-flash-unit { min-width: 38px; padding: 5px 6px; }
     .ls-flash-num { font-size: 15px; }
