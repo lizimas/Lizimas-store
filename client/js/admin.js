@@ -1665,6 +1665,14 @@ function setupTabs() {
                 loadPendingReturns();
             }
 
+            if (button.dataset.tab === "team-messages") {
+                loadTeamMessagingToggle();
+                loadTeamMessagesList();
+                startTeamMessagesPolling();
+            } else {
+                stopTeamMessagesPolling();
+            }
+
             if (button.dataset.tab === "discounts") {
                 loadAdminDiscounts();
             }
@@ -4887,6 +4895,202 @@ async function sendMonitorReply() {
     } catch (error) {
         console.error("Monitor reply error:", error);
         alert("Something went wrong.");
+    }
+}
+
+
+// ============================================
+// TEAM MESSAGES (internal staff <-> admin chat)
+// ============================================
+let teamMessagesPollTimer = null;
+let teamMessagesActiveStaffId = null;
+
+const STAFF_ROLE_LABELS = {
+    product_staff: "Product Staff",
+    store_manager: "Store Manager",
+    customer_support: "Customer Support"
+};
+
+function teamMsgWaitLabel(iso) {
+    if (!iso) return "";
+    const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return mins + "m ago";
+    const h = Math.floor(mins / 60);
+    if (h < 24) return h + "h ago";
+    return Math.floor(h / 24) + "d ago";
+}
+
+async function loadTeamMessagingToggle() {
+    const status = document.getElementById("team-messaging-status");
+    try {
+        const response = await fetch(`${API_URL}/api/admin/staff-messaging/enabled`, {
+            headers: { "Authorization": `Bearer ${getToken()}` }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            status.textContent = data.error || "Could not load setting.";
+            return;
+        }
+        document.getElementById("team-messaging-toggle").checked = !!data.enabled;
+        status.textContent = data.enabled
+            ? "On - staff can message you from their dashboard."
+            : "Off - staff won't see the message option.";
+    } catch (error) {
+        console.error("loadTeamMessagingToggle error:", error);
+        status.textContent = "Could not connect to server.";
+    }
+}
+
+async function toggleStaffMessaging(enabled) {
+    const status = document.getElementById("team-messaging-status");
+    try {
+        const response = await fetch(`${API_URL}/api/admin/staff-messaging/enabled`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${getToken()}`
+            },
+            body: JSON.stringify({ enabled })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.error || "Could not update the setting.");
+            document.getElementById("team-messaging-toggle").checked = !enabled;
+            return;
+        }
+        status.textContent = data.enabled
+            ? "On - staff can message you from their dashboard."
+            : "Off - staff won't see the message option.";
+        showToast(data.enabled ? "Staff messaging turned on." : "Staff messaging turned off.");
+    } catch (error) {
+        console.error("toggleStaffMessaging error:", error);
+        alert("Could not connect to server.");
+        document.getElementById("team-messaging-toggle").checked = !enabled;
+    }
+}
+
+async function loadTeamMessagesList() {
+    const box = document.getElementById("team-messages-list");
+    try {
+        const response = await fetch(`${API_URL}/api/admin/staff-messages/threads`, {
+            headers: { "Authorization": `Bearer ${getToken()}` }
+        });
+        const threads = await response.json();
+        if (!response.ok) {
+            box.innerHTML = `<p class="no-data">${(threads && threads.error) || "Could not load messages."}</p>`;
+            return;
+        }
+        if (!threads.length) {
+            box.innerHTML = `<p class="no-data">No staff accounts yet.</p>`;
+            return;
+        }
+
+        box.innerHTML = threads.map(t => `
+            <div class="q-open" style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #eee;" onclick="openTeamMessagesThread(${t.staffUserId})">
+                <div>
+                    <strong>${t.name}</strong>
+                    <span class="m-pill" style="margin-left:6px;">${STAFF_ROLE_LABELS[t.role] || t.role}</span>
+                    <div style="font-size:13px; color:#666; margin-top:3px;">
+                        ${t.lastMessage ? (t.lastMessage.length > 80 ? t.lastMessage.slice(0, 80) + "..." : t.lastMessage).replace(/</g, "&lt;") : "No messages yet"}
+                    </div>
+                </div>
+                <div style="text-align:right; white-space:nowrap;">
+                    ${t.unreadCount > 0 ? `<span class="q-tag q-waiting">${t.unreadCount} NEW</span><br>` : ""}
+                    <small style="color:#999;">${teamMsgWaitLabel(t.lastMessageAt)}</small>
+                </div>
+            </div>`).join("");
+    } catch (error) {
+        console.error("loadTeamMessagesList error:", error);
+        box.innerHTML = `<p class="no-data">Could not connect to server.</p>`;
+    }
+}
+
+async function openTeamMessagesThread(staffUserId) {
+    teamMessagesActiveStaffId = staffUserId;
+    document.getElementById("team-messages-thread-panel").style.display = "";
+    document.getElementById("team-messages-thread").innerHTML = "Loading...";
+    await loadTeamMessagesThread();
+}
+
+function closeTeamMessagesThread() {
+    teamMessagesActiveStaffId = null;
+    document.getElementById("team-messages-thread-panel").style.display = "none";
+}
+
+async function loadTeamMessagesThread() {
+    if (!teamMessagesActiveStaffId) return;
+    try {
+        const response = await fetch(`${API_URL}/api/admin/staff-messages/threads/${teamMessagesActiveStaffId}`, {
+            headers: { "Authorization": `Bearer ${getToken()}` }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            document.getElementById("team-messages-thread").innerHTML =
+                `<p class="no-data">${data.error || "Could not load."}</p>`;
+            return;
+        }
+
+        const staff = data.staff || {};
+        document.getElementById("team-messages-thread-title").textContent =
+            staff.name + " (" + (STAFF_ROLE_LABELS[staff.role] || staff.role) + ")";
+
+        const msgs = data.messages || [];
+        document.getElementById("team-messages-thread").innerHTML = msgs.length
+            ? msgs.map(m => `<div class="m-msg ${m.is_from_admin ? "m-staff" : "m-customer"}">
+                   <div class="m-msg-body">${(m.body || "").replace(/</g, "&lt;")}</div>
+                   <div class="m-msg-time">${fmtTime(m.created_at)}</div>
+               </div>`).join("")
+            : `<p class="no-data">No messages yet.</p>`;
+
+        loadTeamMessagesList();
+    } catch (error) {
+        console.error("loadTeamMessagesThread error:", error);
+        document.getElementById("team-messages-thread").innerHTML =
+            `<p class="no-data">Could not connect to server.</p>`;
+    }
+}
+
+async function sendTeamMessagesReply() {
+    if (!teamMessagesActiveStaffId) return;
+    const input = document.getElementById("team-messages-reply-input");
+    const body = input.value.trim();
+    if (!body) return;
+
+    try {
+        const response = await fetch(`${API_URL}/api/admin/staff-messages/threads/${teamMessagesActiveStaffId}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${getToken()}`
+            },
+            body: JSON.stringify({ body })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.error || "Could not send.");
+            return;
+        }
+        input.value = "";
+        loadTeamMessagesThread();
+    } catch (error) {
+        console.error("sendTeamMessagesReply error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+function startTeamMessagesPolling() {
+    stopTeamMessagesPolling();
+    teamMessagesPollTimer = setInterval(() => {
+        loadTeamMessagesList();
+        if (teamMessagesActiveStaffId) loadTeamMessagesThread();
+    }, 15000);
+}
+
+function stopTeamMessagesPolling() {
+    if (teamMessagesPollTimer) {
+        clearInterval(teamMessagesPollTimer);
+        teamMessagesPollTimer = null;
     }
 }
 

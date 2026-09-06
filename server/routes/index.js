@@ -23,5 +23,6 @@ router.use("/search", require("./search"));
 router.use("/reviews", require("./reviews"));
 router.use("/reports", reportLimiter, require("./reports"));
 router.use("/track", require("./track"));
+router.use("/staff-messages", require("./staffMessages"));
 
 module.exports = router;

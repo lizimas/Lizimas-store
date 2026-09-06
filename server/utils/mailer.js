@@ -738,4 +738,41 @@ async function sendPerformanceReportEmail(email, name, rangeLabel, pdfBuffer, fi
     }
 }
 
-module.exports = { sendOrderConfirmationEmail, sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert, sendPerformanceReportEmail };
+
+/**
+ * Alerts admin (ADMIN_ALERT_EMAIL) when a staff member sends a message on
+ * the new internal staff<->admin channel - so admin finds out even when not
+ * looking at the dashboard. Best-effort: never throws, matching every other
+ * internal alert email in this file.
+ */
+async function sendStaffMessageAlert(details) {
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: process.env.ADMIN_ALERT_EMAIL,
+            subject: `New message from ${details.senderName} - Lizimas Store`,
+            text: renderCustomerText([
+                `${details.senderName} (${(details.senderRole || "").replace(/_/g, " ")}) sent you a message:`,
+                "",
+                details.body,
+                "",
+                `Time: ${details.time}`,
+                "",
+                "Reply from the Team Messages tab in your admin dashboard."
+            ]),
+            html: renderInternalEmail({
+                title: "New staff message",
+                introHtml: `<strong>${escHtml(details.senderName)}</strong> (${escHtml((details.senderRole || "").replace(/_/g, " "))}) sent you a message:`,
+                rows: [
+                    ["Message", details.body],
+                    ["Time", details.time]
+                ],
+                noteHtml: "Reply from the Team Messages tab in your admin dashboard."
+            })
+        });
+    } catch (error) {
+        console.error("Staff message alert email error:", error);
+    }
+}
+
+module.exports = { sendOrderConfirmationEmail, sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert, sendPerformanceReportEmail, sendStaffMessageAlert };

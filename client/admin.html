@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Admin Dashboard</title>
-<link rel="stylesheet" href="css/admin.css?v=16">
+<link rel="stylesheet" href="css/admin.css?v=17">
 </head>
 <body>
 
@@ -86,6 +86,9 @@
                     </button>
                     <button class="tab-btn" data-tab="staff">
                         <span class="sidebar-icon">&#128100;</span> Staff & Approvals
+                    </button>
+                    <button class="tab-btn" data-tab="team-messages">
+                        <span class="sidebar-icon">&#128233;</span> Team Messages
                     </button>
                     <button class="tab-btn" data-tab="vendors">
                         <span class="sidebar-icon">&#127970;</span> Vendors
@@ -807,6 +810,43 @@
                     </div>
                 </section>
 
+                <section id="tab-team-messages" class="tab-content hidden">
+                    <h2 class="admin-page-title">Team Messages</h2>
+                    <p class="admin-page-sub">Private messages between you and staff members - separate from customer live support.</p>
+
+                    <div class="panel">
+                        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                            <div>
+                                <h2 style="margin-bottom:2px;">Staff Messaging</h2>
+                                <p class="admin-page-sub" style="margin:0;">When on, staff can send you a message from their dashboard and you'll get an email alert.</p>
+                            </div>
+                            <label class="lz-toggle-switch">
+                                <input type="checkbox" id="team-messaging-toggle" onchange="toggleStaffMessaging(this.checked)">
+                                <span class="lz-toggle-slider"></span>
+                            </label>
+                        </div>
+                        <p id="team-messaging-status" style="font-size:13px; color:#666; margin-top:8px;"></p>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Staff Threads</h2>
+                        <p class="admin-page-sub">Tap a staff member to view and reply. Newest activity first.</p>
+                        <div id="team-messages-list">Loading...</div>
+                    </div>
+
+                    <div class="panel" id="team-messages-thread-panel" style="display:none;">
+                        <div class="monitor-head">
+                            <h2 id="team-messages-thread-title">Conversation</h2>
+                            <button class="monitor-close" onclick="closeTeamMessagesThread()">&times;</button>
+                        </div>
+                        <div id="team-messages-thread" class="monitor-thread">Loading...</div>
+                        <div class="monitor-compose">
+                            <textarea id="team-messages-reply-input" rows="2" placeholder="Reply as admin..."></textarea>
+                            <button class="m-btn m-btn-primary" onclick="sendTeamMessagesReply()">Send</button>
+                        </div>
+                    </div>
+                </section>
+
                 <section id="tab-vendors" class="tab-content hidden">
                     <h2 class="admin-page-title">Vendors</h2>
                     <p class="admin-page-subtitle">Vendor applications, drop-off points, handover inspection and returns collection.</p>
@@ -987,7 +1027,7 @@
 <script src="js/description-block-editor.js?v=13"></script>
 <script src="js/category-select.js?v=2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
-<script src="js/admin.js?v=52"></script>
+<script src="js/admin.js?v=53"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

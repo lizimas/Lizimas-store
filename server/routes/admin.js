@@ -26,6 +26,14 @@ const {
 } = require("../controllers/analyticsController");
 
 const {
+    getStaffMessagingEnabled,
+    setStaffMessagingEnabled,
+    listThreadsForAdmin,
+    getThreadForAdmin,
+    replyToThread
+} = require("../controllers/staffMessagesController");
+
+const {
     getPendingProducts,
     approveProduct,
     rejectProduct,
@@ -93,6 +101,14 @@ router.get("/performance/vendors/:id/pdf", getVendorReportPdf);
 router.get("/performance/staff/:id/pdf", getStaffReportPdf);
 router.post("/performance/vendors/:id/share", shareVendorReportPdf);
 router.post("/performance/staff/:id/share", shareStaffReportPdf);
+
+// Internal staff <-> admin messaging (separate from the customer-facing
+// live chat under /api/chat) - admin side.
+router.get("/staff-messaging/enabled", getStaffMessagingEnabled);
+router.post("/staff-messaging/enabled", setStaffMessagingEnabled);
+router.get("/staff-messages/threads", listThreadsForAdmin);
+router.get("/staff-messages/threads/:staffUserId", getThreadForAdmin);
+router.post("/staff-messages/threads/:staffUserId", replyToThread);
 router.get("/orders", getAllOrdersAdmin);
 router.get("/orders/:id/items", getOrderItems);
 router.get("/orders/:id/receipt-link", getReceiptLink);
