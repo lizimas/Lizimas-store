@@ -4119,6 +4119,14 @@ body.sheet-open {
     padding: 10px 18px 28px;
 }
 
+/* A little bigger than a plain product-row heading, so the break reads as
+   a section of its own rather than another row. */
+.ls-explore-block .ls-row-title { font-size: 26px; }
+
+@media (max-width: 720px) {
+    .ls-explore-block .ls-row-title { font-size: 20px; }
+}
+
 .ls-explore-block-grid {
     display: grid;
     grid-template-columns: 1.1fr 0.8fr 0.8fr 1.1fr;

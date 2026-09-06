@@ -949,7 +949,11 @@ async function displayFeaturedProducts(products) {
     // Categories" block and dropped in after every few rows below - see
     // loadExploreCategoryBatches in categories.js (loaded before this file).
     const exploreBatches = await loadExploreCategoryBatches();
-    const LS_ROWS_BETWEEN_EXPLORE = 3;
+    // Until enough curated tiles exist to cover the whole page, spotlight
+    // real products instead - same block, same cadence, just filled with
+    // whatever's in the catalog so customers still get a browsing break.
+    const productExploreBatches = buildProductExploreBatches(products);
+    const LS_ROWS_BETWEEN_EXPLORE = 4;
     let exploreBatchIndex = 0;
     let rowsSinceExplore = 0;
 
@@ -995,12 +999,48 @@ async function displayFeaturedProducts(products) {
         if (!hasTile) autoScrollRow(scroll);
 
         rowsSinceExplore++;
-        if (rowsSinceExplore >= LS_ROWS_BETWEEN_EXPLORE && exploreBatchIndex < exploreBatches.length) {
-            host.appendChild(buildExploreCategoryBlock(exploreBatches[exploreBatchIndex]));
-            exploreBatchIndex++;
-            rowsSinceExplore = 0;
+        if (rowsSinceExplore >= LS_ROWS_BETWEEN_EXPLORE) {
+            let tilesHtml = null;
+            if (exploreBatchIndex < exploreBatches.length) {
+                tilesHtml = exploreBatches[exploreBatchIndex].map(buildCategoryBannerTile);
+            } else if (productExploreBatches.length) {
+                const i = (exploreBatchIndex - exploreBatches.length) % productExploreBatches.length;
+                tilesHtml = productExploreBatches[i].map(buildProductExploreTile);
+            }
+            if (tilesHtml) {
+                host.appendChild(buildExploreCategoryBlock(tilesHtml));
+                exploreBatchIndex++;
+                rowsSinceExplore = 0;
+            }
         }
     }
+}
+
+// A tile in the same visual language as buildCategoryBannerTile (an
+// .ls-cat-banner: image, dark gradient, label), just pointed at a product
+// instead of a category - the placeholder content for explore blocks until
+// enough curated slot-6 tiles exist to cover the whole page.
+function buildProductExploreTile(product) {
+    const href = `/product/${encodeURIComponent(product.id)}`;
+    const img = product.image
+        ? `<img src="${esc(product.image)}" alt="" loading="lazy">` : "";
+    const label = product.name
+        ? `<span class="ls-cat-banner-label">${esc(product.name)}</span>` : "";
+    return `<a class="ls-cat-banner" href="${esc(href)}">${img}${label}</a>`;
+}
+
+// Shuffled once per page load so every visit spotlights a different mix;
+// chunked into full fives only (a trailing handful short of five is
+// dropped rather than rendered as a half-empty block).
+function buildProductExploreBatches(products) {
+    const pool = products.filter(p => p.image);
+    for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    const batches = [];
+    for (let i = 0; i + 5 <= pool.length; i += 5) batches.push(pool.slice(i, i + 5));
+    return batches;
 }
 
 // Nudges a row one card to the right every 5 seconds, looping back at the end.

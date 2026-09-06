@@ -467,14 +467,18 @@ async function loadExploreCategoryBatches() {
     return batches;
 }
 
-function buildExploreCategoryBlock(batch) {
+// tilesHtml is an array of already-built tile markup (one string per
+// tile) - either from buildCategoryBannerTile for admin-curated slot 6
+// promos, or from products.js's own product-spotlight tile builder when
+// there aren't enough curated promos to fill every insertion point.
+function buildExploreCategoryBlock(tilesHtml) {
     const section = document.createElement("section");
     section.className = "ls-explore-block";
     const gridClass = "ls-explore-block-grid" +
-        (batch.length < 5 ? " ls-explore-block-grid--plain" : "");
+        (tilesHtml.length < 5 ? " ls-explore-block-grid--plain" : "");
     section.innerHTML =
         `<div class="ls-row-head"><h2 class="ls-row-title">Explore More Categories</h2></div>` +
-        `<div class="${gridClass}">${batch.map(buildCategoryBannerTile).join("")}</div>`;
+        `<div class="${gridClass}">${tilesHtml.join("")}</div>`;
     return section;
 }
 
