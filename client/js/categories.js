@@ -224,6 +224,7 @@ function startCarousel(track, count) {
 
     const show = i => {
         index = (i + count) % count;
+        track.style.transition = "";
         track.style.transform = `translateX(-${index * 100}%)`;
         dotsBox.querySelectorAll(".ls-promo-dot").forEach((d, n) =>
             d.classList.toggle("active", n === index));
@@ -248,6 +249,56 @@ function startCarousel(track, count) {
         if (document.hidden) clearInterval(timer);
         else restart();
     });
+
+    // ---- Swipe / drag navigation (mouse + touch, unified via Pointer Events) ----
+    let dragging = false;
+    let dragMoved = false;
+    let startX = 0;
+    let deltaX = 0;
+
+    track.addEventListener("dragstart", e => e.preventDefault());
+
+    track.addEventListener("pointerdown", e => {
+        if (e.button !== undefined && e.button !== 0) return;
+        dragging = true;
+        dragMoved = false;
+        startX = e.clientX;
+        deltaX = 0;
+        clearInterval(timer);
+        track.style.transition = "none";
+        try { track.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+
+    track.addEventListener("pointermove", e => {
+        if (!dragging) return;
+        deltaX = e.clientX - startX;
+        if (Math.abs(deltaX) > 4) dragMoved = true;
+        track.style.transform = `translateX(calc(-${index * 100}% + ${deltaX}px))`;
+    });
+
+    const endDrag = () => {
+        if (!dragging) return;
+        dragging = false;
+        track.style.transition = "";
+        const width = track.offsetWidth || 1;
+        const threshold = Math.max(40, width * 0.15);
+        if (deltaX <= -threshold) show(index + 1);
+        else if (deltaX >= threshold) show(index - 1);
+        else show(index);
+        restart();
+
+        // A real drag shouldn't also fire the slide's <a> navigation click
+        if (dragMoved) {
+            const suppressClick = ev => {
+                ev.preventDefault();
+                ev.stopPropagation();
+            };
+            track.addEventListener("click", suppressClick, { capture: true, once: true });
+        }
+    };
+
+    track.addEventListener("pointerup", endDrag);
+    track.addEventListener("pointercancel", endDrag);
 }
 
 document.addEventListener("DOMContentLoaded", loadPromoSlots);
