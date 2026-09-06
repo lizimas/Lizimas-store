@@ -4133,7 +4133,13 @@ body.sheet-open {
     grid-template-rows: 1fr 1fr;
     grid-template-areas: "t1 t2 t2 t3" "t1 t4 t5 t3";
     gap: 14px;
-    min-height: 360px;
+    /* A definite height, not min-height: the tile's height: 100% below only
+       resolves against a definite ancestor height. Without this, height:
+       100% computes to auto and the <img> (also height: 100% of an auto
+       parent, so auto too) falls back to its own natural aspect ratio -
+       which is how a portrait product photo ended up stretching the whole
+       block to 3x taller than intended. */
+    height: 360px;
 }
 
 .ls-explore-block-grid > *:nth-child(1) { grid-area: t1; }
@@ -4148,7 +4154,7 @@ body.sheet-open {
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     grid-template-areas: none;
     grid-template-rows: none;
-    min-height: 0;
+    height: auto;
 }
 
 /* A plain `> *` reset has lower specificity than the :nth-child(N) rules
@@ -4170,7 +4176,7 @@ body.sheet-open {
         grid-template-columns: repeat(2, 1fr);
         grid-template-areas: none;
         grid-template-rows: none;
-        min-height: 0;
+        height: auto;
         gap: 10px;
     }
     /* Same specificity note as .ls-explore-block-grid--plain above. */
