@@ -1771,6 +1771,7 @@ table.lz-dr-cal td {
     flex-direction: column;
     padding: 0;
 }
+.tm-emoji-popover-wrap[hidden] { display: none; }
 .tm-emoji-tabs {
     display: flex;
     gap: 2px;

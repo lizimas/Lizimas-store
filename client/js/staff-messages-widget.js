@@ -229,7 +229,10 @@
         setWindowClasses();
         unreadCount = 0;
         emitUpdate();
-        if (wasClosed) loadThread();
+        if (wasClosed) {
+            hidePopovers();
+            loadThread();
+        }
         startThreadPolling();
     }
 
@@ -244,6 +247,7 @@
         windowState = "minimized";
         setWindowClasses();
         stopThreadPolling();
+        hidePopovers();
     }
 
     function toggleFullView() {

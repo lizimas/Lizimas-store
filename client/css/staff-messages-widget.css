@@ -170,6 +170,7 @@
     flex-direction: column;
     padding: 0;
 }
+.lz-tc-emoji-popover-wrap[hidden] { display: none; }
 
 .lz-tc-emoji-tabs {
     display: flex;

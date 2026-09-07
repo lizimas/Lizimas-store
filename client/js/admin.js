@@ -5191,6 +5191,7 @@ async function loadTeamMessagesList() {
 async function openTeamMessagesThread(staffUserId) {
     teamMessagesActiveStaffId = staffUserId;
     initTeamMessagesComposer();
+    tmHidePopovers();
     document.getElementById("team-messages-thread-panel").style.display = "";
     document.getElementById("team-messages-thread").innerHTML = "Loading...";
     await loadTeamMessagesThread();
