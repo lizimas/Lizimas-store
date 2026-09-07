@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Admin Dashboard</title>
-<link rel="stylesheet" href="css/admin.css?v=18">
+<link rel="stylesheet" href="css/admin.css?v=19">
 </head>
 <body>
 
@@ -836,13 +836,13 @@
 
                     <div class="panel" id="team-messages-thread-panel" style="display:none;">
                         <div class="monitor-head">
-                            <div>
-                                <h2 id="team-messages-thread-title">Conversation</h2>
-                                <div id="team-messages-thread-presence" class="tm-presence">
+                            <h2 class="tm-thread-title-row">
+                                <span id="team-messages-thread-title">Conversation</span>
+                                <span id="team-messages-thread-presence" class="tm-presence">
                                     <span class="tm-presence-dot" id="team-messages-thread-dot"></span>
                                     <span id="team-messages-thread-presence-text"></span>
-                                </div>
-                            </div>
+                                </span>
+                            </h2>
                             <button class="monitor-close" onclick="closeTeamMessagesThread()">&times;</button>
                         </div>
                         <div id="team-messages-thread" class="monitor-thread">Loading...</div>
@@ -1041,7 +1041,7 @@
 <script src="js/description-block-editor.js?v=13"></script>
 <script src="js/category-select.js?v=2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
-<script src="js/admin.js?v=54"></script>
+<script src="js/admin.js?v=55"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>
