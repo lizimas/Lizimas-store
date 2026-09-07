@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <title>Lizimas Store — Store Manager</title>
 <link rel="stylesheet" href="../css/admin.css">
-<link rel="stylesheet" href="../css/staff-messages-widget.css?v=1">
+<link rel="stylesheet" href="../css/staff-messages-widget.css?v=2">
 </head>
 <body>
 
@@ -23,6 +23,10 @@
                     <div style="color:#f4b400; font-size:12px; margin-top:4px;">Tap to edit profile &rarr;</div>
                 </div>
                 <button onclick="StaffAccount.open()" style="margin:16px 16px 0; background:#0f1b3d; color:#fff; border:none; border-radius:8px; padding:10px; cursor:pointer; width:calc(100% - 32px);">Account Security</button>
+                <button id="lz-tm-nav-btn" onclick="window.LZTeamMessages && window.LZTeamMessages.toggle()" style="display:none; margin:10px 16px 0; background:#f4b400; color:#0f1b3d; border:none; border-radius:8px; padding:10px; cursor:pointer; width:calc(100% - 32px); position:relative; font-weight:600;">
+                    Message Admin
+                    <span id="lz-tm-nav-badge" style="display:none; position:absolute; top:-6px; right:8px; background:#c02b2b; color:#fff; border-radius:999px; font-size:11px; font-weight:700; min-width:18px; height:18px; align-items:center; justify-content:center; padding:0 5px;">0</span>
+                </button>
                 <button onclick="staffLogout()" style="margin:16px; background:#DC2626; color:#fff; border:none; border-radius:8px; padding:10px; cursor:pointer; width:calc(100% - 32px);">Log Out</button>
             </aside>
 
@@ -158,7 +162,24 @@
     <script src="../js/category-select.js?v=2"></script>
     <script src="../js/staff-manager.js?v=5"></script>
     <script src="../js/photo-crop.js?v=1"></script>
-<script src="../js/staff-messages-widget.js?v=1"></script>
+<script src="../js/staff-messages-widget.js?v=2"></script>
+<script>
+(function () {
+    var btn = document.getElementById("lz-tm-nav-btn");
+    var badge = document.getElementById("lz-tm-nav-badge");
+    if (!btn) return;
+    document.addEventListener("lz-team-messages:update", function (e) {
+        var d = e.detail || {};
+        btn.style.display = d.enabled ? "block" : "none";
+        if (d.unreadCount > 0) {
+            badge.textContent = d.unreadCount > 9 ? "9+" : String(d.unreadCount);
+            badge.style.display = "flex";
+        } else {
+            badge.style.display = "none";
+        }
+    });
+})();
+</script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>
     <div class="profile-panel" id="profile-panel">

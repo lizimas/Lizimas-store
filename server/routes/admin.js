@@ -30,8 +30,10 @@ const {
     setStaffMessagingEnabled,
     listThreadsForAdmin,
     getThreadForAdmin,
-    replyToThread
+    replyToThread,
+    uploadThreadAttachment
 } = require("../controllers/staffMessagesController");
+const { chatAttachment } = require("../middleware/upload");
 
 const {
     getPendingProducts,
@@ -109,6 +111,7 @@ router.post("/staff-messaging/enabled", setStaffMessagingEnabled);
 router.get("/staff-messages/threads", listThreadsForAdmin);
 router.get("/staff-messages/threads/:staffUserId", getThreadForAdmin);
 router.post("/staff-messages/threads/:staffUserId", replyToThread);
+router.post("/staff-messages/threads/:staffUserId/attachment", chatAttachment.single("file"), uploadThreadAttachment);
 router.get("/orders", getAllOrdersAdmin);
 router.get("/orders/:id/items", getOrderItems);
 router.get("/orders/:id/receipt-link", getReceiptLink);

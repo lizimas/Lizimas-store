@@ -1717,3 +1717,46 @@ table.lz-dr-cal td {
   background: #fff; border-radius: 50%; transition: .2s; }
 .lz-toggle-switch input:checked + .lz-toggle-slider { background: #0f1b3d; }
 .lz-toggle-switch input:checked + .lz-toggle-slider::before { transform: translateX(20px); }
+
+/* Team Messages: presence, sticker/file bubbles, emoji/sticker composer */
+.tm-presence { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #666; margin-top: 3px; }
+.tm-presence-dot { width: 7px; height: 7px; border-radius: 50%; background: #ccc; flex-shrink: 0; }
+.tm-presence-dot.tm-presence-active { background: #35d07f; }
+
+.tm-row-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; display: inline-block; margin-right: 6px; }
+.tm-row-dot.tm-presence-active { background: #35d07f; }
+
+.tm-sticker-msg { font-size: 40px; line-height: 1; }
+
+.tm-file {
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 8px 12px; border-radius: 10px; text-decoration: none;
+    background: rgba(0,0,0,0.06); color: inherit; max-width: 100%;
+}
+.tm-file-icon { font-size: 18px; flex-shrink: 0; }
+.tm-file-meta { display: flex; flex-direction: column; min-width: 0; }
+.tm-file-name { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+.tm-file-size { font-size: 10.5px; opacity: 0.7; }
+
+.tm-composer-wrap { position: relative; margin-top: 10px; }
+
+.tm-popover {
+    position: absolute; bottom: 100%; left: 0; margin-bottom: 6px;
+    background: #fff; border: 1px solid #e6e8ef; border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.18); padding: 8px;
+    width: 280px; max-height: 220px; overflow-y: auto; z-index: 20;
+}
+.tm-emoji-grid, .tm-sticker-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.tm-emoji-item, .tm-sticker-item {
+    background: none; border: none; cursor: pointer; border-radius: 8px;
+    padding: 5px 0; font-size: 20px; line-height: 1;
+}
+.tm-sticker-item { font-size: 26px; }
+.tm-emoji-item:hover, .tm-sticker-item:hover { background: #f0f1f6; }
+
+.tm-icon-btn {
+    background: none; border: none; cursor: pointer; font-size: 18px;
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+.tm-icon-btn:hover { background: #f0f1f6; }

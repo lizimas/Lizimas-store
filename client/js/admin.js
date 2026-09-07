@@ -1666,6 +1666,7 @@ function setupTabs() {
             }
 
             if (button.dataset.tab === "team-messages") {
+                initTeamMessagesComposer();
                 loadTeamMessagingToggle();
                 loadTeamMessagesList();
                 startTeamMessagesPolling();
@@ -4904,12 +4905,30 @@ async function sendMonitorReply() {
 // ============================================
 let teamMessagesPollTimer = null;
 let teamMessagesActiveStaffId = null;
+let teamMessagesComposerInit = false;
+let teamMessagesSending = false;
 
 const STAFF_ROLE_LABELS = {
     product_staff: "Product Staff",
     store_manager: "Store Manager",
     customer_support: "Customer Support"
 };
+
+const TM_EMOJI = [
+    "😀","😁","😂","🤣","😊","😍","😘","😜","🤔","😎",
+    "🙂","🙃","😇","😉","😢","😭","😡","😱","🥳","🤗",
+    "👍","👎","👏","🙏","💪","🙌","👌","✌️","🤝","💯",
+    "❤️","🧡","💛","💚","💙","💜","🖤","💔","💕","✨",
+    "🔥","🎉","🎊","⭐","☀️","🌧️","☕","🍕","🎂","⚽",
+    "✅","❌","⚠️","❓","❗","⏰","📌","📷","🎁","🚀"
+];
+
+const TM_STICKERS = [
+    "👍","❤️","😂","😮","😢","🙏","🎉","🔥",
+    "👏","😍","🤝","💪","✅","🙌","😅","🥳"
+];
+
+const TM_ACTIVE_WINDOW_MS = 2 * 60 * 1000;
 
 function teamMsgWaitLabel(iso) {
     if (!iso) return "";
@@ -4919,6 +4938,140 @@ function teamMsgWaitLabel(iso) {
     const h = Math.floor(mins / 60);
     if (h < 24) return h + "h ago";
     return Math.floor(h / 24) + "d ago";
+}
+
+function tmPresenceLabel(iso) {
+    if (!iso) return { text: "Offline", active: false };
+    const diffMs = Date.now() - new Date(iso).getTime();
+    if (diffMs < TM_ACTIVE_WINDOW_MS) return { text: "Active now", active: true };
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 60) return { text: `Active ${mins}m ago`, active: false };
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return { text: `Active ${hours}h ago`, active: false };
+    const days = Math.floor(hours / 24);
+    return { text: `Active ${days}d ago`, active: false };
+}
+
+function tmFormatBytes(n) {
+    if (!n && n !== 0) return "";
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function tmRenderMessage(m) {
+    const rowCls = m.is_from_admin ? "m-staff" : "m-customer";
+    let inner;
+    if (m.message_type === "sticker") {
+        inner = `<div class="tm-sticker-msg">${(m.body || "").replace(/</g, "&lt;")}</div>`;
+    } else if (m.message_type === "file") {
+        const size = tmFormatBytes(m.attachment_bytes);
+        inner = `<a class="tm-file" href="${(m.attachment_url || "#").replace(/"/g, "&quot;")}" target="_blank" rel="noopener noreferrer">
+                <span class="tm-file-icon">&#128196;</span>
+                <span class="tm-file-meta">
+                    <span class="tm-file-name">${(m.attachment_name || "Attachment").replace(/</g, "&lt;")}</span>
+                    <span class="tm-file-size">${size}</span>
+                </span>
+            </a>`;
+    } else {
+        inner = `<div class="m-msg-body">${(m.body || "").replace(/</g, "&lt;")}</div>`;
+    }
+    return `<div class="m-msg ${rowCls}">
+            ${inner}
+            <div class="m-msg-time">${fmtTime(m.created_at)}</div>
+        </div>`;
+}
+
+function initTeamMessagesComposer() {
+    if (teamMessagesComposerInit) return;
+    teamMessagesComposerInit = true;
+
+    const emojiBox = document.getElementById("tm-emoji-popover");
+    const stickerBox = document.getElementById("tm-sticker-popover");
+    if (emojiBox) {
+        emojiBox.innerHTML = `<div class="tm-emoji-grid">${TM_EMOJI.map(e => `<button type="button" class="tm-emoji-item">${e}</button>`).join("")}</div>`;
+        emojiBox.querySelectorAll(".tm-emoji-item").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const input = document.getElementById("team-messages-reply-input");
+                input.value += btn.textContent;
+                input.focus();
+            });
+        });
+    }
+    if (stickerBox) {
+        stickerBox.innerHTML = `<div class="tm-sticker-grid">${TM_STICKERS.map(e => `<button type="button" class="tm-sticker-item">${e}</button>`).join("")}</div>`;
+        stickerBox.querySelectorAll(".tm-sticker-item").forEach(btn => {
+            btn.addEventListener("click", () => {
+                tmHidePopovers();
+                sendTeamMessagesReply({ overrideBody: btn.textContent, messageType: "sticker" });
+            });
+        });
+    }
+
+    const emojiBtn = document.getElementById("tm-emoji-btn");
+    const stickerBtn = document.getElementById("tm-sticker-btn");
+    const attachBtn = document.getElementById("tm-attach-btn");
+    const fileInput = document.getElementById("tm-file-input");
+
+    if (emojiBtn) emojiBtn.addEventListener("click", (e) => { e.stopPropagation(); tmTogglePopover("emoji"); });
+    if (stickerBtn) stickerBtn.addEventListener("click", (e) => { e.stopPropagation(); tmTogglePopover("sticker"); });
+    if (attachBtn) attachBtn.addEventListener("click", (e) => { e.stopPropagation(); fileInput.click(); });
+    if (fileInput) fileInput.addEventListener("change", tmOnFileChosen);
+
+    document.addEventListener("click", (e) => {
+        if (!e.target.closest(".tm-popover") && !e.target.closest("#tm-emoji-btn") && !e.target.closest("#tm-sticker-btn")) {
+            tmHidePopovers();
+        }
+    });
+}
+
+function tmTogglePopover(which) {
+    const emoji = document.getElementById("tm-emoji-popover");
+    const sticker = document.getElementById("tm-sticker-popover");
+    if (!emoji || !sticker) return;
+    if (which === "emoji") {
+        const willShow = emoji.hidden;
+        tmHidePopovers();
+        emoji.hidden = !willShow;
+    } else {
+        const willShow = sticker.hidden;
+        tmHidePopovers();
+        sticker.hidden = !willShow;
+    }
+}
+
+function tmHidePopovers() {
+    const emoji = document.getElementById("tm-emoji-popover");
+    const sticker = document.getElementById("tm-sticker-popover");
+    if (emoji) emoji.hidden = true;
+    if (sticker) sticker.hidden = true;
+}
+
+async function tmOnFileChosen(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file || !teamMessagesActiveStaffId) return;
+    if (file.size > 15 * 1024 * 1024) {
+        alert("That file is larger than the 15 MB limit.");
+        return;
+    }
+    try {
+        const form = new FormData();
+        form.append("file", file);
+        const response = await fetch(`${API_URL}/api/admin/staff-messages/threads/${teamMessagesActiveStaffId}/attachment`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${getToken()}` },
+            body: form
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.error || "Could not upload that file.");
+        }
+        loadTeamMessagesThread();
+    } catch (error) {
+        console.error("tmOnFileChosen error:", error);
+        alert("Something went wrong uploading that file.");
+    }
 }
 
 async function loadTeamMessagingToggle() {
@@ -4986,10 +5139,12 @@ async function loadTeamMessagesList() {
             return;
         }
 
-        box.innerHTML = threads.map(t => `
+        box.innerHTML = threads.map(t => {
+            const presence = tmPresenceLabel(t.lastSeenAt);
+            return `
             <div class="q-open" style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #eee;" onclick="openTeamMessagesThread(${t.staffUserId})">
                 <div>
-                    <strong>${t.name}</strong>
+                    <strong><span class="tm-row-dot ${presence.active ? "tm-presence-active" : ""}" title="${presence.text}"></span>${t.name}</strong>
                     <span class="m-pill" style="margin-left:6px;">${STAFF_ROLE_LABELS[t.role] || t.role}</span>
                     <div style="font-size:13px; color:#666; margin-top:3px;">
                         ${t.lastMessage ? (t.lastMessage.length > 80 ? t.lastMessage.slice(0, 80) + "..." : t.lastMessage).replace(/</g, "&lt;") : "No messages yet"}
@@ -4999,7 +5154,8 @@ async function loadTeamMessagesList() {
                     ${t.unreadCount > 0 ? `<span class="q-tag q-waiting">${t.unreadCount} NEW</span><br>` : ""}
                     <small style="color:#999;">${teamMsgWaitLabel(t.lastMessageAt)}</small>
                 </div>
-            </div>`).join("");
+            </div>`;
+        }).join("");
     } catch (error) {
         console.error("loadTeamMessagesList error:", error);
         box.innerHTML = `<p class="no-data">Could not connect to server.</p>`;
@@ -5008,6 +5164,7 @@ async function loadTeamMessagesList() {
 
 async function openTeamMessagesThread(staffUserId) {
     teamMessagesActiveStaffId = staffUserId;
+    initTeamMessagesComposer();
     document.getElementById("team-messages-thread-panel").style.display = "";
     document.getElementById("team-messages-thread").innerHTML = "Loading...";
     await loadTeamMessagesThread();
@@ -5016,6 +5173,7 @@ async function openTeamMessagesThread(staffUserId) {
 function closeTeamMessagesThread() {
     teamMessagesActiveStaffId = null;
     document.getElementById("team-messages-thread-panel").style.display = "none";
+    tmHidePopovers();
 }
 
 async function loadTeamMessagesThread() {
@@ -5035,12 +5193,15 @@ async function loadTeamMessagesThread() {
         document.getElementById("team-messages-thread-title").textContent =
             staff.name + " (" + (STAFF_ROLE_LABELS[staff.role] || staff.role) + ")";
 
+        const presence = tmPresenceLabel(staff.lastSeenAt);
+        const dot = document.getElementById("team-messages-thread-dot");
+        const presenceText = document.getElementById("team-messages-thread-presence-text");
+        if (dot) dot.classList.toggle("tm-presence-active", presence.active);
+        if (presenceText) presenceText.textContent = presence.text;
+
         const msgs = data.messages || [];
         document.getElementById("team-messages-thread").innerHTML = msgs.length
-            ? msgs.map(m => `<div class="m-msg ${m.is_from_admin ? "m-staff" : "m-customer"}">
-                   <div class="m-msg-body">${(m.body || "").replace(/</g, "&lt;")}</div>
-                   <div class="m-msg-time">${fmtTime(m.created_at)}</div>
-               </div>`).join("")
+            ? msgs.map(tmRenderMessage).join("")
             : `<p class="no-data">No messages yet.</p>`;
 
         loadTeamMessagesList();
@@ -5051,12 +5212,15 @@ async function loadTeamMessagesThread() {
     }
 }
 
-async function sendTeamMessagesReply() {
-    if (!teamMessagesActiveStaffId) return;
+async function sendTeamMessagesReply(options) {
+    if (!teamMessagesActiveStaffId || teamMessagesSending) return;
+    const opts = options || {};
     const input = document.getElementById("team-messages-reply-input");
-    const body = input.value.trim();
+    const body = opts.overrideBody !== undefined ? opts.overrideBody : input.value.trim();
+    const messageType = opts.messageType || "text";
     if (!body) return;
 
+    teamMessagesSending = true;
     try {
         const response = await fetch(`${API_URL}/api/admin/staff-messages/threads/${teamMessagesActiveStaffId}`, {
             method: "POST",
@@ -5064,18 +5228,20 @@ async function sendTeamMessagesReply() {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${getToken()}`
             },
-            body: JSON.stringify({ body })
+            body: JSON.stringify({ body, messageType })
         });
         const data = await response.json();
         if (!response.ok) {
             alert(data.error || "Could not send.");
             return;
         }
-        input.value = "";
+        if (opts.overrideBody === undefined) input.value = "";
         loadTeamMessagesThread();
     } catch (error) {
         console.error("sendTeamMessagesReply error:", error);
         alert("Something went wrong.");
+    } finally {
+        teamMessagesSending = false;
     }
 }
 
@@ -5093,7 +5259,6 @@ function stopTeamMessagesPolling() {
         teamMessagesPollTimer = null;
     }
 }
-
 
 // ============================================
 // DASHBOARD CLICK HANDLERS

@@ -60,8 +60,43 @@ const promoMedia = multer({
     limits: { fileSize: PROMO_MEDIA_MAX_BYTES }
 });
 
+// Staff <-> admin chat attachments. Broader than the image-only instances
+// above: covers common document types (PDF, Office docs, plain text) plus
+// images, since staff may need to send a delivery note, a receipt photo, or
+// a spreadsheet. Kept separate so its wider file-type allowlist can never
+// leak into product/category/avatar uploads.
+const CHAT_ATTACHMENT_MAX_BYTES = 15 * 1024 * 1024;
+
+const chatAttachmentFilter = (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const mime = (file.mimetype || "").toLowerCase();
+
+    const imageOk = /\.(jpe?g|png|webp|gif)$/.test(ext)
+        || /^image\/(jpeg|jpg|png|webp|gif)$/.test(mime);
+    const docOk = /\.(pdf|docx?|xlsx?|pptx?|txt|csv)$/.test(ext)
+        || /^(application\/pdf|application\/msword|application\/vnd\.openxmlformats-officedocument\.|application\/vnd\.ms-excel|text\/plain|text\/csv)/.test(mime);
+
+    if (imageOk || docOk) {
+        cb(null, true);
+    } else {
+        const err = new Error(
+            "That file type isn't supported. Try an image, PDF, Word, Excel, PowerPoint, or text file.");
+        err.code = "INVALID_FILE_TYPE";
+        cb(err);
+    }
+};
+
+const chatAttachment = multer({
+    storage,
+    fileFilter: chatAttachmentFilter,
+    limits: { fileSize: CHAT_ATTACHMENT_MAX_BYTES }
+});
+
 module.exports = upload;
 // Attached rather than exported as an object so every existing
 // `require("../middleware/upload")` call site keeps working unchanged.
 module.exports.promoMedia = promoMedia;
 module.exports.PROMO_MEDIA_MAX_BYTES = PROMO_MEDIA_MAX_BYTES;
+
+module.exports.chatAttachment = chatAttachment;
+module.exports.CHAT_ATTACHMENT_MAX_BYTES = CHAT_ATTACHMENT_MAX_BYTES;

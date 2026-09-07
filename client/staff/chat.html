@@ -7,7 +7,7 @@
 <title>Live Chat | Lizimas Store</title>
 <link rel="stylesheet" href="../css/style.css?v=57">
 <link rel="stylesheet" href="../css/staff-chat.css?v=10">
-<link rel="stylesheet" href="../css/staff-messages-widget.css?v=1">
+<link rel="stylesheet" href="../css/staff-messages-widget.css?v=2">
 </head>
 
 <body class="sc-body">
@@ -20,6 +20,10 @@
     </div>
     <div class="sc-topbar-right">
         <span class="sc-agent" id="sc-agent"></span>
+        <button class="sc-btn sc-btn-ghost" id="lz-tm-nav-btn" onclick="window.LZTeamMessages && window.LZTeamMessages.toggle()" style="display:none; position:relative;">
+            Message Admin
+            <span id="lz-tm-nav-badge" style="display:none; position:absolute; top:-6px; right:-6px; background:#c02b2b; color:#fff; border-radius:999px; font-size:11px; font-weight:700; min-width:18px; height:18px; align-items:center; justify-content:center; padding:0 5px;">0</span>
+        </button>
         <button class="sc-btn sc-btn-ghost" id="sc-account-btn" onclick="StaffAccount.open()">Account</button>
         <button class="sc-btn sc-btn-ghost" id="sc-logout">Log out</button>
     </div>
@@ -111,7 +115,24 @@
 
 <script src="../js/staff-account.js?v=4"></script>
 <script src="../js/staff-chat.js?v=4"></script>
-<script src="../js/staff-messages-widget.js?v=1"></script>
+<script src="../js/staff-messages-widget.js?v=2"></script>
+<script>
+(function () {
+    var btn = document.getElementById("lz-tm-nav-btn");
+    var badge = document.getElementById("lz-tm-nav-badge");
+    if (!btn) return;
+    document.addEventListener("lz-team-messages:update", function (e) {
+        var d = e.detail || {};
+        btn.style.display = d.enabled ? "inline-flex" : "none";
+        if (d.unreadCount > 0) {
+            badge.textContent = d.unreadCount > 9 ? "9+" : String(d.unreadCount);
+            badge.style.display = "flex";
+        } else {
+            badge.style.display = "none";
+        }
+    });
+})();
+</script>
 
 </body>
 
