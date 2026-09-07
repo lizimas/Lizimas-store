@@ -3634,7 +3634,9 @@ body.sheet-open {
 .ls-explore {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 28px 18px 8px;
+    padding: 28px 18px;
+    background: #f7f1e1;
+    border-radius: 16px;
 }
 
 .ls-explore-head {
@@ -3704,7 +3706,7 @@ body.sheet-open {
     aspect-ratio: 1;
     border-radius: 10px;
     overflow: hidden;
-    background: #ffffff;
+    background: #f3f4f6;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3734,7 +3736,7 @@ body.sheet-open {
 @media (max-width: 900px) {
     .ls-explore-page { grid-template-columns: repeat(6, 1fr); gap: 14px 10px; }
     .ls-explore-title { font-size: 21px; }
-    .ls-explore { padding: 22px 12px 8px; }
+    .ls-explore { padding: 22px 12px; }
     .ls-explore-name { font-size: 11px; }
 }
 
