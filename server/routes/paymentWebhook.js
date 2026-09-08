@@ -119,18 +119,32 @@ router.post(
   }
 );
 
+// Flutterwave's dashboard has ONE webhook URL for the whole account — there
+// is no way to route mobile-money and card charge events to separate URLs,
+// so both arrive at .../webhooks/payments/flutterwave even though card
+// payments are stored with provider = 'flutterwave_card' (kept distinct from
+// mobile money for admin/reporting clarity, and because their initiate()
+// calls are entirely different endpoints). Try every provider name that can
+// plausibly own a payment reaching this URL; every other provider has no
+// alias and is looked up under its own name only, unchanged.
+const PROVIDER_LOOKUP_ALIASES = {
+  flutterwave: ['flutterwave', 'flutterwave_card'],
+};
+
 async function findPayment(client, providerName, { externalRef, providerRef }) {
+  const candidates = PROVIDER_LOOKUP_ALIASES[providerName] || [providerName];
+
   if (externalRef && isUuid(externalRef)) {
     const { rows } = await client.query(
-      `SELECT * FROM payments WHERE provider = $1 AND external_ref = $2`,
-      [providerName, externalRef]
+      `SELECT * FROM payments WHERE provider = ANY($1) AND external_ref = $2`,
+      [candidates, externalRef]
     );
     if (rows[0]) return rows[0];
   }
   if (providerRef) {
     const { rows } = await client.query(
-      `SELECT * FROM payments WHERE provider = $1 AND provider_ref = $2`,
-      [providerName, String(providerRef)]
+      `SELECT * FROM payments WHERE provider = ANY($1) AND provider_ref = $2`,
+      [candidates, String(providerRef)]
     );
     if (rows[0]) return rows[0];
   }

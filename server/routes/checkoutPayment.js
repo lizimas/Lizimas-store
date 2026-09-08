@@ -3,7 +3,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const pool = require('../config/database');
-const { initiatePayment } = require('../payments/service');
+const { initiatePayment, recordPaymentOutcome } = require('../payments/service');
 const { getProvider, defaultProvider } = require('../payments/providers');
 const { isSettled } = require('../payments/stateMachine');
 const { normaliseUgandanMsisdn, detectNetwork } = require('../payments/msisdn');
@@ -72,20 +72,50 @@ const STATUS_COPY = {
 router.post('/', async (req, res) => {
   const { orderId, phone, provider: providerName } = req.body || {};
 
-  const msisdn = normaliseUgandanMsisdn(phone);
-  if (!msisdn) {
-    return res.status(400).json({ error: 'invalid_phone', message: 'Enter a valid Ugandan mobile number.' });
+  let provider;
+  if (providerName) {
+    provider = getProvider(providerName);
+  } else {
+    // No explicit provider: this is the plain "Mobile Money" checkout choice,
+    // which covers both MTN and Airtel from one phone-number field rather
+    // than asking the customer which telco they're on. Detect the network
+    // from the number itself and route to the matching adapter. Falls back
+    // to the env-configured default when the number can't be classified —
+    // the phone validation below still rejects an invalid number either way.
+    const network = detectNetwork(normaliseUgandanMsisdn(phone));
+    provider = network === 'AIRTEL' ? getProvider('airtel_money')
+      : network === 'MTN' ? getProvider('mtn_momo')
+      : defaultProvider();
   }
 
-  const provider = providerName ? getProvider(providerName) : defaultProvider();
+  // Mobile money providers need a phone; hosted-checkout card payments don't
+  // collect one at all (Flutterwave's own page takes the card details), so
+  // the requirement is per-provider rather than blanket. Adapters that don't
+  // set `requiresMsisdn` are assumed to need one, same as MTN/Airtel today.
+  const needsMsisdn = provider.requiresMsisdn !== false;
 
-  // Direct MTN can only charge MTN numbers. Failing here with a clear message
-  // beats letting the customer stare at a prompt that will never arrive.
-  if (provider.name === 'mtn_momo' && detectNetwork(msisdn) !== 'MTN') {
-    return res.status(400).json({
-      error: 'unsupported_network',
-      message: 'This number is not an MTN Mobile Money number. Please use an MTN line.',
-    });
+  let msisdn = null;
+  if (needsMsisdn) {
+    msisdn = normaliseUgandanMsisdn(phone);
+    if (!msisdn) {
+      return res.status(400).json({ error: 'invalid_phone', message: 'Enter a valid Ugandan mobile number.' });
+    }
+
+    // Direct MTN/Airtel can only charge their own network's numbers. Failing
+    // here with a clear message beats letting the customer stare at a prompt
+    // that will never arrive.
+    if (provider.name === 'mtn_momo' && detectNetwork(msisdn) !== 'MTN') {
+      return res.status(400).json({
+        error: 'unsupported_network',
+        message: 'This number is not an MTN Mobile Money number. Please use an MTN line.',
+      });
+    }
+    if (provider.name === 'airtel_money' && detectNetwork(msisdn) !== 'AIRTEL') {
+      return res.status(400).json({
+        error: 'unsupported_network',
+        message: 'This number is not an Airtel Money number. Please use an Airtel line.',
+      });
+    }
   }
 
   const client = await pool.connect();
@@ -126,11 +156,21 @@ router.post('/', async (req, res) => {
     );
     if (live[0]) {
       await client.query('COMMIT');
+      // The one-live-attempt-per-order guard is provider-agnostic (it's an
+      // order-level DB constraint), so the live attempt being reused might be
+      // a card payment from an earlier request. Its hosted-checkout link was
+      // persisted verbatim in request_payload at initiate time — surface it
+      // again so the frontend can still redirect rather than falling into
+      // the poll loop with nothing to poll productively toward.
+      const reusedCheckoutUrl = live[0].provider === 'flutterwave_card'
+        ? live[0].request_payload?.data?.link || null
+        : null;
       return res.status(200).json({
         paymentId: live[0].id,
         status: live[0].status,
         pollToken: issuePollToken(live[0].id),
         reused: true,
+        checkoutUrl: reusedCheckoutUrl || undefined,
         ...STATUS_COPY[live[0].status],
       });
     }
@@ -145,12 +185,30 @@ router.post('/', async (req, res) => {
 
     const currency = process.env.MOMO_CURRENCY || 'UGX';
 
-    const { payment, accepted, deferred } = await initiatePayment(client, {
+    // Card checkout has no phone at all, so it needs the order's own contact
+    // details instead — Flutterwave's hosted page requires an email.
+    let customerEmail = null;
+    let customerName = null;
+    if (!needsMsisdn) {
+      customerEmail = order.customer_email || null;
+      customerName = order.customer_name || null;
+      if (!customerEmail) {
+        await client.query('ROLLBACK');
+        return res.status(422).json({
+          error: 'email_required',
+          message: 'An email address is needed to pay by card. Please add one to your order.',
+        });
+      }
+    }
+
+    const { payment, accepted, deferred, result } = await initiatePayment(client, {
       orderId: order.id,
       providerName: provider.name,
       amountMinor,
       currency,
       msisdn,
+      customerEmail,
+      customerName,
       payerMessage: `Lizimas Store order #${order.id}`,
     });
 
@@ -164,6 +222,9 @@ router.post('/', async (req, res) => {
       // deferred = the provider call failed but the prompt may still have gone
       // out. The reconciler decides. Don't tell the customer it failed.
       deferred,
+      // Only the hosted-checkout card provider sets this — its presence is
+      // what tells the frontend to redirect instead of polling.
+      checkoutUrl: result?.checkoutUrl || undefined,
       ...STATUS_COPY[payment.status],
     });
   } catch (err) {
@@ -224,6 +285,107 @@ router.get('/:id/status', async (req, res) => {
     return res.status(500).json({ error: 'status_failed' });
   }
 });
+
+/* ------------------------------------------------------------------ */
+/* GET /api/payments/by-ref/:externalRef/confirm                       */
+/* Redirect-back landing point for hosted checkout (Flutterwave cards). */
+/* Unauthenticated by necessity — the customer's browser lands here     */
+/* straight from Flutterwave with no session. Safe for the same reason  */
+/* the webhook path is: external_ref is a server-generated, unguessable */
+/* UUID, already used the same way as the sole lookup key there.        */
+/* ------------------------------------------------------------------ */
+
+const EXTERNAL_REF_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+router.get('/by-ref/:externalRef/confirm', async (req, res) => {
+  const externalRef = req.params.externalRef;
+  if (!EXTERNAL_REF_RE.test(externalRef)) {
+    return res.status(400).json({ error: 'bad_ref' });
+  }
+
+  res.set('Cache-Control', 'no-store');
+
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query(
+      `SELECT p.*, o.receipt_number
+         FROM payments p
+         JOIN orders o ON o.id = p.order_id
+        WHERE p.external_ref = $1`,
+      [externalRef]
+    );
+    const payment = rows[0];
+    if (!payment) return res.status(404).json({ error: 'not_found' });
+
+    // Already settled — a webhook or an earlier hit on this same page beat us
+    // to it. Just report it, same short-circuit the webhook route uses.
+    if (payment.settled_at) {
+      return res.json(statusPayload(payment));
+    }
+
+    // Never trust the redirect's own query string (?status=successful is a
+    // customer-controlled URL parameter, not proof of anything) — re-query
+    // the provider directly, identical to the webhook handler's security
+    // model: nothing settles a payment except a fresh fetchStatus() call.
+    const provider = getProvider(payment.provider);
+    const outcome = await provider.fetchStatus({
+      externalRef: payment.external_ref,
+      providerRef: payment.provider_ref,
+    });
+
+    if (!outcome.status) {
+      return res.json(statusPayload(payment));
+    }
+
+    await client.query('BEGIN');
+    const result = await recordPaymentOutcome(client, {
+      paymentId: payment.id,
+      outcome,
+      source: 'redirect',
+      eventKey: `redirect:${payment.provider}:${payment.external_ref}:${outcome.rawStatus || outcome.status}`,
+      body: outcome.raw,
+      headers: {},
+    });
+    await client.query('COMMIT');
+
+    for (const effect of result.effects) {
+      effect().catch((err) => console.error('[payments] post-commit effect failed', err));
+    }
+
+    const { rows: fresh } = await client.query(
+      `SELECT p.*, o.receipt_number
+         FROM payments p
+         JOIN orders o ON o.id = p.order_id
+        WHERE p.id = $1`,
+      [payment.id]
+    );
+    return res.json(statusPayload(fresh[0] || payment));
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[payments] confirm failed', err);
+    return res.status(500).json({ error: 'confirm_failed' });
+  } finally {
+    client.release();
+  }
+});
+
+/** Same response shape as GET /:id/status — the frontend's redirect-return
+ *  page reuses that endpoint's rendering logic, so the two must match. */
+function statusPayload(row) {
+  const done = isSettled(row.status);
+  return {
+    paymentId: row.id,
+    orderId: row.order_id,
+    status: row.status,
+    done,
+    failureReason: done && row.status !== 'succeeded' ? row.failure_reason : null,
+    receiptNumber: row.status === 'succeeded' ? row.receipt_number : null,
+    receiptUrl: row.status === 'succeeded' && row.receipt_number
+      ? `/receipt/${row.order_id}`
+      : null,
+    ...STATUS_COPY[row.status],
+  };
+}
 
 /* ------------------------------------------------------------------ */
 

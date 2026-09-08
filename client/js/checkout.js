@@ -377,7 +377,9 @@ async function confirmAndSubmitOrder() {
         const orderId = result.order.id;
 
         if (pendingOrder.payment_method === "Mobile Money") {
-            await startMomoPayment(orderId, pendingOrder.phone);
+            await startMobileMoneyPayment(orderId, pendingOrder.phone);
+        } else if (pendingOrder.payment_method === "Card Payment") {
+            await startCardPayment(orderId);
         } else {
             finishOrderSuccess(orderId);
         }
@@ -396,16 +398,16 @@ function finishOrderSuccess(orderId) {
     window.location.href = "index.html";
 }
 
-async function startMomoPayment(orderId, phone) {
+async function startMobileMoneyPayment(orderId, phone) {
     document.getElementById("momo-waiting-modal").style.display = "flex";
     document.getElementById("momo-waiting-text").textContent =
         "A payment prompt has been sent to your phone. Approve it to complete your order.";
 
     try {
-        const payResult = await apiPost("/momo/pay", { orderId, phoneNumber: phone });
-        const referenceId = payResult.referenceId;
-
-        pollMomoStatus(referenceId, orderId);
+        // No `provider` field: the server detects MTN vs Airtel from the
+        // phone number itself, so the customer never has to pick a telco.
+        const payResult = await apiPost("/payments", { orderId, phone });
+        pollPaymentStatus(payResult.paymentId, payResult.pollToken, orderId);
 
     } catch (error) {
         console.error(error);
@@ -416,29 +418,53 @@ async function startMomoPayment(orderId, phone) {
     }
 }
 
-function pollMomoStatus(referenceId, orderId) {
-    let attempts = 0;
-    const maxAttempts = 20;
+async function startCardPayment(orderId) {
+    document.getElementById("momo-waiting-modal").style.display = "flex";
+    document.getElementById("momo-waiting-text").textContent =
+        "Taking you to our secure card payment page...";
 
-    momoPollInterval = setInterval(async () => {
+    try {
+        const payResult = await apiPost("/payments", { orderId, provider: "flutterwave_card" });
+        if (!payResult.checkoutUrl) {
+            throw new Error("no_checkout_url");
+        }
+        localStorage.removeItem("cart");
+        window.location.href = payResult.checkoutUrl;
+
+    } catch (error) {
+        console.error(error);
+        document.getElementById("momo-waiting-modal").style.display = "none";
+        alert("Could not start the card payment. Your order was saved as pending - please try paying again from your order history, or contact us.");
+        localStorage.removeItem("cart");
+        window.location.href = "index.html";
+    }
+}
+
+function pollPaymentStatus(paymentId, pollToken, orderId) {
+    let attempts = 0;
+    const maxAttempts = 60; // widening intervals below cover the same ~5 min window the server allows
+
+    const schedule = [3000, 3000, 3000, 5000, 5000, 8000, 10000];
+    const nextDelay = () => schedule[Math.min(attempts, schedule.length - 1)];
+
+    const tick = async () => {
         attempts++;
 
         try {
-            const statusResult = await apiGet(`/momo/status/${referenceId}`);
+            const statusResult = await apiGet(`/payments/${paymentId}/status?t=${encodeURIComponent(pollToken)}`);
 
-            if (statusResult.status === "SUCCESSFUL" || statusResult.status === "verified") {
-                clearInterval(momoPollInterval);
+            if (statusResult.done) {
                 document.getElementById("momo-waiting-modal").style.display = "none";
-                finishOrderSuccess(orderId);
-                return;
-            }
-
-            if (statusResult.status === "FAILED" || statusResult.status === "REJECTED") {
-                clearInterval(momoPollInterval);
-                document.getElementById("momo-waiting-modal").style.display = "none";
-                alert("Payment was not approved. Your order is saved as pending - you can try paying again from your order history.");
-                localStorage.removeItem("cart");
-                window.location.href = "index.html";
+                if (statusResult.status === "succeeded") {
+                    finishOrderSuccess(orderId);
+                } else {
+                    alert(
+                        (statusResult.detail || "Payment was not completed.") +
+                        " Your order is saved as pending - you can try paying again from your order history."
+                    );
+                    localStorage.removeItem("cart");
+                    window.location.href = "index.html";
+                }
                 return;
             }
 
@@ -447,17 +473,21 @@ function pollMomoStatus(referenceId, orderId) {
         }
 
         if (attempts >= maxAttempts) {
-            clearInterval(momoPollInterval);
             document.getElementById("momo-waiting-modal").style.display = "none";
             alert("We could not confirm your payment yet. Your order is saved as pending - we will update it once payment is confirmed.");
             localStorage.removeItem("cart");
             window.location.href = "index.html";
+            return;
         }
-    }, 3000);
+
+        momoPollInterval = setTimeout(tick, nextDelay());
+    };
+
+    momoPollInterval = setTimeout(tick, nextDelay());
 }
 
 function cancelMomoWait() {
-    if (momoPollInterval) clearInterval(momoPollInterval);
+    if (momoPollInterval) clearTimeout(momoPollInterval);
     document.getElementById("momo-waiting-modal").style.display = "none";
     alert("Payment cancelled. Your order is saved as pending - you can complete payment later from your order history.");
     localStorage.removeItem("cart");

@@ -9,7 +9,6 @@ router.use("/checkout", require("./checkout"));
 router.use("/payments", require("./checkoutPayment"));
 router.use("/admin", require("./admin"));
 router.use("/vendors", require("./vendors"));
-router.use("/momo", require("./momo"));
 router.use("/categories", require("./categories"));
 router.use("/promotions", require("./promotions"));
 router.use("/discounts", require("./discounts"));

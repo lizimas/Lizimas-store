@@ -60,7 +60,7 @@ function nextPollDelay(attempts) {
  *
  * @param {import('pg').PoolClient} client - inside a transaction
  */
-async function initiatePayment(client, { orderId, providerName, amountMinor, currency, msisdn, payerMessage }) {
+async function initiatePayment(client, { orderId, providerName, amountMinor, currency, msisdn, payerMessage, customerEmail, customerName }) {
   const provider = getProvider(providerName);
   const externalRef = crypto.randomUUID();
 
@@ -84,6 +84,8 @@ async function initiatePayment(client, { orderId, providerName, amountMinor, cur
       msisdn,
       payerMessage,
       orderId,
+      customerEmail,
+      customerName,
     });
   } catch (err) {
     // Network failure is NOT a payment failure — the prompt may well have gone
@@ -92,7 +94,7 @@ async function initiatePayment(client, { orderId, providerName, amountMinor, cur
       `UPDATE payments SET last_status_body = $2, updated_at = NOW() WHERE id = $1`,
       [payment.id, JSON.stringify({ initiate_error: String(err && err.message) })]
     );
-    return { payment, accepted: false, deferred: true };
+    return { payment, accepted: false, deferred: true, result: null };
   }
 
   const { rows: updated } = await client.query(
@@ -107,7 +109,11 @@ async function initiatePayment(client, { orderId, providerName, amountMinor, cur
     [payment.id, result.providerRef || null, JSON.stringify(result.raw || {})]
   );
 
-  return { payment: updated[0], accepted: true, deferred: false };
+  // `result` (the provider's raw initiate() return — includes `checkoutUrl`
+  // for the hosted-checkout card flow) is returned alongside the payment row,
+  // not just persisted, so checkoutPayment.js can surface fields from it in
+  // the API response without re-deriving them from request_payload.
+  return { payment: updated[0], accepted: true, deferred: false, result };
 }
 
 /* ------------------------------------------------------------------ */

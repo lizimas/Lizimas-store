@@ -70,6 +70,21 @@
           return self.fail(r.data.message || 'We could not start the payment. Please try again.');
         }
 
+        // Hosted-checkout card payments (Flutterwave) don't poll at all —
+        // there's nothing to poll yet. The browser leaves this page entirely
+        // and Flutterwave brings it back to payment-return.html, which calls
+        // the by-ref confirm endpoint instead.
+        if (r.data.checkoutUrl) {
+          self.render({
+            headline: 'Redirecting to secure payment…',
+            detail: 'Taking you to our card payment partner to finish paying.',
+            state: 'initiated',
+            spinner: true
+          });
+          window.location.href = r.data.checkoutUrl;
+          return;
+        }
+
         self.paymentId = r.data.paymentId;
         self.pollToken = r.data.pollToken;
 

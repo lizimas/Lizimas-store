@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Confirming your payment - Lizimas Store</title>
+<link rel="stylesheet" href="css/style.css?v=66">
+<link rel="stylesheet" href="css/lz-payment.css?v=1">
+<style>
+    .pr-page {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8f8f8;
+        padding: 24px 16px;
+    }
+
+    .pr-card {
+        width: 100%;
+        max-width: 420px;
+        background: var(--lz-white, #fff);
+        border: 1px solid var(--lz-line, #e5e7eb);
+        border-radius: 14px;
+        box-shadow: 0 10px 30px rgba(15, 27, 61, 0.08);
+        overflow: hidden;
+    }
+
+    .pr-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        justify-content: center;
+        padding: 20px 20px 0;
+    }
+
+    .pr-brand img {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        object-fit: cover;
+        display: block;
+    }
+
+    .pr-brand span {
+        font-weight: 800;
+        color: var(--lz-navy, #0f1b3d);
+        font-size: 16px;
+    }
+
+    .pr-order-ref {
+        text-align: center;
+        font-size: 13px;
+        color: #8a90a3;
+        margin-top: 4px;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="pr-page">
+    <div class="pr-card">
+        <div class="pr-brand">
+            <img src="https://res.cloudinary.com/ag407tk0/image/upload/whatsapp-gold.jpg" alt="Lizimas Store">
+            <span>Lizimas Store</span>
+        </div>
+        <div id="payment-return-mount"></div>
+        <p class="pr-order-ref" id="payment-return-ref"></p>
+    </div>
+</div>
+
+<script>
+/* payment-return.html — Flutterwave hosted-checkout redirect landing page.
+ *
+ * Deliberately a small standalone script rather than a load of lz-payment.js:
+ * the poller in that file is built to START a payment and poll it; this page
+ * only ever needs to CONFIRM one payment once, via a single GET request. The
+ * render()/esc() helpers below mirror lz-payment.js's so the two pages look
+ * identical, but nothing here calls into that file.
+ */
+(function () {
+    'use strict';
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
+    function render(mount, view) {
+        var cls = 'lz-pay lz-pay--' + (view.state || 'pending');
+        mount.innerHTML =
+            '<div class="' + cls + '" role="status" aria-live="polite">' +
+                (view.spinner ? '<div class="lz-pay__spinner" aria-hidden="true"></div>' : '') +
+                '<h3 class="lz-pay__headline">' + esc(view.headline || '') + '</h3>' +
+                '<p class="lz-pay__detail">' + esc(view.detail || '') + '</p>' +
+                (view.receiptUrl
+                    ? '<a class="lz-pay__cta" href="' + esc(view.receiptUrl) + '">View receipt</a>'
+                    : '') +
+                (view.retry
+                    ? '<a class="lz-pay__retry" href="index.html">Return to store</a>'
+                    : '') +
+            '</div>';
+    }
+
+    var mount = document.getElementById('payment-return-mount');
+    var refEl = document.getElementById('payment-return-ref');
+    var params = new URLSearchParams(window.location.search);
+    var txRef = params.get('tx_ref');
+
+    render(mount, { headline: 'Confirming your payment…', detail: 'Please wait a moment.', state: 'pending', spinner: true });
+
+    if (!txRef) {
+        render(mount, {
+            headline: 'We could not find that payment',
+            detail: 'No payment reference was included in the link. If you completed a card payment, check your order history or contact us.',
+            state: 'failed',
+            retry: true
+        });
+        return;
+    }
+
+    fetch('/api/payments/by-ref/' + encodeURIComponent(txRef) + '/confirm', { cache: 'no-store' })
+        .then(function (res) {
+            if (res.status === 404) throw new Error('not_found');
+            if (!res.ok) throw new Error('confirm_failed');
+            return res.json();
+        })
+        .then(function (data) {
+            refEl.textContent = 'Order #' + data.orderId;
+            render(mount, {
+                headline: data.headline,
+                detail: data.failureReason || data.detail,
+                state: data.status,
+                spinner: !data.done,
+                receiptUrl: data.receiptUrl,
+                retry: data.done && data.status !== 'succeeded'
+            });
+
+            // Not settled yet (a slow card issuer, or the provider hasn't
+            // confirmed to Flutterwave yet) — try again shortly rather than
+            // leaving the customer looking at a spinner forever. A few
+            // retries covers this; the background reconciler is still the
+            // system of record if the customer closes the tab before this
+            // resolves.
+            if (!data.done) {
+                setTimeout(confirmAgain, 4000);
+            }
+        })
+        .catch(function () {
+            render(mount, {
+                headline: 'Something went wrong',
+                detail: 'We could not confirm this payment right now. If money left your account, it will still be applied automatically — check your order history shortly, or contact us.',
+                state: 'failed',
+                retry: true
+            });
+        });
+
+    var retriesLeft = 5;
+    function confirmAgain() {
+        if (retriesLeft-- <= 0) return;
+        fetch('/api/payments/by-ref/' + encodeURIComponent(txRef) + '/confirm', { cache: 'no-store' })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                refEl.textContent = 'Order #' + data.orderId;
+                render(mount, {
+                    headline: data.headline,
+                    detail: data.failureReason || data.detail,
+                    state: data.status,
+                    spinner: !data.done,
+                    receiptUrl: data.receiptUrl,
+                    retry: data.done && data.status !== 'succeeded'
+                });
+                if (!data.done) setTimeout(confirmAgain, 4000);
+            })
+            .catch(function () { setTimeout(confirmAgain, 4000); });
+    }
+})();
+</script>
+
+</body>
+</html>

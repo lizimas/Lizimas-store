@@ -2,6 +2,8 @@
 
 const mtnMomo = require('./mtnMomo');
 const flutterwave = require('./flutterwave');
+const airtel = require('./airtel');
+const flutterwaveCard = require('./flutterwaveCard');
 
 const REQUIRED = [
   'name', 'initiate', 'fetchStatus',
@@ -21,7 +23,8 @@ function register(adapter) {
 
 register(mtnMomo);
 register(flutterwave);
-// register(require('./airtel'));
+register(airtel);
+register(flutterwaveCard);
 // register(require('./pesapal'));
 
 function getProvider(name) {

@@ -39,7 +39,7 @@ exports.getDashboardStats = async (req, res) => {
         );
 
         const pendingPaymentsResult = await pool.query(
-            `SELECT COUNT(*) AS pending_payments FROM payments_legacy WHERE status = 'pending'`
+            `SELECT COUNT(*) AS pending_payments FROM payments WHERE status IN ('pending', 'initiated')`
         );
 
         const lowStockResult = await pool.query(
