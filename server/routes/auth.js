@@ -35,7 +35,7 @@ const { requireAuth, requireAuthOrSetup } = require("../middleware/authMiddlewar
 const upload = require("../middleware/upload");
 
 router.post("/register", registerUser);
-const { googleSignIn, googleCallback } = require("../controllers/oauthController");
+const { googleSignIn, googleCallback, facebookSignIn, facebookDataDeletion } = require("../controllers/oauthController");
 
 router.post("/login", loginLimiter, loginUser);
 router.post("/admin-login", loginLimiter, adminLogin);
@@ -54,6 +54,23 @@ router.post(
     loginLimiter,
     require("express").urlencoded({ extended: false }),
     googleCallback
+);
+
+// Facebook Login. The JS SDK's FB.login() already handles both popup and
+// mobile navigation internally, so unlike Google there is no separate
+// redirect-mode callback to wire up here - one endpoint covers both.
+router.post("/oauth/facebook", loginLimiter, facebookSignIn);
+
+// Meta's data-deletion callback - called by Facebook's own servers, not a
+// browser, so it needs the urlencoded parser for the same reason the Google
+// callback above does (Meta POSTs signed_request as a form field), and no
+// login rate limiter (it is not a login attempt and is not attacker-facing
+// in the same way; the signature check in parseSignedRequest is what
+// actually gates it).
+router.post(
+    "/oauth/facebook/deauthorize",
+    require("express").urlencoded({ extended: false }),
+    facebookDataDeletion
 );
 router.post("/login/2fa/email", otpLimiter, requestEmail2FACode);
 

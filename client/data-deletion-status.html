@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Data Deletion Request | Lizimas Store</title>
+
+<link rel="stylesheet" href="css/style.css?v=66">
+
+</head>
+
+<body>
+
+<header class="ls-header">
+
+  <div class="ls-header-top">
+
+    <a href="index.html" class="ls-brand">
+      <svg class="ls-mark" viewBox="0 0 512 512" aria-hidden="true">
+        <rect width="512" height="512" rx="123" fill="#1a1a2e"/>
+        <path d="M182 253 A74 74 0 0 1 330 253" fill="none" stroke="#F5C518" stroke-width="26"/>
+        <rect x="123" y="195" width="266" height="215" rx="31" fill="#F5C518"/>
+        <text x="256" y="335" font-family="Poppins, Segoe UI, sans-serif" font-size="133"
+              font-weight="700" fill="#1a1a2e" text-anchor="middle">LS</text>
+      </svg>
+      <span class="ls-wordmark">Lizimas Store</span>
+    </a>
+
+  </div>
+
+</header>
+
+<main class="ls-help">
+
+  <div class="ls-help-hero">
+    <h1>Data Deletion Request</h1>
+    <p>Status of a data deletion request made through Facebook.</p>
+  </div>
+
+  <section class="ls-help-section" id="status">
+
+    <h2>Request received</h2>
+    <p>Your request reference is: <strong id="req-id">&mdash;</strong></p>
+    <p>We received your request to delete the data Facebook shared with
+       Lizimas Store when you signed in with Facebook. Your Facebook sign-in
+       link has already been removed, so Facebook can no longer be used to
+       access your Lizimas Store account.</p>
+    <p>If you also have order or payment history with us, some records may
+       be kept for a limited time as required by law &mdash; for example for
+       accounting, tax or dispute resolution &mdash; even after this request.
+       See <a href="privacy.html#retention">how long we keep data</a> in our
+       Privacy Policy.</p>
+    <p>Questions about this request? Contact
+       <a href="mailto:compliance.alert@lizimasstore.com">compliance.alert@lizimasstore.com</a>
+       and include the reference above.</p>
+
+  </section>
+
+</main>
+
+<footer class="site-footer">
+
+<div class="container footer-container">
+
+<div>
+<h3>Lizimas Store</h3>
+<p>Your trusted online shopping partner.</p>
+</div>
+
+<div>
+<h4>Help &amp; Support</h4>
+<p><a href="faq.html">FAQ</a></p>
+<p><a href="help.html">Help Centre</a></p>
+<p><a href="contact.html">Contact Us</a></p>
+</div>
+
+<div>
+<h4>Legal &amp; Privacy</h4>
+<p><a href="privacy.html">Privacy Policy</a></p>
+<p><a href="terms.html">Terms of Service</a></p>
+</div>
+
+</div>
+
+<div class="copyright">
+&copy; 2026 Lizimas Store
+</div>
+
+</footer>
+
+<script>
+(function () {
+  var params = new URLSearchParams(window.location.search);
+  var id = params.get("id");
+  if (id) {
+    document.getElementById("req-id").textContent = id;
+  }
+})();
+</script>
+
+</body>
+</html>

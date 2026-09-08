@@ -702,6 +702,49 @@ async function sendAccountReportAlert(details) {
 }
 
 
+// Sent when Facebook's platform calls our data-deletion callback (either the
+// user removed the app in their Facebook settings, or requested deletion
+// through Facebook's own Data Deletion flow). We unlink the identity
+// immediately so Facebook sign-in stops working for that person, but we do
+// not auto-delete the underlying account or order history - those may be
+// records we are required to keep (see privacy.html#retention) - so this
+// alert is how a human finds out a request happened and can review it.
+async function sendDataDeletionAlert(details) {
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: process.env.ADMIN_ALERT_EMAIL,
+            subject: "Facebook data deletion request " + details.confirmationCode + " - Lizimas Store",
+            text: renderCustomerText([
+                "Facebook's platform called our data-deletion callback for a linked account.",
+                "",
+                `Confirmation code:   ${details.confirmationCode}`,
+                `Facebook user id:    ${details.fbUserId}`,
+                `Linked account:      ${details.linkedEmail || "(no matching link found)"}`,
+                `Identity unlinked:   ${details.unlinked ? "yes" : "no - no matching link was found"}`,
+                `Time:                ${details.time}`,
+                "",
+                "The Facebook sign-in link for this person has been removed. Review whether",
+                "anything further needs to happen with the account itself."
+            ]),
+            html: renderInternalEmail({
+                title: "Facebook data deletion request " + escHtml(details.confirmationCode),
+                introHtml: "Facebook's platform called our data-deletion callback for a linked account.",
+                rows: [
+                    ["Confirmation code", details.confirmationCode],
+                    ["Facebook user id", details.fbUserId],
+                    ["Linked account", details.linkedEmail || "(no matching link found)"],
+                    ["Identity unlinked", details.unlinked ? "yes" : "no - no matching link was found"],
+                    ["Time", details.time]
+                ],
+                noteHtml: "The Facebook sign-in link for this person has been removed. Review whether anything further needs to happen with the account itself."
+            })
+        });
+    } catch (error) {
+        console.error("Data deletion alert email error:", error);
+    }
+}
+
 /**
  * Emails a single-recipient performance-report PDF straight to a vendor or
  * staff member's account email, so they can track their own products
@@ -775,4 +818,4 @@ async function sendStaffMessageAlert(details) {
     }
 }
 
-module.exports = { sendOrderConfirmationEmail, sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert, sendPerformanceReportEmail, sendStaffMessageAlert };
+module.exports = { sendOrderConfirmationEmail, sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert, sendPerformanceReportEmail, sendStaffMessageAlert, sendDataDeletionAlert };

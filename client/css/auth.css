@@ -546,8 +546,35 @@
 
 .auth-page #twofa-form-card .auth-label { text-align: center; }
 
-/* Social sign-in: markup is in place, revealed when OAuth is wired. */
+/* Social sign-in: markup is in place, revealed when OAuth is wired.
+   Facebook's controller now exists server-side, but the button itself stays
+   hidden until login.js's fbAsyncInit sees a real, non-placeholder
+   FACEBOOK_APP_ID and adds .is-ready - so this stays a no-op for real
+   visitors until the Meta app is actually configured. */
 .auth-page .auth-social { display: none; }
+.auth-page .auth-social.is-ready { display: block; }
+
+.auth-page .auth-fb-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 280px;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 9px 12px;
+    background: #fff;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    color: #3c4043;
+    cursor: pointer;
+    transition: background-color .15s, box-shadow .15s;
+}
+.auth-page .auth-fb-btn:hover { background: #f8f9fa; box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+.auth-page .auth-fb-btn svg { flex: none; }
 
 @media (max-width: 420px) {
     .auth-page .checkout-nav-links { padding-bottom: 82px; }

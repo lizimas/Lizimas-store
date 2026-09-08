@@ -85,6 +85,75 @@ async function handleGoogleCredential(response) {
     }
 }
 
+// Set this to the real Facebook App ID once the Meta app exists and has
+// been through app review (see PENDING.md "Facebook sign-in" for what's
+// still needed). Left as a placeholder sentinel on purpose: fbAsyncInit
+// below checks for exactly this string and refuses to init or reveal the
+// button while it is still here, so shipping this file today changes
+// nothing for real visitors - the button stays exactly as invisible as it
+// was before this landed, until someone deliberately flips this constant.
+const FACEBOOK_APP_ID = "REPLACE_WITH_REAL_FACEBOOK_APP_ID";
+
+window.fbAsyncInit = function () {
+    if (!FACEBOOK_APP_ID || FACEBOOK_APP_ID.indexOf("REPLACE_WITH") === 0) return;
+
+    FB.init({ appId: FACEBOOK_APP_ID, cookie: false, xfbml: false, version: "v21.0" });
+
+    document.querySelectorAll(".auth-social").forEach(function (el) {
+        el.removeAttribute("aria-hidden");
+        el.classList.add("is-ready");
+    });
+};
+
+// Triggered by the Facebook button. FB.login()'s popup already degrades to a
+// full-page redirect on mobile browsers by itself, so - unlike Google above -
+// there is no separate redirect-mode entry point to wire up here.
+function handleFacebookLogin() {
+    if (typeof FB === "undefined") {
+        document.getElementById("login-status").textContent = "Facebook sign-in is not available right now.";
+        return;
+    }
+
+    FB.login(function (response) {
+        if (response && response.authResponse && response.authResponse.accessToken) {
+            submitFacebookToken(response.authResponse.accessToken);
+        }
+        // A user who cancels or declines the permission gets no callback
+        // branch here - same as Google, nothing to report, they just stay on
+        // the login form.
+    }, { scope: "email" });
+}
+
+// Sends the access token to the server, which verifies it against the Graph
+// API itself (this file never decides who the user is - see
+// facebookSignIn in oauthController.js). Same response shape as password
+// and Google login, so it lands on the same 2FA/redirect handling.
+async function submitFacebookToken(accessToken) {
+    const statusEl = document.getElementById("login-status");
+    statusEl.textContent = "Signing you in...";
+
+    try {
+        const result = await apiPost("/auth/oauth/facebook", { accessToken });
+
+        if (result.requires2FA) {
+            pendingLoginToken = result.pendingToken;
+            document.getElementById("login-form-card").style.display = "none";
+            document.getElementById("twofa-form-card").style.display = "block";
+            return;
+        }
+
+        localStorage.setItem("userToken", result.token);
+        localStorage.setItem("userInfo", JSON.stringify(result.user));
+
+        statusEl.textContent = "Login successful! Redirecting...";
+        window.location.href = "orders.html";
+
+    } catch (error) {
+        console.error("Facebook sign-in error:", error);
+        statusEl.textContent = (error && error.message) || "Facebook sign-in failed. Please try again.";
+    }
+}
+
 async function verifyTwoFactor() {
     const code = document.getElementById("twofa-code").value.trim();
     const statusEl = document.getElementById("twofa-status");
