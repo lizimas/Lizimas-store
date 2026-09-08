@@ -92,7 +92,7 @@ async function handleGoogleCredential(response) {
 // button while it is still here, so shipping this file today changes
 // nothing for real visitors - the button stays exactly as invisible as it
 // was before this landed, until someone deliberately flips this constant.
-const FACEBOOK_APP_ID = "REPLACE_WITH_REAL_FACEBOOK_APP_ID";
+const FACEBOOK_APP_ID = "1632274215173850";
 
 window.fbAsyncInit = function () {
     if (!FACEBOOK_APP_ID || FACEBOOK_APP_ID.indexOf("REPLACE_WITH") === 0) return;
