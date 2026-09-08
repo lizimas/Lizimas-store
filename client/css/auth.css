@@ -548,7 +548,7 @@
 
 /* Social sign-in: markup is in place, revealed when OAuth is wired.
    Facebook's controller now exists server-side, but the button itself stays
-   hidden until login.js's fbAsyncInit sees a real, non-placeholder
+   hidden until login.js's revealFacebookButton() sees a real, non-placeholder
    FACEBOOK_APP_ID and adds .is-ready - so this stays a no-op for real
    visitors until the Meta app is actually configured. */
 .auth-page .auth-social { display: none; }

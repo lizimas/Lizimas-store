@@ -202,6 +202,98 @@ async function facebookSignIn(req, res) {
     }
 }
 
+// Redirect-mode entry point, mirroring googleCallback below in the same
+// module. FB.login()'s JS-SDK popup was the first thing built here, but it
+// depends on Facebook's own cross-domain status-check iframe, which browsers
+// that block third-party cookies (Chrome, Safari ITP) silently break: the
+// popup opens but never reaches the consent dialog, landing on Facebook's own
+// logged-in feed instead. A plain top-level redirect to the OAuth dialog has
+// no such dependency - Facebook sets the code in a query string on its own
+// 302 back to us, which is a first-party navigation start to finish.
+//
+// CSRF here is the classic OAuth "state" parameter rather than Google's
+// double-submit cookie trick: login.js sets a random value in both the
+// redirect URL and a first-party cookie before leaving the page, and this
+// route requires the two to match on return. A forged redirect back to this
+// URL cannot supply the cookie, so it cannot forge the match.
+async function facebookCallback(req, res) {
+    const { code, state } = req.query;
+    const cookieState = req.cookies && req.cookies.fb_oauth_state;
+
+    res.clearCookie("fb_oauth_state");
+
+    if (!code || !state || !cookieState || state !== cookieState) {
+        await logLoginAttempt(null, req, false, {
+            surface: "oauth_facebook",
+            failureReason: "csrf_mismatch"
+        });
+        return res.redirect("/login.html?e=csrf");
+    }
+
+    if (!FACEBOOK_CONFIGURED) {
+        return res.redirect("/login.html?e=oauth");
+    }
+
+    try {
+        const tokenParams = new URLSearchParams({
+            client_id: FACEBOOK_APP_ID,
+            client_secret: FACEBOOK_APP_SECRET,
+            redirect_uri: `${PUBLIC_BASE_URL}/api/auth/oauth/facebook/callback`,
+            code
+        });
+
+        const tokenRes = await fetch(`${FACEBOOK_GRAPH_BASE}/oauth/access_token?${tokenParams.toString()}`);
+        const tokenBody = await tokenRes.json();
+
+        if (!tokenRes.ok || !tokenBody || !tokenBody.access_token) {
+            console.error("Facebook code exchange failed:", tokenBody);
+            await logLoginAttempt(null, req, false, { surface: "oauth_facebook", failureReason: "code_exchange_failed" });
+            return res.redirect("/login.html?e=oauth");
+        }
+
+        // completeLogin (reached via facebookSignIn) answers with JSON.
+        // Capture it rather than letting it reach the browser, then translate
+        // to the redirect this flow needs - identical shim to googleCallback.
+        const captured = {};
+        const shim = {
+            status(code) { captured.code = code; return shim; },
+            json(body) { captured.body = body; return shim; },
+            redirect(url) { captured.redirect = url; return shim; },
+            cookie(...args) { return res.cookie(...args); },
+            clearCookie(...args) { return res.clearCookie(...args); },
+            set(...args) { return res.set(...args); },
+            setHeader(...args) { return res.setHeader(...args); },
+            getHeader(...args) { return res.getHeader(...args); }
+        };
+
+        const shapedReq = Object.create(req);
+        shapedReq.body = { accessToken: tokenBody.access_token };
+
+        await facebookSignIn(shapedReq, shim);
+
+        const out = captured.body || {};
+
+        if (out.token) {
+            // Fragment, not query: see googleCallback's identical comment -
+            // fragments never reach the server, so the token stays out of
+            // access logs and Referer headers.
+            const payload = encodeURIComponent(JSON.stringify({ t: out.token, u: out.user }));
+            return res.redirect(`/oauth-complete.html#${payload}`);
+        }
+
+        if (out.requires2FA || out.requiresPasswordReset || out.requiresDeviceApproval) {
+            const payload = encodeURIComponent(JSON.stringify(out));
+            return res.redirect(`/oauth-complete.html#${payload}`);
+        }
+
+        return res.redirect("/login.html?e=oauth");
+
+    } catch (error) {
+        console.error("Facebook callback error:", error);
+        return res.redirect("/login.html?e=oauth");
+    }
+}
+
 // Meta's required data-deletion callback. Called server-to-server by
 // Facebook's platform (never by a browser) whenever a user removes this app
 // from their Facebook settings or requests deletion through Facebook's own
@@ -477,6 +569,7 @@ module.exports = {
     googleSignIn,
     googleCallback,
     facebookSignIn,
+    facebookCallback,
     facebookDataDeletion,
     // exported for unit tests only
     _parseSignedRequest: parseSignedRequest

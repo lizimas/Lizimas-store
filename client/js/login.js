@@ -85,73 +85,62 @@ async function handleGoogleCredential(response) {
     }
 }
 
-// Set this to the real Facebook App ID once the Meta app exists and has
-// been through app review (see PENDING.md "Facebook sign-in" for what's
-// still needed). Left as a placeholder sentinel on purpose: fbAsyncInit
-// below checks for exactly this string and refuses to init or reveal the
-// button while it is still here, so shipping this file today changes
-// nothing for real visitors - the button stays exactly as invisible as it
-// was before this landed, until someone deliberately flips this constant.
+// Set this to the real Facebook App ID once the Meta app exists (see
+// PENDING.md "Facebook sign-in"). Left as a placeholder sentinel on
+// purpose: revealFacebookButton() below checks for exactly this string and
+// refuses to reveal the button while it is still here, so shipping this
+// file changes nothing for a visitor until someone deliberately flips this
+// constant.
 const FACEBOOK_APP_ID = "1632274215173850";
+const FACEBOOK_REDIRECT_URI = "https://lizimasstore.com/api/auth/oauth/facebook/callback";
 
-window.fbAsyncInit = function () {
+// Redirect-mode only - the FB JS SDK's FB.login() popup was tried first (see
+// git history) but depends on Facebook's cross-domain login-status iframe,
+// which browsers that block third-party cookies (Chrome, Safari ITP) break
+// silently: the popup opens but never reaches the consent dialog, landing on
+// facebook.com's own logged-in feed instead. A plain top-level redirect has
+// no such dependency - same mechanism Google's ux_mode:"redirect" above
+// relies on - so there's no SDK to load and no async init to race.
+//
+// Reveal is synchronous and runs as soon as this file does (below the button
+// markup in login.html, so the elements already exist): unlike the old
+// SDK-gated version, nothing here waits on a network load, but the "ships
+// inert while APP_ID is a placeholder" property is unchanged.
+(function revealFacebookButton() {
     if (!FACEBOOK_APP_ID || FACEBOOK_APP_ID.indexOf("REPLACE_WITH") === 0) return;
-
-    FB.init({ appId: FACEBOOK_APP_ID, cookie: false, xfbml: false, version: "v21.0" });
-
     document.querySelectorAll(".auth-social").forEach(function (el) {
         el.removeAttribute("aria-hidden");
         el.classList.add("is-ready");
     });
-};
+})();
 
-// Triggered by the Facebook button. FB.login()'s popup already degrades to a
-// full-page redirect on mobile browsers by itself, so - unlike Google above -
-// there is no separate redirect-mode entry point to wire up here.
+// Triggered by the Facebook button. CSRF protection is the classic OAuth
+// "state" parameter: a random value goes into both the redirect URL and a
+// short-lived first-party cookie, and the server (facebookCallback in
+// oauthController.js) requires the two to match on the way back. A forged
+// redirect to our callback cannot supply the cookie, so it cannot forge the
+// match.
 function handleFacebookLogin() {
-    if (typeof FB === "undefined") {
+    if (!FACEBOOK_APP_ID || FACEBOOK_APP_ID.indexOf("REPLACE_WITH") === 0) {
         document.getElementById("login-status").textContent = "Facebook sign-in is not available right now.";
         return;
     }
 
-    FB.login(function (response) {
-        if (response && response.authResponse && response.authResponse.accessToken) {
-            submitFacebookToken(response.authResponse.accessToken);
-        }
-        // A user who cancels or declines the permission gets no callback
-        // branch here - same as Google, nothing to report, they just stay on
-        // the login form.
-    }, { scope: "email" });
-}
+    const state = window.crypto && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-// Sends the access token to the server, which verifies it against the Graph
-// API itself (this file never decides who the user is - see
-// facebookSignIn in oauthController.js). Same response shape as password
-// and Google login, so it lands on the same 2FA/redirect handling.
-async function submitFacebookToken(accessToken) {
-    const statusEl = document.getElementById("login-status");
-    statusEl.textContent = "Signing you in...";
+    document.cookie = `fb_oauth_state=${state}; path=/; max-age=300; SameSite=Lax`;
 
-    try {
-        const result = await apiPost("/auth/oauth/facebook", { accessToken });
+    const params = new URLSearchParams({
+        client_id: FACEBOOK_APP_ID,
+        redirect_uri: FACEBOOK_REDIRECT_URI,
+        state,
+        scope: "email",
+        response_type: "code"
+    });
 
-        if (result.requires2FA) {
-            pendingLoginToken = result.pendingToken;
-            document.getElementById("login-form-card").style.display = "none";
-            document.getElementById("twofa-form-card").style.display = "block";
-            return;
-        }
-
-        localStorage.setItem("userToken", result.token);
-        localStorage.setItem("userInfo", JSON.stringify(result.user));
-
-        statusEl.textContent = "Login successful! Redirecting...";
-        window.location.href = "orders.html";
-
-    } catch (error) {
-        console.error("Facebook sign-in error:", error);
-        statusEl.textContent = (error && error.message) || "Facebook sign-in failed. Please try again.";
-    }
+    window.location.href = `https://www.facebook.com/v21.0/dialog/oauth?${params.toString()}`;
 }
 
 async function verifyTwoFactor() {

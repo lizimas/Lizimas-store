@@ -35,7 +35,7 @@ const { requireAuth, requireAuthOrSetup } = require("../middleware/authMiddlewar
 const upload = require("../middleware/upload");
 
 router.post("/register", registerUser);
-const { googleSignIn, googleCallback, facebookSignIn, facebookDataDeletion } = require("../controllers/oauthController");
+const { googleSignIn, googleCallback, facebookSignIn, facebookCallback, facebookDataDeletion } = require("../controllers/oauthController");
 
 router.post("/login", loginLimiter, loginUser);
 router.post("/admin-login", loginLimiter, adminLogin);
@@ -56,10 +56,17 @@ router.post(
     googleCallback
 );
 
-// Facebook Login. The JS SDK's FB.login() already handles both popup and
-// mobile navigation internally, so unlike Google there is no separate
-// redirect-mode callback to wire up here - one endpoint covers both.
+// Facebook Login. Token-mode entry point (FB JS SDK's FB.login(), when it
+// works) - kept for callers that can use it, but redirect-mode below is now
+// what login.js actually drives, since the popup flow breaks silently in
+// browsers that block third-party cookies.
 router.post("/oauth/facebook", loginLimiter, facebookSignIn);
+
+// Redirect mode. Facebook's own servers 302 the browser here with ?code&state
+// after the user approves on facebook.com, so this is a first-party GET
+// navigation, not a cross-site request - no urlencoded parser or CORS carve-out
+// needed, unlike Google's form-POST callback above.
+router.get("/oauth/facebook/callback", loginLimiter, facebookCallback);
 
 // Meta's data-deletion callback - called by Facebook's own servers, not a
 // browser, so it needs the urlencoded parser for the same reason the Google
