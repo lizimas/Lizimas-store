@@ -72,6 +72,15 @@ router.post(
     require("express").urlencoded({ extended: false }),
     facebookDataDeletion
 );
+
+// Meta's app-settings form validates this URL by visiting it directly (a
+// plain GET, not the signed POST Facebook's platform actually sends) before
+// it will save the field - so without this, saving the Data Deletion URL in
+// the dashboard fails with "should represent a valid URL" even though the
+// real callback above is correct. This just proves the endpoint exists.
+router.get("/oauth/facebook/deauthorize", (req, res) => {
+    res.status(200).json({ ok: true });
+});
 router.post("/login/2fa/email", otpLimiter, requestEmail2FACode);
 
 // Device approval (phase 4c). No auth: the tokens are the credential.
