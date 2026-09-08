@@ -3710,6 +3710,12 @@ body.sheet-open {
     display: flex;
     align-items: center;
     justify-content: center;
+    /* The image below fills 100%/100% of this box, so without an inset the
+       background colour never shows at all - it's completely hidden behind
+       the artwork. Padding here is what actually makes the tile background
+       visible as a frame, which is the whole point of setting it. */
+    padding: 10px;
+    box-sizing: border-box;
 }
 
 /* Only tiles with no artwork keep the grey plate. */
@@ -3718,9 +3724,12 @@ body.sheet-open {
 .ls-explore-thumb img {
     width: 100%;
     height: 100%;
+    border-radius: 6px;
     /* cover, deliberately. The category artwork is portrait with baked-in
        captions; contain letterboxes it into white bars. Revisit once the
-       artwork is replaced with square cutouts. */
+       artwork is replaced with square cutouts. Safe to pad the box above
+       without reintroducing that problem - cover always fills whatever box
+       it's given and never letterboxes, unlike contain. */
     object-fit: cover;
     display: block;
 }
@@ -3749,6 +3758,10 @@ body.sheet-open {
         border-radius: 8px;
         max-width: 82%;
         margin: 0 auto;
+        padding: 7px;
+    }
+    .ls-explore-thumb img {
+        border-radius: 5px;
     }
 }
 
