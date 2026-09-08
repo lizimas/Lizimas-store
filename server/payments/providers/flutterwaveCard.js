@@ -71,6 +71,12 @@ async function initiate({ externalRef, amountMinor, currency, orderId, customerE
         title: 'Lizimas Store',
         description: payerMessage || `Order ${orderId}`,
       },
+      // Without this, Flutterwave's hosted page shows every payment method
+      // enabled on the merchant account (mobile money, bank transfer, USSD,
+      // card...) — which would duplicate the separate Mobile Money flow this
+      // store already has. This provider is specifically the card option, so
+      // pin the hosted page to cards only.
+      payment_options: 'card',
       meta: { order_id: orderId },
     }),
   });
