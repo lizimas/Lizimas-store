@@ -3706,7 +3706,7 @@ body.sheet-open {
     aspect-ratio: 1;
     border-radius: 10px;
     overflow: hidden;
-    background: #e6f0fa;
+    background: #f1f1f1;
     display: flex;
     align-items: center;
     justify-content: center;
