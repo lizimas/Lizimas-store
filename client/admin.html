@@ -804,7 +804,7 @@
                             <select id="staff-role" style="padding:10px; border:1px solid #ccc; border-radius:8px;">
                                 <option value="product_staff">Product Staff (submissions need approval)</option>
                                 <option value="store_manager">Store Manager (publishes directly, deletion needs approval)</option>
-                                <option value="customer_support">Customer Support (live chat only)</option>
+                                <option value="customer_support">Customer Support (live chat &amp; vendor messages)</option>
                             </select>
                             <button onclick="createStaffAccount()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px; cursor:pointer;">Create Staff Account</button>
                             <p id="staff-create-status" style="font-size:13px; color:#666;"></p>
@@ -982,10 +982,11 @@
                     <div class="panel">
                         <h2>Vendor Messages</h2>
                         <p style="font-size:13px; color:#666; margin:0 0 12px;">
-                            Threads vendors open to reach you directly, outside the structured flows above.
+                            Threads vendors open to reach support directly, outside the structured flows above. Support handles these day to day - escalate a thread here if it needs admin.
                         </p>
                         <div style="margin-bottom:10px;">
                             <button onclick="loadVendorMessagesAdmin('open')" id="vendor-messages-filter-open" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer; margin-right:6px;">Open</button>
+                            <button onclick="loadVendorMessagesAdmin('escalated')" id="vendor-messages-filter-escalated" style="background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer; margin-right:6px;">Escalated</button>
                             <button onclick="loadVendorMessagesAdmin('resolved')" id="vendor-messages-filter-resolved" style="background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;">Resolved</button>
                         </div>
                         <div id="vendor-messages-admin-list-view">
@@ -999,6 +1000,7 @@
                             <textarea id="vendor-message-admin-reply-body" rows="3" maxlength="2000" placeholder="Write a reply..." style="width:100%; padding:8px; box-sizing:border-box; margin-bottom:8px;"></textarea>
                             <button type="button" id="vendor-message-admin-reply-btn" onclick="sendVendorMessageReplyAdmin()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 18px; cursor:pointer; font-weight:600;">Reply</button>
                             <button type="button" id="vendor-message-admin-resolve-btn" onclick="toggleVendorMessageResolvedAdmin()" style="background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:8px; padding:10px 18px; cursor:pointer; margin-left:8px;">Mark Resolved</button>
+                            <button type="button" id="vendor-message-admin-escalate-btn" onclick="toggleVendorMessageEscalatedAdmin()" style="background:#fff; color:#B45309; border:1px solid #FDE68A; border-radius:8px; padding:10px 18px; cursor:pointer; margin-left:8px;">Escalate to Admin</button>
                             <span id="vendor-message-admin-reply-status" style="margin-left:10px; font-size:13px;"></span>
                         </div>
                     </div>
@@ -1145,7 +1147,7 @@
 <script src="js/description-block-editor.js?v=13"></script>
 <script src="js/category-select.js?v=2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
-<script src="js/admin.js?v=62"></script>
+<script src="js/admin.js?v=63"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

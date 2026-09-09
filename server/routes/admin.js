@@ -52,7 +52,7 @@ const {
 
 const { createStaffAccount, activateStaffAccount, blockStaffAccount, forcePasswordReset, logoutAllDevices, resetStaff2FA, getLoginHistory } = require("../controllers/authController");
 
-const { requireAuth, requireAdmin } = require("./../middleware/authMiddleware");
+const { requireAuth, requireAdmin, requireSupportOrAdmin } = require("./../middleware/authMiddleware");
 const {
     listDropoffPoints,
     createDropoffPoint,
@@ -97,7 +97,9 @@ const {
     getVendorMessageThreadAdmin,
     replyToVendorMessageAdmin,
     resolveVendorMessageAdmin,
-    reopenVendorMessageAdmin
+    reopenVendorMessageAdmin,
+    escalateVendorMessageAdmin,
+    unescalateVendorMessageAdmin
 } = require("../controllers/vendorController");
 
 const {
@@ -118,6 +120,17 @@ const {
 } = require("../controllers/flashSaleController");
 const csvUpload = require("../middleware/csvUpload");
 const { getSecurityLogins, unlockAccount, getAccountReports, updateAccountReport } = require("../controllers/adminController");
+
+// Vendor messages (Task #71/#76) - reachable by customer_support as well
+// as admin, so these are registered ahead of the requireAdmin gate below
+// with their own requireSupportOrAdmin check instead of inheriting it.
+router.get("/vendor-messages", requireAuth, requireSupportOrAdmin, getVendorMessagesAdmin);
+router.get("/vendor-messages/:id", requireAuth, requireSupportOrAdmin, getVendorMessageThreadAdmin);
+router.post("/vendor-messages/:id/replies", requireAuth, requireSupportOrAdmin, replyToVendorMessageAdmin);
+router.patch("/vendor-messages/:id/resolve", requireAuth, requireSupportOrAdmin, resolveVendorMessageAdmin);
+router.patch("/vendor-messages/:id/reopen", requireAuth, requireSupportOrAdmin, reopenVendorMessageAdmin);
+router.patch("/vendor-messages/:id/escalate", requireAuth, requireSupportOrAdmin, escalateVendorMessageAdmin);
+router.patch("/vendor-messages/:id/unescalate", requireAuth, requireSupportOrAdmin, unescalateVendorMessageAdmin);
 
 router.use(requireAuth, requireAdmin);
 
@@ -219,11 +232,7 @@ router.patch("/vendor-promotions/:id/featured", setVendorPromotionFeatured);
 router.patch("/vendor-promotions/:id/sponsored", setVendorPromotionSponsored);
 
 // Vendor-to-Admin Messaging (Task #71): the admin-side merged inbox.
-router.get("/vendor-messages", getVendorMessagesAdmin);
-router.get("/vendor-messages/:id", getVendorMessageThreadAdmin);
-router.post("/vendor-messages/:id/replies", replyToVendorMessageAdmin);
-router.patch("/vendor-messages/:id/resolve", resolveVendorMessageAdmin);
-router.patch("/vendor-messages/:id/reopen", reopenVendorMessageAdmin);
+
 
 router.get("/dropoff-points", listDropoffPoints);
 router.post("/dropoff-points", createDropoffPoint);

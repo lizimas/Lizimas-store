@@ -7036,26 +7036,34 @@ function initAnalyticsAndPerformance() {
     });
 }
 
-// --- Vendor-to-Admin Messaging (Task #71): admin inbox --------------------
+// --- Vendor-to-Admin Messaging (Task #71/#76): support inbox -------------
+// Vendor threads route to customer_support by default (Ryan, Sept 2026) -
+// this same panel is reachable by both customer_support and admin
+// (requireSupportOrAdmin on the server side), so whichever of them opens
+// it sees the same three views: Open, Escalated, Resolved. Escalating a
+// thread doesn't move it anywhere - it just flags it (escalated_at) so it
+// shows up in the Escalated view for whoever is watching, admin included.
 
 let vendorMessagesAdminFilter = "open";
 let vendorMessagesAdminOpenThreadId = null;
 
-async function loadVendorMessagesAdmin(status) {
-    if (status) vendorMessagesAdminFilter = status;
+async function loadVendorMessagesAdmin(view) {
+    if (view) vendorMessagesAdminFilter = view;
     const openBtn = document.getElementById("vendor-messages-filter-open");
+    const escalatedBtn = document.getElementById("vendor-messages-filter-escalated");
     const resolvedBtn = document.getElementById("vendor-messages-filter-resolved");
-    if (openBtn && resolvedBtn) {
+    if (openBtn && escalatedBtn && resolvedBtn) {
         const activeStyle = "background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer; margin-right:6px;";
         const inactiveStyle = "background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer; margin-right:6px;";
         openBtn.setAttribute("style", vendorMessagesAdminFilter === "open" ? activeStyle : inactiveStyle);
+        escalatedBtn.setAttribute("style", vendorMessagesAdminFilter === "escalated" ? activeStyle : inactiveStyle);
         resolvedBtn.setAttribute("style", (vendorMessagesAdminFilter === "resolved" ? activeStyle : inactiveStyle).replace("margin-right:6px;", ""));
     }
 
     const box = document.getElementById("vendor-messages-admin-list");
     if (!box) return;
     try {
-        const rows = await authorizedFetch(`/api/admin/vendor-messages?status=${vendorMessagesAdminFilter}`);
+        const rows = await authorizedFetch(`/api/admin/vendor-messages?view=${vendorMessagesAdminFilter}`);
         if (rows.error) {
             box.innerHTML = `<p>${rows.error}</p>`;
             return;
@@ -7071,7 +7079,7 @@ async function loadVendorMessagesAdmin(status) {
                     ${rows.map(m => `
                         <tr onclick="openVendorMessageThreadAdmin(${m.id})" style="cursor:pointer;">
                             <td>${m.vendor_business_name}</td>
-                            <td>${m.subject}</td>
+                            <td>${m.subject}${m.escalated_at ? ' <span style="background:#FEF3C7; color:#92400E; font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px; margin-left:6px;">Escalated</span>' : ""}</td>
                             <td>${m.reply_count}</td>
                             <td>${new Date(m.updated_at).toLocaleString()}</td>
                         </tr>
@@ -7105,9 +7113,12 @@ async function loadVendorMessageThreadAdmin() {
         if (data.error) return;
         document.getElementById("vendor-message-admin-thread-subject").textContent = `${data.thread.vendor_business_name} - ${data.thread.subject}`;
         document.getElementById("vendor-message-admin-thread-status").textContent =
-            `${data.thread.status === "resolved" ? "Resolved" : "Open"} · opened ${new Date(data.thread.created_at).toLocaleDateString()}`;
+            `${data.thread.status === "resolved" ? "Resolved" : "Open"} · opened ${new Date(data.thread.created_at).toLocaleDateString()}` +
+            (data.thread.escalated_at ? ` · escalated ${new Date(data.thread.escalated_at).toLocaleDateString()}` : "");
         const resolveBtn = document.getElementById("vendor-message-admin-resolve-btn");
         resolveBtn.textContent = data.thread.status === "resolved" ? "Reopen" : "Mark Resolved";
+        const escalateBtn = document.getElementById("vendor-message-admin-escalate-btn");
+        escalateBtn.textContent = data.thread.escalated_at ? "Un-escalate" : "Escalate to Admin";
 
         const repliesBox = document.getElementById("vendor-message-admin-thread-replies");
         repliesBox.innerHTML = data.replies.map(r => `
@@ -7157,6 +7168,23 @@ async function toggleVendorMessageResolvedAdmin() {
         loadVendorMessageThreadAdmin();
     } catch (error) {
         console.error("Toggle vendor message resolved error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function toggleVendorMessageEscalatedAdmin() {
+    if (!vendorMessagesAdminOpenThreadId) return;
+    try {
+        const token = getToken();
+        const escalateBtn = document.getElementById("vendor-message-admin-escalate-btn");
+        const action = escalateBtn.textContent === "Un-escalate" ? "unescalate" : "escalate";
+        await fetch(`${API_URL}/api/admin/vendor-messages/${vendorMessagesAdminOpenThreadId}/${action}`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        loadVendorMessageThreadAdmin();
+    } catch (error) {
+        console.error("Toggle vendor message escalated error:", error);
         alert("Something went wrong.");
     }
 }

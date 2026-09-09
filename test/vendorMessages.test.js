@@ -4,9 +4,11 @@ const {
     MAX_SUBJECT_LENGTH,
     MAX_BODY_LENGTH,
     MESSAGE_STATUSES,
+    MESSAGE_ADMIN_VIEWS,
     isValidMessageSubject,
     isValidMessageBody,
     isValidMessageStatus,
+    isValidMessageAdminView,
     deriveStatusAfterReply
 } = require("../server/utils/vendorMessages.js");
 
@@ -49,4 +51,16 @@ test("deriveStatusAfterReply: an admin reply never changes status", () => {
 
 test("deriveStatusAfterReply: a vendor reply on an already-open thread stays open", () => {
     assert.equal(deriveStatusAfterReply("open", "vendor"), "open");
+});
+
+test("MESSAGE_ADMIN_VIEWS has exactly open, escalated, and resolved", () => {
+    assert.deepEqual(MESSAGE_ADMIN_VIEWS, ["open", "escalated", "resolved"]);
+});
+
+test("isValidMessageAdminView accepts only the three known views", () => {
+    assert.equal(isValidMessageAdminView("open"), true);
+    assert.equal(isValidMessageAdminView("escalated"), true);
+    assert.equal(isValidMessageAdminView("resolved"), true);
+    assert.equal(isValidMessageAdminView("closed"), false);
+    assert.equal(isValidMessageAdminView(""), false);
 });

@@ -28,7 +28,7 @@ const {
     MAX_BODY_LENGTH,
     isValidMessageSubject,
     isValidMessageBody,
-    isValidMessageStatus,
+    isValidMessageAdminView,
     deriveStatusAfterReply
 } = require("../utils/vendorMessages");
 
@@ -1790,22 +1790,31 @@ exports.replyToVendorMessage = async (req, res) => {
     }
 };
 
-// Admin's merged inbox across every vendor - open threads by default
-// (?status=resolved to see the resolved ones instead), most recently
-// active first, same "plain queue, no unread system" shape as every
-// other admin panel in this codebase.
+// Support/admin's merged inbox across every vendor (Task #76 - vendors
+// route to customer_support by default, admin sees the same inbox via
+// requireSupportOrAdmin). Open threads by default; ?view=escalated shows
+// threads a support agent flagged for admin regardless of status,
+// ?view=resolved the resolved ones. Most recently active first (escalated
+// view sorts by escalation time instead, so the newest flag is on top).
 exports.getVendorMessagesAdmin = async (req, res) => {
     try {
-        const status = isValidMessageStatus(req.query.status) ? req.query.status : "open";
+        const view = isValidMessageAdminView(req.query.view) ? req.query.view : "open";
+        let whereClause = "vm.status = 'open'";
+        let orderClause = "vm.updated_at DESC";
+        if (view === "resolved") {
+            whereClause = "vm.status = 'resolved'";
+        } else if (view === "escalated") {
+            whereClause = "vm.escalated_at IS NOT NULL";
+            orderClause = "vm.escalated_at DESC";
+        }
         const result = await pool.query(
-            `SELECT vm.id, vm.subject, vm.status, vm.created_at, vm.updated_at,
+            `SELECT vm.id, vm.subject, vm.status, vm.escalated_at, vm.created_at, vm.updated_at,
                     v.id AS vendor_id, v.business_name AS vendor_business_name,
                     (SELECT COUNT(*) FROM vendor_message_replies r WHERE r.vendor_message_id = vm.id)::int AS reply_count
              FROM vendor_messages vm
              JOIN vendors v ON v.id = vm.vendor_id
-             WHERE vm.status = $1
-             ORDER BY vm.updated_at DESC`,
-            [status]
+             WHERE ${whereClause}
+             ORDER BY ${orderClause}`
         );
         res.json(result.rows);
     } catch (error) {
@@ -1819,7 +1828,7 @@ exports.getVendorMessageThreadAdmin = async (req, res) => {
     try {
         const { id } = req.params;
         const threadRes = await pool.query(
-            `SELECT vm.id, vm.subject, vm.status, vm.created_at, vm.updated_at,
+            `SELECT vm.id, vm.subject, vm.status, vm.escalated_at, vm.created_at, vm.updated_at,
                     v.id AS vendor_id, v.business_name AS vendor_business_name
              FROM vendor_messages vm
              JOIN vendors v ON v.id = vm.vendor_id
@@ -1903,6 +1912,43 @@ exports.reopenVendorMessageAdmin = async (req, res) => {
             return res.status(404).json({ error: "Message thread not found." });
         }
         res.json({ message: "Thread reopened.", thread: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Escalation (Task #76) - a support agent (or admin) flags a thread for
+// admin attention. Purely a flag, not a reassignment: the thread stays in
+// the same shared inbox, escalated_at just makes it show up in the
+// Escalated view for whoever is watching. Doesn't touch status - an
+// escalated thread can still be open or resolved.
+exports.escalateVendorMessageAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            `UPDATE vendor_messages SET escalated_at = now() WHERE id = $1 RETURNING *`,
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Message thread not found." });
+        }
+        res.json({ message: "Thread escalated to admin.", thread: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.unescalateVendorMessageAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            `UPDATE vendor_messages SET escalated_at = NULL WHERE id = $1 RETURNING *`,
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Message thread not found." });
+        }
+        res.json({ message: "Thread un-escalated.", thread: result.rows[0] });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

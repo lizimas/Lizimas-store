@@ -11,6 +11,12 @@ const MAX_SUBJECT_LENGTH = 150;
 const MAX_BODY_LENGTH = 2000;
 const MESSAGE_STATUSES = ["open", "resolved"];
 
+// The admin/support inbox's three filter views (Task #76). Distinct from
+// MESSAGE_STATUSES on purpose: "escalated" isn't a thread status, it's an
+// independent flag (vendor_messages.escalated_at) - a thread can be open
+// or resolved either way. The view just picks which of those to show.
+const MESSAGE_ADMIN_VIEWS = ["open", "escalated", "resolved"];
+
 function isValidMessageSubject(text) {
     return typeof text === "string" && text.trim().length > 0 && text.length <= MAX_SUBJECT_LENGTH;
 }
@@ -21,6 +27,10 @@ function isValidMessageBody(text) {
 
 function isValidMessageStatus(status) {
     return MESSAGE_STATUSES.includes(status);
+}
+
+function isValidMessageAdminView(view) {
+    return MESSAGE_ADMIN_VIEWS.includes(view);
 }
 
 // What a thread's status becomes after a new reply lands on it. A vendor
@@ -38,8 +48,10 @@ module.exports = {
     MAX_SUBJECT_LENGTH,
     MAX_BODY_LENGTH,
     MESSAGE_STATUSES,
+    MESSAGE_ADMIN_VIEWS,
     isValidMessageSubject,
     isValidMessageBody,
     isValidMessageStatus,
+    isValidMessageAdminView,
     deriveStatusAfterReply
 };
