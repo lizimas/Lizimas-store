@@ -15,12 +15,22 @@ DO $$
 DECLARE
     con_name text;
 BEGIN
+    -- Matched by which column the constraint actually references (conkey),
+    -- not by pattern-matching its rendered text: Postgres silently rewrites
+    -- "type IN (...)" into "type = ANY (ARRAY[...])" internally, so a
+    -- '%IN%' text match against pg_get_constraintdef never fires and the
+    -- old constraint is never dropped - caught when this was first run for
+    -- real against Render (Sept 2026), fixed here before re-running.
     SELECT con.conname INTO con_name
     FROM pg_constraint con
     JOIN pg_class rel ON rel.oid = con.conrelid
+    JOIN pg_attribute att
+      ON att.attrelid = rel.oid
+     AND att.attnum = ANY (con.conkey)
     WHERE rel.relname = 'vendor_notifications'
       AND con.contype = 'c'
-      AND pg_get_constraintdef(con.oid) LIKE '%type%IN%';
+      AND att.attname = 'type'
+      AND array_length(con.conkey, 1) = 1;
 
     IF con_name IS NOT NULL THEN
         EXECUTE format('ALTER TABLE vendor_notifications DROP CONSTRAINT %I', con_name);
