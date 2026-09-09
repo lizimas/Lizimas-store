@@ -193,11 +193,16 @@ exports.getProducts = async (req, res) => {
                      WHERE pi.product_id = products.id
                      ORDER BY COALESCE(pi.display_order, 999999) ASC, pi.id ASC
                      OFFSET 1 LIMIT 1
-                    ) AS hover_image
+                    ) AS hover_image,
+                    EXISTS (
+                        SELECT 1 FROM vendor_promotions vp
+                        WHERE vp.product_id = products.id AND vp.sponsored = true
+                          AND vp.status = 'approved' AND vp.starts_at <= now() AND vp.ends_at >= now()
+                    ) AS is_sponsored
              FROM products
              LEFT JOIN categories ON products.category_id = categories.id
              WHERE products.status = 'approved' AND products.is_active = true AND products.admin_restricted = false AND products.deleted_at IS NULL${filter}
-             ORDER BY products.id DESC`,
+             ORDER BY is_sponsored DESC, products.id DESC`,
             params
         );
 

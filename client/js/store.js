@@ -33,10 +33,12 @@ function stBuildProductCard(product) {
 
     const outOfStock = product.stock !== undefined && Number(product.stock) <= 0;
     const badge = outOfStock ? `<span class="product-badge out-of-stock">Out of Stock</span>` : "";
+    const sponsoredBadge = product.is_sponsored ? `<span class="product-badge sponsored">Sponsored</span>` : "";
     const priceFormatted = Number(product.price).toLocaleString();
 
     card.innerHTML = `
         <div class="product-image-wrapper">
+            ${sponsoredBadge}
             ${badge}
             <img src="${stEscape(product.image)}" alt="${stEscape(product.name)}" class="product-image product-image-primary" loading="lazy">
         </div>

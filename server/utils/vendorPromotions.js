@@ -69,10 +69,26 @@ function deriveVendorPromotionStatus({ status, startsAt, endsAt }, now = new Dat
     return "active";
 }
 
+// Whether a promotion should currently show a "Sponsored" placement
+// boost (Task #73) - sponsored is an admin-only flag (Task #64), and
+// showing the boost only while the promotion is genuinely active (not
+// pending, not scheduled, not expired) keeps "sponsored" meaning "this
+// vendor is paying to be boosted right now", not "was sponsored once".
+// The SQL query that actually ranks/badges product listings
+// (productController.js's getProducts, vendorController.js's
+// getPublicStorefront) mirrors this exact predicate directly in SQL for
+// performance - this function documents the intended semantics and is
+// what the pure-logic tests check against.
+function isSponsoredAndActive({ status, sponsored, startsAt, endsAt }, now = new Date()) {
+    if (!sponsored) return false;
+    return deriveVendorPromotionStatus({ status, startsAt, endsAt }, now) === "active";
+}
+
 module.exports = {
     MAX_VENDOR_DISCOUNT_PERCENT,
     computeDiscountPercent,
     validateProposedPrice,
     isValidPromotionWindow,
-    deriveVendorPromotionStatus
+    deriveVendorPromotionStatus,
+    isSponsoredAndActive
 };

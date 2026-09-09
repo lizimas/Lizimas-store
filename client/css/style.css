@@ -2136,6 +2136,18 @@ width:90%;
     color: #ffffff;
 }
 
+.product-badge.sponsored {
+    left: auto;
+    right: 15px;
+    top: 15px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #6b7280;
+    font-weight: 500;
+    font-size: 11px;
+    padding: 4px 10px;
+    border: 1px solid #e5e7eb;
+}
+
 .product-rating {
     color: #fbbf24;
     font-size: 14px;

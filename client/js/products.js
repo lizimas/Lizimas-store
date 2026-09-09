@@ -203,6 +203,7 @@ function buildProductCard(product) {
 
     card.innerHTML = `
         <div class="product-image-wrapper">
+            ${product.is_sponsored ? `<span class="product-badge sponsored">Sponsored</span>` : ""}
             ${buildBadge(product)}
             <img
                 src="${product.card_image || product.image}"

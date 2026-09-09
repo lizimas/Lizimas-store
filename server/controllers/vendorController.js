@@ -553,10 +553,15 @@ exports.getPublicStorefront = async (req, res) => {
 
         const [productsResult, followerResult, sellerScore] = await Promise.all([
             pool.query(
-                `SELECT id, name, price, image, stock, public_code
+                `SELECT id, name, price, image, stock, public_code,
+                        EXISTS (
+                            SELECT 1 FROM vendor_promotions vp
+                            WHERE vp.product_id = products.id AND vp.sponsored = true
+                              AND vp.status = 'approved' AND vp.starts_at <= now() AND vp.ends_at >= now()
+                        ) AS is_sponsored
                  FROM products
                  WHERE vendor_id = $1 AND status = 'approved' AND is_active = true AND admin_restricted = false AND deleted_at IS NULL
-                 ORDER BY created_at DESC`,
+                 ORDER BY is_sponsored DESC, created_at DESC`,
                 [vendor.id]
             ),
             pool.query(`SELECT COUNT(*)::int AS n FROM vendor_followers WHERE vendor_id = $1`, [vendor.id]),
@@ -1472,8 +1477,11 @@ exports.setVendorPromotionFeatured = async (req, res) => {
     }
 };
 
-// Admin-only flag reserved for a future sponsored-placement mechanic - no
-// placement effect wired to it yet, stored so it's ready when one exists.
+// Admin-only flag (Task #73 wires the actual placement effect): while a
+// promotion is sponsored=true AND active (approved, within its window),
+// getProducts/getPublicStorefront boost it to the top of listings and
+// tag its card "Sponsored" - see isSponsoredAndActive in
+// vendorPromotions.js for the exact predicate those queries mirror.
 exports.setVendorPromotionSponsored = async (req, res) => {
     try {
         const { id } = req.params;

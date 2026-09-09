@@ -665,11 +665,9 @@ promotion competes with admin's own flash sales the same way multiple
 admin campaigns already would - featuring is "eligible to show", not "will
 definitely show."
 
-**`sponsored`** (admin-only flag): stored, toggleable, but has no
-placement mechanic wired to it in this pass - there's no sponsored
-carousel or search-boost anywhere in the codebase to hook it into.
-Reserved for a real sponsored-placement feature later, same "wired but not
-yet surfaced" scoping as `createVendorLedgerAdjustment` in Task #61.
+~~`sponsored` (admin-only flag): stored, toggleable, but has no placement
+mechanic wired to it in this pass.~~ **Fixed (September 2026, Task #73)**
+- see the "Sponsored placement mechanic" section below.
 
 **Known limitation carried over from the existing flash-sale system, not
 new here**: the general product catalogue/search (`getProducts`,
@@ -914,3 +912,43 @@ same as every other tunable/decided default in this file):**
   filter buttons, a merged list across every vendor, and the same
   detail-view-in-place-of-list pattern with a Reply box and a Mark
   Resolved/Reopen toggle.
+
+
+## Sponsored placement mechanic (September 2026)
+
+Closes the last gap from Task #64: `vendor_promotions.sponsored` was
+stored and admin-toggleable but had no actual placement effect - no
+sponsored carousel or search-boost anywhere in the codebase to hook it
+into.
+
+**Design kept deliberately minimal** - no new carousel, no separate
+"Sponsored Products" page, no auction/bidding (this stays an admin-only
+flag, per Task #64's original decision - not vendor self-service, so
+there's no pay-to-play risk of it being abused or gamed):
+
+- **What sponsored does now**: while a promotion is `sponsored = true`
+  AND currently active (approved, within its `starts_at`/`ends_at`
+  window - see `isSponsoredAndActive` in `server/utils/
+  vendorPromotions.js`, 3 new tests), its product is boosted to the top
+  of every category listing and search result
+  (`productController.js`'s `getProducts`, `ORDER BY is_sponsored DESC,
+  products.id DESC`) and gets a small "Sponsored" tag on its card
+  (top-right corner, distinct from the existing New/Sale/Out-of-Stock
+  badge which sits top-left - a product can carry both at once). The
+  same boost+tag applies on the vendor's own storefront page
+  (`getPublicStorefront`), for consistency, though the effect matters
+  less there since a storefront is already scoped to one vendor.
+- **Why boost-to-top rather than a separate carousel**: a dedicated
+  "Sponsored Products" rail is a bigger UI commitment (where does it
+  live on the homepage, how many slots, does it rotate) that nothing in
+  Ryan's original gap-analysis asked for by name - "sponsored" was
+  always the *word* used, without a specific mechanic attached. Boosting
+  existing listings mirrors real placement-boost systems (Amazon/Jumia
+  sponsored results at the top of search) and reuses every existing
+  rendering path with zero new customer-facing screens.
+- **No time/frequency cap, no rotation logic between multiple sponsored
+  products** - if several products are sponsored at once, all of them
+  sort ahead of non-sponsored results (ties broken by the existing `id
+  DESC`). Fine at current catalogue scale; worth a "how many sponsored
+  slots, and how do ties resolve" pass if sponsored placements ever
+  become a real revenue line with many concurrent sponsors.

@@ -5,7 +5,8 @@ const {
     computeDiscountPercent,
     validateProposedPrice,
     isValidPromotionWindow,
-    deriveVendorPromotionStatus
+    deriveVendorPromotionStatus,
+    isSponsoredAndActive
 } = require("../server/utils/vendorPromotions.js");
 
 test("computeDiscountPercent: basic percentages", () => {
@@ -105,3 +106,27 @@ test("deriveVendorPromotionStatus: approved + after window is expired", () => {
         "expired"
     );
 });
+
+test("isSponsoredAndActive: false when sponsored flag is off, even if active", () => {
+    const now = new Date("2026-02-05T00:00:00Z");
+    assert.equal(
+        isSponsoredAndActive({ status: "approved", sponsored: false, startsAt: "2026-02-01T00:00:00Z", endsAt: "2026-02-10T00:00:00Z" }, now),
+        false
+    );
+});
+
+test("isSponsoredAndActive: true when sponsored and within an approved window", () => {
+    const now = new Date("2026-02-05T00:00:00Z");
+    assert.equal(
+        isSponsoredAndActive({ status: "approved", sponsored: true, startsAt: "2026-02-01T00:00:00Z", endsAt: "2026-02-10T00:00:00Z" }, now),
+        true
+    );
+});
+
+test("isSponsoredAndActive: false when sponsored but pending, scheduled, or expired", () => {
+    const now = new Date("2026-02-05T00:00:00Z");
+    assert.equal(isSponsoredAndActive({ status: "pending", sponsored: true, startsAt: "2026-02-01T00:00:00Z", endsAt: "2026-02-10T00:00:00Z" }, now), false);
+    assert.equal(isSponsoredAndActive({ status: "approved", sponsored: true, startsAt: "2026-03-01T00:00:00Z", endsAt: "2026-03-10T00:00:00Z" }, now), false);
+    assert.equal(isSponsoredAndActive({ status: "approved", sponsored: true, startsAt: "2026-01-01T00:00:00Z", endsAt: "2026-01-10T00:00:00Z" }, now), false);
+});
+
