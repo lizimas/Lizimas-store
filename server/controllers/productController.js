@@ -1,6 +1,7 @@
 const pool = require("../config/database");
 const cloudinary = require("../config/cloudinary");
 const { logActivity } = require("../utils/activityLog");
+const { canApplyComplianceAction } = require("../utils/vendorCompliance");
 const { calculatePricing } = require("../utils/commissionEngine");
 
 // Upload a single file buffer to Cloudinary, returns the secure URL
@@ -194,7 +195,7 @@ exports.getProducts = async (req, res) => {
                     ) AS hover_image
              FROM products
              LEFT JOIN categories ON products.category_id = categories.id
-             WHERE products.status = 'approved' AND products.is_active = true AND products.deleted_at IS NULL${filter}
+             WHERE products.status = 'approved' AND products.is_active = true AND products.admin_restricted = false AND products.deleted_at IS NULL${filter}
              ORDER BY products.id DESC`,
             params
         );
@@ -269,7 +270,7 @@ exports.getProductById = async (req, res) => {
             `SELECT products.*, vendors.business_name AS vendor_business_name, vendors.slug AS vendor_slug
              FROM products
              LEFT JOIN vendors ON vendors.id = products.vendor_id AND vendors.status = 'approved'
-             WHERE products.id = $1 AND products.deleted_at IS NULL AND products.status = 'approved' AND products.is_active = true`,
+             WHERE products.id = $1 AND products.deleted_at IS NULL AND products.status = 'approved' AND products.is_active = true AND products.admin_restricted = false`,
             [id]
         );
         if (result.rows.length === 0) {
@@ -1266,5 +1267,89 @@ exports.updateImageOrder = async (req, res) => {
         res.status(500).json({ error: error.message });
     } finally {
         client.release();
+    }
+};
+
+// --- Admin compliance: restrict/unrestrict one product (Task #63) -------
+// Independent of the vendor's own is_active toggle (Task #60) - a
+// restricted product stays off the public catalogue even if the vendor
+// flips is_active back on. Writes to vendor_compliance_actions, which
+// doubles as the admin audit trail and the vendor's own notice feed.
+
+exports.restrictVendorProduct = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+        if (!reason || !String(reason).trim()) {
+            return res.status(400).json({ error: "A reason is required." });
+        }
+
+        const current = await pool.query(
+            `SELECT vendor_id, admin_restricted FROM products WHERE id = $1 AND deleted_at IS NULL`,
+            [id]
+        );
+        if (current.rows.length === 0) {
+            return res.status(404).json({ error: "Product not found." });
+        }
+        const eligibility = canApplyComplianceAction("restrict_product", {
+            productAdminRestricted: current.rows[0].admin_restricted
+        });
+        if (!eligibility.allowed) {
+            return res.status(409).json({ error: eligibility.reason });
+        }
+        if (!current.rows[0].vendor_id) {
+            return res.status(400).json({ error: "This product isn't vendor-sourced - nothing to restrict against a vendor." });
+        }
+
+        const result = await pool.query(
+            `UPDATE products SET admin_restricted = true, restricted_reason = $1
+             WHERE id = $2 RETURNING id, vendor_id, admin_restricted, restricted_reason`,
+            [reason, id]
+        );
+        const vendorId = result.rows[0].vendor_id;
+        await pool.query(
+            `INSERT INTO vendor_compliance_actions (vendor_id, action_type, reason, product_id, created_by)
+             VALUES ($1, 'restrict_product', $2, $3, $4)`,
+            [vendorId, reason, id, req.user.userId]
+        );
+        logActivity(req.user.userId, "product_restricted", "product", id, reason);
+        res.json({ message: "Product restricted.", product: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.unrestrictVendorProduct = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const current = await pool.query(
+            `SELECT vendor_id, admin_restricted FROM products WHERE id = $1 AND deleted_at IS NULL`,
+            [id]
+        );
+        if (current.rows.length === 0) {
+            return res.status(404).json({ error: "Product not found." });
+        }
+        const eligibility = canApplyComplianceAction("unrestrict_product", {
+            productAdminRestricted: current.rows[0].admin_restricted
+        });
+        if (!eligibility.allowed) {
+            return res.status(409).json({ error: eligibility.reason });
+        }
+
+        const result = await pool.query(
+            `UPDATE products SET admin_restricted = false, restricted_reason = NULL
+             WHERE id = $1 RETURNING id, vendor_id, admin_restricted`,
+            [id]
+        );
+        const vendorId = result.rows[0].vendor_id;
+        await pool.query(
+            `INSERT INTO vendor_compliance_actions (vendor_id, action_type, reason, product_id, created_by)
+             VALUES ($1, 'unrestrict_product', 'Restriction lifted.', $2, $3)`,
+            [vendorId, id, req.user.userId]
+        );
+        logActivity(req.user.userId, "product_unrestricted", "product", id, null);
+        res.json({ message: "Restriction lifted.", product: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 };

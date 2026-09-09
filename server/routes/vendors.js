@@ -7,7 +7,8 @@ const {
     followVendor, unfollowVendor, getFollowStatus, getVendorDashboardSummary,
     advanceVendorOrderStage, bulkUpdateVendorProducts,
     getVendorWallet, requestVendorPayout,
-    getMyReturnsRefunds, respondToReturn
+    getMyReturnsRefunds, respondToReturn,
+    getMyComplianceNotices
 } = require("../controllers/vendorController");
 const {
     addProduct,
@@ -34,6 +35,7 @@ const {
 } = require("../controllers/fulfilmentController");
 
 const { previewPricing } = require("../controllers/commissionController");
+const { getVendorReviews, respondToReview } = require("../controllers/reviewController");
 
 const { requireAuth, requireVendor } = require("../middleware/authMiddleware");
 const upload = require("../middleware/upload");
@@ -101,6 +103,13 @@ router.get("/returns", getMyReturns);
 // from the collection-logistics-only "Returns" tab above.
 router.get("/returns-refunds", getMyReturnsRefunds);
 router.patch("/order-items/:orderItemId/return-response", respondToReturn);
+
+// Vendor reviews view (Task #63).
+router.get("/reviews", getVendorReviews);
+router.patch("/reviews/:reviewId/response", respondToReview);
+
+// Admin compliance notices (Task #63) - the vendor's own read-only view.
+router.get("/compliance-notices", getMyComplianceNotices);
 
 // Live pricing preview for the product-upload form (spec section 8): given
 // a category and the vendor's desired payout, returns the commission rate,

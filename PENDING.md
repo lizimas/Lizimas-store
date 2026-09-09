@@ -528,3 +528,87 @@ task); automatic partial refunds tied to specific quantities (one
 refunded item already affects a vendor's wallet balance - `vendorWallet.js`
 already claws back the charge for any item with a return-shaped
 `handover_status`, independent of whether a refund_decision exists yet.
+
+
+## Vendor Reviews View + Admin Compliance Actions (September 2026)
+
+Covers "vendor reviews view + admin compliance actions" from Ryan's gap
+analysis: vendors can now see and publicly reply to their own product
+reviews, and admin has real levers to act on a problem vendor beyond
+approve/reject at registration time - warn, suspend/reinstate, restrict
+one product, freeze/unfreeze payouts. All governance still sits with
+Lizimas/admin, unchanged from the table.
+
+**Migration to run:**
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/069_vendor_compliance.sql
+
+**Reviews.** `product_reviews.vendor_response`/`vendor_response_at` - a
+vendor's public reply, shown alongside the review (now also returned by
+the public `GET /api/reviews/product/:id`). Never edits or removes the
+review itself; admin keeps that power via the existing `deleteReview`.
+Vendor view: `GET /api/vendors/reviews`, `PATCH
+/api/vendors/reviews/:reviewId/response`.
+
+**Confirmed gap fixed**: `approveVendor`/`rejectVendor` never called
+`logActivity` - flagged in an earlier audit, fixed here as a two-line
+addition alongside the rest of this task's admin actions.
+
+**`vendors.status = 'suspended'` was already a valid value with nothing
+that ever set it or checked for it** beyond the public storefront page
+(`getPublicStorefront` already required `status = 'approved'` and 404s
+otherwise - confirmed pre-existing, not new). This task makes it reachable
+(`PATCH /api/admin/vendors/:id/suspend` / `.../reinstate`) and adds one
+more consequence: a suspended vendor can no longer request a payout
+(`requestVendorPayout` now checks status). Deliberately did **not** extend
+suspension to hide a vendor's already-approved individual products from
+general catalogue browsing/search (`getProducts`/`getProductById`) - that
+existing behavior (a product LEFT JOINs the vendor row and still renders
+even if the vendor "lost its approved status", per that code's own
+comment) looked like a considered design choice, not an oversight, and
+changing what shoppers see browsing the catalogue is a bigger, more
+visible call than this task's scope - worth Ryan's explicit sign-off if
+he wants suspension to pull existing listings from search too.
+
+**`vendors.payout_frozen`** (new column) - independent of `status`, a
+narrower lever: stop payouts without suspending the whole account (e.g.
+while investigating one report, not shutting down the seller). Checked in
+`requestVendorPayout`; an outstanding request already submitted is
+unaffected - admin still marks it paid/rejected as usual.
+
+**`products.admin_restricted`/`restricted_reason`** (new columns) - the
+vendor's own `is_active` toggle (Task #60) is a vendor-controlled
+visibility switch; this is admin's override sitting above it, unrelated
+to and unremovable by the vendor. A restricted product is excluded from
+`getProducts`, `getProductById`, and the storefront listing regardless of
+`is_active`. Cleared only by an admin `unrestrict_product` action.
+
+**`vendor_compliance_actions`** is one table doing two jobs: the admin
+audit trail (`GET /api/admin/vendors/:id/compliance-history`) AND the
+vendor's own notice feed (`GET /api/vendors/compliance-notices`, shown on
+their Account tab) - a `warn` has no other schema effect, so this table is
+the only record it ever happened. `warn`/`freeze_payout`/`restrict_product`
+all require a reason; `reinstate`/`unfreeze_payout`/`unrestrict_product`
+don't (lifting a restriction doesn't need justifying the same way imposing
+one does). Every action-type transition is guarded against being applied
+twice in a row (`canApplyComplianceAction` - can't suspend an
+already-suspended vendor, etc.) so two admins clicking the same button
+don't produce a confusing double entry.
+
+**Admin UI**: a new "Vendor Compliance" panel on the Vendors tab lists
+every vendor (`GET /api/admin/vendors` - previously there was no
+"all vendors" listing, only the pending-applications queue) with
+Warn/Suspend-or-Reinstate/Freeze-or-Unfreeze buttons, a "Products" toggle
+that loads that vendor's products for restrict/unrestrict, and a
+"History" button showing their full compliance timeline.
+
+**Deliberately not built in this pass:** blocking a suspended vendor from
+adding/editing products (new listings still require separate admin
+approval before going live regardless of account status, which was judged
+enough of a checkpoint on its own); any UI change to how a review's public
+reply looks on the storefront/product page beyond returning the field from
+the API (the product page's own review-rendering template wasn't touched);
+and a general "browse all products" admin view - restrict/unrestrict is
+reached through the new Vendor Compliance panel's per-vendor product list
+rather than the main Products tab, to avoid touching that already-large,
+actively-used screen for this task.

@@ -21,6 +21,7 @@ exports.getProductReviews = async (req, res) => {
 
         const reviews = await pool.query(
             `SELECT r.id, r.rating, r.comment, r.verified_purchase, r.created_at,
+                    r.vendor_response, r.vendor_response_at,
                     COALESCE(NULLIF(u.display_name, ''), u.name) AS reviewer_name
              FROM product_reviews r
              JOIN users u ON u.id = r.user_id
@@ -95,6 +96,70 @@ exports.deleteReview = async (req, res) => {
             return res.status(404).json({ error: "Review not found or not yours" });
         }
         res.json({ deleted: result.rows[0].id });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// --- Vendor reviews view (Task #63) --------------------------------------
+// A vendor can see every review left on their own products and reply
+// publicly - the reply never edits or removes the review itself; admin
+// keeps that power via the existing deleteReview above.
+
+// GET /api/vendors/reviews
+exports.getVendorReviews = async (req, res) => {
+    try {
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendorId = vendorRow.rows[0].id;
+
+        const result = await pool.query(
+            `SELECT r.id, r.product_id, r.rating, r.comment, r.verified_purchase, r.created_at,
+                    r.vendor_response, r.vendor_response_at,
+                    p.name AS product_name, p.image AS product_image,
+                    COALESCE(NULLIF(u.display_name, ''), u.name) AS reviewer_name
+             FROM product_reviews r
+             JOIN products p ON p.id = r.product_id
+             JOIN users u ON u.id = r.user_id
+             WHERE p.vendor_id = $1
+             ORDER BY r.created_at DESC`,
+            [vendorId]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// PATCH /api/vendors/reviews/:reviewId/response
+exports.respondToReview = async (req, res) => {
+    try {
+        const { reviewId } = req.params;
+        const { response } = req.body;
+        if (!response || !String(response).trim()) {
+            return res.status(400).json({ error: "response is required." });
+        }
+
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendorId = vendorRow.rows[0].id;
+
+        const result = await pool.query(
+            `UPDATE product_reviews r
+             SET vendor_response = $1, vendor_response_at = now()
+             FROM products p
+             WHERE r.product_id = p.id AND r.id = $2 AND p.vendor_id = $3
+             RETURNING r.id, r.vendor_response, r.vendor_response_at`,
+            [response, reviewId, vendorId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Review not found on one of your products." });
+        }
+        res.json({ message: "Response saved.", review: result.rows[0] });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

@@ -9,6 +9,7 @@ const {
     canRequestPayout
 } = require("../utils/vendorWallet");
 const { deriveReturnResolutionStatus } = require("../utils/vendorReturns");
+const { canApplyComplianceAction } = require("../utils/vendorCompliance");
 
 // The logged-in vendor's own KYC/business profile and review status.
 exports.getMyVendorProfile = async (req, res) => {
@@ -375,6 +376,24 @@ exports.advanceVendorOrderStage = async (req, res) => {
 
 // --- Admin: vendor KYC review ------------------------------------------
 
+// Every vendor regardless of status - the admin compliance panel's list.
+// getPendingVendors above stays scoped to 'pending' for the applications
+// queue; this is the broader "look up a vendor to act on" view.
+exports.getAllVendors = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT v.id, v.business_name, v.status, v.payout_frozen, v.phone,
+                    u.name AS owner_name, u.email AS owner_email
+             FROM vendors v
+             JOIN users u ON u.id = v.user_id
+             ORDER BY v.business_name ASC`
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 exports.getPendingVendors = async (req, res) => {
     try {
         const result = await pool.query(
@@ -403,6 +422,7 @@ exports.approveVendor = async (req, res) => {
         if (result.rows.length === 0) {
             return res.status(409).json({ error: "Vendor is not awaiting review." });
         }
+        logActivity(req.user.userId, "vendor_approved", "vendor", id, result.rows[0].business_name);
         res.json({ message: "Vendor approved.", vendor: result.rows[0] });
     } catch (error) {
         // One account per business, enforced at the DB level (migration 054):
@@ -435,6 +455,7 @@ exports.rejectVendor = async (req, res) => {
         if (result.rows.length === 0) {
             return res.status(409).json({ error: "Vendor is not awaiting review." });
         }
+        logActivity(req.user.userId, "vendor_rejected", "vendor", id, reason);
         res.json({ message: "Vendor rejected.", vendor: result.rows[0] });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -462,7 +483,7 @@ exports.getPublicStorefront = async (req, res) => {
             pool.query(
                 `SELECT id, name, price, image, stock, public_code
                  FROM products
-                 WHERE vendor_id = $1 AND status = 'approved' AND is_active = true AND deleted_at IS NULL
+                 WHERE vendor_id = $1 AND status = 'approved' AND is_active = true AND admin_restricted = false AND deleted_at IS NULL
                  ORDER BY created_at DESC`,
                 [vendor.id]
             ),
@@ -665,13 +686,16 @@ exports.getVendorWallet = async (req, res) => {
 exports.requestVendorPayout = async (req, res) => {
     try {
         const vendorRow = await pool.query(
-            "SELECT id, momo_number FROM vendors WHERE user_id = $1",
+            "SELECT id, momo_number, payout_frozen FROM vendors WHERE user_id = $1",
             [req.user.userId]
         );
         if (vendorRow.rows.length === 0) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
         const vendor = vendorRow.rows[0];
+        if (vendor.payout_frozen) {
+            return res.status(403).json({ error: "Payouts are currently frozen on your account. Contact Lizimas Store support." });
+        }
         if (!vendor.momo_number) {
             return res.status(400).json({ error: "Add your MoMo number in your profile before requesting a payout." });
         }
@@ -899,6 +923,208 @@ exports.respondToReturn = async (req, res) => {
             return res.status(404).json({ error: "No recorded return found for this item on your account." });
         }
         res.json({ message: "Response saved.", item: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// --- Admin compliance actions against a vendor (Task #63) ---------------
+// warn/suspend/reinstate/freeze-payout/unfreeze-payout, all writing to
+// vendor_compliance_actions - one table that is both the admin audit
+// trail and the vendor's own notice feed (a warning has no other schema
+// effect to show it happened). Suspend reuses vendors.status, which
+// already supported 'suspended' but nothing ever set it - a suspended
+// vendor's storefront already 404s (getPublicStorefront requires
+// status = 'approved'); this makes the status itself reachable.
+
+async function insertComplianceAction(vendorId, actionType, reason, adminUserId) {
+    return pool.query(
+        `INSERT INTO vendor_compliance_actions (vendor_id, action_type, reason, created_by)
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [vendorId, actionType, reason, adminUserId]
+    );
+}
+
+exports.warnVendor = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+        if (!reason || !String(reason).trim()) {
+            return res.status(400).json({ error: "A reason is required." });
+        }
+        const vendorExists = await pool.query("SELECT id FROM vendors WHERE id = $1", [id]);
+        if (vendorExists.rows.length === 0) {
+            return res.status(404).json({ error: "Vendor not found." });
+        }
+        const action = await insertComplianceAction(id, "warn", reason, req.user.userId);
+        logActivity(req.user.userId, "vendor_warned", "vendor", id, reason);
+        res.status(201).json({ message: "Warning recorded.", action: action.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.suspendVendor = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+        if (!reason || !String(reason).trim()) {
+            return res.status(400).json({ error: "A reason is required." });
+        }
+        const vendorRow = await pool.query("SELECT status FROM vendors WHERE id = $1", [id]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "Vendor not found." });
+        }
+        const eligibility = canApplyComplianceAction("suspend", { vendorStatus: vendorRow.rows[0].status });
+        if (!eligibility.allowed) {
+            return res.status(409).json({ error: eligibility.reason });
+        }
+
+        const result = await pool.query(
+            `UPDATE vendors SET status = 'suspended' WHERE id = $1 RETURNING *`,
+            [id]
+        );
+        await insertComplianceAction(id, "suspend", reason, req.user.userId);
+        logActivity(req.user.userId, "vendor_suspended", "vendor", id, reason);
+        res.json({ message: "Vendor suspended.", vendor: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.reinstateVendor = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const reason = req.body.reason || "Reinstated.";
+        const vendorRow = await pool.query("SELECT status FROM vendors WHERE id = $1", [id]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "Vendor not found." });
+        }
+        const eligibility = canApplyComplianceAction("reinstate", { vendorStatus: vendorRow.rows[0].status });
+        if (!eligibility.allowed) {
+            return res.status(409).json({ error: eligibility.reason });
+        }
+
+        const result = await pool.query(
+            `UPDATE vendors SET status = 'approved' WHERE id = $1 RETURNING *`,
+            [id]
+        );
+        await insertComplianceAction(id, "reinstate", reason, req.user.userId);
+        logActivity(req.user.userId, "vendor_reinstated", "vendor", id, reason);
+        res.json({ message: "Vendor reinstated.", vendor: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.freezeVendorPayouts = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+        if (!reason || !String(reason).trim()) {
+            return res.status(400).json({ error: "A reason is required." });
+        }
+        const vendorRow = await pool.query("SELECT payout_frozen FROM vendors WHERE id = $1", [id]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "Vendor not found." });
+        }
+        const eligibility = canApplyComplianceAction("freeze_payout", { payoutFrozen: vendorRow.rows[0].payout_frozen });
+        if (!eligibility.allowed) {
+            return res.status(409).json({ error: eligibility.reason });
+        }
+
+        const result = await pool.query(
+            `UPDATE vendors SET payout_frozen = true WHERE id = $1 RETURNING *`,
+            [id]
+        );
+        await insertComplianceAction(id, "freeze_payout", reason, req.user.userId);
+        logActivity(req.user.userId, "vendor_payouts_frozen", "vendor", id, reason);
+        res.json({ message: "Payouts frozen for this vendor.", vendor: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.unfreezeVendorPayouts = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const reason = req.body.reason || "Payouts unfrozen.";
+        const vendorRow = await pool.query("SELECT payout_frozen FROM vendors WHERE id = $1", [id]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "Vendor not found." });
+        }
+        const eligibility = canApplyComplianceAction("unfreeze_payout", { payoutFrozen: vendorRow.rows[0].payout_frozen });
+        if (!eligibility.allowed) {
+            return res.status(409).json({ error: eligibility.reason });
+        }
+
+        const result = await pool.query(
+            `UPDATE vendors SET payout_frozen = false WHERE id = $1 RETURNING *`,
+            [id]
+        );
+        await insertComplianceAction(id, "unfreeze_payout", reason, req.user.userId);
+        logActivity(req.user.userId, "vendor_payouts_unfrozen", "vendor", id, reason);
+        res.json({ message: "Payouts unfrozen for this vendor.", vendor: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Admin's full compliance history for one vendor - warnings, suspensions,
+// product restrictions, payout freezes, all in one timeline.
+// A vendor's products for the admin compliance panel - just enough to
+// pick one to restrict/unrestrict, not the full catalogue-management view.
+exports.getVendorProductsAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            `SELECT id, name, image, status, is_active, admin_restricted, restricted_reason
+             FROM products WHERE vendor_id = $1 AND deleted_at IS NULL
+             ORDER BY name ASC`,
+            [id]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.getVendorComplianceHistory = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            `SELECT vca.id, vca.action_type, vca.reason, vca.product_id, vca.created_at,
+                    p.name AS product_name, u.name AS admin_name
+             FROM vendor_compliance_actions vca
+             LEFT JOIN products p ON p.id = vca.product_id
+             LEFT JOIN users u ON u.id = vca.created_by
+             WHERE vca.vendor_id = $1
+             ORDER BY vca.created_at DESC`,
+            [id]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// The vendor's own view of the same history - their "Notices" feed. Same
+// query, scoped to their own vendor_id instead of an admin-supplied id.
+exports.getMyComplianceNotices = async (req, res) => {
+    try {
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const result = await pool.query(
+            `SELECT vca.id, vca.action_type, vca.reason, vca.product_id, vca.created_at, p.name AS product_name
+             FROM vendor_compliance_actions vca
+             LEFT JOIN products p ON p.id = vca.product_id
+             WHERE vca.vendor_id = $1
+             ORDER BY vca.created_at DESC`,
+            [vendorRow.rows[0].id]
+        );
+        res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

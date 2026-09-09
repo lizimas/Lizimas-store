@@ -56,6 +56,8 @@ function setupVendorTabs() {
             if (button.dataset.tab === "returns") loadVendorReturns();
             if (button.dataset.tab === "refunds") loadVendorReturnsRefunds();
             if (button.dataset.tab === "wallet") loadVendorWallet();
+            if (button.dataset.tab === "reviews") loadVendorReviews();
+            if (button.dataset.tab === "account") loadVendorComplianceNotices();
         });
     });
 }
@@ -1317,6 +1319,140 @@ async function submitVendorReturnResponse(orderItemId) {
     } catch (error) {
         console.error("Submit vendor return response error:", error);
         alert("Could not connect to server.");
+    }
+}
+
+// --- Reviews (Task #63) --------------------------------------------------
+// Every review on the vendor's own products, with a public reply box.
+// Admin keeps the power to remove a review outright - this only replies.
+
+function vendorStarString(rating) {
+    const n = Number(rating) || 0;
+    return "&#9733;".repeat(n) + "&#9734;".repeat(5 - n);
+}
+
+async function loadVendorReviews() {
+    const box = document.getElementById("vendor-reviews-list");
+    if (!box) return;
+
+    try {
+        const rows = await vendorAuthorizedFetch("/api/vendors/reviews");
+        if (rows.error) {
+            box.innerHTML = `<p>${vendorEsc(rows.error)}</p>`;
+            return;
+        }
+        if (rows.length === 0) {
+            box.innerHTML = `<p class="no-data">No reviews yet.</p>`;
+            return;
+        }
+
+        box.innerHTML = rows.map(r => `
+            <div class="panel" style="border:1px solid #eee; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <strong>${vendorEsc(r.product_name)}</strong>
+                        <div style="color:#F59E0B; font-size:14px; margin-top:2px;">${vendorStarString(r.rating)}</div>
+                        <div style="font-size:12px; color:#888; margin-top:2px;">
+                            ${vendorEsc(r.reviewer_name)} ${r.verified_purchase ? "&middot; Verified purchase" : ""}
+                            &middot; ${new Date(r.created_at).toLocaleDateString()}
+                        </div>
+                    </div>
+                </div>
+                ${r.comment ? `<p style="font-size:13px; color:#333; margin-top:10px;">${vendorEsc(r.comment)}</p>` : ""}
+
+                <div style="margin-top:12px; border-top:1px solid #f0f0f0; padding-top:10px;">
+                    <label style="font-size:12px; font-weight:600; display:block; margin-bottom:6px;">Your public reply</label>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="vendor-review-response-${r.id}" placeholder="Reply to this review..." value="${r.vendor_response ? vendorEsc(r.vendor_response) : ""}" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:6px; font-size:13px;">
+                        <button onclick="submitVendorReviewResponse(${r.id})" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:8px 14px; cursor:pointer; font-size:13px;">Save</button>
+                    </div>
+                </div>
+            </div>
+        `).join("");
+    } catch (error) {
+        console.error("Load vendor reviews error:", error);
+        box.innerHTML = "<p>Could not connect to server.</p>";
+    }
+}
+
+async function submitVendorReviewResponse(reviewId) {
+    const input = document.getElementById(`vendor-review-response-${reviewId}`);
+    if (!input || !input.value.trim()) {
+        alert("Enter a reply first.");
+        return;
+    }
+    try {
+        const data = await vendorAuthorizedFetch(`/api/vendors/reviews/${reviewId}/response`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ response: input.value.trim() })
+        });
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        await loadVendorReviews();
+    } catch (error) {
+        console.error("Submit vendor review response error:", error);
+        alert("Could not connect to server.");
+    }
+}
+
+// --- Compliance notices (Task #63) --------------------------------------
+// Read-only history of admin actions on this vendor's account - warnings,
+// suspensions, product restrictions, payout freezes.
+
+const VENDOR_NOTICE_LABEL = {
+    warn: "Warning",
+    suspend: "Account suspended",
+    reinstate: "Account reinstated",
+    restrict_product: "Product restricted",
+    unrestrict_product: "Product restriction lifted",
+    freeze_payout: "Payouts frozen",
+    unfreeze_payout: "Payouts unfrozen"
+};
+const VENDOR_NOTICE_CLASS = {
+    warn: "status-pending",
+    suspend: "status-cancelled",
+    reinstate: "status-paid",
+    restrict_product: "status-cancelled",
+    unrestrict_product: "status-paid",
+    freeze_payout: "status-cancelled",
+    unfreeze_payout: "status-paid"
+};
+
+async function loadVendorComplianceNotices() {
+    const box = document.getElementById("vendor-compliance-notices");
+    if (!box) return;
+
+    try {
+        const rows = await vendorAuthorizedFetch("/api/vendors/compliance-notices");
+        if (rows.error) {
+            box.innerHTML = `<p>${vendorEsc(rows.error)}</p>`;
+            return;
+        }
+        if (rows.length === 0) {
+            box.innerHTML = `<p class="no-data">No notices on your account.</p>`;
+            return;
+        }
+
+        box.innerHTML = `
+            <table style="width:100%;">
+                <thead><tr><th>Date</th><th>Action</th><th>Details</th></tr></thead>
+                <tbody>
+                    ${rows.map(n => `
+                        <tr>
+                            <td data-label="Date">${new Date(n.created_at).toLocaleDateString()}</td>
+                            <td data-label="Action"><span class="status-badge ${VENDOR_NOTICE_CLASS[n.action_type] || ""}">${VENDOR_NOTICE_LABEL[n.action_type] || n.action_type}</span></td>
+                            <td data-label="Details">${vendorEsc(n.reason)}${n.product_name ? ` <span style="color:#888;">(${vendorEsc(n.product_name)})</span>` : ""}</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load vendor compliance notices error:", error);
+        box.innerHTML = "<p>Could not connect to server.</p>";
     }
 }
 

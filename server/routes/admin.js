@@ -45,7 +45,9 @@ const {
     rejectDeletionRequest,
     getTrash,
     restoreProduct,
-    permanentlyDeleteProduct
+    permanentlyDeleteProduct,
+    restrictVendorProduct,
+    unrestrictVendorProduct
 } = require("../controllers/productController");
 
 const { createStaffAccount, activateStaffAccount, blockStaffAccount, forcePasswordReset, logoutAllDevices, resetStaff2FA, getLoginHistory } = require("../controllers/authController");
@@ -70,13 +72,21 @@ const {
 } = require("../controllers/fulfilmentController");
 const {
     getPendingVendors,
+    getAllVendors,
     approveVendor,
     rejectVendor,
     getVendorPayoutRequests,
     markVendorPayoutPaid,
     rejectVendorPayout,
     createVendorLedgerAdjustment,
-    getVendorWalletAdmin
+    getVendorWalletAdmin,
+    warnVendor,
+    suspendVendor,
+    reinstateVendor,
+    freezeVendorPayouts,
+    unfreezeVendorPayouts,
+    getVendorComplianceHistory,
+    getVendorProductsAdmin
 } = require("../controllers/vendorController");
 
 const {
@@ -142,6 +152,8 @@ router.get("/staff/:id/login-history", getLoginHistory);
 router.get("/products/pending", getPendingProducts);
 router.patch("/products/:id/approve", approveProduct);
 router.patch("/products/:id/reject", rejectProduct);
+router.patch("/products/:id/restrict", restrictVendorProduct);
+router.patch("/products/:id/unrestrict", unrestrictVendorProduct);
 
 // Deletion requests (from Store Managers)
 router.get("/deletion-requests", getDeletionRequests);
@@ -167,6 +179,7 @@ router.post("/products/import", csvUpload.single("file"), require("../controller
 // Vendor fulfilment: drop-off points, handover inspection, returns collection
 // Vendor KYC review
 router.get("/vendors/pending", getPendingVendors);
+router.get("/vendors", getAllVendors);
 router.patch("/vendors/:id/approve", approveVendor);
 router.patch("/vendors/:id/reject", rejectVendor);
 
@@ -176,6 +189,15 @@ router.patch("/vendor-payouts/:id/paid", markVendorPayoutPaid);
 router.patch("/vendor-payouts/:id/reject", rejectVendorPayout);
 router.get("/vendors/:id/wallet", getVendorWalletAdmin);
 router.post("/vendors/:id/ledger-adjustments", createVendorLedgerAdjustment);
+
+// Admin compliance actions against a vendor (Task #63).
+router.post("/vendors/:id/warn", warnVendor);
+router.patch("/vendors/:id/suspend", suspendVendor);
+router.patch("/vendors/:id/reinstate", reinstateVendor);
+router.patch("/vendors/:id/freeze-payouts", freezeVendorPayouts);
+router.patch("/vendors/:id/unfreeze-payouts", unfreezeVendorPayouts);
+router.get("/vendors/:id/compliance-history", getVendorComplianceHistory);
+router.get("/vendors/:id/products", getVendorProductsAdmin);
 
 router.get("/dropoff-points", listDropoffPoints);
 router.post("/dropoff-points", createDropoffPoint);

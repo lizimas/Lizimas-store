@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Vendor Dashboard</title>
-<link rel="stylesheet" href="../css/admin.css?v=17">
+<link rel="stylesheet" href="../css/admin.css?v=18">
 </head>
 <body>
 
@@ -39,6 +39,9 @@
                     </button>
                     <button class="tab-btn" data-tab="wallet">
                         <span class="sidebar-icon">&#128176;</span> Wallet
+                    </button>
+                    <button class="tab-btn" data-tab="reviews">
+                        <span class="sidebar-icon">&#11088;</span> Reviews
                     </button>
                     <button class="tab-btn" data-tab="account">
                         <span class="sidebar-icon">&#9881;</span> Account
@@ -300,8 +303,20 @@
                     </div>
                 </section>
 
+                <section id="tab-reviews" class="tab-content hidden">
+                    <h2 class="admin-page-title">Reviews</h2>
+                    <p class="admin-page-subtitle">What customers are saying about your products. Your reply is public and shows right under the review.</p>
+                    <div class="panel">
+                        <div id="vendor-reviews-list">Loading...</div>
+                    </div>
+                </section>
+
                 <section id="tab-account" class="tab-content hidden">
                     <h2 class="admin-page-title">Account</h2>
+                    <div class="panel">
+                        <h3 style="margin:0 0 10px;">Notices</h3>
+                        <div id="vendor-compliance-notices">Loading...</div>
+                    </div>
                     <div class="panel">
                         <button onclick="vendorLogout()" style="background:#DC2626; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Log Out</button>
                     </div>
@@ -315,6 +330,6 @@
 
     <script src="../js/category-select.js?v=1"></script>
     <script src="../js/seller-panel.js?v=1"></script>
-    <script src="../js/vendor-dashboard.js?v=10"></script>
+    <script src="../js/vendor-dashboard.js?v=11"></script>
 </body>
 </html>

@@ -1665,6 +1665,7 @@ function setupTabs() {
                 loadPendingReturns();
                 loadPendingVendorPayouts();
                 loadPendingReturnRefunds();
+                loadVendorCompliancePanel();
             }
 
             if (button.dataset.tab === "team-messages") {
@@ -6034,6 +6035,241 @@ async function denyReturnRefundRequest(orderItemId) {
         loadPendingReturnRefunds();
     } catch (error) {
         console.error("Deny return refund error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+// --- Vendor Compliance (Task #63) ---------------------------------------
+// Warn/suspend/reinstate/freeze-payout/unfreeze-payout act on the vendor
+// account; restrict/unrestrict act on one of their products (fetched on
+// demand via "Products"). Every action is recorded to
+// vendor_compliance_actions, which the vendor also sees as a notice.
+
+let vendorComplianceCache = [];
+let vendorComplianceOpenProductsId = null;
+
+async function loadVendorCompliancePanel() {
+    try {
+        vendorComplianceCache = await authorizedFetch("/api/admin/vendors");
+        renderVendorCompliancePanel();
+    } catch (error) {
+        console.error("Load vendor compliance panel error:", error);
+    }
+}
+
+function renderVendorCompliancePanel() {
+    const container = document.getElementById("vendor-compliance-list");
+    if (!container) return;
+
+    if (!vendorComplianceCache || vendorComplianceCache.length === 0) {
+        container.innerHTML = `<p class="no-data">No vendors yet.</p>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <table>
+            <thead><tr><th>Business</th><th>Owner</th><th>Status</th><th>Payouts</th><th>Actions</th></tr></thead>
+            <tbody>
+                ${vendorComplianceCache.map(v => `
+                    <tr>
+                        <td data-label="Business">${v.business_name}</td>
+                        <td data-label="Owner">${v.owner_name}<br><span style="color:#888; font-size:12px;">${v.owner_email}</span></td>
+                        <td data-label="Status"><span class="status-badge ${v.status === "suspended" ? "status-cancelled" : "status-paid"}">${v.status}</span></td>
+                        <td data-label="Payouts">${v.payout_frozen ? `<span class="status-badge status-cancelled">Frozen</span>` : `<span class="status-badge status-paid">Active</span>`}</td>
+                        <td data-label="Actions">
+                            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                <button onclick="warnVendorAccount(${v.id})" style="background:#fff; color:#B45309; border:1px solid #B45309; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">Warn</button>
+                                ${v.status === "suspended"
+                                    ? `<button onclick="reinstateVendorAccount(${v.id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">Reinstate</button>`
+                                    : `<button onclick="suspendVendorAccount(${v.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">Suspend</button>`}
+                                ${v.payout_frozen
+                                    ? `<button onclick="unfreezeVendorAccountPayouts(${v.id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">Unfreeze Payouts</button>`
+                                    : `<button onclick="freezeVendorAccountPayouts(${v.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">Freeze Payouts</button>`}
+                                <button onclick="toggleVendorComplianceProducts(${v.id})" style="background:#fff; color:#1a1a2e; border:1px solid #1a1a2e; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">Products</button>
+                                <button onclick="viewVendorComplianceHistory(${v.id})" style="background:#fff; color:#1a1a2e; border:1px solid #1a1a2e; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">History</button>
+                            </div>
+                            ${vendorComplianceOpenProductsId === v.id ? `<div id="vendor-compliance-products-${v.id}" style="margin-top:10px;">Loading...</div>` : ""}
+                        </td>
+                    </tr>
+                `).join("")}
+            </tbody>
+        </table>
+    `;
+
+    if (vendorComplianceOpenProductsId !== null) {
+        loadVendorComplianceProducts(vendorComplianceOpenProductsId);
+    }
+}
+
+async function warnVendorAccount(vendorId) {
+    const reason = prompt("Reason for this warning (shown to the vendor):");
+    if (!reason) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/vendors/${vendorId}/warn`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ reason })
+        });
+        alert("Warning recorded.");
+    } catch (error) {
+        console.error("Warn vendor error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function suspendVendorAccount(vendorId) {
+    const reason = prompt("Reason for suspending this vendor:");
+    if (!reason) return;
+    if (!confirm("Suspend this vendor? Their storefront page will stop working immediately.")) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/vendors/${vendorId}/suspend`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ reason })
+        });
+        loadVendorCompliancePanel();
+    } catch (error) {
+        console.error("Suspend vendor error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function reinstateVendorAccount(vendorId) {
+    if (!confirm("Reinstate this vendor?")) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/vendors/${vendorId}/reinstate`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        loadVendorCompliancePanel();
+    } catch (error) {
+        console.error("Reinstate vendor error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function freezeVendorAccountPayouts(vendorId) {
+    const reason = prompt("Reason for freezing this vendor's payouts:");
+    if (!reason) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/vendors/${vendorId}/freeze-payouts`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ reason })
+        });
+        loadVendorCompliancePanel();
+    } catch (error) {
+        console.error("Freeze vendor payouts error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function unfreezeVendorAccountPayouts(vendorId) {
+    if (!confirm("Unfreeze payouts for this vendor?")) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/vendors/${vendorId}/unfreeze-payouts`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        loadVendorCompliancePanel();
+    } catch (error) {
+        console.error("Unfreeze vendor payouts error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+function toggleVendorComplianceProducts(vendorId) {
+    vendorComplianceOpenProductsId = vendorComplianceOpenProductsId === vendorId ? null : vendorId;
+    renderVendorCompliancePanel();
+}
+
+async function loadVendorComplianceProducts(vendorId) {
+    const box = document.getElementById(`vendor-compliance-products-${vendorId}`);
+    if (!box) return;
+    try {
+        const products = await authorizedFetch(`/api/admin/vendors/${vendorId}/products`);
+        if (!products || products.length === 0) {
+            box.innerHTML = `<p class="no-data">No products.</p>`;
+            return;
+        }
+        box.innerHTML = `
+            <table>
+                <thead><tr><th>Product</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody>
+                    ${products.map(p => `
+                        <tr>
+                            <td data-label="Product">${p.name}</td>
+                            <td data-label="Status">
+                                ${p.admin_restricted
+                                    ? `<span class="status-badge status-cancelled">Restricted</span>${p.restricted_reason ? ` <span style="color:#888; font-size:12px;">${p.restricted_reason}</span>` : ""}`
+                                    : `<span class="status-badge status-paid">${p.status}</span>`}
+                            </td>
+                            <td data-label="Action">
+                                ${p.admin_restricted
+                                    ? `<button onclick="unrestrictAdminProduct(${p.id}, ${vendorId})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">Lift Restriction</button>`
+                                    : `<button onclick="restrictAdminProduct(${p.id}, ${vendorId})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">Restrict</button>`}
+                            </td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load vendor compliance products error:", error);
+        box.innerHTML = "<p>Could not connect to server.</p>";
+    }
+}
+
+async function restrictAdminProduct(productId, vendorId) {
+    const reason = prompt("Reason for restricting this product (shown to the vendor):");
+    if (!reason) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/products/${productId}/restrict`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ reason })
+        });
+        loadVendorComplianceProducts(vendorId);
+    } catch (error) {
+        console.error("Restrict product error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function unrestrictAdminProduct(productId, vendorId) {
+    if (!confirm("Lift this product's restriction?")) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/products/${productId}/unrestrict`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        loadVendorComplianceProducts(vendorId);
+    } catch (error) {
+        console.error("Unrestrict product error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function viewVendorComplianceHistory(vendorId) {
+    try {
+        const rows = await authorizedFetch(`/api/admin/vendors/${vendorId}/compliance-history`);
+        if (!rows || rows.length === 0) {
+            alert("No compliance actions recorded for this vendor.");
+            return;
+        }
+        const lines = rows.map(r =>
+            `${new Date(r.created_at).toLocaleDateString()} - ${r.action_type}${r.product_name ? ` (${r.product_name})` : ""}: ${r.reason} [${r.admin_name || "unknown admin"}]`
+        );
+        alert(lines.join("\n"));
+    } catch (error) {
+        console.error("View vendor compliance history error:", error);
         alert("Something went wrong.");
     }
 }
