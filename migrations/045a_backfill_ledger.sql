@@ -47,6 +47,7 @@ INSERT INTO schema_migrations (filename, note) VALUES
   ('044_payments.sql', 'backfilled 2026-08-28; applied_at is record time, not actual application date'),
   ('044a_rename_legacy_payments.sql', 'backfilled 2026-08-28; applied_at is record time, not actual application date'),
   ('044b_payment_events_triggers.sql', 'backfilled 2026-08-28; applied_at is record time, not actual application date'),
-  ('045_schema_migrations.sql', 'backfilled 2026-08-28; applied_at is record time, not actual application date')
+  ('045_schema_migrations.sql', 'backfilled 2026-08-28; applied_at is record time, not actual application date'),
+  ('045a_backfill_ledger.sql', 'self-record so the runner does not treat this file as perpetually pending')
 ON CONFLICT (filename) DO NOTHING;
 COMMIT;

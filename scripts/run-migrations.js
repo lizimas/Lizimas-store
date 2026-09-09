@@ -1,29 +1,51 @@
 #!/usr/bin/env node
 /**
- * Applies one or more .sql migration files against DATABASE_URL, in the
- * order given on the command line. Each file is expected to wrap itself in
- * BEGIN...COMMIT and end with its own schema_migrations ledger insert (the
- * project's existing migration convention), so this script just runs the
- * file contents as-is and stops at the first failure.
+ * Applies pending .sql migrations against DATABASE_URL.
  *
- *   DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/049_vendors.sql migrations/050_products_vendor_id.sql
+ * With no arguments, discovers every migrations/*.sql file, sorts them
+ * numerically by filename, skips any already recorded in schema_migrations,
+ * and applies the rest in order. With explicit filenames, applies exactly
+ * those (still skipping already-applied ones unless --force is passed).
  *
- * On Render, use the shell there instead; locally/on a laptop, export
- * RENDER_DB with the production connection string first and pass it as
- * DATABASE_URL, exactly like scripts/unlock-admin.js does.
+ * Each file wraps itself in BEGIN...COMMIT and ends with its own
+ * schema_migrations ledger insert, so this script runs file contents as-is
+ * and stops at the first failure.
+ *
+ *   DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js --dry-run
+ *   DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js
  */
-
 const fs = require("fs");
 const path = require("path");
 const { Pool } = require("pg");
 
-async function main() {
-    const files = process.argv.slice(2);
+const MIGRATIONS_DIR = path.resolve(__dirname, "..", "migrations");
 
-    if (files.length === 0) {
-        console.error("Usage: node scripts/run-migrations.js <file1.sql> [file2.sql ...]");
-        process.exit(1);
+async function appliedFilenames(pool) {
+    try {
+        const { rows } = await pool.query("SELECT filename FROM schema_migrations");
+        return new Set(rows.map((r) => r.filename));
+    } catch (error) {
+        if (error.code === "42P01") {
+            console.log("schema_migrations does not exist yet - treating all migrations as pending.");
+            return new Set();
+        }
+        throw error;
     }
+}
+
+function discoverMigrations() {
+    return fs
+        .readdirSync(MIGRATIONS_DIR)
+        .filter((f) => f.endsWith(".sql"))
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+        .map((f) => path.join("migrations", f));
+}
+
+async function main() {
+    const args = process.argv.slice(2);
+    const dryRun = args.includes("--dry-run");
+    const force = args.includes("--force");
+    const explicit = args.filter((a) => !a.startsWith("--"));
 
     if (!process.env.DATABASE_URL) {
         console.error("DATABASE_URL is not set. Export RENDER_DB and pass it as DATABASE_URL.");
@@ -39,15 +61,39 @@ async function main() {
         ssl: useSSL ? { rejectUnauthorized: false } : false
     });
 
-    for (const file of files) {
+    const done = force ? new Set() : await appliedFilenames(pool);
+    const candidates = explicit.length > 0 ? explicit : discoverMigrations();
+    const pending = candidates.filter((f) => !done.has(path.basename(f)));
+
+    if (pending.length === 0) {
+        console.log("No pending migrations. Database is up to date.");
+        await pool.end();
+        return;
+    }
+
+    console.log(pending.length + " pending migration(s):");
+    pending.forEach((f) => console.log("  " + path.basename(f)));
+
+    if (dryRun) {
+        console.log("\n--dry-run: nothing applied.");
+        await pool.end();
+        return;
+    }
+
+    for (const file of pending) {
         const fullPath = path.resolve(file);
-        console.log(`\n--- Applying ${file} ---`);
+        console.log("\n--- Applying " + path.basename(file) + " ---");
         const sql = fs.readFileSync(fullPath, "utf8");
+
+        if (!sql.includes("BEGIN")) {
+            console.warn("  WARNING: " + path.basename(file) + " is not wrapped in a transaction - a partial failure will leave the schema and ledger out of sync.");
+        }
+
         try {
             await pool.query(sql);
-            console.log(`OK: ${file}`);
+            console.log("OK: " + path.basename(file));
         } catch (error) {
-            console.error(`FAILED: ${file}`);
+            console.error("FAILED: " + path.basename(file));
             console.error(error.message);
             await pool.end();
             process.exit(1);
