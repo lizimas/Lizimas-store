@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Returns & Refunds Center (Task #62).
 --
 -- Builds on the reverse-logistics tracking migration 052 already put on
@@ -46,3 +48,5 @@ VALUES (
     'order_items gains return_evidence_image, refund_decision/amount/notes, and vendor_response - the financial/decision side of returns that migration 052''s physical-logistics tracking did not cover.'
 )
 ON CONFLICT (filename) DO NOTHING;
+
+COMMIT;

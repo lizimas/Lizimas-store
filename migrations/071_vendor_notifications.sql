@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Vendor Notifications (Task #65).
 --
 -- A structured, in-dashboard notification feed: new order, low stock,
@@ -35,3 +37,5 @@ VALUES (
     'vendor_notifications: structured in-dashboard feed (new order, low stock, product approved/rejected, compliance action, payout update).'
 )
 ON CONFLICT (filename) DO NOTHING;
+
+COMMIT;

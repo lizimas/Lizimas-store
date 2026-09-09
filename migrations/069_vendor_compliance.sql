@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Vendor reviews view + admin compliance actions (Task #63).
 --
 -- Two unrelated but similarly-shaped pieces sharing one migration:
@@ -54,3 +56,5 @@ VALUES (
     'product_reviews.vendor_response; vendors.payout_frozen; products.admin_restricted/restricted_reason; vendor_compliance_actions audit+notice table.'
 )
 ON CONFLICT (filename) DO NOTHING;
+
+COMMIT;

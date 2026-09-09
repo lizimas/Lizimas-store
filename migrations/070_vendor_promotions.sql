@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Vendor Promotions: propose, admin-approved (Task #64).
 --
 -- A vendor proposes a time-boxed sale price on one of their own products;
@@ -49,3 +51,5 @@ VALUES (
     'vendor_promotions: vendor-proposed sale price on their own product, admin approve/reject, admin-controlled homepage_featured (materializes into flash_sale_items) and sponsored flag.'
 )
 ON CONFLICT (filename) DO NOTHING;
+
+COMMIT;

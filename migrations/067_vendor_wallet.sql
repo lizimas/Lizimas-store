@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Vendor Wallet & Payouts (Task #61).
 --
 -- The wallet BALANCE itself is not stored anywhere - it is derived on each
@@ -49,3 +51,5 @@ VALUES (
     'vendor_payouts and vendor_ledger_adjustments: the only two wallet facts that cannot be derived from order_items - money actually paid out, and manual admin adjustments.'
 )
 ON CONFLICT (filename) DO NOTHING;
+
+COMMIT;
