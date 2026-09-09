@@ -51,6 +51,11 @@ async function renderSellerPanel(container, { vendor, sellerScore, followerCount
     const visitLink = options.showVisitLink
         ? `<a href="/store/${spEscape(vendor.slug)}" class="seller-visit-link">Visit Store</a>`
         : "";
+    // A vendor viewing their OWN score on their own dashboard has no
+    // business "following" themselves - just show the follower count.
+    const followControl = options.hideFollow
+        ? ""
+        : `<button type="button" class="seller-follow-btn" id="seller-follow-btn">Follow</button>`;
 
     const performanceHtml = sellerScore && !sellerScore.isNew
         ? `<ul class="seller-performance-list">
@@ -68,13 +73,14 @@ async function renderSellerPanel(container, { vendor, sellerScore, followerCount
         </div>
         <div class="seller-panel-meta">
             <span class="seller-followers" id="seller-follower-count">${Number(followerCount || 0).toLocaleString()} Followers</span>
-            <button type="button" class="seller-follow-btn" id="seller-follow-btn">Follow</button>
+            ${followControl}
             ${visitLink}
         </div>
         ${performanceHtml}
     `;
 
     const followBtn = container.querySelector("#seller-follow-btn");
+    if (!followBtn) return; // hideFollow: nothing left to wire up
     const followerCountEl = container.querySelector("#seller-follower-count");
     let isFollowing = await spCheckFollowing(vendor.id);
     if (isFollowing) {

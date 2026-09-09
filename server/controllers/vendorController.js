@@ -104,6 +104,96 @@ exports.updateMyVendorProfile = async (req, res) => {
 // Data Protection Policy, a vendor's fulfilment role ends at handover to
 // Lizimas Store, which owns the customer delivery step from there. A vendor
 // only needs to know what to prepare and how many, not who it's going to.
+// The vendor dashboard's "command center" numbers: order counts by stage,
+// an earnings summary, product/low-stock counts, and the vendor's own
+// seller score (previously only shown on the public storefront/product
+// page). Earnings are shown as Sale / Marketplace charges / Net payable -
+// currency amounts only, never a rate or percentage, per the "sellers must
+// never see the commission %" rule (Ryan, Sept 2026).
+//
+// The charges figure uses each product's CURRENT commission_rate_applied/
+// fixed_fee_applied rather than a rate locked at order time, because order-
+// time commission locking isn't wired up yet (see PENDING.md) - this is an
+// approximation inherited from that same known limitation, not a new one.
+exports.getVendorDashboardSummary = async (req, res) => {
+    try {
+        const vendorRow = await pool.query("SELECT id, business_name, slug FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendorId = vendorRow.rows[0].id;
+
+        const [ordersRes, earningsRes, productsRes, sellerScore, followerRes] = await Promise.all([
+            pool.query(
+                `SELECT
+                    COUNT(DISTINCT o.id) FILTER (WHERE o.created_at::date = CURRENT_DATE) AS today_orders,
+                    COUNT(*) FILTER (WHERE o.status != 'cancelled' AND (oi.handover_status IS NULL OR oi.handover_status = 'pending_handover')) AS pending_handover,
+                    COUNT(*) FILTER (WHERE o.status IN ('paid', 'shipped')) AS awaiting_delivery,
+                    COUNT(*) FILTER (WHERE o.status = 'delivered') AS completed,
+                    COUNT(*) FILTER (WHERE o.status = 'cancelled') AS cancelled,
+                    COUNT(*) FILTER (WHERE oi.handover_status IN ('returned_for_collection', 'collected')) AS active_returns
+                 FROM order_items oi
+                 JOIN orders o ON o.id = oi.order_id
+                 JOIN products p ON p.id = oi.product_id
+                 WHERE p.vendor_id = $1`,
+                [vendorId]
+            ),
+            pool.query(
+                `SELECT
+                    COALESCE(SUM(oi.price * oi.quantity), 0) AS sale_total,
+                    COALESCE(SUM(
+                        CASE WHEN p.commission_rate_applied IS NOT NULL
+                            THEN (oi.price * oi.quantity) * p.commission_rate_applied + COALESCE(p.fixed_fee_applied, 0) * oi.quantity
+                            ELSE 0
+                        END
+                    ), 0) AS charges_total
+                 FROM order_items oi
+                 JOIN orders o ON o.id = oi.order_id
+                 JOIN products p ON p.id = oi.product_id
+                 WHERE p.vendor_id = $1 AND o.status = 'delivered'`,
+                [vendorId]
+            ),
+            pool.query(
+                `SELECT
+                    COUNT(*) AS total,
+                    COUNT(*) FILTER (WHERE stock < 10 AND status = 'approved') AS low_stock
+                 FROM products WHERE vendor_id = $1 AND deleted_at IS NULL`,
+                [vendorId]
+            ),
+            computeSellerScore(vendorId),
+            pool.query(`SELECT COUNT(*)::int AS n FROM vendor_followers WHERE vendor_id = $1`, [vendorId])
+        ]);
+
+        const saleTotal = Number(earningsRes.rows[0].sale_total);
+        const chargesTotal = Number(earningsRes.rows[0].charges_total);
+
+        res.json({
+            vendor: vendorRow.rows[0],
+            followerCount: followerRes.rows[0].n,
+            orders: {
+                today: Number(ordersRes.rows[0].today_orders),
+                pendingHandover: Number(ordersRes.rows[0].pending_handover),
+                awaitingDelivery: Number(ordersRes.rows[0].awaiting_delivery),
+                completed: Number(ordersRes.rows[0].completed),
+                cancelled: Number(ordersRes.rows[0].cancelled),
+                activeReturns: Number(ordersRes.rows[0].active_returns)
+            },
+            earnings: {
+                sale: saleTotal,
+                charges: chargesTotal,
+                net: saleTotal - chargesTotal
+            },
+            products: {
+                total: Number(productsRes.rows[0].total),
+                lowStock: Number(productsRes.rows[0].low_stock)
+            },
+            sellerScore
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 exports.getMyVendorOrders = async (req, res) => {
     try {
         const vendorRow = await pool.query(

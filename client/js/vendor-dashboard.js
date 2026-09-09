@@ -635,6 +635,57 @@ async function loadVendorPromotions() {
     box.innerHTML = html;
 }
 
+// --- Dashboard summary (Store Snapshot / Earnings / Seller Score) --------
+
+function vendorKpiCard(label, value, warning) {
+    return `<div class="stat-card${warning ? " warning" : ""}"><div class="label">${label}</div><div class="value">${value}</div></div>`;
+}
+
+function vendorFmtUgxAmount(n) {
+    return "UGX " + Number(n || 0).toLocaleString();
+}
+
+async function loadVendorDashboardSummary() {
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/dashboard-summary");
+        if (data.error) return;
+
+        const o = data.orders;
+        document.getElementById("vendor-kpi-grid").innerHTML = [
+            vendorKpiCard("Today's Orders", o.today),
+            vendorKpiCard("Pending Handover", o.pendingHandover, o.pendingHandover > 0),
+            vendorKpiCard("Awaiting Delivery", o.awaitingDelivery),
+            vendorKpiCard("Completed", o.completed),
+            vendorKpiCard("Cancelled", o.cancelled),
+            vendorKpiCard("Active Returns", o.activeReturns, o.activeReturns > 0),
+            vendorKpiCard("Products", data.products.total),
+            vendorKpiCard("Low Stock", data.products.lowStock, data.products.lowStock > 0)
+        ].join("");
+
+        // Deliberately currency amounts only, never a rate or percentage -
+        // sellers must never see the commission % (Ryan, Sept 2026).
+        const e = data.earnings;
+        document.getElementById("vendor-earnings-summary").innerHTML = `
+            <div style="display:flex; gap:24px; flex-wrap:wrap; margin-top:6px;">
+                <div><div style="font-size:12px; color:#888;">Sale</div><div style="font-size:20px; font-weight:700; color:#1a1a2e;">${vendorFmtUgxAmount(e.sale)}</div></div>
+                <div><div style="font-size:12px; color:#888;">Marketplace charges</div><div style="font-size:20px; font-weight:700; color:#B45309;">- ${vendorFmtUgxAmount(e.charges)}</div></div>
+                <div><div style="font-size:12px; color:#888;">Net payable</div><div style="font-size:20px; font-weight:700; color:#166534;">${vendorFmtUgxAmount(e.net)}</div></div>
+            </div>
+        `;
+
+        const scoreContainer = document.getElementById("vendor-seller-score-container");
+        if (scoreContainer && data.vendor) {
+            await renderSellerPanel(scoreContainer, {
+                vendor: data.vendor,
+                sellerScore: data.sellerScore,
+                followerCount: data.followerCount
+            }, { showVisitLink: true, hideFollow: true });
+        }
+    } catch (error) {
+        console.error("Load vendor dashboard summary error:", error);
+    }
+}
+
 // --- Init -----------------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -644,6 +695,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     setupVendorTabs();
     loadVendorStatus();
+    loadVendorDashboardSummary();
     loadVendorCategories();
     loadVendorPromotions();
 });
