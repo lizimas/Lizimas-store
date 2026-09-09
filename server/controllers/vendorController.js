@@ -203,3 +203,34 @@ exports.rejectVendor = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+// Public storefront (spec section 17): anyone can view an approved vendor's
+// page and their live catalogue, no auth required. A pending/rejected/
+// suspended vendor has no public page - the slug 404s exactly like a vendor
+// that doesn't exist, rather than leaking review status to shoppers.
+exports.getPublicStorefront = async (req, res) => {
+    try {
+        const { slug } = req.params;
+
+        const vendorResult = await pool.query(
+            `SELECT id, business_name, slug, logo_url, banner_url, about
+             FROM vendors WHERE slug = $1 AND status = 'approved' LIMIT 1`,
+            [slug]
+        );
+        if (vendorResult.rows.length === 0) {
+            return res.status(404).json({ error: "Store not found." });
+        }
+        const vendor = vendorResult.rows[0];
+
+        const productsResult = await pool.query(
+            `SELECT id, name, price, image, stock, public_code
+             FROM products
+             WHERE vendor_id = $1 AND status = 'approved' AND deleted_at IS NULL
+             ORDER BY created_at DESC`,
+            [vendor.id]
+        );
+
+        res.json({ vendor, products: productsResult.rows });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};

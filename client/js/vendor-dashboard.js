@@ -230,8 +230,9 @@ function resetVendorProductForm() {
     document.getElementById("product-id").value = "";
     document.getElementById("product-name").value = "";
     document.getElementById("product-description").value = "";
-    document.getElementById("product-price").value = "";
+    document.getElementById("product-payout").value = "";
     document.getElementById("product-stock").value = "";
+    hideVendorPricingPreview();
     document.getElementById("product-package-size").value = "Small";
     document.getElementById("product-warranty-months").value = "";
     document.getElementById("product-brand").value = "";
@@ -241,6 +242,63 @@ function resetVendorProductForm() {
     document.getElementById("product-authenticity-confirm").checked = false;
     document.getElementById("product-submit-btn").textContent = "Submit for Approval";
     document.getElementById("product-form-status").textContent = "";
+}
+
+// --- Live pricing preview --------------------------------------------------
+// "Vendors enter what they want to earn. Lizimas calculates what the
+// customer pays" (spec section 83) - this just shows the vendor that math
+// as they type, using the same POST /api/vendors/pricing/preview endpoint
+// the submit itself relies on server-side (client math is display-only;
+// the server always recomputes it on save).
+
+let vendorPricingPreviewTimer = null;
+
+function hideVendorPricingPreview() {
+    document.getElementById("pricing-preview").style.display = "none";
+    document.getElementById("pricing-preview-error").style.display = "none";
+}
+
+function scheduleVendorPricingPreview() {
+    clearTimeout(vendorPricingPreviewTimer);
+    vendorPricingPreviewTimer = setTimeout(updateVendorPricingPreview, 400);
+}
+
+async function updateVendorPricingPreview() {
+    const payoutRaw = document.getElementById("product-payout").value;
+    const categoryId = document.getElementById("product-category").value;
+    const previewEl = document.getElementById("pricing-preview");
+    const errorEl = document.getElementById("pricing-preview-error");
+
+    const payout = Number(payoutRaw);
+    if (!payoutRaw || !(payout > 0)) {
+        hideVendorPricingPreview();
+        return;
+    }
+
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/pricing/preview", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ desired_payout: payout, category_id: categoryId || null })
+        });
+
+        if (result.error) {
+            errorEl.textContent = result.error;
+            errorEl.style.display = "block";
+            previewEl.style.display = "none";
+            return;
+        }
+
+        document.getElementById("preview-rate").textContent = (result.commissionRate * 100).toFixed(1).replace(/\.0$/, "");
+        document.getElementById("preview-commission").textContent = Number(result.commissionAmount).toLocaleString();
+        document.getElementById("preview-customer-price").textContent = Number(result.customerPrice).toLocaleString();
+        document.getElementById("preview-payout").textContent = Number(result.vendorPayout).toLocaleString();
+        previewEl.style.display = "block";
+        errorEl.style.display = "none";
+    } catch (error) {
+        console.error("Pricing preview error:", error);
+        hideVendorPricingPreview();
+    }
 }
 
 async function editVendorProduct(id) {
@@ -257,7 +315,10 @@ async function editVendorProduct(id) {
     document.getElementById("product-id").value = product.id;
     document.getElementById("product-name").value = product.name || "";
     document.getElementById("product-description").value = product.description || "";
-    document.getElementById("product-price").value = product.price || "";
+    // Older listings (added before the commission engine) never recorded
+    // vendor_desired_payout - fall back to the current price so the field
+    // isn't blank, though re-saving will recompute it from that number.
+    document.getElementById("product-payout").value = product.vendor_desired_payout || product.price || "";
     document.getElementById("product-stock").value = product.stock || "";
     document.getElementById("product-package-size").value = product.package_size || "Small";
     document.getElementById("product-warranty-months").value = product.warranty_months || "";
@@ -269,6 +330,7 @@ async function editVendorProduct(id) {
     if (categorySelect) categorySelect.innerHTML = buildGroupedCategoryOptions(staffCategories, product.category_id);
     document.getElementById("product-submit-btn").textContent = "Save Changes";
     document.getElementById("product-form-status").textContent = "Editing an approved product returns it to pending review.";
+    scheduleVendorPricingPreview();
 }
 
 async function deleteVendorProduct(id) {
@@ -296,7 +358,7 @@ async function submitVendorProductForm() {
     const name = document.getElementById("product-name").value.trim();
     const category_id = document.getElementById("product-category").value;
     const description = document.getElementById("product-description").value.trim();
-    const price = document.getElementById("product-price").value;
+    const desiredPayout = document.getElementById("product-payout").value;
     const stock = document.getElementById("product-stock").value;
     const packageSize = document.getElementById("product-package-size").value;
     const warrantyMonths = document.getElementById("product-warranty-months").value.trim();
@@ -307,8 +369,8 @@ async function submitVendorProductForm() {
     const statusEl = document.getElementById("product-form-status");
     const submitBtn = document.getElementById("product-submit-btn");
 
-    if (!name || !price || !stock) {
-        statusEl.textContent = "Name, price, and stock are required.";
+    if (!name || !desiredPayout || !stock) {
+        statusEl.textContent = "Name, payout, and stock are required.";
         return;
     }
 
@@ -324,7 +386,7 @@ async function submitVendorProductForm() {
     formData.append("name", name);
     formData.append("category_id", category_id);
     formData.append("description", description);
-    formData.append("price", price);
+    formData.append("desired_payout", desiredPayout);
     formData.append("stock", stock);
     formData.append("package_size", packageSize);
     formData.append("warranty_months", warrantyMonths);

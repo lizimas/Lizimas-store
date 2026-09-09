@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vendor Store | Lizimas Store</title>
+<meta name="description" content="Shop this vendor's products on Lizimas Store, with fast delivery across Uganda and Mobile Money payment options.">
+<link rel="stylesheet" href="/css/style.css?v=68">
+</head>
+<body>
+
+<div class="store-topbar">
+    <button class="store-back-btn" onclick="window.location.href='/index.html'">&larr;</button>
+    <a href="/cart.html" class="store-cart-btn">
+        🛒 <span id="pd-cart-count" class="js-cart-count">0</span>
+    </a>
+</div>
+
+<div id="store-content" hidden>
+    <div class="store-banner" id="store-banner"></div>
+
+    <div class="store-header">
+        <img id="store-logo-img" class="store-logo" alt="" hidden>
+        <div id="store-logo-fallback" class="store-logo-fallback" hidden></div>
+        <div class="store-identity">
+            <h1 class="store-name" id="store-name"></h1>
+            <p class="store-tagline">On Lizimas Store</p>
+        </div>
+    </div>
+
+    <p class="store-about" id="store-about" hidden></p>
+
+    <h2 class="store-section-title">Products</h2>
+    <div id="store-products-container" class="container"></div>
+</div>
+
+<div id="store-not-found" class="store-not-found" hidden>
+    <h1>Store not found</h1>
+    <p>This vendor page doesn't exist, or is no longer available.</p>
+    <p><a href="/index.html">Return to Lizimas Store</a></p>
+</div>
+
+<footer class="site-footer">
+<div class="container footer-container">
+<div>
+<h3>Lizimas Store</h3>
+<p>Your trusted online shopping partner.</p>
+</div>
+<div>
+<h4>Help &amp; Support</h4>
+<p><a href="/faq.html">FAQ</a></p>
+<p><a href="/help.html">Help Centre</a></p>
+<p><a href="/contact.html">Contact Us</a></p>
+</div>
+<div>
+<h4>Legal &amp; Privacy</h4>
+<p><a href="/privacy.html">Privacy Policy</a></p>
+<p><a href="/terms.html">Terms of Service</a></p>
+</div>
+</div>
+<div class="copyright">
+&copy; 2026 Lizimas Store
+</div>
+</footer>
+
+<script src="/js/api.js?v=1"></script>
+<script src="/js/cart.js?v=7"></script>
+<script src="/js/store.js?v=1"></script>
+
+</body>
+</html>

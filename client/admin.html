@@ -354,9 +354,41 @@
 
                 <section id="tab-categories" class="tab-content hidden">
                     <h2 class="admin-page-title">Categories</h2>
+
+                    <div class="panel" id="commission-default-panel">
+                        <h3>Commission Engine — marketplace default</h3>
+                        <p class="promo-hint">Applies to any category (and its subcategories) that has no rate of
+                           its own set below. A vendor never sees or chooses this - they enter what they want to
+                           earn, and this rate is what turns that into the customer-facing price.</p>
+                        <div class="field-row">
+                            <input type="number" id="commission-default-rate" placeholder="Rate % (e.g. 15)" step="0.1" min="0" max="99">
+                            <input type="number" id="commission-default-fee" placeholder="Fixed fee (UGX, optional)" min="0">
+                        </div>
+                        <p id="commission-default-current" class="promo-hint"></p>
+                        <p id="commission-default-error" class="form-error"></p>
+                        <div class="form-actions">
+                            <button class="save-btn" onclick="saveDefaultCommissionRate()">Save Default Rate</button>
+                        </div>
+                    </div>
+
                     <input type="text" id="category-search-input" class="product-search-input" placeholder="Search categories..." oninput="renderCategoriesTable()">
 
                     <button class="add-btn" onclick="openCategoryForm()">+ Add Category</button>
+
+                    <div id="commission-form-container" class="hidden panel">
+                        <h3>Set Commission Rate</h3>
+                        <p id="commission-form-category-name" class="promo-hint"></p>
+                        <input type="hidden" id="commission-category-id">
+                        <div class="field-row">
+                            <input type="number" id="commission-rate-input" placeholder="Rate % (e.g. 15)" step="0.1" min="0" max="99">
+                            <input type="number" id="commission-fee-input" placeholder="Fixed fee (UGX, optional)" min="0">
+                        </div>
+                        <p id="commission-form-error" class="form-error"></p>
+                        <div class="form-actions">
+                            <button class="save-btn" onclick="saveCommissionRate()">Save Rate</button>
+                            <button class="cancel-btn" onclick="closeCommissionForm()">Cancel</button>
+                        </div>
+                    </div>
 
                     <div id="category-form-container" class="hidden panel">
                         <h3 id="category-form-title">Add Category</h3>
@@ -399,6 +431,7 @@
                                     <th>Products</th>
                                     <th>Order</th>
                                     <th>Status</th>
+                                    <th>Commission</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -1041,7 +1074,7 @@
 <script src="js/description-block-editor.js?v=13"></script>
 <script src="js/category-select.js?v=2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
-<script src="js/admin.js?v=56"></script>
+<script src="js/admin.js?v=57"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

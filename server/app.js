@@ -83,6 +83,7 @@ app.use("/api", routes);
 app.use("/", require("./routes/sitemap"));
 app.use("/", require("./routes/receipt"));
 app.use("/", require("./routes/product-page"));
+app.use("/", require("./routes/store-page"));
 app.use("/", require("./routes/feed"));
 
 // Static files

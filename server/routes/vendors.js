@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const { registerVendor, vendorLogin } = require("../controllers/authController");
-const { getMyVendorProfile, getMyVendorOrders, updateMyVendorProfile } = require("../controllers/vendorController");
+const { getMyVendorProfile, getMyVendorOrders, updateMyVendorProfile, getPublicStorefront } = require("../controllers/vendorController");
 const {
     addProduct,
     updateProduct,
@@ -23,6 +23,8 @@ const {
     getMyReturns
 } = require("../controllers/fulfilmentController");
 
+const { previewPricing } = require("../controllers/commissionController");
+
 const { requireAuth, requireVendor } = require("../middleware/authMiddleware");
 const upload = require("../middleware/upload");
 
@@ -31,6 +33,11 @@ const upload = require("../middleware/upload");
 // portal below decides what a pending/rejected vendor is allowed to do.
 router.post("/register", registerVendor);
 router.post("/login", vendorLogin);
+
+// Public storefront (spec section 17) - a shopper's view of one vendor's
+// page and live catalogue. No auth: this must stay reachable by anyone,
+// so it is declared before the requireAuth/requireVendor gate below.
+router.get("/store/:slug", getPublicStorefront);
 
 // Everything below is the vendor's own portal.
 router.use(requireAuth, requireVendor);
@@ -54,5 +61,11 @@ router.post("/products/:id/description-blocks/image", upload.single("image"), up
 router.get("/dropoff-points", listActiveDropoffPoints);
 router.post("/order-items/:orderItemId/handover", vendorMarkHandedOver);
 router.get("/returns", getMyReturns);
+
+// Live pricing preview for the product-upload form (spec section 8): given
+// a category and the vendor's desired payout, returns the commission rate,
+// Lizimas' cut, and the customer-facing price - before the vendor submits
+// anything.
+router.post("/pricing/preview", previewPricing);
 
 module.exports = router;

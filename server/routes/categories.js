@@ -10,6 +10,13 @@ const {
     deleteCategory
 } = require("../controllers/categoryController");
 
+const {
+    listCommissionRules,
+    setCategoryCommissionRule,
+    setDefaultCommissionRule,
+    clearCategoryCommissionRule
+} = require("../controllers/commissionController");
+
 const { requireAuth, requireAdmin } = require("../middleware/authMiddleware");
 const upload = require("../middleware/upload");
 
@@ -24,5 +31,13 @@ router.patch("/:id/status", requireAuth, requireAdmin, setCategoryStatus);
 
 // Hard delete kept as a last resort; refuses while products are linked
 router.delete("/:id", requireAuth, requireAdmin, deleteCategory);
+
+// Commission engine (admin only). Category-specific rules take precedence
+// over the marketplace-wide default; see commissionController.js for how
+// versioning and inheritance work.
+router.get("/commission-rules", requireAuth, requireAdmin, listCommissionRules);
+router.post("/commission-rules/default", requireAuth, requireAdmin, setDefaultCommissionRule);
+router.post("/:id/commission-rule", requireAuth, requireAdmin, setCategoryCommissionRule);
+router.delete("/:id/commission-rule", requireAuth, requireAdmin, clearCategoryCommissionRule);
 
 module.exports = router;

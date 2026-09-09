@@ -5375,3 +5375,121 @@ body.sheet-open {
     font-weight: 600;
 }
 .pd-brand:hover span { text-decoration: underline; }
+
+/* Link from a product page to its seller's storefront - same idea as
+   .pd-brand just above (grey lead-in, accent-coloured name). */
+.pd-vendor {
+    display: block;
+    margin: 0 0 6px;
+    font-size: 14px;
+    color: #6b7280;
+    text-decoration: none;
+}
+.pd-vendor span {
+    color: #1a1a2e;
+    font-weight: 600;
+}
+.pd-vendor:hover span { text-decoration: underline; }
+
+/* ---------------------------------------------------------------------
+   Vendor storefront (client/store.html) - a shopper's view of one
+   vendor's public page: banner, logo, name/about, then their live
+   catalogue rendered with the same .product-card/.product-grid markup
+   used everywhere else on the site.
+   --------------------------------------------------------------------- */
+.store-topbar {
+    position: sticky;
+    top: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    background: #fff;
+    z-index: 10;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+.store-back-btn { background: none; border: none; font-size: 22px; cursor: pointer; }
+.store-cart-btn { text-decoration: none; color: #000; font-size: 16px; }
+
+.store-banner {
+    width: 100%;
+    height: 220px;
+    background: #1a1a2e;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+}
+
+.store-header {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 20px;
+    display: flex;
+    align-items: flex-end;
+    gap: 18px;
+    transform: translateY(-40px);
+}
+
+.store-logo {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    background: #fff;
+    border: 4px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    object-fit: cover;
+    flex-shrink: 0;
+}
+.store-logo-fallback {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    background: #F5C518;
+    border: 4px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: 700;
+    color: #1a1a2e;
+    flex-shrink: 0;
+}
+
+.store-identity { padding-bottom: 10px; }
+.store-name { margin: 0; font-size: 24px; font-weight: 700; color: #1a1a2e; }
+.store-tagline { margin: 4px 0 0; font-size: 13px; color: #666; }
+
+.store-about {
+    max-width: 1100px;
+    margin: 0 auto 10px;
+    padding: 0 20px;
+    color: #444;
+    font-size: 14px;
+    line-height: 1.5;
+    max-width: 720px;
+}
+
+.store-section-title {
+    max-width: 1100px;
+    margin: 24px auto 12px;
+    padding: 0 20px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #1a1a2e;
+}
+
+.store-not-found {
+    max-width: 600px;
+    margin: 80px auto;
+    text-align: center;
+    padding: 0 20px;
+    color: #444;
+}
+.store-not-found a { color: #c0392b; font-weight: 600; }
+
+@media (max-width: 600px) {
+    .store-header { transform: translateY(-30px); gap: 12px; }
+    .store-logo, .store-logo-fallback { width: 64px; height: 64px; font-size: 24px; }
+    .store-name { font-size: 19px; }
+}

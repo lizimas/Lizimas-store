@@ -45,6 +45,17 @@ async function loadProductDetail() {
                 brandEl.hidden = true;
             }
         }
+        var vendorEl = document.getElementById("pd-vendor");
+        if (vendorEl) {
+            if (product.vendor_business_name && product.vendor_slug) {
+                vendorEl.href = "/store/" + encodeURIComponent(product.vendor_slug);
+                vendorEl.innerHTML = "Sold by <span>" + pdEscape(product.vendor_business_name) + "</span>";
+                vendorEl.hidden = false;
+            } else {
+                vendorEl.hidden = true;
+            }
+        }
+
         await loadGallery(id, product);
         await loadOptions(id, product);
         document.getElementById("pd-price").textContent = product.price

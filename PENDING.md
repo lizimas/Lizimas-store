@@ -109,3 +109,82 @@ SDK anymore.
    done (Meta will ask for a screen recording of the login flow).
 3. Requirements shift on Meta's side — check the current ones in the console
    rather than assuming this list is complete.
+
+## Vendor Center — commission engine + storefront (September 2026)
+
+First slice of the 85-section Vendor Center spec (`Lizimas Store Vendors
+Center.pdf`). Scope was deliberately narrowed to "commission engine +
+storefront first" — the piece everything else in the spec (order splitting,
+vendor wallet/payouts, seller scoring, promotions, advertising, etc.) depends
+on, all of which is still entirely unbuilt and out of scope for this slice.
+
+**Migrations to run** (not yet applied anywhere — run them yourself against
+Render):
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/061_commission_rules.sql migrations/062_vendor_storefront_fields.sql migrations/063_products_pricing_snapshot.sql
+
+- `061_commission_rules.sql` — versioned `commission_rules` table (rate,
+  fixed fee, tax, per category or marketplace-wide default), seeded with one
+  15% default rule.
+- `062_vendor_storefront_fields.sql` — `vendors.slug/logo_url/banner_url/about`,
+  with a backfill that generates a unique slug for every existing vendor from
+  `business_name`.
+- `063_products_pricing_snapshot.sql` — `products.vendor_desired_payout` /
+  `commission_rate_applied` / `fixed_fee_applied` / `commission_rule_id`,
+  nullable, unused for staff-created products.
+
+**What shipped:**
+1. **Commission engine** (`server/utils/commissionEngine.js`) — "Vendors
+   enter what they want to earn. Lizimas calculates what the customer pays":
+   `customerPrice = (vendorPayout + fixedFee) / (1 - commissionRate)`, rounded
+   to the nearest UGX 100, then commission is recalculated against the
+   rounded price so the vendor's payout is always exact. Rate lookup checks
+   the product's own category, walks up ancestor categories, then falls back
+   to the marketplace-wide default. Rates are versioned — never edited in
+   place, always expired-then-reinserted — so an order that copies a rate
+   later stays accurate even after the rate changes (order-time locking
+   itself is not wired up yet; see below).
+2. **Admin commission-rules screen** — nested inside the existing Categories
+   tab (`client/admin.html`/`admin.js`): set/clear a per-category rate, set
+   the marketplace default. Backed by `commissionController.js` and four new
+   routes under `/api/categories`.
+3. **Vendor product upload now goes through the engine** — the Add Product
+   form on the vendor dashboard asks for a desired payout instead of a flat
+   price, with a live pricing preview (`POST /api/vendors/pricing/preview`)
+   showing the commission, the customer price, and the vendor's payout as
+   they type. `productController.js`'s `addProduct`/`updateProduct` compute
+   `products.price` server-side from that payout for vendor-role submissions
+   only — staff/admin listings are completely unaffected and still set price
+   directly.
+4. **Public vendor storefront** — `GET /store/:slug` (pretty URL, SSR meta
+   tags via `server/routes/store-page.js`, mirroring how `/product/:slugid`
+   already works) plus `GET /api/vendors/store/:slug` (public, no auth) for
+   the vendor's banner/logo/about and their live product grid
+   (`client/store.html` / `client/js/store.js`). Product pages now show a
+   "Sold by <vendor>" link back to the store when the product has one.
+
+**Known gaps, left for Ryan on purpose rather than guessed at:**
+- **No real per-category commission rates yet.** The PDF's Jumia-benchmark
+  commission table (~35 categories) doesn't map cleanly onto Lizimas' actual
+  ~200-node category tree, and picking the mapping is a pricing decision, not
+  a technical one. Everything runs on the single 15% marketplace default
+  until real rates are set from the new admin screen.
+- **No UI for a vendor to set their own logo/banner/about.** The columns and
+  the storefront page both exist and work, but nothing writes to them yet —
+  every store currently shows the plain fallback (initial-letter avatar, dark
+  banner, no about text) until a follow-up adds that to the vendor dashboard
+  (or they're set directly in the database).
+- **Order-time commission locking is not wired up.** `order_items` doesn't
+  yet copy `commission_rate`/`fixed_fee`/`pricing_rule_version` at the moment
+  an order is placed (spec section 33) — the versioned `commission_rules`
+  table is what makes that possible later, but nothing consumes it at
+  checkout yet.
+
+**Explicitly out of scope for this slice** (per the "commission engine +
+storefront first" decision — build only if asked): order-splitting into a
+Master Order + per-vendor Vendor Orders, vendor wallet
+(pending/available/paid/held/disputed balances) and payouts, seller scoring,
+promotions engine, advertising/CPC auction, marketing analytics, vendor staff
+sub-accounts, notification engine, support tickets, disputes, fraud
+monitoring, reconciliation, official brand stores, and all of Phase 2/Phase 3
+of the spec generally.

@@ -3376,12 +3376,124 @@ async function savePhotoOrder() {
 let adminCategories = [];
 let categoryPickedFile = null;
 
+let adminCommissionRules = null;
+
 async function loadAdminCategories() {
     try {
         adminCategories = await authorizedFetch("/api/categories/manage");
+        await loadCommissionRules();
         renderCategoriesTable();
     } catch (error) {
         console.error("Load categories error:", error);
+    }
+}
+
+async function loadCommissionRules() {
+    try {
+        adminCommissionRules = await authorizedFetch("/api/categories/commission-rules");
+        renderDefaultCommissionCard();
+    } catch (error) {
+        console.error("Load commission rules error:", error);
+    }
+}
+
+function renderDefaultCommissionCard() {
+    const el = document.getElementById("commission-default-current");
+    if (!el || !adminCommissionRules) return;
+
+    const def = adminCommissionRules.default;
+    document.getElementById("commission-default-rate").value = def ? (Number(def.commission_rate) * 100).toFixed(1) : "";
+    document.getElementById("commission-default-fee").value = def ? Number(def.fixed_processing_fee) : "";
+    el.textContent = def
+        ? `Current default: ${(Number(def.commission_rate) * 100).toFixed(1)}% + UGX ${Number(def.fixed_processing_fee).toLocaleString()} fixed fee`
+        : "No default rate set yet.";
+}
+
+async function saveDefaultCommissionRate() {
+    const errorEl = document.getElementById("commission-default-error");
+    errorEl.textContent = "";
+
+    const ratePercent = parseFloat(document.getElementById("commission-default-rate").value);
+    const fee = parseFloat(document.getElementById("commission-default-fee").value) || 0;
+
+    if (!Number.isFinite(ratePercent) || ratePercent < 0 || ratePercent >= 100) {
+        errorEl.textContent = "Enter a rate between 0 and 99.9%.";
+        return;
+    }
+
+    try {
+        await authorizedFetch("/api/categories/commission-rules/default", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ commission_rate: ratePercent / 100, fixed_processing_fee: fee })
+        });
+        await loadCommissionRules();
+        renderCategoriesTable();
+    } catch (error) {
+        errorEl.textContent = error.message || "Could not save the default rate.";
+    }
+}
+
+function commissionCellFor(categoryId) {
+    if (!adminCommissionRules) return "—";
+    const row = adminCommissionRules.categories.find(c => c.category_id === categoryId);
+    if (!row || row.effective_rate === null) return "Not set";
+
+    const pct = `${(row.effective_rate * 100).toFixed(1)}%`;
+    if (row.has_own_rule) return pct;
+    if (row.inherited_from === "default") return `${pct} <span class="promo-hint" style="display:inline">(default)</span>`;
+    return `${pct} <span class="promo-hint" style="display:inline">(inherited)</span>`;
+}
+
+function openCommissionForm(categoryId, categoryName) {
+    document.getElementById("commission-category-id").value = categoryId;
+    document.getElementById("commission-form-category-name").textContent = categoryName;
+
+    const row = adminCommissionRules ? adminCommissionRules.categories.find(c => c.category_id === categoryId) : null;
+    document.getElementById("commission-rate-input").value = (row && row.has_own_rule) ? (row.effective_rate * 100).toFixed(1) : "";
+    document.getElementById("commission-fee-input").value = (row && row.has_own_rule) ? row.effective_fixed_fee : "";
+    document.getElementById("commission-form-error").textContent = "";
+    document.getElementById("commission-form-container").classList.remove("hidden");
+}
+
+function closeCommissionForm() {
+    document.getElementById("commission-form-container").classList.add("hidden");
+}
+
+async function saveCommissionRate() {
+    const errorEl = document.getElementById("commission-form-error");
+    errorEl.textContent = "";
+
+    const categoryId = document.getElementById("commission-category-id").value;
+    const ratePercent = parseFloat(document.getElementById("commission-rate-input").value);
+    const fee = parseFloat(document.getElementById("commission-fee-input").value) || 0;
+
+    if (!Number.isFinite(ratePercent) || ratePercent < 0 || ratePercent >= 100) {
+        errorEl.textContent = "Enter a rate between 0 and 99.9%.";
+        return;
+    }
+
+    try {
+        await authorizedFetch(`/api/categories/${categoryId}/commission-rule`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ commission_rate: ratePercent / 100, fixed_processing_fee: fee })
+        });
+        closeCommissionForm();
+        await loadCommissionRules();
+        renderCategoriesTable();
+    } catch (error) {
+        errorEl.textContent = error.message || "Could not save this rate.";
+    }
+}
+
+async function clearCommissionRate(categoryId) {
+    try {
+        await authorizedFetch(`/api/categories/${categoryId}/commission-rule`, { method: "DELETE" });
+        await loadCommissionRules();
+        renderCategoriesTable();
+    } catch (error) {
+        console.error("Clear commission rate error:", error);
     }
 }
 
@@ -3448,6 +3560,11 @@ function renderCategoriesTable() {
             ? `<button onclick="setCategoryActive(${c.id}, false)">Hide</button>`
             : `<button onclick="setCategoryActive(${c.id}, true)">Restore</button>`;
 
+        const commissionRow = adminCommissionRules ? adminCommissionRules.categories.find(x => x.category_id === c.id) : null;
+        const clearRateBtn = (commissionRow && commissionRow.has_own_rule)
+            ? `<button onclick="clearCommissionRate(${c.id})">Clear</button>`
+            : "";
+
         return `<tr>
             <td data-label="Image">${thumb}</td>
             <td data-label="Name">${c.depth === 1
@@ -3456,9 +3573,12 @@ function renderCategoriesTable() {
             <td data-label="Products">${c.product_count}</td>
             <td data-label="Order">${c.display_order}</td>
             <td data-label="Status">${status}</td>
+            <td data-label="Commission">${commissionCellFor(c.id)}</td>
             <td data-label="Actions">
                 <button onclick="editCategory(${c.id})">Edit</button>
                 ${toggle}
+                <button onclick="openCommissionForm(${c.id}, '${c.name.replace(/'/g, "\\'")}')">Rate</button>
+                ${clearRateBtn}
             </td>
         </tr>`;
     }).join("");

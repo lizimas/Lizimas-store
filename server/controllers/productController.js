@@ -1,6 +1,7 @@
 const pool = require("../config/database");
 const cloudinary = require("../config/cloudinary");
 const { logActivity } = require("../utils/activityLog");
+const { calculatePricing } = require("../utils/commissionEngine");
 
 // Upload a single file buffer to Cloudinary, returns the secure URL
 function uploadBufferToCloudinary(fileBuffer) {
@@ -28,9 +29,10 @@ function safePackageSize(value) {
 // Add product (with optional multiple image uploads)
 exports.addProduct = async (req, res) => {
     try {
-        const { name, category_id, description, price, stock, package_size,
+        const { name, category_id, description, stock, package_size,
                 material, color, sleeve, style, length, fit, pattern, care_instructions, occasion,
-                warranty_months, brand, gtin, mpn } = req.body;
+                warranty_months, brand, gtin, mpn, desired_payout } = req.body;
+        let { price } = req.body;
 
         const packageSize = safePackageSize(package_size);
         const warrantyMonths = warranty_months ? Number(warranty_months) : null;
@@ -41,6 +43,12 @@ exports.addProduct = async (req, res) => {
         // that vendor's own listings/orders/payouts, separately from created_by
         // (which just records who clicked "add").
         let vendorId = null;
+        // Populated only for vendor submissions: what the commission engine
+        // used to turn their desired payout into the customer-facing price
+        // above (migrations/063_products_pricing_snapshot.sql). Staff/admin
+        // listings leave these null and set price directly, unchanged from
+        // before the commission engine existed.
+        let pricingSnapshot = { vendor_desired_payout: null, commission_rate_applied: null, fixed_fee_applied: null, commission_rule_id: null };
         if (req.user.role === "vendor") {
             const vendorRow = await pool.query(
                 "SELECT id FROM vendors WHERE user_id = $1",
@@ -50,6 +58,26 @@ exports.addProduct = async (req, res) => {
                 return res.status(403).json({ error: "No vendor profile found for this account." });
             }
             vendorId = vendorRow.rows[0].id;
+
+            // Vendors enter what they want to earn - Lizimas, never the
+            // vendor, calculates what the customer pays (spec section 83).
+            // A vendor-submitted `price` is ignored entirely.
+            let pricingResult;
+            try {
+                pricingResult = await calculatePricing({
+                    vendorPayout: desired_payout,
+                    categoryId: category_id ? Number(category_id) : null
+                });
+            } catch (pricingError) {
+                return res.status(400).json({ error: pricingError.message });
+            }
+            price = pricingResult.customerPrice;
+            pricingSnapshot = {
+                vendor_desired_payout: pricingResult.vendorPayout,
+                commission_rate_applied: pricingResult.commissionRate,
+                fixed_fee_applied: pricingResult.fixedFee,
+                commission_rule_id: pricingResult.ruleId
+            };
         }
 
         const uploadedFiles = req.files || [];
@@ -61,13 +89,16 @@ exports.addProduct = async (req, res) => {
         const product = await pool.query(
             `INSERT INTO products (name,category_id,description,price,stock,image,status,created_by,
                 material,color,sleeve,style,length,fit,pattern,care_instructions,occasion,package_size,warranty_months,
-              brand,gtin,mpn,vendor_id)
-             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING *`,
+              brand,gtin,mpn,vendor_id,
+                vendor_desired_payout,commission_rate_applied,fixed_fee_applied,commission_rule_id)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27) RETURNING *`,
             [name, category_id, description, price, stock, mainImage, status, req.user.userId,
                 material || null, color || null, sleeve || null, style || null, length || null,
                 fit || null, pattern || null, care_instructions || null, occasion || null,
                 packageSize, warrantyMonths,
-                brand || null, gtin || null, mpn || null, vendorId]
+                brand || null, gtin || null, mpn || null, vendorId,
+                pricingSnapshot.vendor_desired_payout, pricingSnapshot.commission_rate_applied,
+                pricingSnapshot.fixed_fee_applied, pricingSnapshot.commission_rule_id]
         );
 
         const newProduct = product.rows[0];
@@ -214,8 +245,15 @@ exports.getMyProducts = async (req, res) => {
 exports.getProductById = async (req, res) => {
     try {
         const { id } = req.params;
+        // LEFT JOIN so a staff-listed product (vendor_id NULL) or a vendor
+        // that somehow lost its approved status still returns the product
+        // itself - vendor_business_name/vendor_slug just come back null and
+        // the client's "Sold by" link stays hidden.
         const result = await pool.query(
-            "SELECT * FROM products WHERE id = $1 AND deleted_at IS NULL AND status = 'approved'",
+            `SELECT products.*, vendors.business_name AS vendor_business_name, vendors.slug AS vendor_slug
+             FROM products
+             LEFT JOIN vendors ON vendors.id = products.vendor_id AND vendors.status = 'approved'
+             WHERE products.id = $1 AND products.deleted_at IS NULL AND products.status = 'approved'`,
             [id]
         );
         if (result.rows.length === 0) {
@@ -726,9 +764,10 @@ exports.updateProduct = async (req, res) => {
             return res.status(permission.status).json({ error: permission.error });
         }
 
-        const { name, category_id, description, price, stock, package_size,
+        const { name, category_id, description, stock, package_size,
                 material, color, sleeve, style, length, fit, pattern, care_instructions, occasion,
-                warranty_months, brand, gtin, mpn } = req.body;
+                warranty_months, brand, gtin, mpn, desired_payout } = req.body;
+        let { price } = req.body;
 
         const packageSize = safePackageSize(package_size);
         const warrantyMonths = warranty_months ? Number(warranty_months) : null;
@@ -740,21 +779,46 @@ exports.updateProduct = async (req, res) => {
 
         const statusClause = ["product_staff", "vendor"].includes(req.user.role) ? `, status='pending'` : "";
 
+        // Only a vendor re-running the commission engine touches the pricing
+        // snapshot columns - a staff/admin edit (even of a vendor's product)
+        // leaves them exactly as they were, per migrations/063: they record
+        // what produced the CURRENT price, and staff edits set price directly.
+        let pricingClause = "";
+        let pricingParams = [];
+        if (req.user.role === "vendor") {
+            let pricingResult;
+            try {
+                pricingResult = await calculatePricing({
+                    vendorPayout: desired_payout,
+                    categoryId: category_id ? Number(category_id) : null
+                });
+            } catch (pricingError) {
+                return res.status(400).json({ error: pricingError.message });
+            }
+            price = pricingResult.customerPrice;
+            pricingClause = `, vendor_desired_payout=$20, commission_rate_applied=$21, fixed_fee_applied=$22, commission_rule_id=$23`;
+            pricingParams = [
+                pricingResult.vendorPayout, pricingResult.commissionRate,
+                pricingResult.fixedFee, pricingResult.ruleId
+            ];
+        }
+
         let updateQuery = `UPDATE products SET name=$1, category_id=$2, description=$3, price=$4, stock=$5,
             material=$6, color=$7, sleeve=$8, style=$9, length=$10, fit=$11, pattern=$12, care_instructions=$13, occasion=$14,
             package_size=$15, warranty_months=$16,
-            brand=$17, gtin=$18, mpn=$19${statusClause}`;
+            brand=$17, gtin=$18, mpn=$19${pricingClause}${statusClause}`;
         let params = [name, category_id, description, price, stock,
             material || null, color || null, sleeve || null, style || null, length || null,
             fit || null, pattern || null, care_instructions || null, occasion || null,
             packageSize, warrantyMonths,
-            brand || null, gtin || null, mpn || null];
+            brand || null, gtin || null, mpn || null, ...pricingParams];
 
+        const nextParam = params.length + 1;
         if (newImagePaths.length > 0) {
-            updateQuery += `, image=$20 WHERE id=$21 RETURNING *`;
+            updateQuery += `, image=$${nextParam} WHERE id=$${nextParam + 1} RETURNING *`;
             params.push(newImagePaths[0], id);
         } else {
-            updateQuery += ` WHERE id=$20 RETURNING *`;
+            updateQuery += ` WHERE id=$${nextParam} RETURNING *`;
             params.push(id);
         }
 
