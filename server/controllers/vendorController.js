@@ -2,6 +2,12 @@ const pool = require("../config/database");
 const { computeSellerScore } = require("../utils/sellerScore");
 const { deriveVendorOrderStage, STAGE_LABELS, isValidStage, canAdvanceStage } = require("../utils/vendorOrderStage");
 const { logActivity } = require("../utils/activityLog");
+const {
+    MIN_PAYOUT_UGX,
+    classifyOrderItemForWallet,
+    summarizeVendorWallet,
+    canRequestPayout
+} = require("../utils/vendorWallet");
 
 // The logged-in vendor's own KYC/business profile and review status.
 exports.getMyVendorProfile = async (req, res) => {
@@ -527,6 +533,294 @@ exports.getFollowStatus = async (req, res) => {
             [vendorId, req.user.userId]
         );
         res.json({ following: result.rows.length > 0 });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// --- Vendor Wallet & Payouts (Task #61) --------------------------------
+//
+// The balance shown here is DERIVED on every read from order_items + each
+// product's current commission fields - see server/utils/vendorWallet.js
+// for the full rationale and the pure functions this wraps. Only money
+// actually paid out (vendor_payouts) and manual admin adjustments
+// (vendor_ledger_adjustments) are real, stored facts.
+//
+// Currency amounts only, never a rate or percentage - the "sellers must
+// never see the commission %" rule (Ryan, Sept 2026) applies here exactly
+// as it does to the dashboard earnings summary.
+
+// Shared by the vendor-facing and admin-facing wallet endpoints: builds the
+// plain-object inputs summarizeVendorWallet() expects from this vendor's
+// order_items, vendor_payouts and vendor_ledger_adjustments rows.
+async function loadVendorWalletData(vendorId) {
+    const [itemsRes, payoutsRes, adjustmentsRes] = await Promise.all([
+        pool.query(
+            `SELECT o.status AS order_status, oi.handover_status,
+                    oi.price, oi.quantity,
+                    p.commission_rate_applied, p.fixed_fee_applied
+             FROM order_items oi
+             JOIN orders o ON o.id = oi.order_id
+             JOIN products p ON p.id = oi.product_id
+             WHERE p.vendor_id = $1`,
+            [vendorId]
+        ),
+        pool.query(
+            `SELECT id, amount, method, momo_number, status, reference, notes, requested_at, paid_at
+             FROM vendor_payouts WHERE vendor_id = $1 ORDER BY requested_at DESC`,
+            [vendorId]
+        ),
+        pool.query(
+            `SELECT id, amount, reason, created_at
+             FROM vendor_ledger_adjustments WHERE vendor_id = $1 ORDER BY created_at DESC`,
+            [vendorId]
+        )
+    ]);
+
+    const items = itemsRes.rows.map(row => {
+        const saleAmount = Number(row.price) * Number(row.quantity);
+        const chargeAmount = row.commission_rate_applied !== null
+            ? saleAmount * Number(row.commission_rate_applied) + Number(row.fixed_fee_applied || 0) * Number(row.quantity)
+            : 0;
+        return {
+            saleAmount,
+            chargeAmount,
+            classification: classifyOrderItemForWallet({
+                orderStatus: row.order_status,
+                handoverStatus: row.handover_status
+            })
+        };
+    });
+
+    const payouts = payoutsRes.rows.map(row => ({ amount: Number(row.amount), status: row.status }));
+    const adjustments = adjustmentsRes.rows.map(row => ({ amount: Number(row.amount) }));
+
+    const summary = summarizeVendorWallet(items, payouts, adjustments);
+    const hasOutstandingRequest = payoutsRes.rows.some(row => row.status === "requested");
+
+    return { summary, hasOutstandingRequest, payoutRows: payoutsRes.rows, adjustmentRows: adjustmentsRes.rows };
+}
+
+function walletResponsePayload(vendor, walletData) {
+    const { summary, hasOutstandingRequest, payoutRows, adjustmentRows } = walletData;
+    const eligibility = canRequestPayout(summary.availableBalance, hasOutstandingRequest);
+
+    return {
+        momoNumber: vendor.momo_number || null,
+        minPayout: MIN_PAYOUT_UGX,
+        balance: {
+            pending: summary.pendingBalance,
+            available: summary.availableBalance,
+            netEarned: summary.netEarned,
+            paidOutTotal: summary.paidOutTotal,
+            requestedTotal: summary.requestedTotal
+        },
+        breakdown: summary.breakdown,
+        eligibility,
+        payouts: payoutRows.map(row => ({
+            id: row.id,
+            amount: Number(row.amount),
+            method: row.method,
+            momoNumber: row.momo_number,
+            status: row.status,
+            reference: row.reference,
+            notes: row.notes,
+            requestedAt: row.requested_at,
+            paidAt: row.paid_at
+        })),
+        adjustments: adjustmentRows.map(row => ({
+            id: row.id,
+            amount: Number(row.amount),
+            reason: row.reason,
+            createdAt: row.created_at
+        }))
+    };
+}
+
+// The logged-in vendor's own wallet: available/pending balance, payout
+// history and manual adjustment history.
+exports.getVendorWallet = async (req, res) => {
+    try {
+        const vendorRow = await pool.query(
+            "SELECT id, momo_number FROM vendors WHERE user_id = $1",
+            [req.user.userId]
+        );
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendor = vendorRow.rows[0];
+        const walletData = await loadVendorWalletData(vendor.id);
+        res.json(walletResponsePayload(vendor, walletData));
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// A vendor asks to be paid out. Defaults to their full available balance;
+// an explicit `amount` may request less (but never more than what's
+// available). MoMo number is snapshotted from the vendor's profile at
+// request time so a later profile edit can't silently redirect money
+// already requested.
+exports.requestVendorPayout = async (req, res) => {
+    try {
+        const vendorRow = await pool.query(
+            "SELECT id, momo_number FROM vendors WHERE user_id = $1",
+            [req.user.userId]
+        );
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendor = vendorRow.rows[0];
+        if (!vendor.momo_number) {
+            return res.status(400).json({ error: "Add your MoMo number in your profile before requesting a payout." });
+        }
+
+        const walletData = await loadVendorWalletData(vendor.id);
+        const eligibility = canRequestPayout(walletData.summary.availableBalance, walletData.hasOutstandingRequest);
+        if (!eligibility.allowed) {
+            return res.status(400).json({ error: eligibility.reason });
+        }
+
+        let amount = walletData.summary.availableBalance;
+        if (req.body.amount !== undefined) {
+            const requested = Number(req.body.amount);
+            if (!Number.isFinite(requested) || requested <= 0) {
+                return res.status(400).json({ error: "amount must be a positive number." });
+            }
+            if (requested > walletData.summary.availableBalance) {
+                return res.status(400).json({ error: "amount cannot exceed your available balance." });
+            }
+            amount = requested;
+        }
+
+        const result = await pool.query(
+            `INSERT INTO vendor_payouts (vendor_id, amount, method, momo_number, status)
+             VALUES ($1, $2, 'momo', $3, 'requested') RETURNING *`,
+            [vendor.id, amount, vendor.momo_number]
+        );
+
+        logActivity(req.user.userId, "vendor_payout_requested", "vendor_payout", result.rows[0].id,
+            `UGX ${amount.toLocaleString()} requested via MoMo ${vendor.momo_number}`);
+
+        const refreshed = await loadVendorWalletData(vendor.id);
+        res.status(201).json(walletResponsePayload(vendor, refreshed));
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// --- Admin side ----------------------------------------------------------
+
+// Every payout request currently awaiting admin action, oldest first -
+// mirrors getPendingVendors' shape/ordering for the same "queue" feel.
+exports.getVendorPayoutRequests = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT vp.id, vp.vendor_id, vp.amount, vp.method, vp.momo_number, vp.status,
+                    vp.requested_at, v.business_name, v.phone
+             FROM vendor_payouts vp
+             JOIN vendors v ON v.id = vp.vendor_id
+             WHERE vp.status = 'requested'
+             ORDER BY vp.requested_at ASC`
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Admin confirms the MoMo transfer was actually sent.
+exports.markVendorPayoutPaid = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reference, notes } = req.body;
+        const result = await pool.query(
+            `UPDATE vendor_payouts
+             SET status = 'paid', paid_at = now(), paid_by = $1, reference = $2, notes = $3
+             WHERE id = $4 AND status = 'requested' RETURNING *`,
+            [req.user.userId, reference || null, notes || null, id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(409).json({ error: "Payout request is not awaiting payment." });
+        }
+        logActivity(req.user.userId, "vendor_payout_paid", "vendor_payout", id,
+            `UGX ${Number(result.rows[0].amount).toLocaleString()} marked paid`);
+        res.json({ message: "Payout marked as paid.", payout: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Admin declines a payout request - the money simply stays in the
+// vendor's available balance (nothing to reverse; it was never stored
+// anywhere but as a 'requested' row).
+exports.rejectVendorPayout = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+        if (!reason) {
+            return res.status(400).json({ error: "A rejection reason is required." });
+        }
+        const result = await pool.query(
+            `UPDATE vendor_payouts SET status = 'rejected', notes = $1
+             WHERE id = $2 AND status = 'requested' RETURNING *`,
+            [reason, id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(409).json({ error: "Payout request is not awaiting review." });
+        }
+        logActivity(req.user.userId, "vendor_payout_rejected", "vendor_payout", id, reason);
+        res.json({ message: "Payout request rejected.", payout: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// A one-off manual credit/debit to a vendor's balance (goodwill credit,
+// dispute correction). amount is signed: positive = credit, negative =
+// debit. Always requires a reason - shown to the vendor alongside it.
+exports.createVendorLedgerAdjustment = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { amount, reason } = req.body;
+        const numericAmount = Number(amount);
+        if (!Number.isFinite(numericAmount) || numericAmount === 0) {
+            return res.status(400).json({ error: "amount must be a non-zero number." });
+        }
+        if (!reason || !String(reason).trim()) {
+            return res.status(400).json({ error: "A reason is required." });
+        }
+
+        const vendorExists = await pool.query("SELECT id FROM vendors WHERE id = $1", [id]);
+        if (vendorExists.rows.length === 0) {
+            return res.status(404).json({ error: "Vendor not found." });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO vendor_ledger_adjustments (vendor_id, amount, reason, created_by)
+             VALUES ($1, $2, $3, $4) RETURNING *`,
+            [id, numericAmount, reason, req.user.userId]
+        );
+        logActivity(req.user.userId, "vendor_ledger_adjustment", "vendor", id,
+            `UGX ${numericAmount.toLocaleString()}: ${reason}`);
+        res.status(201).json({ message: "Adjustment recorded.", adjustment: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Admin's view of one vendor's full wallet - same shape as the vendor's
+// own view, for reviewing a payout request or investigating a dispute.
+exports.getVendorWalletAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const vendorRow = await pool.query("SELECT id, business_name, momo_number FROM vendors WHERE id = $1", [id]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "Vendor not found." });
+        }
+        const vendor = vendorRow.rows[0];
+        const walletData = await loadVendorWalletData(vendor.id);
+        res.json({ vendor: { id: vendor.id, businessName: vendor.business_name }, ...walletResponsePayload(vendor, walletData) });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

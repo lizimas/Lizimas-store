@@ -396,3 +396,71 @@ category/etc. across many products at once - Ryan's list only asked for
 activate/deactivate/delete), and a vendor-facing color/size CATALOG browser
 (vendors just type names; there's no UI to see or reuse Lizimas' existing
 catalogue of colour/size names before typing their own).
+
+
+## Vendor Wallet & Payouts (September 2026)
+
+Covers the "Wallet / Payouts" line from Ryan's gap analysis: a vendor-facing
+balance and payout request flow, plus an admin queue to actually send the
+money and record it. Lizimas still controls the MoMo transfer itself -
+nothing here moves money automatically.
+
+**Migration to run:**
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/067_vendor_wallet.sql
+
+**Derived balance, not a maintained ledger.** The wallet balance is computed
+fresh on every read from `order_items` + each product's current
+`commission_rate_applied`/`fixed_fee_applied` - the same approximation
+`getVendorDashboardSummary` already uses (inherits its known limitation:
+charges use the CURRENT rate, not one locked at order time, since order-time
+commission locking isn't wired up yet - see the Commission Engine section
+above). A written transaction ledger populated by hooks on every order
+status change was considered and rejected: it would be a second source of
+truth that could drift from `order_items` itself. Only two things that
+truly cannot be derived get real tables: `vendor_payouts` (money actually
+requested/paid) and `vendor_ledger_adjustments` (manual admin credits/
+debits, e.g. a goodwill credit or dispute correction - always requires a
+reason, shown to the vendor).
+
+**`MIN_PAYOUT_UGX = 20000`** (`server/utils/vendorWallet.js`): the floor a
+vendor's available balance must reach before they can request a payout.
+Flagged as a starting point, not a settled business rule - same spirit as
+the 15% default commission rate, tune in one place.
+
+**One outstanding request at a time**, enforced server-side
+(`canRequestPayout`): a vendor cannot submit a second payout request while
+one is still `requested`. Keeps the admin queue and the vendor's own
+expectations simple - my own judgment call, not something Ryan specified.
+
+**MoMo-only.** `vendor_payouts.method` defaults to `'momo'` since
+`vendors.momo_number` is the only payout channel Lizimas currently collects
+from vendors. The MoMo number is snapshotted onto the payout row at request
+time, not read live from the vendor profile, so a vendor changing their
+number later can't silently redirect a payout already requested.
+
+**What happens to a rejected request**: nothing needs reversing. Because the
+balance is derived and a `rejected` payout is excluded from
+`paidOutTotal`/`requestedTotal`, the money is simply available to request
+again - there's no separate "return to balance" step.
+
+**Currency amounts only, never a rate or percentage**, in every response on
+both the vendor and admin side - the same "sellers must never see the
+commission %" rule (Ryan, Sept 2026) already applied to the dashboard
+earnings summary and the Orders Center.
+
+**Admin side**: a "Vendor Payouts" panel on the existing Vendors tab lists
+every `requested` payout, oldest first (same shape as Pending Vendor
+Applications), with Mark Paid / Reject actions and a View Wallet button that
+shows a vendor's full derived balance before deciding. A `POST
+/api/admin/vendors/:id/ledger-adjustments` endpoint exists for manual
+adjustments (wired into `admin.js` as `createVendorLedgerAdjustment()`, not
+yet surfaced as its own button anywhere in the UI - callable from the
+console/a future dispute-resolution flow for now; worth a dedicated button
+if adjustments turn out to be common).
+
+**Deliberately not built in this pass:** automatic/scheduled payouts (every
+payout is a vendor-initiated request, admin-confirmed), any non-MoMo payout
+method, and a vendor-facing itemized statement of exactly which orders make
+up the current balance (the summary is currency totals only - Sale/Charges/
+Refunded/Adjustments - not a per-order breakdown).

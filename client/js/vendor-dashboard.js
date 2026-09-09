@@ -54,6 +54,7 @@ function setupVendorTabs() {
             if (button.dataset.tab === "add-product" && staffCategoriesLoaded === false) loadVendorCategories();
             if (button.dataset.tab === "orders") loadVendorOrders();
             if (button.dataset.tab === "returns") loadVendorReturns();
+            if (button.dataset.tab === "wallet") loadVendorWallet();
         });
     });
 }
@@ -1109,6 +1110,109 @@ async function loadVendorDashboardSummary() {
         }
     } catch (error) {
         console.error("Load vendor dashboard summary error:", error);
+    }
+}
+
+// --- Wallet & Payouts (Task #61) ----------------------------------------
+// Balance figures are currency amounts only, never a rate or percentage -
+// same "sellers must never see the commission %" rule as the dashboard
+// earnings summary above.
+
+const VENDOR_PAYOUT_STATUS_LABEL = { requested: "Awaiting review", paid: "Paid", rejected: "Rejected" };
+const VENDOR_PAYOUT_STATUS_CLASS = { requested: "status-pending", paid: "status-paid", rejected: "status-cancelled" };
+
+async function loadVendorWallet() {
+    const summaryBox = document.getElementById("vendor-wallet-summary");
+    const historyBox = document.getElementById("vendor-payout-history");
+    const adjustmentsBox = document.getElementById("vendor-ledger-adjustments");
+    if (!summaryBox) return;
+
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/wallet");
+        if (data.error) {
+            summaryBox.innerHTML = `<p>${vendorEsc(data.error)}</p>`;
+            return;
+        }
+
+        const b = data.balance;
+        summaryBox.innerHTML = `
+            <div style="display:flex; gap:24px; flex-wrap:wrap; margin-bottom:18px;">
+                <div><div style="font-size:12px; color:#888;">Available Balance</div><div style="font-size:24px; font-weight:700; color:#166534;">${vendorFmtUgx(b.available)}</div></div>
+                <div><div style="font-size:12px; color:#888;">Pending (not yet delivered)</div><div style="font-size:20px; font-weight:700; color:#B45309;">${vendorFmtUgx(b.pending)}</div></div>
+                <div><div style="font-size:12px; color:#888;">Requested (awaiting review)</div><div style="font-size:20px; font-weight:700; color:#1a1a2e;">${vendorFmtUgx(b.requestedTotal)}</div></div>
+                <div><div style="font-size:12px; color:#888;">Paid Out to Date</div><div style="font-size:20px; font-weight:700; color:#1a1a2e;">${vendorFmtUgx(b.paidOutTotal)}</div></div>
+            </div>
+            <p style="font-size:13px; color:#666; margin:0 0 14px;">
+                MoMo number on file: ${data.momoNumber ? vendorEsc(data.momoNumber) : '<span style="color:#DC2626;">none - add one in Account before requesting a payout</span>'}
+                &middot; Minimum payout: ${vendorFmtUgx(data.minPayout)}
+            </p>
+            <button id="vendor-request-payout-btn" onclick="requestVendorPayout()"
+                style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;"
+                ${data.eligibility.allowed ? "" : "disabled"}>
+                Request Payout
+            </button>
+            ${!data.eligibility.allowed ? `<p style="font-size:13px; color:#888; margin:8px 0 0;">${vendorEsc(data.eligibility.reason)}</p>` : ""}
+        `;
+
+        historyBox.innerHTML = data.payouts.length === 0
+            ? `<p>No payout requests yet.</p>`
+            : `<table style="width:100%;">
+                <thead><tr><th>Date</th><th>Amount</th><th>MoMo Number</th><th>Status</th><th>Reference</th></tr></thead>
+                <tbody>
+                    ${data.payouts.map(p => `
+                        <tr>
+                            <td data-label="Date">${new Date(p.requestedAt).toLocaleDateString()}</td>
+                            <td data-label="Amount">${vendorFmtUgx(p.amount)}</td>
+                            <td data-label="MoMo Number">${vendorEsc(p.momoNumber || "-")}</td>
+                            <td data-label="Status"><span class="status-badge ${VENDOR_PAYOUT_STATUS_CLASS[p.status] || ""}">${VENDOR_PAYOUT_STATUS_LABEL[p.status] || p.status}</span></td>
+                            <td data-label="Reference">${vendorEsc(p.reference || "-")}</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>`;
+
+        adjustmentsBox.innerHTML = data.adjustments.length === 0
+            ? `<p>No balance adjustments.</p>`
+            : `<table style="width:100%;">
+                <thead><tr><th>Date</th><th>Amount</th><th>Reason</th></tr></thead>
+                <tbody>
+                    ${data.adjustments.map(a => `
+                        <tr>
+                            <td data-label="Date">${new Date(a.createdAt).toLocaleDateString()}</td>
+                            <td data-label="Amount" style="color:${a.amount >= 0 ? '#166534' : '#DC2626'};">${a.amount >= 0 ? "+" : ""}${vendorFmtUgx(a.amount)}</td>
+                            <td data-label="Reason">${vendorEsc(a.reason)}</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>`;
+    } catch (error) {
+        console.error("Load vendor wallet error:", error);
+        summaryBox.innerHTML = "<p>Could not connect to server.</p>";
+    }
+}
+
+async function requestVendorPayout() {
+    if (!confirm("Request a payout of your full available balance via MoMo?")) return;
+    const btn = document.getElementById("vendor-request-payout-btn");
+    if (btn) btn.disabled = true;
+
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/wallet/payout-requests", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({})
+        });
+        if (data.error) {
+            alert(data.error);
+            if (btn) btn.disabled = false;
+            return;
+        }
+        alert("Payout requested. Lizimas will review it and send your MoMo transfer.");
+        await loadVendorWallet();
+    } catch (error) {
+        console.error("Request vendor payout error:", error);
+        alert("Could not connect to server.");
+        if (btn) btn.disabled = false;
     }
 }
 

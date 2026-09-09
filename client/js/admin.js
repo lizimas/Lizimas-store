@@ -1663,6 +1663,7 @@ function setupTabs() {
                 loadDropoffPoints();
                 loadPendingHandovers();
                 loadPendingReturns();
+                loadPendingVendorPayouts();
             }
 
             if (button.dataset.tab === "team-messages") {
@@ -5796,6 +5797,130 @@ async function forfeitReturnItem(orderItemId) {
         loadPendingReturns();
     } catch (error) {
         console.error("Forfeit error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+// --- Vendor Payouts (Task #61) ------------------------------------------
+// The balance itself is derived server-side from order_items - see
+// server/utils/vendorWallet.js. This panel only ever handles requests
+// already sitting in vendor_payouts (status = 'requested').
+
+async function loadPendingVendorPayouts() {
+    try {
+        const payouts = await authorizedFetch("/api/admin/vendor-payouts");
+        const container = document.getElementById("pending-vendor-payouts-list");
+
+        if (!payouts || payouts.length === 0) {
+            container.innerHTML = `<p class="no-data">No payout requests awaiting review.</p>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Vendor</th><th>Amount</th><th>MoMo Number</th><th>Requested</th><th>Actions</th></tr></thead>
+                <tbody>
+                    ${payouts.map(p => `
+                        <tr>
+                            <td data-label="Vendor">${p.business_name}<br><span style="color:#888; font-size:12px;">${p.phone || ""}</span></td>
+                            <td data-label="Amount">${fmtUgx(p.amount)}</td>
+                            <td data-label="MoMo Number">${p.momo_number || "-"}</td>
+                            <td data-label="Requested">${new Date(p.requested_at).toLocaleDateString()}</td>
+                            <td data-label="Actions">
+                                <button onclick="viewVendorWallet(${p.vendor_id})" style="background:#fff; color:#1a1a2e; border:1px solid #1a1a2e; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">View Wallet</button>
+                                <button onclick="markVendorPayoutPaid(${p.id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Mark Paid</button>
+                                <button onclick="rejectVendorPayoutRequest(${p.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Reject</button>
+                            </td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load pending vendor payouts error:", error);
+    }
+}
+
+async function markVendorPayoutPaid(id) {
+    const reference = prompt("MoMo transaction reference (optional):") || "";
+    if (!confirm("Confirm the MoMo transfer has actually been sent?")) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/vendor-payouts/${id}/paid`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ reference })
+        });
+        loadPendingVendorPayouts();
+    } catch (error) {
+        console.error("Mark vendor payout paid error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function rejectVendorPayoutRequest(id) {
+    const reason = prompt("Reason for rejecting this payout request:");
+    if (!reason) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/vendor-payouts/${id}/reject`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ reason })
+        });
+        loadPendingVendorPayouts();
+    } catch (error) {
+        console.error("Reject vendor payout error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function viewVendorWallet(vendorId) {
+    try {
+        const data = await authorizedFetch(`/api/admin/vendors/${vendorId}/wallet`);
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        const b = data.balance;
+        const lines = [
+            `${data.vendor.businessName}`,
+            ``,
+            `Available balance: ${fmtUgx(b.available)}`,
+            `Pending (not yet delivered): ${fmtUgx(b.pending)}`,
+            `Requested (awaiting review): ${fmtUgx(b.requestedTotal)}`,
+            `Paid out to date: ${fmtUgx(b.paidOutTotal)}`,
+            ``,
+            `MoMo number: ${data.momoNumber || "none on file"}`
+        ];
+        alert(lines.join("\n"));
+    } catch (error) {
+        console.error("View vendor wallet error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function createVendorLedgerAdjustment(vendorId) {
+    const amountStr = prompt("Adjustment amount (UGX, use a negative number to debit):");
+    if (amountStr === null) return;
+    const amount = Number(amountStr);
+    if (!Number.isFinite(amount) || amount === 0) {
+        alert("Amount must be a non-zero number.");
+        return;
+    }
+    const reason = prompt("Reason for this adjustment (shown to the vendor):");
+    if (!reason) return;
+
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/vendors/${vendorId}/ledger-adjustments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ amount, reason })
+        });
+        alert("Adjustment recorded.");
+    } catch (error) {
+        console.error("Create vendor ledger adjustment error:", error);
         alert("Something went wrong.");
     }
 }

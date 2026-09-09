@@ -5,7 +5,8 @@ const { registerVendor, vendorLogin } = require("../controllers/authController")
 const {
     getMyVendorProfile, getMyVendorOrders, updateMyVendorProfile, getPublicStorefront,
     followVendor, unfollowVendor, getFollowStatus, getVendorDashboardSummary,
-    advanceVendorOrderStage, bulkUpdateVendorProducts
+    advanceVendorOrderStage, bulkUpdateVendorProducts,
+    getVendorWallet, requestVendorPayout
 } = require("../controllers/vendorController");
 const {
     addProduct,
@@ -64,6 +65,11 @@ router.patch("/me", updateMyVendorProfile);
 router.get("/orders", getMyVendorOrders);
 router.patch("/order-items/:orderItemId/stage", advanceVendorOrderStage);
 router.get("/dashboard-summary", getVendorDashboardSummary);
+
+// Vendor Wallet & Payouts (Task #61): the balance is derived on every read
+// from order_items - see server/utils/vendorWallet.js.
+router.get("/wallet", getVendorWallet);
+router.post("/wallet/payout-requests", requestVendorPayout);
 
 router.get("/products", getMyProducts);
 router.patch("/products/bulk", bulkUpdateVendorProducts);

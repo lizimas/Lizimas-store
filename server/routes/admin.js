@@ -65,7 +65,12 @@ const {
 const {
     getPendingVendors,
     approveVendor,
-    rejectVendor
+    rejectVendor,
+    getVendorPayoutRequests,
+    markVendorPayoutPaid,
+    rejectVendorPayout,
+    createVendorLedgerAdjustment,
+    getVendorWalletAdmin
 } = require("../controllers/vendorController");
 
 const {
@@ -158,6 +163,13 @@ router.post("/products/import", csvUpload.single("file"), require("../controller
 router.get("/vendors/pending", getPendingVendors);
 router.patch("/vendors/:id/approve", approveVendor);
 router.patch("/vendors/:id/reject", rejectVendor);
+
+// Vendor Wallet & Payouts (Task #61).
+router.get("/vendor-payouts", getVendorPayoutRequests);
+router.patch("/vendor-payouts/:id/paid", markVendorPayoutPaid);
+router.patch("/vendor-payouts/:id/reject", rejectVendorPayout);
+router.get("/vendors/:id/wallet", getVendorWalletAdmin);
+router.post("/vendors/:id/ledger-adjustments", createVendorLedgerAdjustment);
 
 router.get("/dropoff-points", listDropoffPoints);
 router.post("/dropoff-points", createDropoffPoint);
