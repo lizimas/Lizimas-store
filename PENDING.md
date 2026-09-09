@@ -991,3 +991,32 @@ Ryan's correction: "vendors to communicate with support team not admin directly,
 **Both roles can escalate/un-escalate** - not gated to support-only in the UI, since the frontend has no existing concept of "which staff role is currently logged in" to gate a button by (nothing else in the codebase needed that distinction before now), and admin flagging their own thread for follow-up is harmless. If Ryan wants this tightened to support-only later, it's a small addition once there's a reason to build role-awareness into the admin frontend generally.
 
 **What shipped:** `migrations/077_vendor_messages_escalation.sql`; `server/utils/vendorMessages.js` gets `MESSAGE_ADMIN_VIEWS`/`isValidMessageAdminView` (2 new tests, 172 total in the suite); `getVendorMessagesAdmin`/`getVendorMessageThreadAdmin` in `vendorController.js` updated for the three-way view and `escalated_at`; new `escalateVendorMessageAdmin`/`unescalateVendorMessageAdmin`; the five existing vendor-messages routes in `server/routes/admin.js` moved ahead of the router-wide `requireAdmin` gate with their own `requireSupportOrAdmin` check, plus the two new escalate/unescalate routes; Admin UI gets a third "Escalated" filter button and an "Escalate to Admin"/"Un-escalate" toggle in the thread view; the staff-creation dropdown's Customer Support option label updated from "(live chat only)" since it now covers vendor messages too.
+
+
+## Real per-category commission rates (Task #72, September 2026)
+
+Ryan supplied a Jumia Uganda 2025-benchmarked rate card (20 categories) and asked for it to be "editable from the admin panel." The admin Categories tab already had a per-category "Rate" editor wired to `commission_rules` since Task #52/53 - nothing new to build there. The actual work was mapping Ryan's 20 Jumia-style buckets onto Lizimas' real category tree, which doesn't look anything like Jumia's flat ~20-category structure (fetched live from `GET /api/products/categories` in production - 230 categories, 6 top-level, 3 levels deep).
+
+**Migration to run:**
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/078_category_commission_rates.sql
+
+**How the rate lookup works** (`server/utils/commissionEngine.js`, `getActiveCommissionRule`): a product's own category is checked first, then its parent, then grandparent, and so on up to the marketplace-wide default (`category_id IS NULL`, currently 15%). This means one rule on a branch category (e.g. "Apparel & Boutique") covers every leaf underneath it, and a rule on a specific leaf always wins over anything set higher up the tree. Migration 078 uses both: branch-level rules where a whole subtree shares one rate, and leaf-level overrides where a subtree needs to be split or a specific product type needs to break from its parent's rate.
+
+**Rates applied**, confirmed with Ryan against his rate card:
+- Mobile Phones 6% (Smartphones, Feature Phones) / Electronics Accessories 17% (phone cases, screen protectors, chargers, power banks) - split out of the "Mobiles & Gadgets" branch, which has no rule of its own.
+- Laptops/Desktops/Monitors 10% / Electronics Accessories 17% (printers, keyboards & mice, laptop bags) - split out of "Computers & Accessories."
+- Electronics Accessories 17% - the whole "IT Accessories" branch (cables, routers, storage, UPS, webcams).
+- Televisions 8% (Smart/LED/UHD TVs) / Electronics Accessories 17% (TV mounts, TV accessories) - split out of "TV."
+- Small Appliances 7% - both "Home Appliances" (fans, irons, sewing machines, vacuums, water dispensers) and "Kitchen Appliances" (blenders, kettles, microwaves, rice cookers, etc.) - Ryan's call, since Kitchen Appliances wasn't its own row on the rate card and these are all countertop/portable items, not the Large Appliances below.
+- Large Appliances 10% - "Major Appliances" branch (cookers, gas cylinders, fridges, washing machines).
+- Home 12% - Home Furniture, Décor, Cooking & Dining, Outdoor Furniture branches.
+- Fashion & Sportswear 12% (same rate for both) - the entire "Apparel & Boutique" top-level branch in one rule (clothing, sunglasses, bags & accessories, sportswear).
+- Grocery & Health & Beauty 15% - explicit rule on "Supermarket" (matches the marketplace default numerically, but recorded explicitly rather than left implicit, since Ryan's rate card treats it as a deliberate rate, not a fallback).
+- Toys & Games 10% - carved out of Supermarket's 15% for the "Toys" branch.
+- Baby Products 15% - scattered across four unrelated branches with no single category to unify under (Baby Care under Personal Care, Baby Clothing under Children's Clothing, Baby & Toddler Toys under Toys, Baby's Food & Milk under Groceries). Baby Care and Baby's Food & Milk already land on 15% via Supermarket's rate; Baby Clothing and Baby & Toddler Toys needed explicit leaf-level overrides back to 15% since they'd otherwise inherit Fashion's 12% and Toys' 10% respectively.
+- Gaming, Sounds & Audio, Books & Stationery, Cleaning & Essentials - not on Ryan's rate card at all. Given explicit rules at the 15% marketplace default anyway, for a clear audited record rather than leaving them to an implicit fallback.
+
+**What's intentionally NOT covered, per Ryan's explicit decision ("15% default until category exists")**: Cameras, Tablets, Beauty Appliances (as distinct from Health & Beauty), Sporting Goods, Musical Instruments, Auto & Moto, and Luggage & Travel Gear do not exist as categories anywhere in Lizimas' live catalog. There's no `category_id` to attach a rate to, so these fall through to the 15% marketplace default automatically and will pick up their own rate the moment a matching category is created - no placeholder categories were created preemptively. Smartwatches (a leaf under Mobiles & Gadgets) also wasn't part of the rate card and was left uncovered the same way.
+
+**What shipped:** `migrations/078_category_commission_rates.sql` - 34 `commission_rules` rows (branch-level and leaf-level), inserted idempotently (`WHERE NOT EXISTS`) against the existing unique-active-rule-per-category constraint. No application code changes - the admin Categories tab's existing "Rate" column and per-category edit form already display and let Ryan adjust every one of these rows.
