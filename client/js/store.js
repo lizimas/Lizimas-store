@@ -116,6 +116,12 @@ async function loadStore() {
         stRenderVendor(data.vendor);
         stRenderProducts(data.products);
         document.getElementById("store-content").hidden = false;
+
+        const sellerPanel = document.getElementById("store-seller-panel");
+        if (sellerPanel) {
+            await renderSellerPanel(sellerPanel, data, { showVisitLink: false });
+            sellerPanel.hidden = false;
+        }
     } catch (error) {
         console.error("Store load error:", error);
         stShowNotFound();

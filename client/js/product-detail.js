@@ -10,6 +10,23 @@ const PD_SPEC_LABELS = {
     occasion: "Occasion"
 };
 
+// Fills the "Seller Information" box from the same public storefront
+// endpoint the storefront page itself uses (GET /api/vendors/store/:slug) -
+// separate, non-blocking fetch so a slow score calculation never holds up
+// the rest of the product page rendering.
+async function loadSellerPanel(product) {
+    var panel = document.getElementById("pd-seller-panel");
+    if (!panel || !product.vendor_slug) return;
+    try {
+        var data = await spFetchStore(product.vendor_slug);
+        if (!data) return;
+        await renderSellerPanel(panel, data, { showVisitLink: true });
+        panel.hidden = false;
+    } catch (error) {
+        console.error("Seller panel load error:", error);
+    }
+}
+
 function pdResolveId() {
     const m = window.location.pathname.match(/\/product\/(?:.*-)?(\d+)\/?$/);
     if (m) return m[1];
@@ -45,16 +62,7 @@ async function loadProductDetail() {
                 brandEl.hidden = true;
             }
         }
-        var vendorEl = document.getElementById("pd-vendor");
-        if (vendorEl) {
-            if (product.vendor_business_name && product.vendor_slug) {
-                vendorEl.href = "/store/" + encodeURIComponent(product.vendor_slug);
-                vendorEl.innerHTML = "Sold by <span>" + pdEscape(product.vendor_business_name) + "</span>";
-                vendorEl.hidden = false;
-            } else {
-                vendorEl.hidden = true;
-            }
-        }
+        loadSellerPanel(product);
 
         await loadGallery(id, product);
         await loadOptions(id, product);

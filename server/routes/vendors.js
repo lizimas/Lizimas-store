@@ -2,7 +2,10 @@ const express = require("express");
 const router = express.Router();
 
 const { registerVendor, vendorLogin } = require("../controllers/authController");
-const { getMyVendorProfile, getMyVendorOrders, updateMyVendorProfile, getPublicStorefront } = require("../controllers/vendorController");
+const {
+    getMyVendorProfile, getMyVendorOrders, updateMyVendorProfile, getPublicStorefront,
+    followVendor, unfollowVendor, getFollowStatus
+} = require("../controllers/vendorController");
 const {
     addProduct,
     updateProduct,
@@ -38,6 +41,15 @@ router.post("/login", vendorLogin);
 // page and live catalogue. No auth: this must stay reachable by anyone,
 // so it is declared before the requireAuth/requireVendor gate below.
 router.get("/store/:slug", getPublicStorefront);
+
+// Follow/unfollow a vendor's storefront (spec: "Followers - customers can
+// follow, Lizimas owns the system"). Any logged-in user, not just
+// customers with a "customer" role and not vendors managing their own
+// portal - so this is requireAuth only, declared before the
+// requireVendor gate below rather than folded into it.
+router.post("/:id/follow", requireAuth, followVendor);
+router.delete("/:id/follow", requireAuth, unfollowVendor);
+router.get("/:id/follow-status", requireAuth, getFollowStatus);
 
 // Everything below is the vendor's own portal.
 router.use(requireAuth, requireVendor);

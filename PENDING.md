@@ -188,3 +188,62 @@ promotions engine, advertising/CPC auction, marketing analytics, vendor staff
 sub-accounts, notification engine, support tickets, disputes, fraud
 monitoring, reconciliation, official brand stores, and all of Phase 2/Phase 3
 of the spec generally.
+
+## Seller Score, Followers, and the seller performance panel (September 2026)
+
+Adds the Jumia-style "Seller Information" box Ryan asked for after sharing
+screenshots of a Jumia product page: a store link, a seller score
+percentage, a follower count with a Follow button, and a four-item
+performance checklist (Shipping speed / Quality Score / Customer Rating /
+Cancellation Rate), each bucketed into Excellent/Good/Fair/Poor. Shown on
+the product page sidebar and on the vendor's own storefront.
+
+**Migration to run** (not yet applied):
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/064_vendor_followers.sql
+
+**How the score is computed** (`server/utils/sellerScore.js`, on demand -
+no caching or background job, computed fresh on every storefront/product
+view; revisit if that becomes a real load problem):
+
+- **Shipping speed** - average hours between an order being placed and the
+  vendor handing that item to a drop-off point. Full marks at or under 48h,
+  0 at a full week (168h), linear between.
+- **Quality Score** - the share of a vendor's handed-over items that passed
+  Lizimas' own inspection (`order_items.handover_status != 'rejected'`
+  among everything inspected). This is the one signal Lizimas directly
+  controls end to end, so it's the most trustworthy of the four.
+- **Customer Rating** - average `product_reviews` rating across all of a
+  vendor's products, scaled 0-5 stars to a 0-100 sub-score.
+- **Cancellation Rate** - share of a vendor's order_items whose PARENT
+  ORDER was cancelled. This is an approximation: order splitting per vendor
+  doesn't exist yet (still Phase 2/3 of the spec), so a multi-vendor order
+  cancelled for a reason that has nothing to do with one particular vendor
+  still counts against every vendor whose item was in it. Worth revisiting
+  once orders split by vendor.
+
+Each signal needs a minimum sample size before it counts at all (5 handed-
+over items, 5 inspected items, 3 reviews, 5 order items respectively) - a
+vendor short on all four shows as "New Seller" instead of a score built
+from almost no data. The overall percentage is a weighted average
+(shipping 20%, quality 30%, rating 35%, cancellation 15%) renormalized over
+whichever signals actually have enough data yet.
+
+**All of the above - the SLA hours, the sample-size floors, and the
+weights - are considered starting points, not settled business rules.**
+Same spirit as the 15% default commission rate: tune them once there's
+enough real order volume to judge them against, in `server/utils/sellerScore.js`.
+
+**Followers** (`migrations/064_vendor_followers.sql`, `vendor_followers`
+table): any logged-in user can follow/unfollow a vendor via
+`POST`/`DELETE /api/vendors/:id/follow` - a customer action, not part of
+the vendor's own portal, so it sits outside the `requireVendor` gate in
+`routes/vendors.js`. Vendors only ever see their own follower COUNT
+(exposed on the public storefront response), never who is following -
+there is no vendor-facing follower list, matching "Lizimas owns the
+system" from Ryan's governance table.
+
+**Deliberately not built in this pass:** an admin dashboard/leaderboard of
+seller scores across all vendors, score caching or a recompute job (every
+view runs the aggregate queries fresh), and any change to how
+cancellation is tracked (still order-level, not per-vendor).

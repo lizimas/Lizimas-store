@@ -1,4 +1,5 @@
 const pool = require("../config/database");
+const { computeSellerScore } = require("../utils/sellerScore");
 
 // The logged-in vendor's own KYC/business profile and review status.
 exports.getMyVendorProfile = async (req, res) => {
@@ -221,15 +222,82 @@ exports.getPublicStorefront = async (req, res) => {
         }
         const vendor = vendorResult.rows[0];
 
-        const productsResult = await pool.query(
-            `SELECT id, name, price, image, stock, public_code
-             FROM products
-             WHERE vendor_id = $1 AND status = 'approved' AND deleted_at IS NULL
-             ORDER BY created_at DESC`,
-            [vendor.id]
-        );
+        const [productsResult, followerResult, sellerScore] = await Promise.all([
+            pool.query(
+                `SELECT id, name, price, image, stock, public_code
+                 FROM products
+                 WHERE vendor_id = $1 AND status = 'approved' AND deleted_at IS NULL
+                 ORDER BY created_at DESC`,
+                [vendor.id]
+            ),
+            pool.query(`SELECT COUNT(*)::int AS n FROM vendor_followers WHERE vendor_id = $1`, [vendor.id]),
+            computeSellerScore(vendor.id)
+        ]);
 
-        res.json({ vendor, products: productsResult.rows });
+        res.json({
+            vendor,
+            products: productsResult.rows,
+            followerCount: followerResult.rows[0].n,
+            sellerScore
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// A customer follows/unfollows a vendor's storefront. Any logged-in user
+// may call these (requireAuth only, no role check) - following is a
+// customer action, not something scoped to the vendor portal.
+exports.followVendor = async (req, res) => {
+    try {
+        const vendorId = Number(req.params.id);
+        const vendorExists = await pool.query(
+            `SELECT id FROM vendors WHERE id = $1 AND status = 'approved'`,
+            [vendorId]
+        );
+        if (vendorExists.rows.length === 0) {
+            return res.status(404).json({ error: "Store not found." });
+        }
+        await pool.query(
+            `INSERT INTO vendor_followers (vendor_id, user_id) VALUES ($1, $2)
+             ON CONFLICT (vendor_id, user_id) DO NOTHING`,
+            [vendorId, req.user.userId]
+        );
+        const countResult = await pool.query(
+            `SELECT COUNT(*)::int AS n FROM vendor_followers WHERE vendor_id = $1`,
+            [vendorId]
+        );
+        res.json({ following: true, followerCount: countResult.rows[0].n });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.unfollowVendor = async (req, res) => {
+    try {
+        const vendorId = Number(req.params.id);
+        await pool.query(
+            `DELETE FROM vendor_followers WHERE vendor_id = $1 AND user_id = $2`,
+            [vendorId, req.user.userId]
+        );
+        const countResult = await pool.query(
+            `SELECT COUNT(*)::int AS n FROM vendor_followers WHERE vendor_id = $1`,
+            [vendorId]
+        );
+        res.json({ following: false, followerCount: countResult.rows[0].n });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.getFollowStatus = async (req, res) => {
+    try {
+        const vendorId = Number(req.params.id);
+        const result = await pool.query(
+            `SELECT 1 FROM vendor_followers WHERE vendor_id = $1 AND user_id = $2`,
+            [vendorId, req.user.userId]
+        );
+        res.json({ following: result.rows.length > 0 });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
