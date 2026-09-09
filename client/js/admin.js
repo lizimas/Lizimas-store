@@ -2346,12 +2346,14 @@ async function approvePendingProduct(id) {
 }
 
 async function rejectPendingProduct(id) {
-    if (!confirm("Reject this product submission?")) return;
+    const reason = prompt("Reason for rejecting this product (shown to the vendor):");
+    if (!reason) return;
     try {
         const token = getToken();
         await fetch(`${API_URL}/api/admin/products/${id}/reject`, {
             method: "PATCH",
-            headers: { "Authorization": `Bearer ${token}` }
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ reason })
         });
         loadPendingProducts();
     } catch (error) {

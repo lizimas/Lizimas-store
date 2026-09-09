@@ -335,7 +335,7 @@ function renderVendorProductsTable() {
                         <td data-label="SKU">${p.sku || "—"}</td>
                         <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
                         <td data-label="Stock">${p.stock}</td>
-                        <td data-label="Status">${vendorProductStatusBadge(p)}</td>
+                        <td data-label="Status">${vendorProductStatusBadge(p)}${p.status === "rejected" && p.rejection_reason ? `<div style="font-size:11px; color:#991B1B; margin-top:4px;">${p.rejection_reason}</div>` : ""}</td>
                         <td data-label="Actions">
                             <button onclick="editVendorProduct(${p.id})" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Edit</button>
                             ${p.status === "approved" ? `<button onclick="bulkVendorProductActionSingle(${p.id}, '${p.is_active ? "deactivate" : "activate"}')" style="background:${p.is_active ? "#B45309" : "#16A34A"}; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">${p.is_active ? "Deactivate" : "Activate"}</button>` : ""}

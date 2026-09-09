@@ -722,14 +722,14 @@ without either picking one variant arbitrarily or notifying once per
 variant, both of which felt like the wrong default. Revisit if variant
 products turn out to need their own low-stock signal.
 
-**`product_rejected` reason is a generic fallback, not the admin's actual
-reason** - the existing product-rejection flow (`rejectProduct` in
-`productController.js`, wired from `client/js/admin.js`) has never
-collected a rejection reason from the admin; that's a pre-existing gap,
-not something this task introduced or fixed, so the notification uses
-"Contact Lizimas Store support for details." Worth a follow-up: add a
-reason field to the reject-product flow so this (and the vendor-facing
-product list) can show something real.
+~~`product_rejected` reason is a generic fallback, not the admin's actual
+reason.~~ **Fixed (September 2026, Task #69)** - `rejectProduct` now
+takes a `reason` from admin (`client/js/admin.js` prompts for one, same
+pattern as every other reason-collecting admin action), stores it on the
+new `products.rejection_reason` column (migration 073), passes the real
+text into the `product_rejected` notification instead of the generic
+fallback, and shows it under the "Rejected" badge on the vendor's own
+product list.
 
 **No notification for return/refund decisions** (Task #62) - a deliberate
 scope cut for this pass, not an oversight. A vendor already sees refund
