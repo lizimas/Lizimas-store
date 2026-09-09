@@ -91,7 +91,7 @@ exports.vendorMarkHandedOver = async (req, res) => {
         }
 
         const itemRow = await pool.query(
-            `SELECT oi.id, oi.handover_status, p.vendor_id
+            `SELECT oi.id, oi.handover_status, oi.vendor_fulfilment_stage, p.vendor_id
              FROM order_items oi
              JOIN products p ON p.id = oi.product_id
              WHERE oi.id = $1`,
@@ -107,6 +107,14 @@ exports.vendorMarkHandedOver = async (req, res) => {
         if (!["pending_handover", "rejected"].includes(item.handover_status)) {
             return res.status(409).json({
                 error: `Item cannot be handed over from its current state (${item.handover_status}).`
+            });
+        }
+        // The vendor must have walked the item through New -> Accepted ->
+        // Processing -> Ready for Handover (Task #59) before handing it over -
+        // see utils/vendorOrderStage.js and PATCH /order-items/:id/stage.
+        if ((item.vendor_fulfilment_stage || "new") !== "ready_for_handover") {
+            return res.status(409).json({
+                error: "Mark this item Ready for Handover in your Orders tab before handing it over."
             });
         }
 
@@ -200,7 +208,8 @@ exports.rejectHandover = async (req, res) => {
         }
         const result = await pool.query(
             `UPDATE order_items
-             SET handover_status = 'rejected', inspected_by = $1, inspected_at = now(), rejection_reason = $2
+             SET handover_status = 'rejected', inspected_by = $1, inspected_at = now(), rejection_reason = $2,
+                 vendor_fulfilment_stage = 'new'
              WHERE id = $3 AND handover_status = 'handed_over' RETURNING *`,
             [req.user.userId, reason, orderItemId]
         );

@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Vendor Dashboard</title>
-<link rel="stylesheet" href="../css/admin.css?v=14">
+<link rel="stylesheet" href="../css/admin.css?v=15">
 </head>
 <body>
 
@@ -28,8 +28,8 @@
                     <button class="tab-btn" data-tab="add-product">
                         <span class="sidebar-icon">&#10133;</span> Add Product
                     </button>
-                    <button class="tab-btn" data-tab="handovers">
-                        <span class="sidebar-icon">&#128230;</span> Handover
+                    <button class="tab-btn" data-tab="orders">
+                        <span class="sidebar-icon">&#128230;</span> Orders
                     </button>
                     <button class="tab-btn" data-tab="returns">
                         <span class="sidebar-icon">&#8634;</span> Returns
@@ -205,17 +205,18 @@
                     </div>
                 </section>
 
-                <section id="tab-handovers" class="tab-content hidden">
-                    <h2 class="admin-page-title">Handover to Lizimas Store</h2>
+                <section id="tab-orders" class="tab-content hidden">
+                    <h2 class="admin-page-title">Orders</h2>
                     <p class="admin-page-subtitle">
-                        Prepare each item per the
+                        Move each item through New &#8594; Accepted &#8594; Processing &#8594; Ready for Handover, then
+                        prepare it per the
                         <a href="../vendor-policies.html#packaging" target="_blank">Packaging Guidelines</a> and
-                        <a href="../vendor-policies.html#fulfilment" target="_blank">Fulfilment Guidelines</a>,
-                        then mark it handed over once you've dropped it at the chosen location. Lizimas Store
-                        inspects each item before accepting it.
+                        <a href="../vendor-policies.html#fulfilment" target="_blank">Fulfilment Guidelines</a> and mark
+                        it handed over. Lizimas Store inspects each item before accepting it and taking over delivery.
                     </p>
+                    <div id="vendor-orders-filters" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;"></div>
                     <div class="panel">
-                        <div id="vendor-handovers-list">Loading...</div>
+                        <div id="vendor-orders-list">Loading...</div>
                     </div>
                 </section>
 
@@ -246,6 +247,6 @@
 
     <script src="../js/category-select.js?v=1"></script>
     <script src="../js/seller-panel.js?v=1"></script>
-    <script src="../js/vendor-dashboard.js?v=6"></script>
+    <script src="../js/vendor-dashboard.js?v=7"></script>
 </body>
 </html>

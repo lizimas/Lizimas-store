@@ -247,3 +247,83 @@ system" from Ryan's governance table.
 seller scores across all vendors, score caching or a recompute job (every
 view runs the aggregate queries fresh), and any change to how
 cancellation is tracked (still order-level, not per-vendor).
+
+## Vendor Dashboard: real KPIs, earnings, and own Seller Score (September 2026)
+
+Replaced the vendor dashboard's Overview tab (previously just a KYC status
+page) with `GET /api/vendors/dashboard-summary`
+(`getVendorDashboardSummary` in `vendorController.js`): today's order
+count, pending-handover/awaiting-delivery/completed/cancelled/active-return
+counts, an earnings breakdown, product/low-stock counts, and the vendor's
+own Seller Score + follower count (reusing `renderSellerPanel` from Task
+#57's seller-panel.js, with `hideFollow: true` since a vendor following
+themselves makes no sense).
+
+**Earnings are shown as `Sale / Marketplace charges / Net payable` -
+currency amounts only, never a rate or percentage** (Ryan, Sept 2026:
+"sellers should never see the % commission on their pages"). The charges
+figure uses each product's *current* `commission_rate_applied` /
+`fixed_fee_applied` rather than a rate locked at order time, because
+order-time commission locking isn't wired up yet - an approximation
+inherited from that same known limitation (see the commission-engine
+section above), not a new one. No migration needed for this slice.
+
+## Vendor Orders Center (September 2026)
+
+Built the real order-workflow tab Ryan asked for in his "what's missing"
+gap analysis: **New -> Accepted -> Processing -> Ready for Handover ->
+Handed Over -> In Delivery -> Delivered**, plus the exception states
+Cancelled / Rejected at Inspection / Return in Progress / Forfeited.
+Replaces the old "Handover" tab (which only ever showed items already
+awaiting/rejected at handover) with a full "Orders" tab covering every
+stage, with filter chips and a per-row action button.
+
+**Migration to run:**
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/065_vendor_order_stage.sql
+
+**Why a new column instead of reusing `handover_status`:** `handover_status`
+(052_vendor_fulfilment.sql) is Lizimas' OWN post-handover inspection/
+returns lifecycle - its `'accepted'`/`'rejected'` values specifically mean
+"Lizimas accepted/rejected this item at inspection," not "the vendor
+accepted the order." Ryan's requested pre-handover workflow needed its own
+states, so `order_items.vendor_fulfilment_stage` (`new` / `accepted` /
+`processing` / `ready_for_handover`) was added as a separate column
+specifically to avoid two different meanings of "accepted" colliding on
+the same row. The two lifecycles are combined into one display stage per
+item by a pure function, `deriveVendorOrderStage()` in
+`server/utils/vendorOrderStage.js` (11 unit tests in
+`test/vendorOrderStage.test.js`), following the same pure/DB-split
+convention as `sellerScore.js` and `commissionEngine.js`.
+
+**How a vendor moves an item forward:** `PATCH
+/api/vendors/order-items/:orderItemId/stage` with `{ stage }`, one step at
+a time only (`canAdvanceStage()` rejects skipping a stage, going backward,
+or repeating one). Once at Ready for Handover, the existing `POST
+/order-items/:orderItemId/handover` endpoint takes over - it now also
+checks `vendor_fulfilment_stage === 'ready_for_handover'` before allowing
+handover, so a vendor can no longer hand an item over without walking it
+through the new stages first. **This enforcement is a new business rule
+introduced by this slice** (previously any `pending_handover`/`rejected`
+item could be handed over directly) - flagging it explicitly, same as the
+commission-rate default, in case Ryan wants it looser.
+
+**On rejection at inspection**, `vendor_fulfilment_stage` resets to `new` -
+a rejected item needs to be re-prepared, so the vendor re-walks
+New -> Accepted -> Processing -> Ready for Handover before re-submitting
+it. Also a policy default introduced here, not something Ryan specified
+directly - easy to change if he'd rather a rejected item skip straight
+back to Ready for Handover.
+
+**Known simplification:** "Delivered" is a bucket for *any* order with
+`orders.status = 'delivered'`, whether it was delivered five minutes ago
+or five weeks ago - there's no `delivered_at` timestamp yet to separate
+"just delivered" from "past the return window." Noted in
+`vendorOrderStage.js` itself; revisit once delivery timestamps exist
+(likely alongside the Returns & Refunds Center, Task #62).
+
+**Deliberately not built in this pass:** per-vendor order splitting (an
+order-level `orders.status` is still shared across every vendor in a
+multi-vendor order, a pre-existing limitation this slice works around, not
+one it fixes), and any notification to the vendor when a new order
+arrives (Task #65).

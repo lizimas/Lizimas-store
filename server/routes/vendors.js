@@ -4,7 +4,8 @@ const router = express.Router();
 const { registerVendor, vendorLogin } = require("../controllers/authController");
 const {
     getMyVendorProfile, getMyVendorOrders, updateMyVendorProfile, getPublicStorefront,
-    followVendor, unfollowVendor, getFollowStatus, getVendorDashboardSummary
+    followVendor, unfollowVendor, getFollowStatus, getVendorDashboardSummary,
+    advanceVendorOrderStage
 } = require("../controllers/vendorController");
 const {
     addProduct,
@@ -57,6 +58,7 @@ router.use(requireAuth, requireVendor);
 router.get("/me", getMyVendorProfile);
 router.patch("/me", updateMyVendorProfile);
 router.get("/orders", getMyVendorOrders);
+router.patch("/order-items/:orderItemId/stage", advanceVendorOrderStage);
 router.get("/dashboard-summary", getVendorDashboardSummary);
 
 router.get("/products", getMyProducts);

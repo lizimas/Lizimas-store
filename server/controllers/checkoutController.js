@@ -320,11 +320,15 @@ exports.checkout = async (req, res) => {
             // lifecycle (see 052_vendor_fulfilment.sql); staff-stocked items
             // (vendorId null) leave handover_status null - not applicable.
             const handoverStatus = item.vendorId ? "pending_handover" : null;
+            // ...and their own pre-handover New/Accepted/Processing/Ready for
+            // Handover progress (see 065_vendor_order_stage.sql), which the
+            // vendor advances themselves before handover ever happens.
+            const vendorFulfilmentStage = item.vendorId ? "new" : null;
 
             await client.query(
-                `INSERT INTO order_items (order_id, product_id, quantity, price, product_name, image_url, variant_color, variant_size, handover_status)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-                [order.id, item.productId, item.quantity, item.price, item.productName, item.imageUrl, item.variantColor, item.variantSize, handoverStatus]
+                `INSERT INTO order_items (order_id, product_id, quantity, price, product_name, image_url, variant_color, variant_size, handover_status, vendor_fulfilment_stage)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                [order.id, item.productId, item.quantity, item.price, item.productName, item.imageUrl, item.variantColor, item.variantSize, handoverStatus, vendorFulfilmentStage]
             );
 
             if (item.variantId) {

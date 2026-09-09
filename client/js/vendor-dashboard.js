@@ -52,7 +52,7 @@ function setupVendorTabs() {
             if (button.dataset.tab === "overview") loadVendorStatus();
             if (button.dataset.tab === "products") loadVendorProducts();
             if (button.dataset.tab === "add-product" && staffCategoriesLoaded === false) loadVendorCategories();
-            if (button.dataset.tab === "handovers") loadVendorHandovers();
+            if (button.dataset.tab === "orders") loadVendorOrders();
             if (button.dataset.tab === "returns") loadVendorReturns();
         });
     });
@@ -430,7 +430,53 @@ async function submitVendorProductForm() {
     }
 }
 
-// --- Handovers ------------------------------------------------------------
+// --- Orders (Task #59: New -> Accepted -> Processing -> Ready for
+// Handover -> Handed Over -> In Delivery -> Delivered, plus the
+// Cancelled/Rejected/Returned/Forfeited exceptions) ------------------------
+
+let vendorOrdersCache = [];
+let vendorOrdersFilter = "all";
+
+const VENDOR_STAGE_BADGE_CLASS = {
+    new: "status-new",
+    accepted: "status-accepted",
+    processing: "status-processing",
+    ready_for_handover: "status-ready",
+    handed_over: "status-shipped",
+    in_delivery: "status-shipped",
+    completed: "status-delivered",
+    rejected: "status-cancelled",
+    return_in_progress: "status-pending",
+    forfeited: "status-forfeited",
+    cancelled: "status-cancelled"
+};
+
+const VENDOR_STAGE_FILTERS = [
+    ["all", "All"],
+    ["new", "New"],
+    ["accepted", "Accepted"],
+    ["processing", "Processing"],
+    ["ready_for_handover", "Ready for Handover"],
+    ["handed_over", "Handed Over"],
+    ["in_delivery", "In Delivery"],
+    ["completed", "Delivered"],
+    ["rejected", "Rejected"],
+    ["return_in_progress", "Returned"],
+    ["cancelled", "Cancelled"]
+];
+
+// Forward-only, one step at a time - mirrors server/utils/vendorOrderStage.js.
+const VENDOR_NEXT_STAGE = {
+    new: "accepted",
+    accepted: "processing",
+    processing: "ready_for_handover"
+};
+
+const VENDOR_NEXT_STAGE_BUTTON_LABEL = {
+    accepted: "Accept Order",
+    processing: "Start Processing",
+    ready_for_handover: "Mark Ready for Handover"
+};
 
 async function loadVendorDropoffPointsIfNeeded() {
     if (vendorDropoffPoints.length > 0) return;
@@ -447,56 +493,100 @@ function dropoffPointOptions() {
     ).join("");
 }
 
-async function loadVendorHandovers() {
+function renderVendorOrderFilters() {
+    const container = document.getElementById("vendor-orders-filters");
+    if (!container) return;
+    container.innerHTML = VENDOR_STAGE_FILTERS.map(([key, label]) => {
+        const count = key === "all" ? vendorOrdersCache.length : vendorOrdersCache.filter(o => o.stage === key).length;
+        const active = vendorOrdersFilter === key;
+        return `<button onclick="setVendorOrdersFilter('${key}')" style="padding:6px 12px; border-radius:999px; border:1px solid ${active ? "#1a1a2e" : "#ddd"}; background:${active ? "#1a1a2e" : "#fff"}; color:${active ? "#fff" : "#333"}; font-size:12px; cursor:pointer;">${label}${count ? ` (${count})` : ""}</button>`;
+    }).join("");
+}
+
+function setVendorOrdersFilter(key) {
+    vendorOrdersFilter = key;
+    renderVendorOrderFilters();
+    renderVendorOrdersTable();
+}
+
+async function loadVendorOrders() {
     try {
         await loadVendorDropoffPointsIfNeeded();
-        const orders = await vendorAuthorizedFetch("/api/vendors/orders");
-        const relevant = orders.filter(o =>
-            ["pending_handover", "handed_over", "rejected"].includes(o.handover_status)
-        );
-        const container = document.getElementById("vendor-handovers-list");
+        vendorOrdersCache = await vendorAuthorizedFetch("/api/vendors/orders");
+        renderVendorOrderFilters();
+        renderVendorOrdersTable();
+    } catch (error) {
+        console.error("Load orders error:", error);
+    }
+}
 
-        if (relevant.length === 0) {
-            container.innerHTML = `<p class="no-data">Nothing awaiting handover right now.</p>`;
+function renderVendorOrdersTable() {
+    const container = document.getElementById("vendor-orders-list");
+    if (!container) return;
+
+    const rows = vendorOrdersFilter === "all"
+        ? vendorOrdersCache
+        : vendorOrdersCache.filter(o => o.stage === vendorOrdersFilter);
+
+    if (rows.length === 0) {
+        container.innerHTML = `<p class="no-data">No orders in this view.</p>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <table>
+            <thead><tr><th>Product</th><th>Qty</th><th>Order Date</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+                ${rows.map(o => vendorOrderRow(o)).join("")}
+            </tbody>
+        </table>
+    `;
+}
+
+function vendorOrderRow(o) {
+    const badgeClass = VENDOR_STAGE_BADGE_CLASS[o.stage] || "status-pending";
+    const rejectedNote = o.stage === "rejected"
+        ? `<div style="font-size:12px; color:#991B1B; margin-top:4px;">Rejected: ${o.rejection_reason || "no reason given"} - re-prepare and re-submit.</div>`
+        : "";
+
+    let action = "-";
+    if (o.stage in VENDOR_NEXT_STAGE) {
+        const next = VENDOR_NEXT_STAGE[o.stage];
+        action = `<button onclick="advanceVendorOrderStage(${o.order_item_id}, '${next}')" style="background:#16264f; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">${VENDOR_NEXT_STAGE_BUTTON_LABEL[next]}</button>`;
+    } else if (o.stage === "ready_for_handover") {
+        action = `
+            <select id="dropoff-select-${o.order_item_id}" style="padding:6px; border:1px solid #ccc; border-radius:6px; margin-right:6px;">
+                <option value="">Choose drop-off point</option>
+                ${dropoffPointOptions()}
+            </select>
+            <button onclick="markVendorHandedOver(${o.order_item_id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Mark Handed Over</button>`;
+    }
+
+    return `
+        <tr>
+            <td data-label="Product">${o.product_name}${rejectedNote}</td>
+            <td data-label="Qty">${o.quantity}</td>
+            <td data-label="Order Date">${new Date(o.created_at).toLocaleDateString()}</td>
+            <td data-label="Status"><span class="status-badge ${badgeClass}">${o.stageLabel}</span></td>
+            <td data-label="Action">${action}</td>
+        </tr>`;
+}
+
+async function advanceVendorOrderStage(orderItemId, stage) {
+    try {
+        const data = await vendorAuthorizedFetch(`/api/vendors/order-items/${orderItemId}/stage`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ stage })
+        });
+        if (data.error) {
+            alert(data.error);
             return;
         }
-
-        container.innerHTML = `
-            <table>
-                <thead><tr><th>Product</th><th>Qty</th><th>Status</th><th>Action</th></tr></thead>
-                <tbody>
-                    ${relevant.map(o => {
-                        if (o.handover_status === "handed_over") {
-                            return `
-                                <tr>
-                                    <td data-label="Product">${o.product_name}</td>
-                                    <td data-label="Qty">${o.quantity}</td>
-                                    <td data-label="Status"><span class="status-badge status-pending">Awaiting inspection at ${o.dropoff_point_name || "drop-off point"}</span></td>
-                                    <td data-label="Action">-</td>
-                                </tr>`;
-                        }
-                        const rejectedNote = o.handover_status === "rejected"
-                            ? `<div style="font-size:12px; color:#991B1B; margin-top:4px;">Rejected: ${o.rejection_reason || "no reason given"} - re-prepare and re-submit.</div>`
-                            : "";
-                        return `
-                            <tr>
-                                <td data-label="Product">${o.product_name}${rejectedNote}</td>
-                                <td data-label="Qty">${o.quantity}</td>
-                                <td data-label="Status"><span class="status-badge status-cancelled">${o.handover_status === "rejected" ? "Rejected" : "Needs handover"}</span></td>
-                                <td data-label="Action">
-                                    <select id="dropoff-select-${o.order_item_id}" style="padding:6px; border:1px solid #ccc; border-radius:6px; margin-right:6px;">
-                                        <option value="">Choose drop-off point</option>
-                                        ${dropoffPointOptions()}
-                                    </select>
-                                    <button onclick="markVendorHandedOver(${o.order_item_id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Mark Handed Over</button>
-                                </td>
-                            </tr>`;
-                    }).join("")}
-                </tbody>
-            </table>
-        `;
+        loadVendorOrders();
     } catch (error) {
-        console.error("Load handovers error:", error);
+        console.error("Advance order stage error:", error);
+        alert("Could not connect to server.");
     }
 }
 
@@ -521,7 +611,7 @@ async function markVendorHandedOver(orderItemId) {
             alert(data.error || "Could not mark as handed over.");
             return;
         }
-        loadVendorHandovers();
+        loadVendorOrders();
     } catch (error) {
         console.error("Mark handed over error:", error);
         alert("Could not connect to server.");

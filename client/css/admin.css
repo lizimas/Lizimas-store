@@ -217,6 +217,14 @@ th {
 .status-delivered { background: #ede7f6; color: #4527a0; }
 .status-cancelled { background: #fce8e6; color: #c5221f; }
 
+/* Vendor Orders Center stages (Task #59) - reuses the palette above where a
+   stage is conceptually similar, adds a few of its own. */
+.status-new { background: #eef2ff; color: #3730a3; }
+.status-accepted { background: #e6f4ea; color: #1e7e34; }
+.status-processing { background: #e0f2fe; color: #075985; }
+.status-ready { background: #dcfce7; color: #166534; }
+.status-forfeited { background: #f3f4f6; color: #374151; }
+
 select.status-select {
     padding: 6px 8px;
     border-radius: 6px;

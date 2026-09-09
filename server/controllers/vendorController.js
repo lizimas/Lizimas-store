@@ -1,5 +1,6 @@
 const pool = require("../config/database");
 const { computeSellerScore } = require("../utils/sellerScore");
+const { deriveVendorOrderStage, STAGE_LABELS, isValidStage, canAdvanceStage } = require("../utils/vendorOrderStage");
 
 // The logged-in vendor's own KYC/business profile and review status.
 exports.getMyVendorProfile = async (req, res) => {
@@ -210,7 +211,7 @@ exports.getMyVendorOrders = async (req, res) => {
                     p.name AS product_name, p.image AS product_image,
                     o.status AS order_status, o.created_at,
                     oi.handover_status, oi.handed_over_at, oi.rejection_reason,
-                    oi.dropoff_point_id, dp.name AS dropoff_point_name
+                    oi.vendor_fulfilment_stage, oi.dropoff_point_id, dp.name AS dropoff_point_name
              FROM order_items oi
              JOIN products p ON p.id = oi.product_id
              JOIN orders o ON o.id = oi.order_id
@@ -220,7 +221,87 @@ exports.getMyVendorOrders = async (req, res) => {
             [vendorId]
         );
 
-        res.json(result.rows);
+        // Combine order status, the vendor's own pre-handover progress, and
+        // Lizimas' post-handover inspection/returns lifecycle into one
+        // display-friendly stage per item (see utils/vendorOrderStage.js).
+        const rows = result.rows.map(row => {
+            const stage = deriveVendorOrderStage({
+                orderStatus: row.order_status,
+                vendorFulfilmentStage: row.vendor_fulfilment_stage,
+                handoverStatus: row.handover_status
+            });
+            return { ...row, stage, stageLabel: STAGE_LABELS[stage] };
+        });
+
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Vendor advances their own pre-handover stage for one order line item:
+// New -> Accepted -> Processing -> Ready for Handover, one step at a time
+// (see utils/vendorOrderStage.js). Once at Ready for Handover, the existing
+// POST /order-items/:orderItemId/handover call (fulfilmentController.js)
+// takes over. Forward-only and scoped to the vendor's own items, same as
+// vendorMarkHandedOver below it in the fulfilment controller.
+exports.advanceVendorOrderStage = async (req, res) => {
+    try {
+        const { orderItemId } = req.params;
+        const { stage } = req.body;
+
+        if (!isValidStage(stage)) {
+            return res.status(400).json({
+                error: "stage must be one of: new, accepted, processing, ready_for_handover."
+            });
+        }
+
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendorId = vendorRow.rows[0].id;
+
+        const itemRow = await pool.query(
+            `SELECT oi.id, oi.vendor_fulfilment_stage, oi.handover_status, p.vendor_id, o.status AS order_status
+             FROM order_items oi
+             JOIN products p ON p.id = oi.product_id
+             JOIN orders o ON o.id = oi.order_id
+             WHERE oi.id = $1`,
+            [orderItemId]
+        );
+        if (itemRow.rows.length === 0) {
+            return res.status(404).json({ error: "Order item not found." });
+        }
+        const item = itemRow.rows[0];
+        if (Number(item.vendor_id) !== Number(vendorId)) {
+            return res.status(403).json({ error: "This item does not belong to your vendor account." });
+        }
+        if (item.order_status === "cancelled") {
+            return res.status(409).json({ error: "This order has been cancelled." });
+        }
+        // Once handed over (or past that), the vendor's pre-handover stages
+        // are done - handover_status is the record of what happens next.
+        // 'rejected' is the one exception: a rejected item comes back to the
+        // vendor to re-prepare, so it re-enters the New/Accepted/Processing/
+        // Ready for Handover flow (see rejectHandover in fulfilmentController.js,
+        // which resets vendor_fulfilment_stage back to 'new').
+        if (item.handover_status && !["pending_handover", "rejected"].includes(item.handover_status)) {
+            return res.status(409).json({ error: "This item has already moved past your pre-handover stages." });
+        }
+
+        const currentStage = item.vendor_fulfilment_stage || "new";
+        if (!canAdvanceStage(currentStage, stage)) {
+            return res.status(409).json({
+                error: `Cannot move from "${STAGE_LABELS[currentStage] || currentStage}" to "${STAGE_LABELS[stage]}" - stages advance one step at a time (New \u2192 Accepted \u2192 Processing \u2192 Ready for Handover).`
+            });
+        }
+
+        const result = await pool.query(
+            `UPDATE order_items SET vendor_fulfilment_stage = $1 WHERE id = $2 RETURNING *`,
+            [stage, orderItemId]
+        );
+        res.json({ message: `Marked as ${STAGE_LABELS[stage]}.`, item: result.rows[0] });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
