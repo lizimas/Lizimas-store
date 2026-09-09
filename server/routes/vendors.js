@@ -6,7 +6,8 @@ const {
     getMyVendorProfile, getMyVendorOrders, updateMyVendorProfile, getPublicStorefront,
     followVendor, unfollowVendor, getFollowStatus, getVendorDashboardSummary,
     advanceVendorOrderStage, bulkUpdateVendorProducts,
-    getVendorWallet, requestVendorPayout
+    getVendorWallet, requestVendorPayout,
+    getMyReturnsRefunds, respondToReturn
 } = require("../controllers/vendorController");
 const {
     addProduct,
@@ -95,6 +96,11 @@ router.post("/products/:id/description-blocks/image", upload.single("image"), up
 router.get("/dropoff-points", listActiveDropoffPoints);
 router.post("/order-items/:orderItemId/handover", vendorMarkHandedOver);
 router.get("/returns", getMyReturns);
+
+// Returns & Refunds Center (Task #62): the financial/decision view, apart
+// from the collection-logistics-only "Returns" tab above.
+router.get("/returns-refunds", getMyReturnsRefunds);
+router.patch("/order-items/:orderItemId/return-response", respondToReturn);
 
 // Live pricing preview for the product-upload form (spec section 8): given
 // a category and the vendor's desired payout, returns the commission rate,

@@ -54,6 +54,7 @@ function setupVendorTabs() {
             if (button.dataset.tab === "add-product" && staffCategoriesLoaded === false) loadVendorCategories();
             if (button.dataset.tab === "orders") loadVendorOrders();
             if (button.dataset.tab === "returns") loadVendorReturns();
+            if (button.dataset.tab === "refunds") loadVendorReturnsRefunds();
             if (button.dataset.tab === "wallet") loadVendorWallet();
         });
     });
@@ -1213,6 +1214,109 @@ async function requestVendorPayout() {
         console.error("Request vendor payout error:", error);
         alert("Could not connect to server.");
         if (btn) btn.disabled = false;
+    }
+}
+
+// --- Returns & Refunds Center (Task #62) --------------------------------
+// A financial/decision view of returns, separate from the collection-
+// logistics-only Returns tab (loadVendorReturns above). Lizimas makes the
+// final call on every refund - this only shows the vendor what happened
+// and lets them add their own response, never changes the decision.
+
+const VENDOR_RETURN_REASON_LABEL = {
+    failed_delivery: "Failed delivery",
+    customer_return: "Customer return",
+    damaged: "Damaged",
+    defective: "Defective",
+    expired: "Expired"
+};
+
+const VENDOR_RESOLUTION_LABEL = {
+    awaiting_decision: "Awaiting Lizimas' decision",
+    refund_approved: "Refund approved",
+    refund_denied: "Refund denied"
+};
+const VENDOR_RESOLUTION_CLASS = {
+    awaiting_decision: "status-pending",
+    refund_approved: "status-paid",
+    refund_denied: "status-cancelled"
+};
+
+async function loadVendorReturnsRefunds() {
+    const box = document.getElementById("vendor-returns-refunds-list");
+    if (!box) return;
+
+    try {
+        const rows = await vendorAuthorizedFetch("/api/vendors/returns-refunds");
+        if (rows.error) {
+            box.innerHTML = `<p>${vendorEsc(rows.error)}</p>`;
+            return;
+        }
+        if (rows.length === 0) {
+            box.innerHTML = `<p class="no-data">No returns recorded.</p>`;
+            return;
+        }
+
+        box.innerHTML = rows.map(r => `
+            <div class="panel" style="border:1px solid #eee; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; align-items:flex-start;">
+                    <div>
+                        <strong>${vendorEsc(r.product_name)}</strong> &times; ${r.quantity}
+                        <div style="font-size:12px; color:#888; margin-top:2px;">
+                            ${VENDOR_RETURN_REASON_LABEL[r.return_reason] || r.return_reason}
+                            &middot; Returned ${new Date(r.returned_at).toLocaleDateString()}
+                        </div>
+                    </div>
+                    <span class="status-badge ${VENDOR_RESOLUTION_CLASS[r.resolutionStatus] || ""}">${VENDOR_RESOLUTION_LABEL[r.resolutionStatus] || r.resolutionStatus}</span>
+                </div>
+
+                ${r.return_evidence_image ? `<img src="${vendorEsc(r.return_evidence_image)}" alt="Return evidence" style="max-width:200px; border-radius:8px; margin-top:10px;">` : ""}
+
+                ${r.refund_decision ? `
+                    <div style="margin-top:10px; font-size:13px;">
+                        ${r.refund_decision === "approved"
+                            ? `<span style="color:#166534; font-weight:600;">Refund approved: ${vendorFmtUgx(r.refund_amount)}</span>`
+                            : `<span style="color:#DC2626; font-weight:600;">Refund denied</span>`}
+                        ${r.refund_notes ? `<div style="color:#666; margin-top:4px;">${vendorEsc(r.refund_notes)}</div>` : ""}
+                    </div>
+                ` : ""}
+
+                <div style="margin-top:12px; border-top:1px solid #f0f0f0; padding-top:10px;">
+                    <label style="font-size:12px; font-weight:600; display:block; margin-bottom:6px;">Your response</label>
+                    ${r.vendor_response ? `<p style="font-size:13px; color:#333; margin:0 0 8px;">${vendorEsc(r.vendor_response)}</p>` : ""}
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="vendor-return-response-${r.order_item_id}" placeholder="Add or update your response..." value="${r.vendor_response ? vendorEsc(r.vendor_response) : ""}" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:6px; font-size:13px;">
+                        <button onclick="submitVendorReturnResponse(${r.order_item_id})" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:8px 14px; cursor:pointer; font-size:13px;">Save</button>
+                    </div>
+                </div>
+            </div>
+        `).join("");
+    } catch (error) {
+        console.error("Load vendor returns/refunds error:", error);
+        box.innerHTML = "<p>Could not connect to server.</p>";
+    }
+}
+
+async function submitVendorReturnResponse(orderItemId) {
+    const input = document.getElementById(`vendor-return-response-${orderItemId}`);
+    if (!input || !input.value.trim()) {
+        alert("Enter a response first.");
+        return;
+    }
+    try {
+        const data = await vendorAuthorizedFetch(`/api/vendors/order-items/${orderItemId}/return-response`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ response: input.value.trim() })
+        });
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        await loadVendorReturnsRefunds();
+    } catch (error) {
+        console.error("Submit vendor return response error:", error);
+        alert("Could not connect to server.");
     }
 }
 

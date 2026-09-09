@@ -1,4 +1,7 @@
 const pool = require("../config/database");
+const { logActivity } = require("../utils/activityLog");
+const { uploadBuffer } = require("../utils/cloudinaryUpload");
+const { canRecordRefundDecision } = require("../utils/vendorReturns");
 
 // --- Drop-off points (admin-managed) ---------------------------------
 
@@ -304,6 +307,162 @@ exports.markForfeited = async (req, res) => {
             return res.status(409).json({ error: "Item is not yet eligible for forfeiture." });
         }
         res.json({ message: "Item forfeited.", item: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// --- Returns & Refunds Center (Task #62) --------------------------------
+//
+// The physical side (getPendingReturns/markCollected/markForfeited above)
+// tracks getting an item back from the customer. These cover the
+// financial/decision side that was missing entirely: an evidence photo,
+// Lizimas' approve/deny call on refunding the customer, and the recorded
+// amount. refund_amount is a RECORDED figure - what Lizimas actually
+// refunded the customer via the payment gateway/MoMo dashboard - not an
+// automatic gateway refund call, same manual-confirmation pattern as
+// vendor payouts.
+
+// Every return awaiting a refund decision, oldest first.
+exports.getReturnsAwaitingRefundDecision = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT oi.id AS order_item_id, oi.order_id, oi.quantity, oi.price,
+                    oi.return_reason, oi.returned_at, oi.return_evidence_image,
+                    oi.vendor_response, oi.vendor_responded_at,
+                    p.name AS product_name, v.business_name AS vendor_business_name
+             FROM order_items oi
+             JOIN products p ON p.id = oi.product_id
+             LEFT JOIN vendors v ON v.id = p.vendor_id
+             WHERE oi.return_reason IS NOT NULL AND oi.refund_decision IS NULL
+             ORDER BY oi.returned_at ASC`
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Already-decided returns, most recent first - a resolution history.
+exports.getReturnsRefundHistory = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT oi.id AS order_item_id, oi.order_id, oi.quantity, oi.price,
+                    oi.return_reason, oi.returned_at, oi.return_evidence_image,
+                    oi.refund_decision, oi.refund_amount, oi.refund_notes, oi.refund_decided_at,
+                    oi.vendor_response, oi.vendor_responded_at,
+                    p.name AS product_name, v.business_name AS vendor_business_name
+             FROM order_items oi
+             JOIN products p ON p.id = oi.product_id
+             LEFT JOIN vendors v ON v.id = p.vendor_id
+             WHERE oi.refund_decision IS NOT NULL
+             ORDER BY oi.refund_decided_at DESC
+             LIMIT 200`
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Admin attaches a photo of the returned item's condition - separate from
+// the decision itself, so evidence can be added as soon as the item is
+// inspected, before Lizimas has decided anything.
+exports.uploadReturnEvidence = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No file uploaded." });
+        }
+        const { orderItemId } = req.params;
+        const existing = await pool.query(
+            `SELECT id FROM order_items WHERE id = $1 AND return_reason IS NOT NULL`,
+            [orderItemId]
+        );
+        if (existing.rows.length === 0) {
+            return res.status(404).json({ error: "No recorded return for this item." });
+        }
+
+        const uploaded = await uploadBuffer(req.file.buffer, "lizimas-store/returns");
+        const result = await pool.query(
+            `UPDATE order_items SET return_evidence_image = $1 WHERE id = $2 RETURNING id, return_evidence_image`,
+            [uploaded.url, orderItemId]
+        );
+        res.json({ message: "Evidence photo saved.", item: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Lizimas approves refunding the customer. The decision is final once
+// made (canRecordRefundDecision) - Lizimas/admin retains final authority,
+// and a genuine after-the-fact correction should go through the vendor's
+// manual ledger adjustment, not a second call here.
+exports.approveReturnRefund = async (req, res) => {
+    try {
+        const { orderItemId } = req.params;
+        const { amount, notes } = req.body;
+        const numericAmount = Number(amount);
+        if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+            return res.status(400).json({ error: "amount must be a positive number." });
+        }
+
+        const current = await pool.query(
+            `SELECT return_reason, refund_decision FROM order_items WHERE id = $1`,
+            [orderItemId]
+        );
+        if (current.rows.length === 0 || !current.rows[0].return_reason) {
+            return res.status(404).json({ error: "No recorded return for this item." });
+        }
+        const eligibility = canRecordRefundDecision(current.rows[0].refund_decision);
+        if (!eligibility.allowed) {
+            return res.status(409).json({ error: eligibility.reason });
+        }
+
+        const result = await pool.query(
+            `UPDATE order_items
+             SET refund_decision = 'approved', refund_amount = $1, refund_notes = $2,
+                 refund_decided_at = now(), refund_decided_by = $3
+             WHERE id = $4 RETURNING *`,
+            [numericAmount, notes || null, req.user.userId, orderItemId]
+        );
+        logActivity(req.user.userId, "return_refund_approved", "order_item", orderItemId,
+            `UGX ${numericAmount.toLocaleString()} approved`);
+        res.json({ message: "Refund approved.", item: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Lizimas decides against refunding the customer for this item.
+exports.denyReturnRefund = async (req, res) => {
+    try {
+        const { orderItemId } = req.params;
+        const { notes } = req.body;
+        if (!notes || !String(notes).trim()) {
+            return res.status(400).json({ error: "notes explaining the denial is required." });
+        }
+
+        const current = await pool.query(
+            `SELECT return_reason, refund_decision FROM order_items WHERE id = $1`,
+            [orderItemId]
+        );
+        if (current.rows.length === 0 || !current.rows[0].return_reason) {
+            return res.status(404).json({ error: "No recorded return for this item." });
+        }
+        const eligibility = canRecordRefundDecision(current.rows[0].refund_decision);
+        if (!eligibility.allowed) {
+            return res.status(409).json({ error: eligibility.reason });
+        }
+
+        const result = await pool.query(
+            `UPDATE order_items
+             SET refund_decision = 'denied', refund_notes = $1,
+                 refund_decided_at = now(), refund_decided_by = $2
+             WHERE id = $3 RETURNING *`,
+            [notes, req.user.userId, orderItemId]
+        );
+        logActivity(req.user.userId, "return_refund_denied", "order_item", orderItemId, notes);
+        res.json({ message: "Refund denied.", item: result.rows[0] });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

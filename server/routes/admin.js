@@ -34,6 +34,7 @@ const {
     uploadThreadAttachment
 } = require("../controllers/staffMessagesController");
 const { chatAttachment } = require("../middleware/upload");
+const upload = require("../middleware/upload");
 
 const {
     getPendingProducts,
@@ -60,7 +61,12 @@ const {
     markReturned,
     getPendingReturns,
     markCollected,
-    markForfeited
+    markForfeited,
+    getReturnsAwaitingRefundDecision,
+    getReturnsRefundHistory,
+    uploadReturnEvidence,
+    approveReturnRefund,
+    denyReturnRefund
 } = require("../controllers/fulfilmentController");
 const {
     getPendingVendors,
@@ -183,6 +189,13 @@ router.patch("/handovers/:orderItemId/return", markReturned);
 router.get("/returns/pending", getPendingReturns);
 router.patch("/returns/:orderItemId/collect", markCollected);
 router.patch("/returns/:orderItemId/forfeit", markForfeited);
+
+// Returns & Refunds Center (Task #62): the financial/decision side.
+router.get("/returns/refunds/pending", getReturnsAwaitingRefundDecision);
+router.get("/returns/refunds/history", getReturnsRefundHistory);
+router.post("/returns/:orderItemId/evidence", upload.single("image"), uploadReturnEvidence);
+router.patch("/returns/:orderItemId/refund/approve", approveReturnRefund);
+router.patch("/returns/:orderItemId/refund/deny", denyReturnRefund);
 
 
 router.get("/discount-codes", listDiscountCodes);

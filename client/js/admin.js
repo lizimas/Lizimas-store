@@ -1664,6 +1664,7 @@ function setupTabs() {
                 loadPendingHandovers();
                 loadPendingReturns();
                 loadPendingVendorPayouts();
+                loadPendingReturnRefunds();
             }
 
             if (button.dataset.tab === "team-messages") {
@@ -5921,6 +5922,118 @@ async function createVendorLedgerAdjustment(vendorId) {
         alert("Adjustment recorded.");
     } catch (error) {
         console.error("Create vendor ledger adjustment error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+// --- Returns & Refunds Center (Task #62) --------------------------------
+// Approve/deny is final once made - Lizimas/admin retains final authority
+// over the outcome. refund_amount is a RECORDED figure (what was actually
+// refunded via the payment gateway/MoMo dashboard), not an automatic
+// gateway refund call - this panel never moves money itself.
+
+async function loadPendingReturnRefunds() {
+    try {
+        const items = await authorizedFetch("/api/admin/returns/refunds/pending");
+        const container = document.getElementById("pending-return-refunds-list");
+
+        if (!items || items.length === 0) {
+            container.innerHTML = `<p class="no-data">No returns awaiting a refund decision.</p>`;
+            return;
+        }
+
+        container.innerHTML = items.map(i => `
+            <div class="panel" style="border:1px solid #eee; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <strong>${i.product_name}</strong> &times; ${i.quantity}
+                        <div style="font-size:12px; color:#888; margin-top:2px;">
+                            Vendor: ${i.vendor_business_name || "-"} &middot; Reason: ${(i.return_reason || "").replace(/_/g, " ")}
+                            &middot; Returned ${new Date(i.returned_at).toLocaleDateString()}
+                        </div>
+                    </div>
+                </div>
+
+                ${i.return_evidence_image ? `<img src="${i.return_evidence_image}" alt="Return evidence" style="max-width:200px; border-radius:8px; margin-top:10px;">` : `
+                    <div style="margin-top:10px;">
+                        <label style="font-size:12px; font-weight:600; display:block; margin-bottom:4px;">Attach evidence photo</label>
+                        <input type="file" accept="image/*" onchange="uploadReturnEvidencePhoto(${i.order_item_id}, this)">
+                    </div>
+                `}
+
+                ${i.vendor_response ? `<p style="font-size:13px; color:#333; margin-top:10px;"><strong>Vendor's response:</strong> ${i.vendor_response}</p>` : ""}
+
+                <div style="display:flex; gap:10px; align-items:center; margin-top:12px; border-top:1px solid #f0f0f0; padding-top:10px;">
+                    <input type="number" min="0" step="1" id="refund-amount-${i.order_item_id}" placeholder="Amount (UGX)" style="width:140px; padding:8px; border:1px solid #ccc; border-radius:6px; font-size:13px;">
+                    <button onclick="approveReturnRefundRequest(${i.order_item_id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-size:13px; cursor:pointer;">Approve Refund</button>
+                    <button onclick="denyReturnRefundRequest(${i.order_item_id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-size:13px; cursor:pointer;">Deny Refund</button>
+                </div>
+            </div>
+        `).join("");
+    } catch (error) {
+        console.error("Load pending return refunds error:", error);
+    }
+}
+
+async function uploadReturnEvidencePhoto(orderItemId, input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+        const form = new FormData();
+        form.append("image", file);
+        const response = await fetch(`${API_URL}/api/admin/returns/${orderItemId}/evidence`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${getToken()}` },
+            body: form
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.error || "Could not upload that photo.");
+            return;
+        }
+        loadPendingReturnRefunds();
+    } catch (error) {
+        console.error("Upload return evidence error:", error);
+        alert("Something went wrong uploading that photo.");
+    }
+}
+
+async function approveReturnRefundRequest(orderItemId) {
+    const amountInput = document.getElementById(`refund-amount-${orderItemId}`);
+    const amount = Number(amountInput ? amountInput.value : "");
+    if (!Number.isFinite(amount) || amount <= 0) {
+        alert("Enter a refund amount first.");
+        return;
+    }
+    if (!confirm(`Approve a refund of ${fmtUgx(amount)}? Record this only after you've actually refunded the customer.`)) return;
+
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/returns/${orderItemId}/refund/approve`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ amount })
+        });
+        loadPendingReturnRefunds();
+    } catch (error) {
+        console.error("Approve return refund error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function denyReturnRefundRequest(orderItemId) {
+    const notes = prompt("Reason for denying this refund (shown to the vendor):");
+    if (!notes) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/returns/${orderItemId}/refund/deny`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ notes })
+        });
+        loadPendingReturnRefunds();
+    } catch (error) {
+        console.error("Deny return refund error:", error);
         alert("Something went wrong.");
     }
 }

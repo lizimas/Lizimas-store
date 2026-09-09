@@ -464,3 +464,67 @@ payout is a vendor-initiated request, admin-confirmed), any non-MoMo payout
 method, and a vendor-facing itemized statement of exactly which orders make
 up the current balance (the summary is currency totals only - Sale/Charges/
 Refunded/Adjustments - not a per-order breakdown).
+
+
+## Returns & Refunds Center (September 2026)
+
+Covers the "Returns & Refunds Center" line from Ryan's gap analysis: a
+vendor-facing, decision-focused view of returns (reason, evidence photo,
+Lizimas' refund decision, vendor response), separate from the existing
+Returns tab which is purely about the vendor physically collecting a
+returned item back (`getMyReturns`/`markCollected`/`markForfeited` -
+migration 052). Lizimas/admin retains final authority over every refund
+decision, unchanged from the governance table.
+
+**Migration to run:**
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/068_return_refunds.sql
+
+**What was actually missing.** Migration 052 already tracked the physical
+side of a return (`return_reason`, `collection_deadline`, `handover_status`
+moving through `returned_for_collection` -> `collected`/`forfeited`) but
+nothing about the financial outcome: no evidence photo, no refund
+approve/deny decision, no recorded amount, and no way for a vendor to see
+or respond to any of it. This migration adds exactly those columns to
+`order_items` rather than a parallel table, since a return is still
+fundamentally one order_item with more state on it - same reasoning as
+Task #59's `vendor_fulfilment_stage`.
+
+**`refund_amount` is a recorded figure, not an automatic transfer.** Same
+manual-confirmation pattern as `vendor_payouts` (Task #61): admin approves
+a refund and records what was actually sent back to the customer via the
+payment gateway/MoMo dashboard; nothing here calls Flutterwave/Airtel Money
+to issue a refund itself. Wiring up a real automated gateway refund call
+was considered out of scope for this pass - a materially bigger,
+higher-risk change than the rest of the vendor center, and better done as
+its own reviewed piece of work.
+
+**A refund decision is final once made** (`canRecordRefundDecision`):
+approve/deny can each only be called once per return. A genuine
+after-the-fact correction (e.g. Lizimas made a mistake) should go through
+a manual vendor wallet ledger adjustment (Task #61), not a second call
+here - keeps "Lizimas/admin retains final authority" meaning something
+rather than being reversible on a whim.
+
+**Vendor response is unrestricted and non-binding**: a vendor can add or
+update a comment on any of their returns at any time (before or after
+Lizimas' decision) via `PATCH /api/vendors/order-items/:id/return-response`
+- it's visible to admin alongside the return, but never changes the
+decision itself. Simpler than gating it to "only before a decision exists"
+and covers the more likely real use (disputing a decision after seeing it),
+flagged here as my own judgment call.
+
+**Evidence photo** is admin-attached (uploaded via the same Cloudinary
+`uploadBuffer` helper product images use, folder
+`lizimas-store/returns`), not something a customer or vendor submits
+themselves - there's no customer-facing return-request flow to attach
+anything to; a return still only gets created when Lizimas staff mark an
+item returned via the existing `markReturned` endpoint.
+
+**Deliberately not built in this pass:** a customer-facing "request a
+return" flow (returns are still staff-initiated, exactly as before this
+task); automatic partial refunds tied to specific quantities (one
+`refund_amount` per order_item, not per unit); and any change to how a
+refunded item already affects a vendor's wallet balance - `vendorWallet.js`
+already claws back the charge for any item with a return-shaped
+`handover_status`, independent of whether a refund_decision exists yet.

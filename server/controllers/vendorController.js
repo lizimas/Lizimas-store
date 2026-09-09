@@ -8,6 +8,7 @@ const {
     summarizeVendorWallet,
     canRequestPayout
 } = require("../utils/vendorWallet");
+const { deriveReturnResolutionStatus } = require("../utils/vendorReturns");
 
 // The logged-in vendor's own KYC/business profile and review status.
 exports.getMyVendorProfile = async (req, res) => {
@@ -821,6 +822,83 @@ exports.getVendorWalletAdmin = async (req, res) => {
         const vendor = vendorRow.rows[0];
         const walletData = await loadVendorWalletData(vendor.id);
         res.json({ vendor: { id: vendor.id, businessName: vendor.business_name }, ...walletResponsePayload(vendor, walletData) });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// --- Returns & Refunds Center (Task #62), vendor side --------------------
+// A dedicated financial/decision view of this vendor's returns, separate
+// from the logistics-only Returns tab (getMyReturns/vendorMarkHandedOver
+// in fulfilmentController.js, which is about collecting the physical item
+// back). This is: why it came back, the evidence photo, Lizimas' decision,
+// and the vendor's own response to that decision.
+exports.getMyReturnsRefunds = async (req, res) => {
+    try {
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendorId = vendorRow.rows[0].id;
+
+        const result = await pool.query(
+            `SELECT oi.id AS order_item_id, oi.order_id, oi.quantity, oi.price,
+                    oi.return_reason, oi.returned_at, oi.return_evidence_image,
+                    oi.refund_decision, oi.refund_amount, oi.refund_notes, oi.refund_decided_at,
+                    oi.vendor_response, oi.vendor_responded_at,
+                    p.name AS product_name, p.image AS product_image
+             FROM order_items oi
+             JOIN products p ON p.id = oi.product_id
+             WHERE p.vendor_id = $1 AND oi.return_reason IS NOT NULL
+             ORDER BY oi.returned_at DESC`,
+            [vendorId]
+        );
+
+        const rows = result.rows.map(row => ({
+            ...row,
+            resolutionStatus: deriveReturnResolutionStatus({
+                returnReason: row.return_reason,
+                refundDecision: row.refund_decision
+            })
+        }));
+
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// A vendor's own comment/dispute on a return - visible to admin, never
+// changes the refund decision itself (Lizimas/admin retains final
+// authority). Can be updated any time there's an active return recorded;
+// deliberately not locked to "before decision only" - a vendor may want
+// to respond to Lizimas' decision after it's made just as much as before.
+exports.respondToReturn = async (req, res) => {
+    try {
+        const { orderItemId } = req.params;
+        const { response } = req.body;
+        if (!response || !String(response).trim()) {
+            return res.status(400).json({ error: "response is required." });
+        }
+
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendorId = vendorRow.rows[0].id;
+
+        const result = await pool.query(
+            `UPDATE order_items oi
+             SET vendor_response = $1, vendor_responded_at = now()
+             FROM products p
+             WHERE oi.product_id = p.id AND oi.id = $2 AND p.vendor_id = $3 AND oi.return_reason IS NOT NULL
+             RETURNING oi.id, oi.vendor_response, oi.vendor_responded_at`,
+            [response, orderItemId, vendorId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "No recorded return found for this item on your account." });
+        }
+        res.json({ message: "Response saved.", item: result.rows[0] });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
