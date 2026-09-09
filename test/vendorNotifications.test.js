@@ -7,10 +7,10 @@ const {
     buildNotification
 } = require("../server/utils/vendorNotifications.js");
 
-test("NOTIFICATION_TYPES has exactly the six known types", () => {
+test("NOTIFICATION_TYPES has exactly the seven known types", () => {
     assert.deepEqual(NOTIFICATION_TYPES, [
         "new_order", "low_stock", "product_approved", "product_rejected",
-        "compliance_action", "payout_update"
+        "compliance_action", "payout_update", "refund_decision"
     ]);
 });
 
@@ -66,6 +66,17 @@ test("buildNotification: payout_update varies title by status", () => {
     const rejected = buildNotification("payout_update", { status: "rejected", amount: 20000 });
     assert.equal(rejected.title, "Payout rejected");
     assert.match(rejected.message, /UGX 20,000 was rejected/);
+});
+
+test("buildNotification: refund_decision varies title/message by decision", () => {
+    const approved = buildNotification("refund_decision", { decision: "approved", productName: "Blue Shirt", amount: 30000 });
+    assert.equal(approved.title, "Refund approved");
+    assert.match(approved.message, /Blue Shirt was approved \(UGX 30,000\)/);
+    assert.equal(approved.linkTab, "refunds");
+
+    const denied = buildNotification("refund_decision", { decision: "denied", productName: "Blue Shirt", notes: "Item showed signs of use" });
+    assert.equal(denied.title, "Refund denied");
+    assert.match(denied.message, /Blue Shirt was denied: Item showed signs of use/);
 });
 
 test("buildNotification: unknown type returns null", () => {

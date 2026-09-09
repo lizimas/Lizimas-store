@@ -6,7 +6,7 @@
 
 const NOTIFICATION_TYPES = [
     "new_order", "low_stock", "product_approved", "product_rejected",
-    "compliance_action", "payout_update"
+    "compliance_action", "payout_update", "refund_decision"
 ];
 
 // Matches the `stock < 10` threshold getVendorDashboardSummary already
@@ -58,6 +58,14 @@ function buildNotification(type, context = {}) {
                 title: context.status === "paid" ? "Payout sent" : "Payout rejected",
                 message: `Your payout request of UGX ${Number(context.amount).toLocaleString()} was ${context.status}.`,
                 linkTab: "wallet"
+            };
+        case "refund_decision":
+            return {
+                title: context.decision === "approved" ? "Refund approved" : "Refund denied",
+                message: context.decision === "approved"
+                    ? `Your refund for ${context.productName} was approved (UGX ${Number(context.amount).toLocaleString()}).`
+                    : `Your refund for ${context.productName} was denied${context.notes ? `: ${context.notes}` : "."}`,
+                linkTab: "refunds"
             };
         default:
             return null;

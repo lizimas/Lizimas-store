@@ -731,11 +731,12 @@ text into the `product_rejected` notification instead of the generic
 fallback, and shows it under the "Rejected" badge on the vendor's own
 product list.
 
-**No notification for return/refund decisions** (Task #62) - a deliberate
-scope cut for this pass, not an oversight. A vendor already sees refund
-outcomes directly in their "Returns & Refunds" tab, so this is a smaller
-gap than the others; add `refund_decision` as a seventh notification type
-if it turns out vendors want a push rather than having to check that tab.
+~~No notification for return/refund decisions.~~ **Fixed (September
+2026, Task #70)** - `refund_decision` is now a seventh
+`vendor_notifications` type (migration 074), hooked into
+`approveReturnRefund`/`denyReturnRefund` in `fulfilmentController.js`. A
+vendor still sees the outcome in their Returns & Refunds tab too - this
+just adds the push instead of requiring them to go check.
 
 **Reports tab**: fixed 30-day range, no custom date picker - deliberately
 simpler than admin's analytics/performance tabs, which already have one.

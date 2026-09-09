@@ -2,6 +2,7 @@ const pool = require("../config/database");
 const { logActivity } = require("../utils/activityLog");
 const { uploadBuffer } = require("../utils/cloudinaryUpload");
 const { canRecordRefundDecision } = require("../utils/vendorReturns");
+const { createVendorNotification } = require("./vendorController");
 
 // --- Drop-off points (admin-managed) ---------------------------------
 
@@ -407,7 +408,10 @@ exports.approveReturnRefund = async (req, res) => {
         }
 
         const current = await pool.query(
-            `SELECT return_reason, refund_decision FROM order_items WHERE id = $1`,
+            `SELECT oi.return_reason, oi.refund_decision, oi.product_name, p.vendor_id
+             FROM order_items oi
+             LEFT JOIN products p ON p.id = oi.product_id
+             WHERE oi.id = $1`,
             [orderItemId]
         );
         if (current.rows.length === 0 || !current.rows[0].return_reason) {
@@ -427,6 +431,13 @@ exports.approveReturnRefund = async (req, res) => {
         );
         logActivity(req.user.userId, "return_refund_approved", "order_item", orderItemId,
             `UGX ${numericAmount.toLocaleString()} approved`);
+        if (current.rows[0].vendor_id) {
+            await createVendorNotification(current.rows[0].vendor_id, "refund_decision", {
+                decision: "approved",
+                productName: current.rows[0].product_name,
+                amount: numericAmount
+            });
+        }
         res.json({ message: "Refund approved.", item: result.rows[0] });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -443,7 +454,10 @@ exports.denyReturnRefund = async (req, res) => {
         }
 
         const current = await pool.query(
-            `SELECT return_reason, refund_decision FROM order_items WHERE id = $1`,
+            `SELECT oi.return_reason, oi.refund_decision, oi.product_name, p.vendor_id
+             FROM order_items oi
+             LEFT JOIN products p ON p.id = oi.product_id
+             WHERE oi.id = $1`,
             [orderItemId]
         );
         if (current.rows.length === 0 || !current.rows[0].return_reason) {
@@ -462,6 +476,13 @@ exports.denyReturnRefund = async (req, res) => {
             [notes, req.user.userId, orderItemId]
         );
         logActivity(req.user.userId, "return_refund_denied", "order_item", orderItemId, notes);
+        if (current.rows[0].vendor_id) {
+            await createVendorNotification(current.rows[0].vendor_id, "refund_decision", {
+                decision: "denied",
+                productName: current.rows[0].product_name,
+                notes
+            });
+        }
         res.json({ message: "Refund denied.", item: result.rows[0] });
     } catch (error) {
         res.status(500).json({ error: error.message });
