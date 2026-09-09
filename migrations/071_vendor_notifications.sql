@@ -29,7 +29,7 @@ CREATE INDEX IF NOT EXISTS idx_vendor_notifications_unread
 
 COMMENT ON TABLE vendor_notifications IS 'In-dashboard notification feed for a vendor - link_tab names which dashboard tab the client should jump to when the notification is clicked.';
 
-INSERT INTO schema_migrations (filename, description)
+INSERT INTO schema_migrations (filename, note)
 VALUES (
     '071_vendor_notifications.sql',
     'vendor_notifications: structured in-dashboard feed (new order, low stock, product approved/rejected, compliance action, payout update).'
