@@ -169,11 +169,9 @@ Render):
   ~200-node category tree, and picking the mapping is a pricing decision, not
   a technical one. Everything runs on the single 15% marketplace default
   until real rates are set from the new admin screen.
-- **No UI for a vendor to set their own logo/banner/about.** The columns and
-  the storefront page both exist and work, but nothing writes to them yet —
-  every store currently shows the plain fallback (initial-letter avatar, dark
-  banner, no about text) until a follow-up adds that to the vendor dashboard
-  (or they're set directly in the database).
+- ~~No UI for a vendor to set their own logo/banner/about.~~ **Fixed
+  (September 2026, Task #68) — see the "Vendor storefront branding UI"
+  section below.**
 - ~~Order-time commission locking is not wired up.~~ **Fixed (September
   2026, Task #67) — see the "Order-time commission locking" section
   below.**
@@ -814,3 +812,44 @@ discount/flash-sale/promotion price resolution, and every other part of
 placing an order are untouched. This only affects what gets stored
 alongside each `order_items` row and which numbers vendor-earnings
 reporting reads back.
+
+
+## Vendor storefront branding UI (September 2026)
+
+Closes the other gap flagged since the commission-engine slice: the
+`vendors.logo_url`/`banner_url`/`about` columns (migration 062) and the
+public storefront page (`/store/:slug`) both existed and worked, but
+nothing let a vendor actually set them — every store showed the plain
+fallback (initial-letter avatar, dark banner, no bio) regardless of what
+the vendor wanted their store to look like.
+
+**What shipped:**
+- `server/utils/vendorStorefront.js` — `isValidAboutText`/
+  `MAX_ABOUT_LENGTH` (1000 chars — a starting point, tune in one place,
+  same spirit as every other tunable default in this codebase). 5 tests.
+- `vendorController.js`'s `updateVendorStorefront` (new) — a dedicated
+  `PATCH /api/vendors/me/storefront`, kept deliberately separate from the
+  existing `updateMyVendorProfile` (KYC/business data): different concern,
+  different validation, no reason to overload one endpoint for both.
+  Multipart, and partial by design — omitting `about` leaves it untouched
+  (so a vendor can update just their logo without resending their bio),
+  an empty string clears it, and `remove_logo=true`/`remove_banner=true`
+  clears an image without requiring a replacement upload. Reuses the
+  existing 5MB image-only multer instance and `uploadBuffer` Cloudinary
+  helper (same pattern as return-evidence photos, Task #62).
+- `getMyVendorProfile`'s SELECT now also returns `slug`/`logo_url`/
+  `banner_url`/`about`, so the dashboard can prefill the form from the
+  same call it already makes.
+- Vendor dashboard: new "Storefront" tab — logo (circular preview +
+  upload + remove), banner (cover preview + upload + remove), an about
+  textarea with a live 1000-char counter, a "View my storefront" link
+  that points at the vendor's own `/store/:slug`, and a Save button. A
+  newly-chosen file previews immediately via `URL.createObjectURL`
+  before upload; clicking Remove clears the preview optimistically and
+  is only actually sent to the server if no replacement file is chosen
+  before Save.
+
+**Nothing about the storefront's public rendering changed** — `store.js`
+already handled the "field is set" vs. "field is null" cases gracefully
+(that fallback behavior is exactly why this was a UI-only gap, not a
+backend one).

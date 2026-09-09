@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Vendor Dashboard</title>
-<link rel="stylesheet" href="../css/admin.css?v=20">
+<link rel="stylesheet" href="../css/admin.css?v=21">
 </head>
 <body>
 
@@ -58,6 +58,9 @@
                     </button>
                     <button class="tab-btn" data-tab="reports">
                         <span class="sidebar-icon">&#128202;</span> Reports
+                    </button>
+                    <button class="tab-btn" data-tab="storefront">
+                        <span class="sidebar-icon">&#127978;</span> Storefront
                     </button>
                     <button class="tab-btn" data-tab="account">
                         <span class="sidebar-icon">&#9881;</span> Account
@@ -384,6 +387,42 @@
                     </div>
                 </section>
 
+                <section id="tab-storefront" class="tab-content hidden">
+                    <h2 class="admin-page-title">Storefront</h2>
+                    <p class="admin-page-subtitle">
+                        Your logo, banner and about text appear on your public store page.
+                        <a id="vendor-storefront-view-link" href="#" target="_blank" rel="noopener">View my storefront &rarr;</a>
+                    </p>
+
+                    <div class="panel">
+                        <h3 style="margin:0 0 10px;">Logo</h3>
+                        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                            <img id="vendor-storefront-logo-preview" src="" alt="" style="width:80px; height:80px; border-radius:50%; object-fit:cover; background:#f3f4f6; display:none;">
+                            <div id="vendor-storefront-logo-placeholder" style="width:80px; height:80px; border-radius:50%; background:#e5e7eb; display:flex; align-items:center; justify-content:center; font-size:12px; color:#888;">No logo</div>
+                            <div>
+                                <input type="file" id="vendor-storefront-logo-input" accept="image/*" style="display:block; margin-bottom:6px;">
+                                <button type="button" id="vendor-storefront-remove-logo-btn" style="background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; padding:6px 12px; cursor:pointer; font-size:12px;">Remove logo</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <h3 style="margin:0 0 10px;">Banner</h3>
+                        <div id="vendor-storefront-banner-preview" style="width:100%; max-width:480px; height:120px; border-radius:8px; background:#e5e7eb no-repeat center/cover; margin-bottom:10px; display:flex; align-items:center; justify-content:center; font-size:12px; color:#888;">No banner</div>
+                        <input type="file" id="vendor-storefront-banner-input" accept="image/*" style="display:block; margin-bottom:6px;">
+                        <button type="button" id="vendor-storefront-remove-banner-btn" style="background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; padding:6px 12px; cursor:pointer; font-size:12px;">Remove banner</button>
+                    </div>
+
+                    <div class="panel">
+                        <h3 style="margin:0 0 10px;">About</h3>
+                        <textarea id="vendor-storefront-about" rows="5" maxlength="1000" placeholder="Tell customers a little about your store..." style="width:100%; padding:8px; box-sizing:border-box;"></textarea>
+                        <div style="font-size:12px; color:#888; margin-top:4px;"><span id="vendor-storefront-about-count">0</span>/1000</div>
+                    </div>
+
+                    <button type="button" id="vendor-storefront-save-btn" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:12px 20px; cursor:pointer; font-weight:600;">Save Storefront</button>
+                    <span id="vendor-storefront-status" style="margin-left:10px; font-size:13px;"></span>
+                </section>
+
                 <section id="tab-account" class="tab-content hidden">
                     <h2 class="admin-page-title">Account</h2>
                     <div class="panel">
@@ -404,6 +443,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
     <script src="../js/category-select.js?v=1"></script>
     <script src="../js/seller-panel.js?v=1"></script>
-    <script src="../js/vendor-dashboard.js?v=13"></script>
+    <script src="../js/vendor-dashboard.js?v=14"></script>
 </body>
 </html>

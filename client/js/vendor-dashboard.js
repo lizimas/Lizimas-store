@@ -60,6 +60,7 @@ function setupVendorTabs() {
             if (button.dataset.tab === "promotions") loadVendorPromotionsTab();
             if (button.dataset.tab === "account") loadVendorComplianceNotices();
             if (button.dataset.tab === "reports") loadVendorReports();
+            if (button.dataset.tab === "storefront") loadVendorStorefront();
         });
     });
 }
@@ -1734,6 +1735,173 @@ function renderVendorReportsChart(dailySales) {
             }
         }
     });
+}
+
+// --- Storefront branding (Task #68) ---------------------------------------
+// Logo/banner/about, shown on the vendor's own public store page
+// (client/store.html). Saved via multipart PATCH so a logo/banner file and
+// the about text can go up together in one request.
+
+let vendorStorefrontRemoveLogo = false;
+let vendorStorefrontRemoveBanner = false;
+
+async function loadVendorStorefront() {
+    try {
+        const v = await vendorAuthorizedFetch("/api/vendors/me");
+        if (v.error) return;
+
+        vendorStorefrontRemoveLogo = false;
+        vendorStorefrontRemoveBanner = false;
+
+        const logoPreview = document.getElementById("vendor-storefront-logo-preview");
+        const logoPlaceholder = document.getElementById("vendor-storefront-logo-placeholder");
+        if (v.logo_url) {
+            logoPreview.src = v.logo_url;
+            logoPreview.style.display = "block";
+            logoPlaceholder.style.display = "none";
+        } else {
+            logoPreview.style.display = "none";
+            logoPlaceholder.style.display = "flex";
+        }
+
+        const bannerPreview = document.getElementById("vendor-storefront-banner-preview");
+        if (v.banner_url) {
+            bannerPreview.style.backgroundImage = `url("${v.banner_url}")`;
+            bannerPreview.textContent = "";
+        } else {
+            bannerPreview.style.backgroundImage = "none";
+            bannerPreview.textContent = "No banner";
+        }
+
+        const aboutEl = document.getElementById("vendor-storefront-about");
+        aboutEl.value = v.about || "";
+        document.getElementById("vendor-storefront-about-count").textContent = aboutEl.value.length;
+
+        const viewLink = document.getElementById("vendor-storefront-view-link");
+        if (v.slug) {
+            viewLink.href = `/store/${encodeURIComponent(v.slug)}`;
+        }
+
+        document.getElementById("vendor-storefront-logo-input").value = "";
+        document.getElementById("vendor-storefront-banner-input").value = "";
+        document.getElementById("vendor-storefront-status").textContent = "";
+    } catch (error) {
+        console.error("Load vendor storefront error:", error);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const aboutEl = document.getElementById("vendor-storefront-about");
+    if (aboutEl) {
+        aboutEl.addEventListener("input", () => {
+            document.getElementById("vendor-storefront-about-count").textContent = aboutEl.value.length;
+        });
+    }
+
+    const logoInput = document.getElementById("vendor-storefront-logo-input");
+    if (logoInput) {
+        logoInput.addEventListener("change", () => {
+            if (!logoInput.files[0]) return;
+            vendorStorefrontRemoveLogo = false;
+            const url = URL.createObjectURL(logoInput.files[0]);
+            const preview = document.getElementById("vendor-storefront-logo-preview");
+            preview.src = url;
+            preview.style.display = "block";
+            document.getElementById("vendor-storefront-logo-placeholder").style.display = "none";
+        });
+    }
+
+    const bannerInput = document.getElementById("vendor-storefront-banner-input");
+    if (bannerInput) {
+        bannerInput.addEventListener("change", () => {
+            if (!bannerInput.files[0]) return;
+            vendorStorefrontRemoveBanner = false;
+            const url = URL.createObjectURL(bannerInput.files[0]);
+            const preview = document.getElementById("vendor-storefront-banner-preview");
+            preview.style.backgroundImage = `url("${url}")`;
+            preview.textContent = "";
+        });
+    }
+
+    const removeLogoBtn = document.getElementById("vendor-storefront-remove-logo-btn");
+    if (removeLogoBtn) {
+        removeLogoBtn.addEventListener("click", () => {
+            vendorStorefrontRemoveLogo = true;
+            document.getElementById("vendor-storefront-logo-input").value = "";
+            document.getElementById("vendor-storefront-logo-preview").style.display = "none";
+            document.getElementById("vendor-storefront-logo-placeholder").style.display = "flex";
+        });
+    }
+
+    const removeBannerBtn = document.getElementById("vendor-storefront-remove-banner-btn");
+    if (removeBannerBtn) {
+        removeBannerBtn.addEventListener("click", () => {
+            vendorStorefrontRemoveBanner = true;
+            document.getElementById("vendor-storefront-banner-input").value = "";
+            const preview = document.getElementById("vendor-storefront-banner-preview");
+            preview.style.backgroundImage = "none";
+            preview.textContent = "No banner";
+        });
+    }
+
+    const saveBtn = document.getElementById("vendor-storefront-save-btn");
+    if (saveBtn) {
+        saveBtn.addEventListener("click", saveVendorStorefront);
+    }
+});
+
+async function saveVendorStorefront() {
+    const statusEl = document.getElementById("vendor-storefront-status");
+    const saveBtn = document.getElementById("vendor-storefront-save-btn");
+    const logoInput = document.getElementById("vendor-storefront-logo-input");
+    const bannerInput = document.getElementById("vendor-storefront-banner-input");
+    const about = document.getElementById("vendor-storefront-about").value;
+
+    const formData = new FormData();
+    formData.append("about", about);
+    if (logoInput.files[0]) {
+        formData.append("logo", logoInput.files[0]);
+    } else if (vendorStorefrontRemoveLogo) {
+        formData.append("remove_logo", "true");
+    }
+    if (bannerInput.files[0]) {
+        formData.append("banner", bannerInput.files[0]);
+    } else if (vendorStorefrontRemoveBanner) {
+        formData.append("remove_banner", "true");
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.style.opacity = "0.6";
+    statusEl.style.color = "";
+    statusEl.textContent = "Saving...";
+
+    try {
+        const token = getVendorToken();
+        const response = await fetch(`${API_URL}/api/vendors/me/storefront`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` },
+            body: formData
+        });
+        const data = await response.json();
+        saveBtn.disabled = false;
+        saveBtn.style.opacity = "1";
+
+        if (!response.ok) {
+            statusEl.style.color = "#DC2626";
+            statusEl.textContent = data.error || "Could not save storefront.";
+            return;
+        }
+
+        statusEl.style.color = "#16A34A";
+        statusEl.textContent = "Saved.";
+        loadVendorStorefront();
+    } catch (error) {
+        console.error("Save vendor storefront error:", error);
+        saveBtn.disabled = false;
+        saveBtn.style.opacity = "1";
+        statusEl.style.color = "#DC2626";
+        statusEl.textContent = "Could not connect to server.";
+    }
 }
 
 // --- Init -----------------------------------------------------------

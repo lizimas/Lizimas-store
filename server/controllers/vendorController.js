@@ -17,6 +17,8 @@ const {
     deriveVendorPromotionStatus
 } = require("../utils/vendorPromotions");
 const { buildNotification } = require("../utils/vendorNotifications");
+const { MAX_ABOUT_LENGTH, isValidAboutText } = require("../utils/vendorStorefront");
+const { uploadBuffer } = require("../utils/cloudinaryUpload");
 
 // The logged-in vendor's own KYC/business profile and review status.
 exports.getMyVendorProfile = async (req, res) => {
@@ -24,7 +26,7 @@ exports.getMyVendorProfile = async (req, res) => {
         const result = await pool.query(
             `SELECT id, business_name, account_type, registration_number, national_id_number, phone,
                     physical_address, momo_number, referral_source, status, rejection_reason,
-                    submitted_at, reviewed_at
+                    submitted_at, reviewed_at, slug, logo_url, banner_url, about
              FROM vendors WHERE user_id = $1`,
             [req.user.userId]
         );
@@ -34,6 +36,58 @@ exports.getMyVendorProfile = async (req, res) => {
         }
 
         res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// A vendor's own storefront branding (Task #68) - logo, banner, and a
+// short about blurb shown on their public store page (getPublicStorefront
+// below). Kept separate from updateMyVendorProfile on purpose: that
+// endpoint is KYC/business-profile data (registration number, MoMo
+// number, address), this one is pure storefront presentation - different
+// concerns, different validation rules, no reason to overload one
+// endpoint for both.
+//
+// Partial by design: omitting `about` entirely leaves it untouched (so a
+// vendor can update just their logo without resending their bio); sending
+// an empty string clears it. remove_logo=/remove_banner=true clears an
+// image without requiring a replacement upload.
+exports.updateVendorStorefront = async (req, res) => {
+    try {
+        const vendorRow = await pool.query(
+            "SELECT id, logo_url, banner_url, about FROM vendors WHERE user_id = $1",
+            [req.user.userId]
+        );
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendor = vendorRow.rows[0];
+
+        const aboutProvided = req.body.about !== undefined;
+        const about = aboutProvided ? req.body.about : vendor.about;
+        if (aboutProvided && !isValidAboutText(about)) {
+            return res.status(400).json({ error: `About text must be ${MAX_ABOUT_LENGTH} characters or fewer.` });
+        }
+
+        let logoUrl = req.body.remove_logo === "true" ? null : vendor.logo_url;
+        let bannerUrl = req.body.remove_banner === "true" ? null : vendor.banner_url;
+
+        if (req.files && req.files.logo && req.files.logo[0]) {
+            const uploaded = await uploadBuffer(req.files.logo[0].buffer, "lizimas-store/vendor-storefront");
+            logoUrl = uploaded.url;
+        }
+        if (req.files && req.files.banner && req.files.banner[0]) {
+            const uploaded = await uploadBuffer(req.files.banner[0].buffer, "lizimas-store/vendor-storefront");
+            bannerUrl = uploaded.url;
+        }
+
+        const result = await pool.query(
+            `UPDATE vendors SET logo_url = $1, banner_url = $2, about = $3 WHERE id = $4
+             RETURNING id, business_name, slug, logo_url, banner_url, about`,
+            [logoUrl, bannerUrl, about, vendor.id]
+        );
+        res.json({ message: "Storefront updated.", vendor: result.rows[0] });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
