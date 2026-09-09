@@ -185,10 +185,12 @@ exports.bulkUpdateVendorProducts = async (req, res) => {
 // currency amounts only, never a rate or percentage, per the "sellers must
 // never see the commission %" rule (Ryan, Sept 2026).
 //
-// The charges figure uses each product's CURRENT commission_rate_applied/
-// fixed_fee_applied rather than a rate locked at order time, because order-
-// time commission locking isn't wired up yet (see PENDING.md) - this is an
-// approximation inherited from that same known limitation, not a new one.
+// The charges figure prefers each order_item's own locked-in
+// commission_rate_applied/fixed_fee_applied (Task #67, migration 072),
+// snapshotted at checkout - falling back to the product's CURRENT snapshot
+// only for orders placed before that migration existed, so old numbers
+// don't change and new ones stay accurate even if a rate or product price
+// changes later.
 exports.getVendorDashboardSummary = async (req, res) => {
     try {
         const vendorRow = await pool.query("SELECT id, business_name, slug FROM vendors WHERE user_id = $1", [req.user.userId]);
@@ -216,8 +218,9 @@ exports.getVendorDashboardSummary = async (req, res) => {
                 `SELECT
                     COALESCE(SUM(oi.price * oi.quantity), 0) AS sale_total,
                     COALESCE(SUM(
-                        CASE WHEN p.commission_rate_applied IS NOT NULL
-                            THEN (oi.price * oi.quantity) * p.commission_rate_applied + COALESCE(p.fixed_fee_applied, 0) * oi.quantity
+                        CASE WHEN COALESCE(oi.commission_rate_applied, p.commission_rate_applied) IS NOT NULL
+                            THEN (oi.price * oi.quantity) * COALESCE(oi.commission_rate_applied, p.commission_rate_applied)
+                                 + COALESCE(oi.fixed_fee_applied, p.fixed_fee_applied, 0) * oi.quantity
                             ELSE 0
                         END
                     ), 0) AS charges_total
@@ -587,7 +590,8 @@ async function loadVendorWalletData(vendorId) {
         pool.query(
             `SELECT o.status AS order_status, oi.handover_status,
                     oi.price, oi.quantity,
-                    p.commission_rate_applied, p.fixed_fee_applied
+                    COALESCE(oi.commission_rate_applied, p.commission_rate_applied) AS commission_rate_applied,
+                    COALESCE(oi.fixed_fee_applied, p.fixed_fee_applied) AS fixed_fee_applied
              FROM order_items oi
              JOIN orders o ON o.id = oi.order_id
              JOIN products p ON p.id = oi.product_id

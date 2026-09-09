@@ -174,11 +174,9 @@ Render):
   every store currently shows the plain fallback (initial-letter avatar, dark
   banner, no about text) until a follow-up adds that to the vendor dashboard
   (or they're set directly in the database).
-- **Order-time commission locking is not wired up.** `order_items` doesn't
-  yet copy `commission_rate`/`fixed_fee`/`pricing_rule_version` at the moment
-  an order is placed (spec section 33) — the versioned `commission_rules`
-  table is what makes that possible later, but nothing consumes it at
-  checkout yet.
+- ~~Order-time commission locking is not wired up.~~ **Fixed (September
+  2026, Task #67) — see the "Order-time commission locking" section
+  below.**
 
 **Explicitly out of scope for this slice** (per the "commission engine +
 storefront first" decision — build only if asked): order-splitting into a
@@ -760,3 +758,59 @@ inbox/thread system properly (who can start a thread, does admin see one
 merged queue across all vendors, does it need its own read/unread state)
 is enough scope that it doesn't belong bolted onto this task. Recommend
 tracking it as its own future task rather than expanding this one further.
+
+
+## Order-time commission locking (September 2026)
+
+Closes a gap flagged since the original commission-engine slice: every
+vendor earnings figure (dashboard summary, wallet balance) was computed by
+joining `order_items` back to `products` and using that product's CURRENT
+`commission_rate_applied`/`fixed_fee_applied` — not what actually applied
+at the moment the order was placed. In practice that meant an old,
+already-delivered order's earnings could silently shift later if a vendor
+edited their listing price (which recomputes the product's commission
+snapshot) or if a category's commission rate changed — exactly the
+retroactive-distortion risk the versioned `commission_rules` table
+(migration 061) was built to prevent, but nothing was actually copying its
+values onto an order.
+
+**Migration to run:**
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/072_order_item_commission_lock.sql
+
+**What changed:**
+- `migrations/072_order_item_commission_lock.sql` — adds
+  `commission_rate_applied`/`fixed_fee_applied`/`commission_rule_id` to
+  `order_items`, mirroring the same three columns migration 063 already
+  added to `products`.
+- `checkoutController.js` — both the variant and plain-product item
+  branches now select those three columns off the product row and copy
+  them straight onto the new `order_items` columns at insert time. This is
+  a snapshot of the product's commission fields as they stand at the exact
+  moment of purchase — checkout does not re-run the commission engine or
+  re-resolve a rate, it just locks in whatever was already true of that
+  listing.
+- `getVendorDashboardSummary`'s earnings query and `loadVendorWalletData`
+  (both in `vendorController.js`) now read
+  `COALESCE(oi.commission_rate_applied, p.commission_rate_applied)` (and
+  the same for the fixed fee) instead of reading straight from `products`.
+  **Why COALESCE and not just `oi.*`**: every order placed before this
+  migration has NULL in those new columns — falling back to the product's
+  current snapshot for those old rows means historical numbers don't
+  change at all on the day this ships; only orders placed from now on are
+  actually locked. This is a deliberate one-way migration boundary, not a
+  backfill — backfilling old orders would require knowing what rate
+  actually applied to each one at the time, which isn't recoverable now
+  that `commission_rules` rows get expired-and-reinserted rather than kept
+  as a full history per order. If exact historical accuracy for pre-#67
+  orders ever matters, that's a data problem, not a code one — flagging
+  here rather than guessing.
+- Two stale code comments (`vendorController.js`, `vendorWallet.js`) that
+  said commission locking "isn't wired up yet" are corrected to describe
+  the fix.
+
+**No checkout behavior changed** — the customer-facing price, the
+discount/flash-sale/promotion price resolution, and every other part of
+placing an order are untouched. This only affects what gets stored
+alongside each `order_items` row and which numbers vendor-earnings
+reporting reads back.

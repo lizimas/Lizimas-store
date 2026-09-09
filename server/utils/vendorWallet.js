@@ -5,15 +5,16 @@
 // adjustments and calls into this.
 //
 // The wallet is DERIVED, not a maintained ledger table: sale and
-// marketplace-charge amounts are computed straight from order_items and
-// its current commission_rate_applied/fixed_fee_applied, the same
-// approximation already used by getVendorDashboardSummary (order-time
-// commission locking isn't wired up yet - see PENDING.md). The two things
-// that genuinely cannot be derived from anything else - money actually
-// paid out, and one-off admin adjustments - are the only two real tables
-// (vendor_payouts, vendor_ledger_adjustments). Avoiding a second,
-// separately-maintained ledger table for the derivable part avoids ledger
-// drift from its own source of truth.
+// marketplace-charge amounts are computed straight from order_items,
+// using each order_item's own locked-in commission_rate_applied/
+// fixed_fee_applied where present (Task #67, migration 072) and falling
+// back to the product's current snapshot only for orders placed before
+// that migration existed - see loadVendorWalletData in vendorController.js.
+// The two things that genuinely cannot be derived from anything else -
+// money actually paid out, and one-off admin adjustments - are the only
+// two real tables (vendor_payouts, vendor_ledger_adjustments). Avoiding a
+// second, separately-maintained ledger table for the derivable part
+// avoids ledger drift from its own source of truth.
 
 // A vendor can request a payout once their available balance reaches this
 // floor. Considered a starting point, not a settled business rule - same
