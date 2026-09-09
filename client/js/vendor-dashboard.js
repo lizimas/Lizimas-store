@@ -57,6 +57,7 @@ function setupVendorTabs() {
             if (button.dataset.tab === "refunds") loadVendorReturnsRefunds();
             if (button.dataset.tab === "wallet") loadVendorWallet();
             if (button.dataset.tab === "reviews") loadVendorReviews();
+            if (button.dataset.tab === "promotions") loadVendorPromotionsTab();
             if (button.dataset.tab === "account") loadVendorComplianceNotices();
         });
     });
@@ -1452,6 +1453,132 @@ async function loadVendorComplianceNotices() {
         `;
     } catch (error) {
         console.error("Load vendor compliance notices error:", error);
+        box.innerHTML = "<p>Could not connect to server.</p>";
+    }
+}
+
+// --- Promotions (Task #64) ------------------------------------------------
+// Propose a time-boxed sale price on one of the vendor's own products.
+// Lizimas reviews every promotion before it affects anything a customer
+// sees or pays.
+
+const VENDOR_PROMO_STATUS_LABEL = {
+    pending: "Awaiting review",
+    rejected: "Rejected",
+    scheduled: "Scheduled",
+    active: "Live",
+    expired: "Ended"
+};
+const VENDOR_PROMO_STATUS_CLASS = {
+    pending: "status-pending",
+    rejected: "status-cancelled",
+    scheduled: "status-processing",
+    active: "status-paid",
+    expired: "status-forfeited"
+};
+
+async function loadVendorPromotionsTab() {
+    await Promise.all([populateVendorPromoProductSelect(), loadVendorPromotionsList()]);
+}
+
+async function populateVendorPromoProductSelect() {
+    const select = document.getElementById("vendor-promo-product");
+    if (!select) return;
+    try {
+        const products = await vendorAuthorizedFetch("/api/vendors/products");
+        if (products.error) return;
+        const eligible = products.filter(p => p.status === "approved" && !p.admin_restricted);
+        select.innerHTML = eligible.length === 0
+            ? `<option value="">No eligible products</option>`
+            : eligible.map(p => `<option value="${p.id}" data-price="${p.price}">${vendorEsc(p.name)} (UGX ${Number(p.price).toLocaleString()})</option>`).join("");
+    } catch (error) {
+        console.error("Load vendor promo product select error:", error);
+    }
+}
+
+async function submitVendorPromotion() {
+    const productId = document.getElementById("vendor-promo-product").value;
+    const salePrice = Number(document.getElementById("vendor-promo-price").value);
+    const startsAt = document.getElementById("vendor-promo-starts").value;
+    const endsAt = document.getElementById("vendor-promo-ends").value;
+    const statusEl = document.getElementById("vendor-promo-status");
+
+    if (!productId) {
+        statusEl.textContent = "Choose a product first.";
+        return;
+    }
+    if (!salePrice || salePrice <= 0) {
+        statusEl.textContent = "Enter a sale price.";
+        return;
+    }
+    if (!startsAt || !endsAt) {
+        statusEl.textContent = "Choose a start and end time.";
+        return;
+    }
+
+    statusEl.textContent = "Submitting...";
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/promotions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                product_id: Number(productId),
+                proposed_sale_price: salePrice,
+                starts_at: new Date(startsAt).toISOString(),
+                ends_at: new Date(endsAt).toISOString()
+            })
+        });
+        if (data.error) {
+            statusEl.textContent = data.error;
+            return;
+        }
+        statusEl.textContent = "Submitted for review.";
+        document.getElementById("vendor-promo-price").value = "";
+        document.getElementById("vendor-promo-starts").value = "";
+        document.getElementById("vendor-promo-ends").value = "";
+        await loadVendorPromotionsList();
+    } catch (error) {
+        console.error("Submit vendor promotion error:", error);
+        statusEl.textContent = "Could not connect to server.";
+    }
+}
+
+async function loadVendorPromotionsList() {
+    const box = document.getElementById("vendor-promotions-list");
+    if (!box) return;
+
+    try {
+        const rows = await vendorAuthorizedFetch("/api/vendors/promotions");
+        if (rows.error) {
+            box.innerHTML = `<p>${vendorEsc(rows.error)}</p>`;
+            return;
+        }
+        if (rows.length === 0) {
+            box.innerHTML = `<p class="no-data">No promotions proposed yet.</p>`;
+            return;
+        }
+
+        box.innerHTML = `
+            <table style="width:100%;">
+                <thead><tr><th>Product</th><th>Price</th><th>Window</th><th>Status</th><th>Notes</th></tr></thead>
+                <tbody>
+                    ${rows.map(r => `
+                        <tr>
+                            <td data-label="Product">${vendorEsc(r.product_name)}</td>
+                            <td data-label="Price"><s style="color:#888;">${vendorFmtUgx(r.original_price)}</s> ${vendorFmtUgx(r.proposed_sale_price)}</td>
+                            <td data-label="Window">${new Date(r.starts_at).toLocaleDateString()} - ${new Date(r.ends_at).toLocaleDateString()}</td>
+                            <td data-label="Status">
+                                <span class="status-badge ${VENDOR_PROMO_STATUS_CLASS[r.resolutionStatus] || ""}">${VENDOR_PROMO_STATUS_LABEL[r.resolutionStatus] || r.resolutionStatus}</span>
+                                ${r.homepage_featured ? `<span class="status-badge status-paid" style="margin-left:4px;">Featured</span>` : ""}
+                            </td>
+                            <td data-label="Notes">${r.rejection_reason ? vendorEsc(r.rejection_reason) : "-"}</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load vendor promotions list error:", error);
         box.innerHTML = "<p>Could not connect to server.</p>";
     }
 }

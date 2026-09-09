@@ -141,9 +141,24 @@ exports.checkout = async (req, res) => {
                      LIMIT 1`,
                     [productId]
                 );
+                // An approved vendor promotion (Task #64) also wins over the
+                // regular price, independent of whether admin featured it on
+                // the homepage (homepage_featured only gates the flash_sales
+                // materialization above, which a featured promotion also
+                // creates - checked separately here so a non-featured
+                // approved promotion is still honored at checkout).
+                const vendorPromoPrice = await client.query(
+                    `SELECT proposed_sale_price FROM vendor_promotions
+                     WHERE product_id = $1 AND status = 'approved'
+                       AND starts_at <= now() AND ends_at >= now()
+                     LIMIT 1`,
+                    [productId]
+                );
                 const itemPrice = flashPrice.rows.length
                     ? Number(flashPrice.rows[0].sale_price)
-                    : Number(product.price);
+                    : vendorPromoPrice.rows.length
+                        ? Number(vendorPromoPrice.rows[0].proposed_sale_price)
+                        : Number(product.price);
                 total += itemPrice * quantity;
 
                 validatedItems.push({

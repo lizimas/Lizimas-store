@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Vendor Dashboard</title>
-<link rel="stylesheet" href="../css/admin.css?v=18">
+<link rel="stylesheet" href="../css/admin.css?v=19">
 </head>
 <body>
 
@@ -42,6 +42,9 @@
                     </button>
                     <button class="tab-btn" data-tab="reviews">
                         <span class="sidebar-icon">&#11088;</span> Reviews
+                    </button>
+                    <button class="tab-btn" data-tab="promotions">
+                        <span class="sidebar-icon">&#127991;</span> Promotions
                     </button>
                     <button class="tab-btn" data-tab="account">
                         <span class="sidebar-icon">&#9881;</span> Account
@@ -311,6 +314,42 @@
                     </div>
                 </section>
 
+                <section id="tab-promotions" class="tab-content hidden">
+                    <h2 class="admin-page-title">Promotions</h2>
+                    <p class="admin-page-subtitle">
+                        Propose a time-boxed sale price on one of your own products. Lizimas reviews every
+                        promotion before it goes live, and decides separately whether to feature it on the
+                        homepage.
+                    </p>
+                    <div class="panel">
+                        <h3 style="margin:0 0 10px;">Propose a Promotion</h3>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                            <div>
+                                <label style="font-size:12px; font-weight:600; display:block;">Product</label>
+                                <select id="vendor-promo-product" style="padding:8px; border:1px solid #ccc; border-radius:6px; min-width:200px;"></select>
+                            </div>
+                            <div>
+                                <label style="font-size:12px; font-weight:600; display:block;">Sale Price (UGX)</label>
+                                <input type="number" min="0" id="vendor-promo-price" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:140px;">
+                            </div>
+                            <div>
+                                <label style="font-size:12px; font-weight:600; display:block;">Starts</label>
+                                <input type="datetime-local" id="vendor-promo-starts" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
+                            </div>
+                            <div>
+                                <label style="font-size:12px; font-weight:600; display:block;">Ends</label>
+                                <input type="datetime-local" id="vendor-promo-ends" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
+                            </div>
+                            <button onclick="submitVendorPromotion()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:9px 16px; cursor:pointer;">Submit for Review</button>
+                        </div>
+                        <p id="vendor-promo-status" style="font-size:13px; margin-top:8px;"></p>
+                    </div>
+                    <div class="panel">
+                        <h3 style="margin:0 0 10px;">Your Promotions</h3>
+                        <div id="vendor-promotions-list">Loading...</div>
+                    </div>
+                </section>
+
                 <section id="tab-account" class="tab-content hidden">
                     <h2 class="admin-page-title">Account</h2>
                     <div class="panel">
@@ -330,6 +369,6 @@
 
     <script src="../js/category-select.js?v=1"></script>
     <script src="../js/seller-panel.js?v=1"></script>
-    <script src="../js/vendor-dashboard.js?v=11"></script>
+    <script src="../js/vendor-dashboard.js?v=12"></script>
 </body>
 </html>

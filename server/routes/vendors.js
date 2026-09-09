@@ -8,7 +8,8 @@ const {
     advanceVendorOrderStage, bulkUpdateVendorProducts,
     getVendorWallet, requestVendorPayout,
     getMyReturnsRefunds, respondToReturn,
-    getMyComplianceNotices
+    getMyComplianceNotices,
+    proposeVendorPromotion, getMyVendorPromotions
 } = require("../controllers/vendorController");
 const {
     addProduct,
@@ -110,6 +111,11 @@ router.patch("/reviews/:reviewId/response", respondToReview);
 
 // Admin compliance notices (Task #63) - the vendor's own read-only view.
 router.get("/compliance-notices", getMyComplianceNotices);
+
+// Vendor Promotions (Task #64): propose a time-boxed sale price on one of
+// your own products.
+router.post("/promotions", proposeVendorPromotion);
+router.get("/promotions", getMyVendorPromotions);
 
 // Live pricing preview for the product-upload form (spec section 8): given
 // a category and the vendor's desired payout, returns the commission rate,

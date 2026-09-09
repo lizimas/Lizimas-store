@@ -86,7 +86,13 @@ const {
     freezeVendorPayouts,
     unfreezeVendorPayouts,
     getVendorComplianceHistory,
-    getVendorProductsAdmin
+    getVendorProductsAdmin,
+    getPendingVendorPromotions,
+    getApprovedVendorPromotions,
+    approveVendorPromotion,
+    rejectVendorPromotion,
+    setVendorPromotionFeatured,
+    setVendorPromotionSponsored
 } = require("../controllers/vendorController");
 
 const {
@@ -198,6 +204,14 @@ router.patch("/vendors/:id/freeze-payouts", freezeVendorPayouts);
 router.patch("/vendors/:id/unfreeze-payouts", unfreezeVendorPayouts);
 router.get("/vendors/:id/compliance-history", getVendorComplianceHistory);
 router.get("/vendors/:id/products", getVendorProductsAdmin);
+
+// Vendor Promotions (Task #64): admin review + homepage/sponsored control.
+router.get("/vendor-promotions/pending", getPendingVendorPromotions);
+router.get("/vendor-promotions/approved", getApprovedVendorPromotions);
+router.patch("/vendor-promotions/:id/approve", approveVendorPromotion);
+router.patch("/vendor-promotions/:id/reject", rejectVendorPromotion);
+router.patch("/vendor-promotions/:id/featured", setVendorPromotionFeatured);
+router.patch("/vendor-promotions/:id/sponsored", setVendorPromotionSponsored);
 
 router.get("/dropoff-points", listDropoffPoints);
 router.post("/dropoff-points", createDropoffPoint);

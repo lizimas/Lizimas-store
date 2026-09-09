@@ -1666,6 +1666,8 @@ function setupTabs() {
                 loadPendingVendorPayouts();
                 loadPendingReturnRefunds();
                 loadVendorCompliancePanel();
+                loadPendingVendorPromotions();
+                loadApprovedVendorPromotions();
             }
 
             if (button.dataset.tab === "team-messages") {
@@ -6270,6 +6272,159 @@ async function viewVendorComplianceHistory(vendorId) {
         alert(lines.join("\n"));
     } catch (error) {
         console.error("View vendor compliance history error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+// --- Vendor Promotions (Task #64) ---------------------------------------
+// Approve/reject a vendor's proposed sale price; feature/unfeature puts an
+// approved promotion in (or removes it from) the existing homepage
+// flash-sale section, independent of whether the discount is honored at
+// checkout (it always is, once approved).
+
+async function loadPendingVendorPromotions() {
+    try {
+        const rows = await authorizedFetch("/api/admin/vendor-promotions/pending");
+        const container = document.getElementById("pending-vendor-promotions-list");
+
+        if (!rows || rows.length === 0) {
+            container.innerHTML = `<p class="no-data">No promotions awaiting review.</p>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Vendor</th><th>Product</th><th>Price</th><th>Window</th><th>Actions</th></tr></thead>
+                <tbody>
+                    ${rows.map(r => `
+                        <tr>
+                            <td data-label="Vendor">${r.vendor_business_name}</td>
+                            <td data-label="Product">${r.product_name}</td>
+                            <td data-label="Price"><s style="color:#888;">${fmtUgx(r.original_price)}</s> ${fmtUgx(r.proposed_sale_price)}</td>
+                            <td data-label="Window">${new Date(r.starts_at).toLocaleDateString()} - ${new Date(r.ends_at).toLocaleDateString()}</td>
+                            <td data-label="Actions">
+                                <button onclick="approveVendorPromotionRequest(${r.id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Approve</button>
+                                <button onclick="rejectVendorPromotionRequest(${r.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Reject</button>
+                            </td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load pending vendor promotions error:", error);
+    }
+}
+
+async function approveVendorPromotionRequest(id) {
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/vendor-promotions/${id}/approve`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        loadPendingVendorPromotions();
+        loadApprovedVendorPromotions();
+    } catch (error) {
+        console.error("Approve vendor promotion error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function rejectVendorPromotionRequest(id) {
+    const reason = prompt("Reason for rejecting this promotion:");
+    if (!reason) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/vendor-promotions/${id}/reject`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ reason })
+        });
+        loadPendingVendorPromotions();
+        loadApprovedVendorPromotions();
+    } catch (error) {
+        console.error("Reject vendor promotion error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+const ADMIN_PROMO_STATUS_CLASS = {
+    scheduled: "status-processing",
+    active: "status-paid",
+    expired: "status-forfeited"
+};
+
+async function loadApprovedVendorPromotions() {
+    try {
+        const rows = await authorizedFetch("/api/admin/vendor-promotions/approved");
+        const container = document.getElementById("approved-vendor-promotions-list");
+        if (!container) return;
+
+        if (!rows || rows.length === 0) {
+            container.innerHTML = `<p class="no-data">No approved promotions.</p>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Vendor</th><th>Product</th><th>Price</th><th>Window</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody>
+                    ${rows.map(r => `
+                        <tr>
+                            <td data-label="Vendor">${r.vendor_business_name}</td>
+                            <td data-label="Product">${r.product_name}</td>
+                            <td data-label="Price"><s style="color:#888;">${fmtUgx(r.original_price)}</s> ${fmtUgx(r.proposed_sale_price)}</td>
+                            <td data-label="Window">${new Date(r.starts_at).toLocaleDateString()} - ${new Date(r.ends_at).toLocaleDateString()}</td>
+                            <td data-label="Status"><span class="status-badge ${ADMIN_PROMO_STATUS_CLASS[r.resolutionStatus] || ""}">${r.resolutionStatus}</span></td>
+                            <td data-label="Actions">
+                                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                    <button onclick="toggleVendorPromotionFeatured(${r.id}, ${!r.homepage_featured})" style="background:${r.homepage_featured ? "#B45309" : "#1a1a2e"}; color:#fff; border:none; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">${r.homepage_featured ? "Unfeature" : "Feature on Homepage"}</button>
+                                    <button onclick="toggleVendorPromotionSponsored(${r.id}, ${!r.sponsored})" style="background:#fff; color:#1a1a2e; border:1px solid #1a1a2e; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">${r.sponsored ? "Unmark Sponsored" : "Mark Sponsored"}</button>
+                                    <button onclick="rejectVendorPromotionRequest(${r.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">Cancel</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load approved vendor promotions error:", error);
+    }
+}
+
+async function toggleVendorPromotionFeatured(id, featured) {
+    try {
+        const token = getToken();
+        const response = await fetch(`${API_URL}/api/admin/vendor-promotions/${id}/featured`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ featured })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.error || "Something went wrong.");
+            return;
+        }
+        loadApprovedVendorPromotions();
+    } catch (error) {
+        console.error("Toggle vendor promotion featured error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function toggleVendorPromotionSponsored(id, sponsored) {
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/vendor-promotions/${id}/sponsored`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ sponsored })
+        });
+        loadApprovedVendorPromotions();
+    } catch (error) {
+        console.error("Toggle vendor promotion sponsored error:", error);
         alert("Something went wrong.");
     }
 }

@@ -10,6 +10,12 @@ const {
 } = require("../utils/vendorWallet");
 const { deriveReturnResolutionStatus } = require("../utils/vendorReturns");
 const { canApplyComplianceAction } = require("../utils/vendorCompliance");
+const {
+    MAX_VENDOR_DISCOUNT_PERCENT,
+    validateProposedPrice,
+    isValidPromotionWindow,
+    deriveVendorPromotionStatus
+} = require("../utils/vendorPromotions");
 
 // The logged-in vendor's own KYC/business profile and review status.
 exports.getMyVendorProfile = async (req, res) => {
@@ -1125,6 +1131,283 @@ exports.getMyComplianceNotices = async (req, res) => {
             [vendorRow.rows[0].id]
         );
         res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// --- Vendor Promotions: propose (Task #64) --------------------------------
+// A vendor proposes a time-boxed sale price on one of their own products.
+// The discount, once approved, is honored at checkout regardless of
+// homepage placement (see checkoutController.js) - homepage_featured only
+// controls whether it also shows in the existing flash-sale homepage
+// section (see setVendorPromotionFeatured below).
+
+exports.proposeVendorPromotion = async (req, res) => {
+    try {
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendorId = vendorRow.rows[0].id;
+
+        const { product_id, proposed_sale_price, starts_at, ends_at } = req.body;
+        const productRow = await pool.query(
+            `SELECT id, price FROM products WHERE id = $1 AND vendor_id = $2 AND deleted_at IS NULL`,
+            [product_id, vendorId]
+        );
+        if (productRow.rows.length === 0) {
+            return res.status(404).json({ error: "Product not found on your account." });
+        }
+        const originalPrice = Number(productRow.rows[0].price);
+        const salePrice = Number(proposed_sale_price);
+
+        const priceCheck = validateProposedPrice(originalPrice, salePrice, MAX_VENDOR_DISCOUNT_PERCENT);
+        if (!priceCheck.allowed) {
+            return res.status(400).json({ error: priceCheck.reason });
+        }
+        const windowCheck = isValidPromotionWindow(starts_at, ends_at);
+        if (!windowCheck.allowed) {
+            return res.status(400).json({ error: windowCheck.reason });
+        }
+
+        const existing = await pool.query(
+            `SELECT id FROM vendor_promotions
+             WHERE product_id = $1
+               AND (status = 'pending' OR (status = 'approved' AND ends_at > now()))
+             LIMIT 1`,
+            [product_id]
+        );
+        if (existing.rows.length > 0) {
+            return res.status(409).json({ error: "This product already has a pending or active promotion." });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO vendor_promotions (vendor_id, product_id, original_price, proposed_sale_price, starts_at, ends_at)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+            [vendorId, product_id, originalPrice, salePrice, starts_at, ends_at]
+        );
+        res.status(201).json({ message: "Promotion submitted for review.", promotion: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// The vendor's own promotions, most recent first.
+exports.getMyVendorPromotions = async (req, res) => {
+    try {
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const result = await pool.query(
+            `SELECT vp.*, p.name AS product_name, p.image AS product_image
+             FROM vendor_promotions vp
+             JOIN products p ON p.id = vp.product_id
+             WHERE vp.vendor_id = $1
+             ORDER BY vp.created_at DESC`,
+            [vendorRow.rows[0].id]
+        );
+        const rows = result.rows.map(row => ({
+            ...row,
+            resolutionStatus: deriveVendorPromotionStatus(
+                { status: row.status, startsAt: row.starts_at, endsAt: row.ends_at }
+            )
+        }));
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// --- Vendor Promotions: admin review (Task #64) --------------------------
+
+exports.getPendingVendorPromotions = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT vp.*, p.name AS product_name, v.business_name AS vendor_business_name
+             FROM vendor_promotions vp
+             JOIN products p ON p.id = vp.product_id
+             JOIN vendors v ON v.id = vp.vendor_id
+             WHERE vp.status = 'pending'
+             ORDER BY vp.created_at ASC`
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Approved promotions - live, scheduled, or expired - for the admin
+// homepage/sponsored controls. Expired ones stay listed (read-only in the
+// UI) as a short recent history rather than vanishing outright.
+exports.getApprovedVendorPromotions = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT vp.*, p.name AS product_name, v.business_name AS vendor_business_name
+             FROM vendor_promotions vp
+             JOIN products p ON p.id = vp.product_id
+             JOIN vendors v ON v.id = vp.vendor_id
+             WHERE vp.status = 'approved'
+             ORDER BY vp.ends_at DESC
+             LIMIT 100`
+        );
+        const rows = result.rows.map(row => ({
+            ...row,
+            resolutionStatus: deriveVendorPromotionStatus(
+                { status: row.status, startsAt: row.starts_at, endsAt: row.ends_at }
+            )
+        }));
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.approveVendorPromotion = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            `UPDATE vendor_promotions
+             SET status = 'approved', reviewed_by = $1, reviewed_at = now()
+             WHERE id = $2 AND status = 'pending' RETURNING *`,
+            [req.user.userId, id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(409).json({ error: "Promotion is not awaiting review." });
+        }
+        logActivity(req.user.userId, "vendor_promotion_approved", "vendor_promotion", id, null);
+        res.json({ message: "Promotion approved.", promotion: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Also usable to cancel a promotion that was already approved and is
+// currently live - clears any homepage feature materialization first, so
+// there's one "shut this down" action rather than two.
+exports.rejectVendorPromotion = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+        if (!reason || !String(reason).trim()) {
+            return res.status(400).json({ error: "A reason is required." });
+        }
+
+        const current = await pool.query(
+            `SELECT status, flash_sale_item_id FROM vendor_promotions WHERE id = $1`,
+            [id]
+        );
+        if (current.rows.length === 0) {
+            return res.status(404).json({ error: "Promotion not found." });
+        }
+        if (!["pending", "approved"].includes(current.rows[0].status)) {
+            return res.status(409).json({ error: "Promotion has already been rejected." });
+        }
+
+        if (current.rows[0].flash_sale_item_id) {
+            await removeVendorPromotionFeature(current.rows[0].flash_sale_item_id);
+        }
+
+        const result = await pool.query(
+            `UPDATE vendor_promotions
+             SET status = 'rejected', rejection_reason = $1, reviewed_by = $2, reviewed_at = now(),
+                 homepage_featured = false, flash_sale_item_id = NULL
+             WHERE id = $3 RETURNING *`,
+            [reason, req.user.userId, id]
+        );
+        logActivity(req.user.userId, "vendor_promotion_rejected", "vendor_promotion", id, reason);
+        res.json({ message: "Promotion rejected.", promotion: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Deletes the single-item flash_sale campaign a featured promotion
+// created, and its flash_sale_items row - both were created only for this
+// promotion's own homepage placement, so nothing else references them.
+async function removeVendorPromotionFeature(flashSaleItemId) {
+    const item = await pool.query(`SELECT flash_sale_id FROM flash_sale_items WHERE id = $1`, [flashSaleItemId]);
+    if (item.rows.length === 0) return;
+    await pool.query(`DELETE FROM flash_sales WHERE id = $1`, [item.rows[0].flash_sale_id]);
+}
+
+// Admin-only: whether an approved promotion also shows in the existing
+// homepage flash-sale section. Materializes/removes a dedicated single-
+// item flash_sale campaign matching the promotion's own time window -
+// reuses the already-built, already-tested homepage rendering rather than
+// a second one. Does NOT affect whether the discount is honored at
+// checkout (see checkoutController.js) - only whether it's marketed there.
+exports.setVendorPromotionFeatured = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { featured } = req.body;
+
+        const current = await pool.query(
+            `SELECT vp.*, p.name AS product_name FROM vendor_promotions vp
+             JOIN products p ON p.id = vp.product_id WHERE vp.id = $1`,
+            [id]
+        );
+        if (current.rows.length === 0) {
+            return res.status(404).json({ error: "Promotion not found." });
+        }
+        const promo = current.rows[0];
+        if (promo.status !== "approved") {
+            return res.status(409).json({ error: "Only an approved promotion can be featured." });
+        }
+
+        if (featured) {
+            if (promo.flash_sale_item_id) {
+                return res.status(409).json({ error: "Already featured." });
+            }
+            const flashSale = await pool.query(
+                `INSERT INTO flash_sales (title, subtitle, starts_at, ends_at, is_active, created_by)
+                 VALUES ($1, $2, $3, $4, true, $5) RETURNING id`,
+                [`${promo.product_name} Deal`, "Vendor promotion", promo.starts_at, promo.ends_at, req.user.userId]
+            );
+            const item = await pool.query(
+                `INSERT INTO flash_sale_items (flash_sale_id, product_id, sale_price)
+                 VALUES ($1, $2, $3) RETURNING id`,
+                [flashSale.rows[0].id, promo.product_id, promo.proposed_sale_price]
+            );
+            const result = await pool.query(
+                `UPDATE vendor_promotions SET homepage_featured = true, flash_sale_item_id = $1
+                 WHERE id = $2 RETURNING *`,
+                [item.rows[0].id, id]
+            );
+            logActivity(req.user.userId, "vendor_promotion_featured", "vendor_promotion", id, null);
+            res.json({ message: "Promotion featured on the homepage.", promotion: result.rows[0] });
+        } else {
+            if (promo.flash_sale_item_id) {
+                await removeVendorPromotionFeature(promo.flash_sale_item_id);
+            }
+            const result = await pool.query(
+                `UPDATE vendor_promotions SET homepage_featured = false, flash_sale_item_id = NULL
+                 WHERE id = $1 RETURNING *`,
+                [id]
+            );
+            logActivity(req.user.userId, "vendor_promotion_unfeatured", "vendor_promotion", id, null);
+            res.json({ message: "Promotion removed from the homepage.", promotion: result.rows[0] });
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Admin-only flag reserved for a future sponsored-placement mechanic - no
+// placement effect wired to it yet, stored so it's ready when one exists.
+exports.setVendorPromotionSponsored = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { sponsored } = req.body;
+        const result = await pool.query(
+            `UPDATE vendor_promotions SET sponsored = $1 WHERE id = $2 RETURNING *`,
+            [!!sponsored, id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Promotion not found." });
+        }
+        res.json({ message: sponsored ? "Marked sponsored." : "Sponsored flag cleared.", promotion: result.rows[0] });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

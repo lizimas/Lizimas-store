@@ -612,3 +612,83 @@ and a general "browse all products" admin view - restrict/unrestrict is
 reached through the new Vendor Compliance panel's per-vendor product list
 rather than the main Products tab, to avoid touching that already-large,
 actively-used screen for this task.
+
+
+## Vendor Promotions: Propose, Admin-Approved (September 2026)
+
+Covers "vendor promotions (propose, admin-approved)" from Ryan's gap
+analysis: a vendor proposes a time-boxed sale price on one of their own
+products; Lizimas admin approves or rejects it, sets a discount ceiling,
+and separately controls homepage/sponsored placement.
+
+**Migration to run:**
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/070_vendor_promotions.sql
+
+**Scope decision: sale price on a product, not a discount CODE.** Ryan's
+list said "discount/flash-sale/coupon" - discount_codes (migration 056)
+apply to the whole order at checkout and can span multiple vendors' items
+in one cart, so letting a single vendor set one would be setting a price
+on money that isn't only theirs. Only admin creates those, unchanged. What
+vendors actually get is the flash-sale shape: a specific product, a sale
+price, a time window - which is also the one of the three that already had
+a fitting table to extend (`flash_sales`/`flash_sale_items`, migration
+057).
+
+**`MAX_VENDOR_DISCOUNT_PERCENT = 50`** (`server/utils/vendorPromotions.js`)
+- the ceiling a vendor may propose without it being rejected outright.
+Flagged as a starting point, not a settled business rule - same spirit as
+`MIN_PAYOUT_UGX` and the 15% default commission rate, tune in one place.
+`original_price` is snapshotted onto the row at proposal time so a later
+price edit doesn't retroactively change what discount % was actually
+approved.
+
+**The discount is honored at checkout the moment it's approved, independent
+of homepage placement.** `checkoutController.js`'s price resolution (which
+already checked `flash_sale_items` for the regular flash-sale system) now
+also checks `vendor_promotions` directly for an approved, in-window
+promotion on the item being bought. This matters because of a real
+constraint discovered in the existing flash-sale system: the homepage only
+ever shows ONE active campaign at a time
+(`getActiveFlashSalePublic ORDER BY ends_at ASC LIMIT 1`) - so if every
+approved promotion automatically became a `flash_sales` row, they'd be
+silently fighting each other (and admin's own campaigns) for that one
+slot, with no way for admin to actually decide who wins beyond racing end
+dates. Keeping "approved" (discount is real, checkout honors it) and
+"featured" (shown on the homepage) as two independent, admin-controlled
+things avoids that.
+
+**`homepage_featured`** (admin-only toggle): flipping it on creates a
+dedicated, single-item `flash_sales` campaign (title = product name,
+window = the promotion's own `starts_at`/`ends_at`) plus its
+`flash_sale_items` row, reusing the existing, already-built homepage
+flash-sale rendering rather than a second one - zero new customer-facing
+frontend code. Flipping it off deletes that campaign and item. Because the
+homepage still only shows one campaign at a time, a featured vendor
+promotion competes with admin's own flash sales the same way multiple
+admin campaigns already would - featuring is "eligible to show", not "will
+definitely show."
+
+**`sponsored`** (admin-only flag): stored, toggleable, but has no
+placement mechanic wired to it in this pass - there's no sponsored
+carousel or search-boost anywhere in the codebase to hook it into.
+Reserved for a real sponsored-placement feature later, same "wired but not
+yet surfaced" scoping as `createVendorLedgerAdjustment` in Task #61.
+
+**Known limitation carried over from the existing flash-sale system, not
+new here**: the general product catalogue/search (`getProducts`,
+`getProductById`) and a vendor's own storefront listing don't show a
+strikethrough sale price anywhere - only the dedicated homepage flash-sale
+endpoint does, and checkout independently re-resolves the correct price
+regardless. A non-featured approved vendor promotion is real (checkout
+charges the sale price) but effectively invisible until checkout unless a
+customer already knows to expect it - worth a "show the sale price
+wherever the product appears" pass later, but that's a pre-existing gap in
+how flash sales display everywhere, not something introduced by this task.
+
+**Admin UI**: two panels on the Vendors tab - "Vendor Promotions Awaiting
+Review" (approve/reject) and "Approved Vendor Promotions" (Feature/
+Unfeature, Mark/Unmark Sponsored, Cancel - cancelling an approved,
+currently-live promotion also tears down its homepage campaign if it had
+one, so there's one "shut this down" action rather than two separate
+paths for declining vs. revoking).
