@@ -43,7 +43,7 @@ COMMENT ON COLUMN vendor_promotions.homepage_featured IS 'Admin-only: whether an
 COMMENT ON COLUMN vendor_promotions.sponsored IS 'Admin-only flag reserved for future sponsored-placement/search-boost - stored now, no placement mechanic wired to it yet.';
 COMMENT ON COLUMN vendor_promotions.flash_sale_item_id IS 'Set only when homepage_featured is true - the flash_sale_items row this promotion materialized into. Cleared automatically if that row is deleted (ON DELETE SET NULL).';
 
-INSERT INTO schema_migrations (filename, description)
+INSERT INTO schema_migrations (filename, note)
 VALUES (
     '070_vendor_promotions.sql',
     'vendor_promotions: vendor-proposed sale price on their own product, admin approve/reject, admin-controlled homepage_featured (materializes into flash_sale_items) and sponsored flag.'

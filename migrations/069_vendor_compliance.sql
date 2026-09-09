@@ -48,7 +48,7 @@ CREATE INDEX IF NOT EXISTS idx_vendor_compliance_actions_vendor ON vendor_compli
 COMMENT ON TABLE vendor_compliance_actions IS 'Audit trail AND vendor-visible notice feed for admin compliance actions - a warning has no schema effect elsewhere, so this table is the only record of it.';
 COMMENT ON COLUMN vendor_compliance_actions.product_id IS 'Set only for restrict_product/unrestrict_product - which product the action applied to.';
 
-INSERT INTO schema_migrations (filename, description)
+INSERT INTO schema_migrations (filename, note)
 VALUES (
     '069_vendor_compliance.sql',
     'product_reviews.vendor_response; vendors.payout_frozen; products.admin_restricted/restricted_reason; vendor_compliance_actions audit+notice table.'

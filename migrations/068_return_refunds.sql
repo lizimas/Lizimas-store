@@ -40,7 +40,7 @@ CREATE INDEX IF NOT EXISTS idx_order_items_refund_pending
     ON order_items (return_reason)
     WHERE return_reason IS NOT NULL AND refund_decision IS NULL;
 
-INSERT INTO schema_migrations (filename, description)
+INSERT INTO schema_migrations (filename, note)
 VALUES (
     '068_return_refunds.sql',
     'order_items gains return_evidence_image, refund_decision/amount/notes, and vendor_response - the financial/decision side of returns that migration 052''s physical-logistics tracking did not cover.'

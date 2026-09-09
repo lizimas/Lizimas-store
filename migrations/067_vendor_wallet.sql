@@ -43,7 +43,7 @@ CREATE INDEX IF NOT EXISTS idx_vendor_ledger_adjustments_vendor ON vendor_ledger
 COMMENT ON TABLE vendor_ledger_adjustments IS 'Manual admin credits/debits to a vendor''s balance (goodwill credit, dispute correction, etc) - amount is signed: positive = credit, negative = debit.';
 COMMENT ON COLUMN vendor_ledger_adjustments.reason IS 'Required free-text explanation, shown to the vendor alongside the amount - never a bare number with no context.';
 
-INSERT INTO schema_migrations (filename, description)
+INSERT INTO schema_migrations (filename, note)
 VALUES (
     '067_vendor_wallet.sql',
     'vendor_payouts and vendor_ledger_adjustments: the only two wallet facts that cannot be derived from order_items - money actually paid out, and manual admin adjustments.'
