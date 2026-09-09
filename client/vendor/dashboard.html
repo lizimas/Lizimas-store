@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Vendor Dashboard</title>
-<link rel="stylesheet" href="../css/admin.css?v=19">
+<link rel="stylesheet" href="../css/admin.css?v=20">
 </head>
 <body>
 
@@ -13,9 +13,19 @@
         <div class="admin-shell">
 
             <aside class="admin-sidebar">
-                <div class="sidebar-brand">
-                    <span class="sidebar-brand-icon">L</span>
-                    <span>Vendor Portal</span>
+                <div class="sidebar-brand" style="position:relative; display:flex; align-items:center; justify-content:space-between;">
+                    <span style="display:flex; align-items:center; gap:8px;"><span class="sidebar-brand-icon">L</span><span>Vendor Portal</span></span>
+                    <button id="vendor-notif-bell" onclick="toggleVendorNotifPanel()" style="position:relative; background:none; border:none; cursor:pointer; font-size:18px; color:inherit; padding:4px;">
+                        &#128276;
+                        <span id="vendor-notif-badge" hidden style="position:absolute; top:-2px; right:-2px; background:#DC2626; color:#fff; border-radius:10px; font-size:10px; padding:1px 5px; font-weight:700;">0</span>
+                    </button>
+                    <div id="vendor-notif-panel" hidden style="position:absolute; top:100%; right:0; width:320px; max-height:400px; overflow-y:auto; background:#fff; color:#1a1a2e; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.2); z-index:100; padding:10px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <strong style="font-size:13px;">Notifications</strong>
+                            <button onclick="markAllVendorNotifsRead()" style="background:none; border:none; color:#1a1a2e; font-size:12px; text-decoration:underline; cursor:pointer;">Mark all read</button>
+                        </div>
+                        <div id="vendor-notif-list" style="font-size:13px;">Loading...</div>
+                    </div>
                 </div>
 
                 <nav class="sidebar-nav">
@@ -45,6 +55,9 @@
                     </button>
                     <button class="tab-btn" data-tab="promotions">
                         <span class="sidebar-icon">&#127991;</span> Promotions
+                    </button>
+                    <button class="tab-btn" data-tab="reports">
+                        <span class="sidebar-icon">&#128202;</span> Reports
                     </button>
                     <button class="tab-btn" data-tab="account">
                         <span class="sidebar-icon">&#9881;</span> Account
@@ -350,6 +363,27 @@
                     </div>
                 </section>
 
+                <section id="tab-reports" class="tab-content hidden">
+                    <h2 class="admin-page-title">Reports</h2>
+                    <p class="admin-page-subtitle">Sales, orders and payouts over the last 30 days.</p>
+                    <div class="panel">
+                        <h3 style="margin:0 0 10px;">Daily Sales</h3>
+                        <canvas id="vendor-reports-chart" height="90"></canvas>
+                    </div>
+                    <div class="panel">
+                        <h3 style="margin:0 0 10px;">Top Products</h3>
+                        <div id="vendor-reports-top-products">Loading...</div>
+                    </div>
+                    <div class="panel">
+                        <h3 style="margin:0 0 10px;">Orders by Status</h3>
+                        <div id="vendor-reports-order-status">Loading...</div>
+                    </div>
+                    <div class="panel">
+                        <h3 style="margin:0 0 10px;">Payouts</h3>
+                        <div id="vendor-reports-payouts">Loading...</div>
+                    </div>
+                </section>
+
                 <section id="tab-account" class="tab-content hidden">
                     <h2 class="admin-page-title">Account</h2>
                     <div class="panel">
@@ -367,8 +401,9 @@
 
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
     <script src="../js/category-select.js?v=1"></script>
     <script src="../js/seller-panel.js?v=1"></script>
-    <script src="../js/vendor-dashboard.js?v=12"></script>
+    <script src="../js/vendor-dashboard.js?v=13"></script>
 </body>
 </html>

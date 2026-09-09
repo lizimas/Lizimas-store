@@ -59,6 +59,7 @@ function setupVendorTabs() {
             if (button.dataset.tab === "reviews") loadVendorReviews();
             if (button.dataset.tab === "promotions") loadVendorPromotionsTab();
             if (button.dataset.tab === "account") loadVendorComplianceNotices();
+            if (button.dataset.tab === "reports") loadVendorReports();
         });
     });
 }
@@ -1583,6 +1584,158 @@ async function loadVendorPromotionsList() {
     }
 }
 
+// --- Notifications (Task #65) --------------------------------------------
+// A small bell in the sidebar header, polled on load and whenever the
+// panel is opened. Clicking a notification jumps to its linked tab and
+// marks it read.
+
+let vendorNotifPanelOpen = false;
+
+async function refreshVendorNotifBadge() {
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/notifications/unread-count");
+        const badge = document.getElementById("vendor-notif-badge");
+        if (!badge) return;
+        if (data.unread > 0) {
+            badge.textContent = data.unread > 99 ? "99+" : String(data.unread);
+            badge.hidden = false;
+        } else {
+            badge.hidden = true;
+        }
+    } catch (error) {
+        console.error("Refresh vendor notif badge error:", error);
+    }
+}
+
+function toggleVendorNotifPanel() {
+    const panel = document.getElementById("vendor-notif-panel");
+    if (!panel) return;
+    vendorNotifPanelOpen = !vendorNotifPanelOpen;
+    panel.hidden = !vendorNotifPanelOpen;
+    if (vendorNotifPanelOpen) loadVendorNotifList();
+}
+
+async function loadVendorNotifList() {
+    const box = document.getElementById("vendor-notif-list");
+    if (!box) return;
+    try {
+        const rows = await vendorAuthorizedFetch("/api/vendors/notifications");
+        if (rows.error) {
+            box.innerHTML = `<p>${vendorEsc(rows.error)}</p>`;
+            return;
+        }
+        if (rows.length === 0) {
+            box.innerHTML = `<p style="color:#888;">No notifications yet.</p>`;
+            return;
+        }
+        box.innerHTML = rows.map(n => `
+            <div onclick="openVendorNotification(${n.id}, '${n.link_tab || ""}')" style="padding:8px 6px; border-bottom:1px solid #eee; cursor:pointer; ${n.read_at ? "opacity:0.55;" : ""}">
+                <div style="font-weight:600;">${vendorEsc(n.title)}</div>
+                <div style="color:#555; margin-top:2px;">${vendorEsc(n.message)}</div>
+                <div style="color:#999; font-size:11px; margin-top:2px;">${new Date(n.created_at).toLocaleString()}</div>
+            </div>
+        `).join("");
+    } catch (error) {
+        console.error("Load vendor notif list error:", error);
+        box.innerHTML = "<p>Could not connect to server.</p>";
+    }
+}
+
+async function openVendorNotification(id, linkTab) {
+    try {
+        await vendorAuthorizedFetch(`/api/vendors/notifications/${id}/read`, { method: "PATCH" });
+        refreshVendorNotifBadge();
+        loadVendorNotifList();
+    } catch (error) {
+        console.error("Mark vendor notification read error:", error);
+    }
+    if (linkTab) {
+        const button = document.querySelector(`.tab-btn[data-tab="${linkTab}"]`);
+        if (button) button.click();
+    }
+    toggleVendorNotifPanel();
+}
+
+async function markAllVendorNotifsRead() {
+    try {
+        await vendorAuthorizedFetch("/api/vendors/notifications/read-all", { method: "PATCH" });
+        refreshVendorNotifBadge();
+        loadVendorNotifList();
+    } catch (error) {
+        console.error("Mark all vendor notifications read error:", error);
+    }
+}
+
+// --- Reports (Task #65) ---------------------------------------------------
+
+let vendorReportsChart = null;
+
+async function loadVendorReports() {
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/reports");
+        if (data.error) return;
+
+        renderVendorReportsChart(data.dailySales);
+
+        const topBox = document.getElementById("vendor-reports-top-products");
+        topBox.innerHTML = data.topProducts.length === 0
+            ? `<p class="no-data">No sales in the last 30 days.</p>`
+            : `<table style="width:100%;">
+                <thead><tr><th>Product</th><th>Units Sold</th><th>Revenue</th></tr></thead>
+                <tbody>
+                    ${data.topProducts.map(p => `
+                        <tr>
+                            <td data-label="Product">${vendorEsc(p.name)}</td>
+                            <td data-label="Units Sold">${p.unitsSold}</td>
+                            <td data-label="Revenue">${vendorFmtUgx(p.revenue)}</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>`;
+
+        const statusBox = document.getElementById("vendor-reports-order-status");
+        statusBox.innerHTML = data.orderStatusBreakdown.length === 0
+            ? `<p class="no-data">No orders in the last 30 days.</p>`
+            : data.orderStatusBreakdown.map(s => `<span class="status-badge status-${vendorEsc(s.status)}" style="margin-right:6px;">${vendorEsc(s.status)}: ${s.count}</span>`).join("");
+
+        const payoutsBox = document.getElementById("vendor-reports-payouts");
+        payoutsBox.innerHTML = data.payoutSummary.length === 0
+            ? `<p class="no-data">No payout requests in the last 30 days.</p>`
+            : data.payoutSummary.map(p => `<div>${p.status}: ${p.count} (${vendorFmtUgx(p.total)})</div>`).join("");
+    } catch (error) {
+        console.error("Load vendor reports error:", error);
+    }
+}
+
+function renderVendorReportsChart(dailySales) {
+    const canvas = document.getElementById("vendor-reports-chart");
+    if (!canvas || typeof Chart === "undefined") return;
+    const labels = dailySales.map(d => d.day);
+    const datasets = [
+        { label: "Sales (UGX)", data: dailySales.map(d => d.sales), borderColor: "#1a1a2e", backgroundColor: "rgba(26,26,46,0.08)", tension: 0.3, fill: true, yAxisID: "y" },
+        { label: "Orders", data: dailySales.map(d => d.orders), borderColor: "#C9A227", backgroundColor: "rgba(201,162,39,0.12)", tension: 0.3, fill: true, yAxisID: "y1" }
+    ];
+    if (vendorReportsChart) {
+        vendorReportsChart.data.labels = labels;
+        vendorReportsChart.data.datasets = datasets;
+        vendorReportsChart.update();
+        return;
+    }
+    vendorReportsChart = new Chart(canvas.getContext("2d"), {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: "index", intersect: false },
+            scales: {
+                y: { beginAtZero: true, position: "left" },
+                y1: { beginAtZero: true, position: "right", grid: { drawOnChartArea: false } }
+            }
+        }
+    });
+}
+
 // --- Init -----------------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -1595,4 +1748,5 @@ document.addEventListener("DOMContentLoaded", () => {
     loadVendorDashboardSummary();
     loadVendorCategories();
     loadVendorPromotions();
+    refreshVendorNotifBadge();
 });

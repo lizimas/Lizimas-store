@@ -4,6 +4,8 @@ const { sendOrderStatusEmail, sendOrderConfirmationEmail } = require("../utils/m
 const { sign: signReceipt } = require("../routes/receipt");
 const { priceOrder } = require("../utils/deliveryPricing");
 const { DiscountError, resolveDiscountCode, recordDiscountCodeUsage } = require("../utils/discounts");
+const { createVendorNotification } = require("./vendorController");
+const { LOW_STOCK_THRESHOLD } = require("../utils/vendorNotifications");
 
 // Base URL for links that leave the app (emails, receipts). Hardcoding the
 // production domain makes locally generated links unusable, since they resolve
@@ -352,10 +354,16 @@ exports.checkout = async (req, res) => {
                     [item.quantity, item.variantId]
                 );
             } else {
-                await client.query(
-                    "UPDATE products SET stock = stock - $1 WHERE id = $2",
+                const stockResult = await client.query(
+                    "UPDATE products SET stock = stock - $1 WHERE id = $2 RETURNING stock",
                     [item.quantity, item.productId]
                 );
+                // Low-stock notification (Task #65) - simple products only;
+                // variant-level stock is tracked per color/size and doesn't
+                // reduce to one "the product is low" number the same way.
+                if (item.vendorId && stockResult.rows.length && Number(stockResult.rows[0].stock) < LOW_STOCK_THRESHOLD) {
+                    item.resultingStock = Number(stockResult.rows[0].stock);
+                }
             }
         }
 
@@ -363,6 +371,32 @@ exports.checkout = async (req, res) => {
 
         // Order confirmation notifications - best-effort, never block the response
         sendOrderStatusSms(phone, order, "pending").catch(err => console.error("SMS notify error:", err));
+
+        // Vendor dashboard notifications (Task #65) - one "new order" per
+        // vendor whose items are in this order, plus a "low stock" alert
+        // for any simple (non-variant) product that just crossed under the
+        // threshold. Best-effort, never blocks the order response.
+        (async () => {
+            try {
+                const itemsByVendor = new Map();
+                for (const item of validatedItems) {
+                    if (!item.vendorId) continue;
+                    itemsByVendor.set(item.vendorId, (itemsByVendor.get(item.vendorId) || 0) + 1);
+                }
+                for (const [vendorId, itemCount] of itemsByVendor) {
+                    await createVendorNotification(vendorId, "new_order", { orderId: order.id, itemCount });
+                }
+                for (const item of validatedItems) {
+                    if (item.vendorId && item.resultingStock !== undefined) {
+                        await createVendorNotification(item.vendorId, "low_stock", {
+                            productName: item.productName, stock: item.resultingStock
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error("Vendor notification error:", err);
+            }
+        })();
 
         // customer_email is captured at checkout for guests and members alike.
         if (order.customer_email) {

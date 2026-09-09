@@ -692,3 +692,71 @@ Unfeature, Mark/Unmark Sponsored, Cancel - cancelling an approved,
 currently-live promotion also tears down its homepage campaign if it had
 one, so there's one "shut this down" action rather than two separate
 paths for declining vs. revoking).
+
+
+## Vendor Notifications + Reports (September 2026)
+
+**`vendor_notifications`** (migration 071): a plain in-dashboard feed table
+- `type` (`new_order`, `low_stock`, `product_approved`, `product_rejected`,
+`compliance_action`, `payout_update`), `title`, `message`, `link_tab` (which
+dashboard tab to jump to on click), `read_at`. One shared helper,
+`createVendorNotification(vendorId, type, context)` in
+`vendorController.js`, builds the copy via the pure `buildNotification()`
+in `server/utils/vendorNotifications.js` and inserts the row - every
+trigger point across the codebase calls this one function rather than
+duplicating insert logic, so all notification copy lives in one place.
+
+**Hooked triggers**: `new_order` and `low_stock` fire from
+`checkoutController.js` right after an order commits (best-effort, wrapped
+in its own try/catch so a notification failure never blocks the order
+response); `product_approved`/`product_rejected` fire from
+`productController.js`'s `approveProduct`/`rejectProduct`;
+`compliance_action` fires from the existing `insertComplianceAction`
+helper (Task #63) using `COMPLIANCE_ACTION_LABELS` for the title;
+`payout_update` fires from `markVendorPayoutPaid`/`rejectVendorPayout`
+(Task #61).
+
+**`LOW_STOCK_THRESHOLD = 10`** (`server/utils/vendorNotifications.js`) -
+deliberately reuses the exact cutoff the vendor dashboard's own "Low
+Stock" KPI card already uses (`stock < 10`), so the notification and the
+KPI never disagree about what counts as low. Low-stock detection is
+scoped to simple (non-variant) products only - variant-level stock is
+per-variant, so there's no single "the product is low" number to check
+without either picking one variant arbitrarily or notifying once per
+variant, both of which felt like the wrong default. Revisit if variant
+products turn out to need their own low-stock signal.
+
+**`product_rejected` reason is a generic fallback, not the admin's actual
+reason** - the existing product-rejection flow (`rejectProduct` in
+`productController.js`, wired from `client/js/admin.js`) has never
+collected a rejection reason from the admin; that's a pre-existing gap,
+not something this task introduced or fixed, so the notification uses
+"Contact Lizimas Store support for details." Worth a follow-up: add a
+reason field to the reject-product flow so this (and the vendor-facing
+product list) can show something real.
+
+**No notification for return/refund decisions** (Task #62) - a deliberate
+scope cut for this pass, not an oversight. A vendor already sees refund
+outcomes directly in their "Returns & Refunds" tab, so this is a smaller
+gap than the others; add `refund_decision` as a seventh notification type
+if it turns out vendors want a push rather than having to check that tab.
+
+**Reports tab**: fixed 30-day range, no custom date picker - deliberately
+simpler than admin's analytics/performance tabs, which already have one.
+`getVendorReports` returns `dailySales` (day, sales, orders - drawn from
+`order_items`/`orders`, same derived-not-stored approach as the wallet
+balance in Task #61), `topProducts` (top 5 by revenue), `orderStatusBreakdown`,
+and `payoutSummary` (from `vendor_payouts`). Rendered with the same
+Chart.js 4.5.1 UMD build already used for admin's analytics chart.
+
+**Still-open gap, carried forward rather than folded in here: vendor-to-admin
+messaging.** A prior pass flagged that vendors have no channel to ask
+admin a question or flag an issue outside of the specific structured flows
+that already exist (return responses, compliance notices, promotion
+proposals). This pass added a *notification feed* (admin/system -> vendor,
+one-way) rather than a *messaging channel* (two-way, freeform) - the two
+are different features solving different problems, and building a real
+inbox/thread system properly (who can start a thread, does admin see one
+merged queue across all vendors, does it need its own read/unread state)
+is enough scope that it doesn't belong bolted onto this task. Recommend
+tracking it as its own future task rather than expanding this one further.

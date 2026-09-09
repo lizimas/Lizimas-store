@@ -9,7 +9,10 @@ const {
     getVendorWallet, requestVendorPayout,
     getMyReturnsRefunds, respondToReturn,
     getMyComplianceNotices,
-    proposeVendorPromotion, getMyVendorPromotions
+    proposeVendorPromotion, getMyVendorPromotions,
+    getMyVendorNotifications, getMyVendorNotificationsUnreadCount,
+    markVendorNotificationRead, markAllVendorNotificationsRead,
+    getVendorReports
 } = require("../controllers/vendorController");
 const {
     addProduct,
@@ -116,6 +119,13 @@ router.get("/compliance-notices", getMyComplianceNotices);
 // your own products.
 router.post("/promotions", proposeVendorPromotion);
 router.get("/promotions", getMyVendorPromotions);
+
+// Vendor Notifications + Reports (Task #65).
+router.get("/notifications", getMyVendorNotifications);
+router.get("/notifications/unread-count", getMyVendorNotificationsUnreadCount);
+router.patch("/notifications/:id/read", markVendorNotificationRead);
+router.patch("/notifications/read-all", markAllVendorNotificationsRead);
+router.get("/reports", getVendorReports);
 
 // Live pricing preview for the product-upload form (spec section 8): given
 // a category and the vendor's desired payout, returns the commission rate,

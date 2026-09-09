@@ -2,6 +2,7 @@ const pool = require("../config/database");
 const cloudinary = require("../config/cloudinary");
 const { logActivity } = require("../utils/activityLog");
 const { canApplyComplianceAction } = require("../utils/vendorCompliance");
+const { createVendorNotification } = require("./vendorController");
 const { calculatePricing } = require("../utils/commissionEngine");
 
 // Upload a single file buffer to Cloudinary, returns the secure URL
@@ -1069,6 +1070,11 @@ exports.approveProduct = async (req, res) => {
             return res.status(404).json({ error: "Product not found." });
         }
         logActivity(req.user.userId, "approved_product", "product", Number(id), `Approved "${result.rows[0].name}"`);
+        if (result.rows[0].vendor_id) {
+            await createVendorNotification(result.rows[0].vendor_id, "product_approved", {
+                productName: result.rows[0].name
+            });
+        }
         res.json({ message: "Product approved and is now live.", product: result.rows[0] });
     } catch (error) {
         console.error("Approve product error:", error);
@@ -1087,6 +1093,12 @@ exports.rejectProduct = async (req, res) => {
             return res.status(404).json({ error: "Product not found." });
         }
         logActivity(req.user.userId, "rejected_product", "product", Number(id), `Rejected "${result.rows[0].name}"`);
+        if (result.rows[0].vendor_id) {
+            await createVendorNotification(result.rows[0].vendor_id, "product_rejected", {
+                productName: result.rows[0].name,
+                reason: "Contact Lizimas Store support for details."
+            });
+        }
         res.json({ message: "Product rejected.", product: result.rows[0] });
     } catch (error) {
         console.error("Reject product error:", error);

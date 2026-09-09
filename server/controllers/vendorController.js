@@ -9,13 +9,14 @@ const {
     canRequestPayout
 } = require("../utils/vendorWallet");
 const { deriveReturnResolutionStatus } = require("../utils/vendorReturns");
-const { canApplyComplianceAction } = require("../utils/vendorCompliance");
+const { canApplyComplianceAction, COMPLIANCE_ACTION_LABELS } = require("../utils/vendorCompliance");
 const {
     MAX_VENDOR_DISCOUNT_PERCENT,
     validateProposedPrice,
     isValidPromotionWindow,
     deriveVendorPromotionStatus
 } = require("../utils/vendorPromotions");
+const { buildNotification } = require("../utils/vendorNotifications");
 
 // The logged-in vendor's own KYC/business profile and review status.
 exports.getMyVendorProfile = async (req, res) => {
@@ -776,6 +777,9 @@ exports.markVendorPayoutPaid = async (req, res) => {
         }
         logActivity(req.user.userId, "vendor_payout_paid", "vendor_payout", id,
             `UGX ${Number(result.rows[0].amount).toLocaleString()} marked paid`);
+        await createVendorNotification(result.rows[0].vendor_id, "payout_update", {
+            status: "paid", amount: result.rows[0].amount
+        });
         res.json({ message: "Payout marked as paid.", payout: result.rows[0] });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -801,6 +805,9 @@ exports.rejectVendorPayout = async (req, res) => {
             return res.status(409).json({ error: "Payout request is not awaiting review." });
         }
         logActivity(req.user.userId, "vendor_payout_rejected", "vendor_payout", id, reason);
+        await createVendorNotification(result.rows[0].vendor_id, "payout_update", {
+            status: "rejected", amount: result.rows[0].amount
+        });
         res.json({ message: "Payout request rejected.", payout: result.rows[0] });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -944,11 +951,16 @@ exports.respondToReturn = async (req, res) => {
 // status = 'approved'); this makes the status itself reachable.
 
 async function insertComplianceAction(vendorId, actionType, reason, adminUserId) {
-    return pool.query(
+    const result = await pool.query(
         `INSERT INTO vendor_compliance_actions (vendor_id, action_type, reason, created_by)
          VALUES ($1, $2, $3, $4) RETURNING *`,
         [vendorId, actionType, reason, adminUserId]
     );
+    await createVendorNotification(vendorId, "compliance_action", {
+        actionLabel: COMPLIANCE_ACTION_LABELS[actionType] || actionType,
+        reason
+    });
+    return result;
 }
 
 exports.warnVendor = async (req, res) => {
@@ -1408,6 +1420,160 @@ exports.setVendorPromotionSponsored = async (req, res) => {
             return res.status(404).json({ error: "Promotion not found." });
         }
         res.json({ message: sponsored ? "Marked sponsored." : "Sponsored flag cleared.", promotion: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// --- Vendor Notifications (Task #65) --------------------------------------
+// One shared helper other controllers call directly (checkoutController.js
+// for new_order/low_stock, productController.js for product approved/
+// rejected) plus the compliance/payout hooks right below it. Everything
+// funnels through buildNotification() so the copy lives in one place.
+
+async function createVendorNotification(vendorId, type, context) {
+    const built = buildNotification(type, context);
+    if (!built) return null;
+    const result = await pool.query(
+        `INSERT INTO vendor_notifications (vendor_id, type, title, message, link_tab)
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [vendorId, type, built.title, built.message, built.linkTab]
+    );
+    return result.rows[0];
+}
+exports.createVendorNotification = createVendorNotification;
+
+exports.getMyVendorNotifications = async (req, res) => {
+    try {
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const result = await pool.query(
+            `SELECT id, type, title, message, link_tab, read_at, created_at
+             FROM vendor_notifications WHERE vendor_id = $1
+             ORDER BY created_at DESC LIMIT 100`,
+            [vendorRow.rows[0].id]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.getMyVendorNotificationsUnreadCount = async (req, res) => {
+    try {
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const result = await pool.query(
+            `SELECT COUNT(*)::int AS n FROM vendor_notifications WHERE vendor_id = $1 AND read_at IS NULL`,
+            [vendorRow.rows[0].id]
+        );
+        res.json({ unread: result.rows[0].n });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.markVendorNotificationRead = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const result = await pool.query(
+            `UPDATE vendor_notifications SET read_at = now()
+             WHERE id = $1 AND vendor_id = $2 AND read_at IS NULL RETURNING id, read_at`,
+            [id, vendorRow.rows[0].id]
+        );
+        res.json({ message: "Marked read.", notification: result.rows[0] || null });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.markAllVendorNotificationsRead = async (req, res) => {
+    try {
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const result = await pool.query(
+            `UPDATE vendor_notifications SET read_at = now()
+             WHERE vendor_id = $1 AND read_at IS NULL RETURNING id`,
+            [vendorRow.rows[0].id]
+        );
+        res.json({ message: `${result.rows.length} notification(s) marked read.` });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// --- Vendor Reports (Task #65) -------------------------------------------
+// Basic sales/orders/payouts reporting, fixed to the last 30 days - no
+// custom date-range picker in this pass (admin's analytics/performance
+// tabs already have one; this is deliberately simpler).
+
+exports.getVendorReports = async (req, res) => {
+    try {
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendorId = vendorRow.rows[0].id;
+
+        const [dailyRes, topProductsRes, statusRes, payoutsRes] = await Promise.all([
+            pool.query(
+                `SELECT o.created_at::date AS day,
+                        COALESCE(SUM(oi.price * oi.quantity) FILTER (WHERE o.status = 'delivered'), 0) AS sales,
+                        COUNT(DISTINCT o.id) FILTER (WHERE o.status != 'cancelled') AS orders
+                 FROM order_items oi
+                 JOIN orders o ON o.id = oi.order_id
+                 JOIN products p ON p.id = oi.product_id
+                 WHERE p.vendor_id = $1 AND o.created_at >= now() - INTERVAL '30 days'
+                 GROUP BY o.created_at::date
+                 ORDER BY day ASC`,
+                [vendorId]
+            ),
+            pool.query(
+                `SELECT p.id, p.name, COUNT(*) AS units_sold,
+                        COALESCE(SUM(oi.price * oi.quantity), 0) AS revenue
+                 FROM order_items oi
+                 JOIN orders o ON o.id = oi.order_id
+                 JOIN products p ON p.id = oi.product_id
+                 WHERE p.vendor_id = $1 AND o.status = 'delivered' AND o.created_at >= now() - INTERVAL '30 days'
+                 GROUP BY p.id, p.name
+                 ORDER BY revenue DESC
+                 LIMIT 5`,
+                [vendorId]
+            ),
+            pool.query(
+                `SELECT o.status, COUNT(DISTINCT o.id) AS n
+                 FROM order_items oi
+                 JOIN orders o ON o.id = oi.order_id
+                 JOIN products p ON p.id = oi.product_id
+                 WHERE p.vendor_id = $1 AND o.created_at >= now() - INTERVAL '30 days'
+                 GROUP BY o.status`,
+                [vendorId]
+            ),
+            pool.query(
+                `SELECT status, COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total
+                 FROM vendor_payouts WHERE vendor_id = $1 AND requested_at >= now() - INTERVAL '30 days'
+                 GROUP BY status`,
+                [vendorId]
+            )
+        ]);
+
+        res.json({
+            rangeDays: 30,
+            dailySales: dailyRes.rows.map(r => ({ day: r.day, sales: Number(r.sales), orders: Number(r.orders) })),
+            topProducts: topProductsRes.rows.map(r => ({ id: r.id, name: r.name, unitsSold: Number(r.units_sold), revenue: Number(r.revenue) })),
+            orderStatusBreakdown: statusRes.rows.map(r => ({ status: r.status, count: Number(r.n) })),
+            payoutSummary: payoutsRes.rows.map(r => ({ status: r.status, count: Number(r.n), total: Number(r.total) }))
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
