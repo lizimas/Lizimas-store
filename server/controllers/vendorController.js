@@ -19,6 +19,14 @@ const {
 const { buildNotification } = require("../utils/vendorNotifications");
 const { MAX_ABOUT_LENGTH, isValidAboutText } = require("../utils/vendorStorefront");
 const { uploadBuffer } = require("../utils/cloudinaryUpload");
+const {
+    MAX_SUBJECT_LENGTH,
+    MAX_BODY_LENGTH,
+    isValidMessageSubject,
+    isValidMessageBody,
+    isValidMessageStatus,
+    deriveStatusAfterReply
+} = require("../utils/vendorMessages");
 
 // The logged-in vendor's own KYC/business profile and review status.
 exports.getMyVendorProfile = async (req, res) => {
@@ -1632,6 +1640,247 @@ exports.getVendorReports = async (req, res) => {
             orderStatusBreakdown: statusRes.rows.map(r => ({ status: r.status, count: Number(r.n) })),
             payoutSummary: payoutsRes.rows.map(r => ({ status: r.status, count: Number(r.n), total: Number(r.total) }))
         });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// --- Vendor-to-Admin Messaging (Task #71) ---------------------------------
+// A minimal ticket/thread channel so a vendor can reach admin outside the
+// specific structured flows that already exist (return responses,
+// compliance notices, promotion proposals). See PENDING.md for the design
+// notes - one open thread per issue, status is admin-managed triage, and
+// the vendor's existing notification bell (not a second unread system)
+// is what tells them an admin reply landed.
+
+// The vendor's own list of threads, most recently active first.
+exports.getMyVendorMessages = async (req, res) => {
+    try {
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const result = await pool.query(
+            `SELECT vm.id, vm.subject, vm.status, vm.created_at, vm.updated_at,
+                    (SELECT COUNT(*) FROM vendor_message_replies r WHERE r.vendor_message_id = vm.id)::int AS reply_count
+             FROM vendor_messages vm
+             WHERE vm.vendor_id = $1
+             ORDER BY vm.updated_at DESC`,
+            [vendorRow.rows[0].id]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// One of the vendor's own threads, with its full reply history.
+exports.getMyVendorMessageThread = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const threadRes = await pool.query(
+            `SELECT id, subject, status, created_at, updated_at FROM vendor_messages WHERE id = $1 AND vendor_id = $2`,
+            [id, vendorRow.rows[0].id]
+        );
+        if (threadRes.rows.length === 0) {
+            return res.status(404).json({ error: "Message thread not found." });
+        }
+        const repliesRes = await pool.query(
+            `SELECT id, sender_role, body, created_at FROM vendor_message_replies
+             WHERE vendor_message_id = $1 ORDER BY created_at ASC`,
+            [id]
+        );
+        res.json({ thread: threadRes.rows[0], replies: repliesRes.rows });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// A vendor opens a new thread - a subject plus the first message, created
+// together so a thread never exists without at least one reply in it.
+exports.createVendorMessage = async (req, res) => {
+    try {
+        const { subject, body } = req.body;
+        if (!isValidMessageSubject(subject)) {
+            return res.status(400).json({ error: `Subject is required and must be ${MAX_SUBJECT_LENGTH} characters or fewer.` });
+        }
+        if (!isValidMessageBody(body)) {
+            return res.status(400).json({ error: `Message is required and must be ${MAX_BODY_LENGTH} characters or fewer.` });
+        }
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendorId = vendorRow.rows[0].id;
+
+        const threadRes = await pool.query(
+            `INSERT INTO vendor_messages (vendor_id, subject) VALUES ($1, $2) RETURNING *`,
+            [vendorId, subject.trim()]
+        );
+        const thread = threadRes.rows[0];
+        const replyRes = await pool.query(
+            `INSERT INTO vendor_message_replies (vendor_message_id, sender_role, body) VALUES ($1, 'vendor', $2) RETURNING *`,
+            [thread.id, body.trim()]
+        );
+        res.json({ message: "Message sent.", thread, reply: replyRes.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// A vendor replies to one of their own threads. Reopens it automatically
+// if it was resolved (deriveStatusAfterReply) - a vendor following up on
+// a closed thread means it isn't actually closed.
+exports.replyToVendorMessage = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { body } = req.body;
+        if (!isValidMessageBody(body)) {
+            return res.status(400).json({ error: `Message is required and must be ${MAX_BODY_LENGTH} characters or fewer.` });
+        }
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const threadRes = await pool.query(
+            `SELECT id, status FROM vendor_messages WHERE id = $1 AND vendor_id = $2`,
+            [id, vendorRow.rows[0].id]
+        );
+        if (threadRes.rows.length === 0) {
+            return res.status(404).json({ error: "Message thread not found." });
+        }
+        const newStatus = deriveStatusAfterReply(threadRes.rows[0].status, "vendor");
+        await pool.query(
+            `UPDATE vendor_messages SET status = $1, updated_at = now() WHERE id = $2`,
+            [newStatus, id]
+        );
+        const replyRes = await pool.query(
+            `INSERT INTO vendor_message_replies (vendor_message_id, sender_role, body) VALUES ($1, 'vendor', $2) RETURNING *`,
+            [id, body.trim()]
+        );
+        res.json({ message: "Reply sent.", reply: replyRes.rows[0], status: newStatus });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Admin's merged inbox across every vendor - open threads by default
+// (?status=resolved to see the resolved ones instead), most recently
+// active first, same "plain queue, no unread system" shape as every
+// other admin panel in this codebase.
+exports.getVendorMessagesAdmin = async (req, res) => {
+    try {
+        const status = isValidMessageStatus(req.query.status) ? req.query.status : "open";
+        const result = await pool.query(
+            `SELECT vm.id, vm.subject, vm.status, vm.created_at, vm.updated_at,
+                    v.id AS vendor_id, v.business_name AS vendor_business_name,
+                    (SELECT COUNT(*) FROM vendor_message_replies r WHERE r.vendor_message_id = vm.id)::int AS reply_count
+             FROM vendor_messages vm
+             JOIN vendors v ON v.id = vm.vendor_id
+             WHERE vm.status = $1
+             ORDER BY vm.updated_at DESC`,
+            [status]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Any vendor's thread, with its full reply history - admin can view
+// across vendors, unlike getMyVendorMessageThread's own-vendor scoping.
+exports.getVendorMessageThreadAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const threadRes = await pool.query(
+            `SELECT vm.id, vm.subject, vm.status, vm.created_at, vm.updated_at,
+                    v.id AS vendor_id, v.business_name AS vendor_business_name
+             FROM vendor_messages vm
+             JOIN vendors v ON v.id = vm.vendor_id
+             WHERE vm.id = $1`,
+            [id]
+        );
+        if (threadRes.rows.length === 0) {
+            return res.status(404).json({ error: "Message thread not found." });
+        }
+        const repliesRes = await pool.query(
+            `SELECT id, sender_role, body, created_at FROM vendor_message_replies
+             WHERE vendor_message_id = $1 ORDER BY created_at ASC`,
+            [id]
+        );
+        res.json({ thread: threadRes.rows[0], replies: repliesRes.rows });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Admin replies to a vendor's thread. Never changes status on its own
+// (deriveStatusAfterReply) - resolving/reopening is a separate, explicit
+// action below - and pings the vendor's notification bell so they know
+// to check their Messages tab.
+exports.replyToVendorMessageAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { body } = req.body;
+        if (!isValidMessageBody(body)) {
+            return res.status(400).json({ error: `Message is required and must be ${MAX_BODY_LENGTH} characters or fewer.` });
+        }
+        const threadRes = await pool.query(
+            `SELECT id, vendor_id, subject, status FROM vendor_messages WHERE id = $1`,
+            [id]
+        );
+        if (threadRes.rows.length === 0) {
+            return res.status(404).json({ error: "Message thread not found." });
+        }
+        const thread = threadRes.rows[0];
+        const newStatus = deriveStatusAfterReply(thread.status, "admin");
+        await pool.query(
+            `UPDATE vendor_messages SET status = $1, updated_at = now() WHERE id = $2`,
+            [newStatus, id]
+        );
+        const replyRes = await pool.query(
+            `INSERT INTO vendor_message_replies (vendor_message_id, sender_role, sender_user_id, body)
+             VALUES ($1, 'admin', $2, $3) RETURNING *`,
+            [id, req.user.userId, body.trim()]
+        );
+        await createVendorNotification(thread.vendor_id, "admin_message", { subject: thread.subject });
+        res.json({ message: "Reply sent.", reply: replyRes.rows[0], status: newStatus });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.resolveVendorMessageAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            `UPDATE vendor_messages SET status = 'resolved', updated_at = now() WHERE id = $1 RETURNING *`,
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Message thread not found." });
+        }
+        res.json({ message: "Thread marked resolved.", thread: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.reopenVendorMessageAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            `UPDATE vendor_messages SET status = 'open', updated_at = now() WHERE id = $1 RETURNING *`,
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Message thread not found." });
+        }
+        res.json({ message: "Thread reopened.", thread: result.rows[0] });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

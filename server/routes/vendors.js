@@ -13,7 +13,8 @@ const {
     getMyVendorNotifications, getMyVendorNotificationsUnreadCount,
     markVendorNotificationRead, markAllVendorNotificationsRead,
     getVendorReports,
-    updateVendorStorefront
+    updateVendorStorefront,
+    getMyVendorMessages, getMyVendorMessageThread, createVendorMessage, replyToVendorMessage
 } = require("../controllers/vendorController");
 const {
     addProduct,
@@ -128,6 +129,12 @@ router.get("/notifications/unread-count", getMyVendorNotificationsUnreadCount);
 router.patch("/notifications/:id/read", markVendorNotificationRead);
 router.patch("/notifications/read-all", markAllVendorNotificationsRead);
 router.get("/reports", getVendorReports);
+
+// Vendor-to-Admin Messaging (Task #71).
+router.get("/messages", getMyVendorMessages);
+router.get("/messages/:id", getMyVendorMessageThread);
+router.post("/messages", createVendorMessage);
+router.post("/messages/:id/replies", replyToVendorMessage);
 
 // Live pricing preview for the product-upload form (spec section 8): given
 // a category and the vendor's desired payout, returns the commission rate,

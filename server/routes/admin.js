@@ -92,7 +92,12 @@ const {
     approveVendorPromotion,
     rejectVendorPromotion,
     setVendorPromotionFeatured,
-    setVendorPromotionSponsored
+    setVendorPromotionSponsored,
+    getVendorMessagesAdmin,
+    getVendorMessageThreadAdmin,
+    replyToVendorMessageAdmin,
+    resolveVendorMessageAdmin,
+    reopenVendorMessageAdmin
 } = require("../controllers/vendorController");
 
 const {
@@ -212,6 +217,13 @@ router.patch("/vendor-promotions/:id/approve", approveVendorPromotion);
 router.patch("/vendor-promotions/:id/reject", rejectVendorPromotion);
 router.patch("/vendor-promotions/:id/featured", setVendorPromotionFeatured);
 router.patch("/vendor-promotions/:id/sponsored", setVendorPromotionSponsored);
+
+// Vendor-to-Admin Messaging (Task #71): the admin-side merged inbox.
+router.get("/vendor-messages", getVendorMessagesAdmin);
+router.get("/vendor-messages/:id", getVendorMessageThreadAdmin);
+router.post("/vendor-messages/:id/replies", replyToVendorMessageAdmin);
+router.patch("/vendor-messages/:id/resolve", resolveVendorMessageAdmin);
+router.patch("/vendor-messages/:id/reopen", reopenVendorMessageAdmin);
 
 router.get("/dropoff-points", listDropoffPoints);
 router.post("/dropoff-points", createDropoffPoint);

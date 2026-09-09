@@ -1668,6 +1668,7 @@ function setupTabs() {
                 loadVendorCompliancePanel();
                 loadPendingVendorPromotions();
                 loadApprovedVendorPromotions();
+                loadVendorMessagesAdmin();
             }
 
             if (button.dataset.tab === "team-messages") {
@@ -7033,4 +7034,129 @@ function initAnalyticsAndPerformance() {
             lzStaffPerfData.map(s => [s.name, s.role, s.productCount, s.productViews, s.unitsSold, s.ordersCount, s.revenue])
         );
     });
+}
+
+// --- Vendor-to-Admin Messaging (Task #71): admin inbox --------------------
+
+let vendorMessagesAdminFilter = "open";
+let vendorMessagesAdminOpenThreadId = null;
+
+async function loadVendorMessagesAdmin(status) {
+    if (status) vendorMessagesAdminFilter = status;
+    const openBtn = document.getElementById("vendor-messages-filter-open");
+    const resolvedBtn = document.getElementById("vendor-messages-filter-resolved");
+    if (openBtn && resolvedBtn) {
+        const activeStyle = "background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer; margin-right:6px;";
+        const inactiveStyle = "background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer; margin-right:6px;";
+        openBtn.setAttribute("style", vendorMessagesAdminFilter === "open" ? activeStyle : inactiveStyle);
+        resolvedBtn.setAttribute("style", (vendorMessagesAdminFilter === "resolved" ? activeStyle : inactiveStyle).replace("margin-right:6px;", ""));
+    }
+
+    const box = document.getElementById("vendor-messages-admin-list");
+    if (!box) return;
+    try {
+        const rows = await authorizedFetch(`/api/admin/vendor-messages?status=${vendorMessagesAdminFilter}`);
+        if (rows.error) {
+            box.innerHTML = `<p>${rows.error}</p>`;
+            return;
+        }
+        if (rows.length === 0) {
+            box.innerHTML = `<p style="color:#888;">No ${vendorMessagesAdminFilter} threads.</p>`;
+            return;
+        }
+        box.innerHTML = `
+            <table style="width:100%;">
+                <thead><tr><th>Vendor</th><th>Subject</th><th>Replies</th><th>Last Update</th></tr></thead>
+                <tbody>
+                    ${rows.map(m => `
+                        <tr onclick="openVendorMessageThreadAdmin(${m.id})" style="cursor:pointer;">
+                            <td>${m.vendor_business_name}</td>
+                            <td>${m.subject}</td>
+                            <td>${m.reply_count}</td>
+                            <td>${new Date(m.updated_at).toLocaleString()}</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>`;
+    } catch (error) {
+        console.error("Load admin vendor messages error:", error);
+        box.innerHTML = "<p>Could not connect to server.</p>";
+    }
+}
+
+async function openVendorMessageThreadAdmin(id) {
+    vendorMessagesAdminOpenThreadId = id;
+    document.getElementById("vendor-messages-admin-list-view").hidden = true;
+    document.getElementById("vendor-messages-admin-thread-view").hidden = false;
+    await loadVendorMessageThreadAdmin();
+}
+
+function closeVendorMessageThreadAdmin() {
+    vendorMessagesAdminOpenThreadId = null;
+    document.getElementById("vendor-messages-admin-thread-view").hidden = true;
+    document.getElementById("vendor-messages-admin-list-view").hidden = false;
+    loadVendorMessagesAdmin();
+}
+
+async function loadVendorMessageThreadAdmin() {
+    if (!vendorMessagesAdminOpenThreadId) return;
+    try {
+        const data = await authorizedFetch(`/api/admin/vendor-messages/${vendorMessagesAdminOpenThreadId}`);
+        if (data.error) return;
+        document.getElementById("vendor-message-admin-thread-subject").textContent = `${data.thread.vendor_business_name} - ${data.thread.subject}`;
+        document.getElementById("vendor-message-admin-thread-status").textContent =
+            `${data.thread.status === "resolved" ? "Resolved" : "Open"} · opened ${new Date(data.thread.created_at).toLocaleDateString()}`;
+        const resolveBtn = document.getElementById("vendor-message-admin-resolve-btn");
+        resolveBtn.textContent = data.thread.status === "resolved" ? "Reopen" : "Mark Resolved";
+
+        const repliesBox = document.getElementById("vendor-message-admin-thread-replies");
+        repliesBox.innerHTML = data.replies.map(r => `
+            <div style="padding:8px 10px; border-radius:8px; margin-bottom:8px; max-width:85%; ${r.sender_role === "admin" ? "background:#F3F4F6; margin-left:auto;" : "background:#EEF2FF; margin-right:auto;"}">
+                <div style="font-size:11px; font-weight:600; color:#555; margin-bottom:2px;">${r.sender_role === "admin" ? "You" : data.thread.vendor_business_name}</div>
+                <div>${r.body}</div>
+                <div style="font-size:10px; color:#999; margin-top:2px;">${new Date(r.created_at).toLocaleString()}</div>
+            </div>
+        `).join("");
+    } catch (error) {
+        console.error("Load admin vendor message thread error:", error);
+    }
+}
+
+async function sendVendorMessageReplyAdmin() {
+    const bodyEl = document.getElementById("vendor-message-admin-reply-body");
+    const statusEl = document.getElementById("vendor-message-admin-reply-status");
+    const body = bodyEl.value.trim();
+    if (!body || !vendorMessagesAdminOpenThreadId) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/vendor-messages/${vendorMessagesAdminOpenThreadId}/replies`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ body })
+        });
+        bodyEl.value = "";
+        statusEl.textContent = "";
+        loadVendorMessageThreadAdmin();
+    } catch (error) {
+        console.error("Send admin vendor message reply error:", error);
+        statusEl.style.color = "#DC2626";
+        statusEl.textContent = "Could not connect to server.";
+    }
+}
+
+async function toggleVendorMessageResolvedAdmin() {
+    if (!vendorMessagesAdminOpenThreadId) return;
+    try {
+        const token = getToken();
+        const resolveBtn = document.getElementById("vendor-message-admin-resolve-btn");
+        const action = resolveBtn.textContent === "Reopen" ? "reopen" : "resolve";
+        await fetch(`${API_URL}/api/admin/vendor-messages/${vendorMessagesAdminOpenThreadId}/${action}`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        loadVendorMessageThreadAdmin();
+    } catch (error) {
+        console.error("Toggle vendor message resolved error:", error);
+        alert("Something went wrong.");
+    }
 }

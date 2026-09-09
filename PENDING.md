@@ -746,17 +746,8 @@ balance in Task #61), `topProducts` (top 5 by revenue), `orderStatusBreakdown`,
 and `payoutSummary` (from `vendor_payouts`). Rendered with the same
 Chart.js 4.5.1 UMD build already used for admin's analytics chart.
 
-**Still-open gap, carried forward rather than folded in here: vendor-to-admin
-messaging.** A prior pass flagged that vendors have no channel to ask
-admin a question or flag an issue outside of the specific structured flows
-that already exist (return responses, compliance notices, promotion
-proposals). This pass added a *notification feed* (admin/system -> vendor,
-one-way) rather than a *messaging channel* (two-way, freeform) - the two
-are different features solving different problems, and building a real
-inbox/thread system properly (who can start a thread, does admin see one
-merged queue across all vendors, does it need its own read/unread state)
-is enough scope that it doesn't belong bolted onto this task. Recommend
-tracking it as its own future task rather than expanding this one further.
+~~Still-open gap: vendor-to-admin messaging.~~ **Fixed (September 2026,
+Task #71)** - see the "Vendor-to-Admin Messaging" section below.
 
 
 ## Order-time commission locking (September 2026)
@@ -854,3 +845,72 @@ the vendor wanted their store to look like.
 already handled the "field is set" vs. "field is null" cases gracefully
 (that fallback behavior is exactly why this was a UI-only gap, not a
 backend one).
+
+
+## Vendor-to-Admin Messaging (September 2026)
+
+Closes the gap flagged in Task #65: vendors had a one-way notification
+feed (admin/system -> vendor) but no channel to raise a question or issue
+back the other way, outside the specific structured flows that already
+exist (return responses, compliance notices, promotion proposals).
+
+**Migration to run:**
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/075_vendor_messages.sql
+
+**Design decisions made (documented here rather than guessed at silently,
+same as every other tunable/decided default in this file):**
+
+- **A lightweight ticket/thread model, not real-time chat.** A vendor
+  opens one thread per issue with a subject + first message; either side
+  can reply within it. No websockets, no typing indicators, no per-reply
+  read receipts - the existing Team Messages system (Tasks #27-38) is
+  the real-time Messenger-style tool for internal staff chat; this is
+  deliberately a simpler, ticket-style channel for an external party.
+- **Status is admin-managed triage, not a hard lock.** `open`/`resolved`
+  on `vendor_messages` doesn't block replying either way - a vendor can
+  always follow up on a "resolved" thread (which auto-reopens it, since
+  a follow-up obviously means it wasn't actually resolved), and admin's
+  reply never changes status on its own (`deriveStatusAfterReply`) so
+  admin can add a note to a closed thread without it silently reopening
+  under them. Resolving/reopening stays a separate, explicit admin
+  button.
+- **No second unread-tracking system.** A vendor's existing notification
+  bell (`vendor_notifications`, Tasks #65/#70) gains an 8th type,
+  `admin_message`, fired whenever admin replies - that's what tells a
+  vendor to check their Messages tab. Admin's inbox is a plain list
+  (open by default, a button to switch to resolved) with no unread
+  counting, the same shape as every other admin queue panel in this
+  codebase (pending promotions, payout requests, return refunds). Adding
+  a proper unread-count system for admin was considered and deliberately
+  left out - it would need per-admin-user read state (which staff member
+  saw which reply), which is a bigger feature than this ticket model
+  needs for a first version.
+- **One merged inbox across all vendors for admin**, not per-vendor
+  panels - a `JOIN vendors` on the list query, filterable by status.
+
+**What shipped:**
+- `migrations/075_vendor_messages.sql` - `vendor_messages` (id, vendor_id,
+  subject, status, timestamps) and `vendor_message_replies` (id,
+  vendor_message_id, sender_role, sender_user_id, body, created_at).
+  Also extends `vendor_notifications.type` with `admin_message`, using
+  the same "look up the real constraint name via `pg_constraint`" pattern
+  Task #70 established, rather than guessing the auto-generated name.
+- `server/utils/vendorMessages.js` - `isValidMessageSubject`/
+  `isValidMessageBody` (length caps: 150/2000 chars, tune in one place
+  like everything else), `isValidMessageStatus`, `deriveStatusAfterReply`.
+  7 tests.
+- `vendorController.js` - vendor side: `getMyVendorMessages`,
+  `getMyVendorMessageThread`, `createVendorMessage`,
+  `replyToVendorMessage` (all scoped to the logged-in vendor's own
+  threads). Admin side: `getVendorMessagesAdmin` (the merged inbox),
+  `getVendorMessageThreadAdmin` (any vendor's thread),
+  `replyToVendorMessageAdmin` (fires the `admin_message` notification),
+  `resolveVendorMessageAdmin`, `reopenVendorMessageAdmin`.
+- Vendor dashboard: new "Messages" tab - a "New Message" form, a list of
+  the vendor's own threads, and a detail view (conversation + reply box)
+  shown in place of the list when a thread is opened.
+- Admin: new "Vendor Messages" panel on the Vendors tab - Open/Resolved
+  filter buttons, a merged list across every vendor, and the same
+  detail-view-in-place-of-list pattern with a Reply box and a Mark
+  Resolved/Reopen toggle.

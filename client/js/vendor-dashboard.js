@@ -61,6 +61,7 @@ function setupVendorTabs() {
             if (button.dataset.tab === "account") loadVendorComplianceNotices();
             if (button.dataset.tab === "reports") loadVendorReports();
             if (button.dataset.tab === "storefront") loadVendorStorefront();
+            if (button.dataset.tab === "messages") loadVendorMessages();
         });
     });
 }
@@ -1903,6 +1904,173 @@ async function saveVendorStorefront() {
         statusEl.textContent = "Could not connect to server.";
     }
 }
+
+// --- Vendor-to-Admin Messaging (Task #71) ---------------------------------
+// A minimal ticket/thread view: a list of the vendor's own threads plus a
+// "New Message" form, and a detail view (conversation + reply box) shown
+// in place of the list when a thread is opened.
+
+let vendorMessagesCache = [];
+let vendorOpenMessageThreadId = null;
+
+function vendorMessageStatusBadge(status) {
+    return status === "resolved"
+        ? `<span class="status-badge status-paid">Resolved</span>`
+        : `<span class="status-badge status-pending">Open</span>`;
+}
+
+async function loadVendorMessages() {
+    const box = document.getElementById("vendor-messages-list");
+    if (!box) return;
+    try {
+        const rows = await vendorAuthorizedFetch("/api/vendors/messages");
+        if (rows.error) {
+            box.innerHTML = `<p>${rows.error}</p>`;
+            return;
+        }
+        vendorMessagesCache = rows;
+        if (rows.length === 0) {
+            box.innerHTML = `<p class="no-data">You haven't sent any messages yet.</p>`;
+            return;
+        }
+        box.innerHTML = `
+            <table style="width:100%;">
+                <thead><tr><th>Subject</th><th>Status</th><th>Replies</th><th>Last Update</th></tr></thead>
+                <tbody>
+                    ${rows.map(m => `
+                        <tr onclick="openVendorMessageThread(${m.id})" style="cursor:pointer;">
+                            <td data-label="Subject">${m.subject}</td>
+                            <td data-label="Status">${vendorMessageStatusBadge(m.status)}</td>
+                            <td data-label="Replies">${m.reply_count}</td>
+                            <td data-label="Last Update">${new Date(m.updated_at).toLocaleString()}</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>`;
+    } catch (error) {
+        console.error("Load vendor messages error:", error);
+        box.innerHTML = "<p>Could not connect to server.</p>";
+    }
+}
+
+async function openVendorMessageThread(id) {
+    vendorOpenMessageThreadId = id;
+    document.getElementById("vendor-messages-list-view").hidden = true;
+    document.getElementById("vendor-messages-thread-view").hidden = false;
+    await loadVendorMessageThread();
+}
+
+function closeVendorMessageThread() {
+    vendorOpenMessageThreadId = null;
+    document.getElementById("vendor-messages-thread-view").hidden = true;
+    document.getElementById("vendor-messages-list-view").hidden = false;
+    loadVendorMessages();
+}
+
+async function loadVendorMessageThread() {
+    if (!vendorOpenMessageThreadId) return;
+    try {
+        const data = await vendorAuthorizedFetch(`/api/vendors/messages/${vendorOpenMessageThreadId}`);
+        if (data.error) return;
+        document.getElementById("vendor-message-thread-subject").textContent = data.thread.subject;
+        document.getElementById("vendor-message-thread-status").innerHTML =
+            `${vendorMessageStatusBadge(data.thread.status)} &middot; opened ${new Date(data.thread.created_at).toLocaleDateString()}`;
+        const repliesBox = document.getElementById("vendor-message-thread-replies");
+        repliesBox.innerHTML = data.replies.map(r => `
+            <div style="padding:8px 10px; border-radius:8px; margin-bottom:8px; max-width:85%; ${r.sender_role === "admin" ? "background:#EEF2FF; margin-right:auto;" : "background:#F3F4F6; margin-left:auto;"}">
+                <div style="font-size:11px; font-weight:600; color:#555; margin-bottom:2px;">${r.sender_role === "admin" ? "Lizimas Store" : "You"}</div>
+                <div>${r.body}</div>
+                <div style="font-size:10px; color:#999; margin-top:2px;">${new Date(r.created_at).toLocaleString()}</div>
+            </div>
+        `).join("");
+    } catch (error) {
+        console.error("Load vendor message thread error:", error);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const sendBtn = document.getElementById("vendor-message-send-btn");
+    if (sendBtn) {
+        sendBtn.addEventListener("click", async () => {
+            const subjectEl = document.getElementById("vendor-message-subject");
+            const bodyEl = document.getElementById("vendor-message-body");
+            const statusEl = document.getElementById("vendor-message-send-status");
+            const subject = subjectEl.value.trim();
+            const body = bodyEl.value.trim();
+            if (!subject || !body) {
+                statusEl.style.color = "#DC2626";
+                statusEl.textContent = "Subject and message are both required.";
+                return;
+            }
+            sendBtn.disabled = true;
+            sendBtn.style.opacity = "0.6";
+            statusEl.style.color = "";
+            statusEl.textContent = "Sending...";
+            try {
+                const data = await vendorAuthorizedFetch("/api/vendors/messages", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ subject, body })
+                });
+                sendBtn.disabled = false;
+                sendBtn.style.opacity = "1";
+                if (data.error) {
+                    statusEl.style.color = "#DC2626";
+                    statusEl.textContent = data.error;
+                    return;
+                }
+                subjectEl.value = "";
+                bodyEl.value = "";
+                statusEl.style.color = "#16A34A";
+                statusEl.textContent = "Sent.";
+                loadVendorMessages();
+            } catch (error) {
+                console.error("Send vendor message error:", error);
+                sendBtn.disabled = false;
+                sendBtn.style.opacity = "1";
+                statusEl.style.color = "#DC2626";
+                statusEl.textContent = "Could not connect to server.";
+            }
+        });
+    }
+
+    const replyBtn = document.getElementById("vendor-message-reply-btn");
+    if (replyBtn) {
+        replyBtn.addEventListener("click", async () => {
+            const bodyEl = document.getElementById("vendor-message-reply-body");
+            const statusEl = document.getElementById("vendor-message-reply-status");
+            const body = bodyEl.value.trim();
+            if (!body || !vendorOpenMessageThreadId) return;
+            replyBtn.disabled = true;
+            replyBtn.style.opacity = "0.6";
+            statusEl.style.color = "";
+            statusEl.textContent = "Sending...";
+            try {
+                const data = await vendorAuthorizedFetch(`/api/vendors/messages/${vendorOpenMessageThreadId}/replies`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ body })
+                });
+                replyBtn.disabled = false;
+                replyBtn.style.opacity = "1";
+                if (data.error) {
+                    statusEl.style.color = "#DC2626";
+                    statusEl.textContent = data.error;
+                    return;
+                }
+                bodyEl.value = "";
+                statusEl.textContent = "";
+                loadVendorMessageThread();
+            } catch (error) {
+                console.error("Send vendor message reply error:", error);
+                replyBtn.disabled = false;
+                replyBtn.style.opacity = "1";
+                statusEl.style.color = "#DC2626";
+                statusEl.textContent = "Could not connect to server.";
+            }
+        });
+    }
+});
 
 // --- Init -----------------------------------------------------------
 

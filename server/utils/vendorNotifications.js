@@ -6,7 +6,7 @@
 
 const NOTIFICATION_TYPES = [
     "new_order", "low_stock", "product_approved", "product_rejected",
-    "compliance_action", "payout_update", "refund_decision"
+    "compliance_action", "payout_update", "refund_decision", "admin_message"
 ];
 
 // Matches the `stock < 10` threshold getVendorDashboardSummary already
@@ -66,6 +66,12 @@ function buildNotification(type, context = {}) {
                     ? `Your refund for ${context.productName} was approved (UGX ${Number(context.amount).toLocaleString()}).`
                     : `Your refund for ${context.productName} was denied${context.notes ? `: ${context.notes}` : "."}`,
                 linkTab: "refunds"
+            };
+        case "admin_message":
+            return {
+                title: "New reply from Lizimas Store",
+                message: context.subject ? `Reply on: ${context.subject}` : "You have a new reply on your message.",
+                linkTab: "messages"
             };
         default:
             return null;

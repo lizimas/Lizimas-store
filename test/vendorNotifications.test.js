@@ -7,10 +7,10 @@ const {
     buildNotification
 } = require("../server/utils/vendorNotifications.js");
 
-test("NOTIFICATION_TYPES has exactly the seven known types", () => {
+test("NOTIFICATION_TYPES has exactly the eight known types", () => {
     assert.deepEqual(NOTIFICATION_TYPES, [
         "new_order", "low_stock", "product_approved", "product_rejected",
-        "compliance_action", "payout_update", "refund_decision"
+        "compliance_action", "payout_update", "refund_decision", "admin_message"
     ]);
 });
 
@@ -77,6 +77,16 @@ test("buildNotification: refund_decision varies title/message by decision", () =
     const denied = buildNotification("refund_decision", { decision: "denied", productName: "Blue Shirt", notes: "Item showed signs of use" });
     assert.equal(denied.title, "Refund denied");
     assert.match(denied.message, /Blue Shirt was denied: Item showed signs of use/);
+});
+
+test("buildNotification: admin_message includes the thread subject when given", () => {
+    const withSubject = buildNotification("admin_message", { subject: "Payout question" });
+    assert.equal(withSubject.title, "New reply from Lizimas Store");
+    assert.match(withSubject.message, /Reply on: Payout question/);
+    assert.equal(withSubject.linkTab, "messages");
+
+    const withoutSubject = buildNotification("admin_message", {});
+    assert.match(withoutSubject.message, /You have a new reply/);
 });
 
 test("buildNotification: unknown type returns null", () => {

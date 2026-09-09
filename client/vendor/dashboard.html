@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Vendor Dashboard</title>
-<link rel="stylesheet" href="../css/admin.css?v=21">
+<link rel="stylesheet" href="../css/admin.css?v=22">
 </head>
 <body>
 
@@ -61,6 +61,9 @@
                     </button>
                     <button class="tab-btn" data-tab="storefront">
                         <span class="sidebar-icon">&#127978;</span> Storefront
+                    </button>
+                    <button class="tab-btn" data-tab="messages">
+                        <span class="sidebar-icon">&#128172;</span> Messages
                     </button>
                     <button class="tab-btn" data-tab="account">
                         <span class="sidebar-icon">&#9881;</span> Account
@@ -423,6 +426,35 @@
                     <span id="vendor-storefront-status" style="margin-left:10px; font-size:13px;"></span>
                 </section>
 
+                <section id="tab-messages" class="tab-content hidden">
+                    <h2 class="admin-page-title">Messages</h2>
+                    <p class="admin-page-subtitle">Reach Lizimas Store directly with a question or issue.</p>
+
+                    <div id="vendor-messages-list-view">
+                        <div class="panel">
+                            <h3 style="margin:0 0 10px;">New Message</h3>
+                            <input type="text" id="vendor-message-subject" placeholder="Subject" maxlength="150" style="width:100%; padding:8px; box-sizing:border-box; margin-bottom:8px;">
+                            <textarea id="vendor-message-body" rows="3" maxlength="2000" placeholder="Describe your question or issue..." style="width:100%; padding:8px; box-sizing:border-box; margin-bottom:8px;"></textarea>
+                            <button type="button" id="vendor-message-send-btn" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 18px; cursor:pointer; font-weight:600;">Send</button>
+                            <span id="vendor-message-send-status" style="margin-left:10px; font-size:13px;"></span>
+                        </div>
+                        <div class="panel">
+                            <h3 style="margin:0 0 10px;">Your Messages</h3>
+                            <div id="vendor-messages-list">Loading...</div>
+                        </div>
+                    </div>
+
+                    <div id="vendor-messages-thread-view" class="panel" hidden>
+                        <a href="#" onclick="closeVendorMessageThread(); return false;" style="font-size:13px;">&larr; Back to messages</a>
+                        <h3 id="vendor-message-thread-subject" style="margin:12px 0 4px;"></h3>
+                        <div id="vendor-message-thread-status" style="font-size:12px; color:#888; margin-bottom:12px;"></div>
+                        <div id="vendor-message-thread-replies" style="margin-bottom:14px;"></div>
+                        <textarea id="vendor-message-reply-body" rows="3" maxlength="2000" placeholder="Write a reply..." style="width:100%; padding:8px; box-sizing:border-box; margin-bottom:8px;"></textarea>
+                        <button type="button" id="vendor-message-reply-btn" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 18px; cursor:pointer; font-weight:600;">Reply</button>
+                        <span id="vendor-message-reply-status" style="margin-left:10px; font-size:13px;"></span>
+                    </div>
+                </section>
+
                 <section id="tab-account" class="tab-content hidden">
                     <h2 class="admin-page-title">Account</h2>
                     <div class="panel">
@@ -443,6 +475,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
     <script src="../js/category-select.js?v=1"></script>
     <script src="../js/seller-panel.js?v=1"></script>
-    <script src="../js/vendor-dashboard.js?v=14"></script>
+    <script src="../js/vendor-dashboard.js?v=15"></script>
 </body>
 </html>
