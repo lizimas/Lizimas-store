@@ -182,8 +182,15 @@ exports.clearCategoryCommissionRule = async (req, res) => {
 
 // Used by the vendor product-upload pricing preview (spec section 8/58):
 // given a category and a vendor's desired payout, returns what the
-// customer will pay and what Lizimas keeps. No auth requirement beyond
-// being a logged-in vendor - enforced by the router this is mounted on.
+// customer will pay. No auth requirement beyond being a logged-in vendor -
+// enforced by the router this is mounted on.
+//
+// Deliberately returns ONLY customerPrice/vendorPayout, never
+// commissionRate or commissionAmount: sellers must never be able to see
+// or derive Lizimas' take rate from their own dashboard (Ryan, Sept 2026).
+// This route is vendor-only, so the redaction happens here rather than in
+// calculatePricing() itself, which other, non-vendor-facing callers may
+// still want the full breakdown from.
 exports.previewPricing = async (req, res) => {
     try {
         const { calculatePricing } = require("../utils/commissionEngine");
@@ -194,7 +201,10 @@ exports.previewPricing = async (req, res) => {
             categoryId: category_id ? Number(category_id) : null
         });
 
-        res.json(result);
+        res.json({
+            customerPrice: result.customerPrice,
+            vendorPayout: result.vendorPayout
+        });
 
     } catch (error) {
         res.status(400).json({ error: error.message });

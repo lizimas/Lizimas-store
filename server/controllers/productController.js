@@ -26,6 +26,20 @@ function safePackageSize(value) {
     return SIZE_RANK[value] ? value : "Small";
 }
 
+// Sellers must never see or derive Lizimas' commission rate from their own
+// dashboard (Ryan, Sept 2026) - vendor_desired_payout (their own input) and
+// price (the final customer price) are fine to hand back, but
+// commission_rate_applied/fixed_fee_applied/commission_rule_id are not.
+// These fields only ever exist on vendor-submitted products in the first
+// place (migrations/063), so this only has anything to strip when it does;
+// staff/admin viewing the same shared endpoints (getMyProducts, and staff
+// editing a vendor's product via /api/products) still see them.
+function redactCommissionForVendor(role, product) {
+    if (role !== "vendor" || !product) return product;
+    const { commission_rate_applied, fixed_fee_applied, commission_rule_id, ...rest } = product;
+    return rest;
+}
+
 // Add product (with optional multiple image uploads)
 exports.addProduct = async (req, res) => {
     try {
@@ -118,7 +132,7 @@ exports.addProduct = async (req, res) => {
             ? "Product submitted and is pending admin approval."
             : "Product added successfully";
 
-        res.json({ message, product: newProduct, images: imagePaths, image_records: imageRecords });
+        res.json({ message, product: redactCommissionForVendor(req.user.role, newProduct), images: imagePaths, image_records: imageRecords });
 
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -185,7 +199,9 @@ exports.getProducts = async (req, res) => {
             params
         );
 
-        res.json(products.rows);
+        // Public, unauthenticated listing - see getProductById for why all
+        // four commission-engine columns are stripped, not just the rate.
+        res.json(products.rows.map(({ vendor_desired_payout, commission_rate_applied, fixed_fee_applied, commission_rule_id, ...publicProduct }) => publicProduct));
 
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -234,7 +250,7 @@ exports.getMyProducts = async (req, res) => {
             [req.user.userId]
         );
 
-        res.json(result.rows);
+        res.json(result.rows.map(row => redactCommissionForVendor(req.user.role, row)));
 
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -259,7 +275,11 @@ exports.getProductById = async (req, res) => {
         if (result.rows.length === 0) {
             return res.status(404).json({ error: "Product not found" });
         }
-        res.json(result.rows[0]);
+        // Public, unauthenticated endpoint - strip the commission-engine
+        // inputs/outputs entirely rather than just the rate: payout next to
+        // the public price would let anyone back-calculate the rate anyway.
+        const { vendor_desired_payout, commission_rate_applied, fixed_fee_applied, commission_rule_id, ...publicProduct } = result.rows[0];
+        res.json(publicProduct);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: "Server error fetching product" });
@@ -845,7 +865,7 @@ exports.updateProduct = async (req, res) => {
             ? "Product updated and is pending admin approval."
             : "Product updated successfully";
 
-        res.json({ message, product: product.rows[0], images: newImagePaths, image_records: imageRecords });
+        res.json({ message, product: redactCommissionForVendor(req.user.role, product.rows[0]), images: newImagePaths, image_records: imageRecords });
 
     } catch (error) {
         res.status(500).json({ error: error.message });

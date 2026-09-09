@@ -289,8 +289,9 @@ async function updateVendorPricingPreview() {
             return;
         }
 
-        document.getElementById("preview-rate").textContent = (result.commissionRate * 100).toFixed(1).replace(/\.0$/, "");
-        document.getElementById("preview-commission").textContent = Number(result.commissionAmount).toLocaleString();
+        // Deliberately no commission rate/amount here - sellers must never
+        // be able to see or derive Lizimas' take rate (Ryan, Sept 2026); the
+        // server only ever sends customerPrice/vendorPayout to this endpoint.
         document.getElementById("preview-customer-price").textContent = Number(result.customerPrice).toLocaleString();
         document.getElementById("preview-payout").textContent = Number(result.vendorPayout).toLocaleString();
         previewEl.style.display = "block";
