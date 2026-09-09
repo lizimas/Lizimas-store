@@ -5,7 +5,7 @@ const { registerVendor, vendorLogin } = require("../controllers/authController")
 const {
     getMyVendorProfile, getMyVendorOrders, updateMyVendorProfile, getPublicStorefront,
     followVendor, unfollowVendor, getFollowStatus, getVendorDashboardSummary,
-    advanceVendorOrderStage
+    advanceVendorOrderStage, bulkUpdateVendorProducts
 } = require("../controllers/vendorController");
 const {
     addProduct,
@@ -14,7 +14,11 @@ const {
     getMyProducts,
     getProductImages,
     updateImageOrder,
-    deleteProductImage
+    deleteProductImage,
+    saveProductOptions,
+    generateProductVariants,
+    updateVariantStock,
+    setVariantStockMode
 } = require("../controllers/productController");
 const {
     getDescriptionBlocks,
@@ -62,12 +66,21 @@ router.patch("/order-items/:orderItemId/stage", advanceVendorOrderStage);
 router.get("/dashboard-summary", getVendorDashboardSummary);
 
 router.get("/products", getMyProducts);
+router.patch("/products/bulk", bulkUpdateVendorProducts);
 router.post("/products", upload.array("images", 20), addProduct);
 router.put("/products/:id", upload.array("images", 20), updateProduct);
 router.delete("/products/:id", deleteProduct);
 router.get("/products/:id/images", getProductImages);
 router.patch("/products/:id/images/order", updateImageOrder);
 router.delete("/products/images/:imageId", deleteProductImage);
+
+// Basic variant support (Task #60): colors/sizes + a generated stock grid,
+// scoped to the vendor's own products via the same canEditProduct ownership
+// check the admin-only routes at /api/products/... rely on internally.
+router.post("/products/:id/options", saveProductOptions);
+router.post("/products/:id/variants/generate", generateProductVariants);
+router.patch("/products/:id/variant-stock", setVariantStockMode);
+router.patch("/products/:id/variants/stock", updateVariantStock);
 
 router.get("/products/:id/description-blocks", getDescriptionBlocks);
 router.put("/products/:id/description-blocks", saveDescriptionBlocks);

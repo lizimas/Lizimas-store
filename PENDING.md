@@ -327,3 +327,72 @@ order-level `orders.status` is still shared across every vendor in a
 multi-vendor order, a pre-existing limitation this slice works around, not
 one it fixes), and any notification to the vendor when a new order
 arrives (Task #65).
+
+## Vendor Product Center enhancements (September 2026)
+
+Covers the four Product Center bullets from Ryan's gap analysis: a SKU
+field, basic variant support, bulk actions, and clearer status filtering.
+Approval, category assignment, and content standards stay entirely
+admin-controlled, per the governance table - none of this changes who can
+approve, reject, or set what counts as an acceptable listing.
+
+**Migration to run:**
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/066_vendor_product_center.sql
+
+**SKU** (`products.sku`, free text): shown on the vendor's product form and
+table. Not validated for uniqueness - it's the vendor's own internal code,
+Lizimas doesn't police it.
+
+**`products.is_active`** (new column, default `true`): a vendor-controlled
+visibility toggle for their own *already-approved* listings, entirely
+separate from the admin `status` column. Deactivating a product pulls it
+off the public catalogue/storefront/product page immediately (added to the
+`WHERE` clause on `getProducts`, `getProductById`, and the storefront
+listing) without touching its approval or needing re-review to bring it
+back - unlike editing a listing's content, which still resets `status` to
+`pending` as it always has. This is a judgment call, not something Ryan
+specified: an approved listing a vendor takes down temporarily (out of
+stock elsewhere, seasonal pause) shouldn't have to go back through admin
+review to come back.
+
+**Bulk actions**: `PATCH /api/vendors/products/bulk` with `{ productIds,
+action }`, `action` one of `activate` / `deactivate` / `delete`, scoped to
+`vendor_id` ownership. Delete reuses the exact same soft-delete
+`deleteProduct` already did for a single vendor product (straight to
+Trash - the admin deletion-request approval step is `store_manager`-only,
+untouched). The vendor Products tab gets checkboxes, a bulk-action bar, and
+a per-row Activate/Deactivate button for one-off toggles.
+
+**Clearer status filtering**: filter chips (All / Active / Pending Approval
+/ Rejected / Out of Stock / Deactivated) computed client-side from
+`status` + `stock` + `is_active` - no new backend field needed, since all
+three already come back from `GET /api/vendors/products`.
+
+**Basic variant support**: exposed the *existing* admin-only colour/size/
+variant-stock system (`saveProductOptions`, `generateProductVariants`,
+`updateVariantStock`, `setVariantStockMode` in `productController.js` -
+these already existed, built for staff/admin, and were previously
+unreachable by any vendor) to vendors, scoped to their own products via
+the same `canEditProduct()` ownership check `updateProduct` already uses
+internally (added as an explicit guard to the three of those four
+functions that didn't already have one). New routes under
+`/api/vendors/products/:id/...`, same paths as the admin ones under
+`/api/products/:id/...`.
+
+**Deliberately simplified vs. the admin version**: admin's colour picker
+draws from a global `color_catalog`/`size_catalog` with a per-colour photo
+thumbnail assignment UI (`admin.js` ~line 780-900) - a vendor instead types
+comma-separated colour and size names (`saveProductOptions` already accepts
+plain name strings/objects, no catalogue coupling required), with no photo-
+per-colour assignment. Colours a vendor types still resolve against/create
+rows in the same shared `color_catalog` server-side, so there's no data
+model split - just a simpler input than the admin form's swatch picker.
+Worth revisiting if vendors want colour swatches shown on their storefront
+listings.
+
+**Deliberately not built in this pass:** bulk edit of shared fields (price/
+category/etc. across many products at once - Ryan's list only asked for
+activate/deactivate/delete), and a vendor-facing color/size CATALOG browser
+(vendors just type names; there's no UI to see or reuse Lizimas' existing
+catalogue of colour/size names before typing their own).

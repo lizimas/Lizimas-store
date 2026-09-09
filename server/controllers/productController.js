@@ -45,7 +45,7 @@ exports.addProduct = async (req, res) => {
     try {
         const { name, category_id, description, stock, package_size,
                 material, color, sleeve, style, length, fit, pattern, care_instructions, occasion,
-                warranty_months, brand, gtin, mpn, desired_payout } = req.body;
+                warranty_months, brand, gtin, mpn, desired_payout, sku } = req.body;
         let { price } = req.body;
 
         const packageSize = safePackageSize(package_size);
@@ -104,15 +104,15 @@ exports.addProduct = async (req, res) => {
             `INSERT INTO products (name,category_id,description,price,stock,image,status,created_by,
                 material,color,sleeve,style,length,fit,pattern,care_instructions,occasion,package_size,warranty_months,
               brand,gtin,mpn,vendor_id,
-                vendor_desired_payout,commission_rate_applied,fixed_fee_applied,commission_rule_id)
-             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27) RETURNING *`,
+                vendor_desired_payout,commission_rate_applied,fixed_fee_applied,commission_rule_id,sku)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28) RETURNING *`,
             [name, category_id, description, price, stock, mainImage, status, req.user.userId,
                 material || null, color || null, sleeve || null, style || null, length || null,
                 fit || null, pattern || null, care_instructions || null, occasion || null,
                 packageSize, warrantyMonths,
                 brand || null, gtin || null, mpn || null, vendorId,
                 pricingSnapshot.vendor_desired_payout, pricingSnapshot.commission_rate_applied,
-                pricingSnapshot.fixed_fee_applied, pricingSnapshot.commission_rule_id]
+                pricingSnapshot.fixed_fee_applied, pricingSnapshot.commission_rule_id, sku || null]
         );
 
         const newProduct = product.rows[0];
@@ -194,7 +194,7 @@ exports.getProducts = async (req, res) => {
                     ) AS hover_image
              FROM products
              LEFT JOIN categories ON products.category_id = categories.id
-             WHERE products.status = 'approved' AND products.deleted_at IS NULL${filter}
+             WHERE products.status = 'approved' AND products.is_active = true AND products.deleted_at IS NULL${filter}
              ORDER BY products.id DESC`,
             params
         );
@@ -269,7 +269,7 @@ exports.getProductById = async (req, res) => {
             `SELECT products.*, vendors.business_name AS vendor_business_name, vendors.slug AS vendor_slug
              FROM products
              LEFT JOIN vendors ON vendors.id = products.vendor_id AND vendors.status = 'approved'
-             WHERE products.id = $1 AND products.deleted_at IS NULL AND products.status = 'approved'`,
+             WHERE products.id = $1 AND products.deleted_at IS NULL AND products.status = 'approved' AND products.is_active = true`,
             [id]
         );
         if (result.rows.length === 0) {
@@ -489,6 +489,11 @@ exports.generateProductVariants = async (req, res) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
+        const permission = await canEditProduct(req.user, id);
+        if (!permission.allowed) {
+            return res.status(permission.status).json({ error: permission.error });
+        }
+
         await client.query("BEGIN");
 
         const productRow = (await client.query(
@@ -567,6 +572,11 @@ exports.updateVariantStock = async (req, res) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
+        const permission = await canEditProduct(req.user, id);
+        if (!permission.allowed) {
+            return res.status(permission.status).json({ error: permission.error });
+        }
+
         const updates = Array.isArray(req.body.updates) ? req.body.updates : [];
 
         if (updates.length === 0) {
@@ -643,6 +653,11 @@ exports.updateVariantStock = async (req, res) => {
 exports.setVariantStockMode = async (req, res) => {
     try {
         const { id } = req.params;
+        const permission = await canEditProduct(req.user, id);
+        if (!permission.allowed) {
+            return res.status(permission.status).json({ error: permission.error });
+        }
+
         const enabled = req.body.enabled === true;
 
         if (enabled) {
@@ -786,7 +801,7 @@ exports.updateProduct = async (req, res) => {
 
         const { name, category_id, description, stock, package_size,
                 material, color, sleeve, style, length, fit, pattern, care_instructions, occasion,
-                warranty_months, brand, gtin, mpn, desired_payout } = req.body;
+                warranty_months, brand, gtin, mpn, desired_payout, sku } = req.body;
         let { price } = req.body;
 
         const packageSize = safePackageSize(package_size);
@@ -832,6 +847,13 @@ exports.updateProduct = async (req, res) => {
             fit || null, pattern || null, care_instructions || null, occasion || null,
             packageSize, warrantyMonths,
             brand || null, gtin || null, mpn || null, ...pricingParams];
+
+        // Appended after the pricing params (rather than inlined at a fixed
+        // $N alongside name/category/etc.) so its placeholder number doesn't
+        // depend on whether the vendor-only pricing clause is present.
+        const skuParam = params.length + 1;
+        updateQuery += `, sku=$${skuParam}`;
+        params.push(sku || null);
 
         const nextParam = params.length + 1;
         if (newImagePaths.length > 0) {

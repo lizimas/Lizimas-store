@@ -1,6 +1,7 @@
 const pool = require("../config/database");
 const { computeSellerScore } = require("../utils/sellerScore");
 const { deriveVendorOrderStage, STAGE_LABELS, isValidStage, canAdvanceStage } = require("../utils/vendorOrderStage");
+const { logActivity } = require("../utils/activityLog");
 
 // The logged-in vendor's own KYC/business profile and review status.
 exports.getMyVendorProfile = async (req, res) => {
@@ -92,6 +93,63 @@ exports.updateMyVendorProfile = async (req, res) => {
         );
 
         res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Bulk activate/deactivate/delete across the vendor's own products (Task
+// #60: "bulk actions"). Delete reuses the same soft-delete deleteProduct
+// already does for a single vendor product (straight to Trash, no admin
+// deletion-request step - that step is store_manager-only, see
+// productController.js deleteProduct); activate/deactivate flips the new
+// is_active visibility column, which is entirely separate from admin
+// approval status - it never needs re-review.
+const BULK_PRODUCT_ACTIONS = ["activate", "deactivate", "delete"];
+
+exports.bulkUpdateVendorProducts = async (req, res) => {
+    try {
+        const { productIds, action } = req.body;
+
+        if (!Array.isArray(productIds) || productIds.length === 0) {
+            return res.status(400).json({ error: "productIds must be a non-empty array." });
+        }
+        if (!BULK_PRODUCT_ACTIONS.includes(action)) {
+            return res.status(400).json({ error: `action must be one of: ${BULK_PRODUCT_ACTIONS.join(", ")}.` });
+        }
+
+        const ids = productIds.map(Number).filter(n => Number.isInteger(n) && n > 0);
+        if (ids.length === 0) {
+            return res.status(400).json({ error: "No valid product ids given." });
+        }
+
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendorId = vendorRow.rows[0].id;
+
+        const result = action === "delete"
+            ? await pool.query(
+                `UPDATE products SET deleted_at = now()
+                 WHERE id = ANY($1::int[]) AND vendor_id = $2 AND deleted_at IS NULL
+                 RETURNING id`,
+                [ids, vendorId]
+            )
+            : await pool.query(
+                `UPDATE products SET is_active = $1
+                 WHERE id = ANY($2::int[]) AND vendor_id = $3 AND deleted_at IS NULL
+                 RETURNING id`,
+                [action === "activate", ids, vendorId]
+            );
+
+        logActivity(req.user.userId, `bulk_${action}_products`, "product", null,
+            `${result.rows.length} product(s): ${action}`);
+
+        res.json({
+            message: `${result.rows.length} product(s) ${action}d.`,
+            updatedIds: result.rows.map(r => r.id)
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -397,7 +455,7 @@ exports.getPublicStorefront = async (req, res) => {
             pool.query(
                 `SELECT id, name, price, image, stock, public_code
                  FROM products
-                 WHERE vendor_id = $1 AND status = 'approved' AND deleted_at IS NULL
+                 WHERE vendor_id = $1 AND status = 'approved' AND is_active = true AND deleted_at IS NULL
                  ORDER BY created_at DESC`,
                 [vendor.id]
             ),

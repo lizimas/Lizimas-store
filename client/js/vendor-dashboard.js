@@ -183,52 +183,189 @@ async function loadVendorCategories() {
     }
 }
 
-function vendorProductStatusBadge(status) {
-    if (status === "pending") return `<span class="status-badge status-pending">Pending Approval</span>`;
-    if (status === "rejected") return `<span class="status-badge status-cancelled">Rejected</span>`;
-    return `<span class="status-badge status-paid">Approved</span>`;
+// Clearer status filtering (Task #60): combines the admin approval status
+// with stock and the vendor's own is_active toggle into one badge/filter
+// key per product, rather than just showing the raw approval status.
+function vendorProductFilterKey(p) {
+    if (p.status === "pending") return "pending";
+    if (p.status === "rejected") return "rejected";
+    if (!p.is_active) return "inactive";
+    if (Number(p.stock) <= 0) return "out_of_stock";
+    return "active";
+}
+
+const VENDOR_PRODUCT_FILTERS = [
+    ["all", "All"],
+    ["active", "Active"],
+    ["pending", "Pending Approval"],
+    ["rejected", "Rejected"],
+    ["out_of_stock", "Out of Stock"],
+    ["inactive", "Deactivated"]
+];
+
+function vendorProductStatusBadge(p) {
+    const key = vendorProductFilterKey(p);
+    const map = {
+        pending: `<span class="status-badge status-pending">Pending Approval</span>`,
+        rejected: `<span class="status-badge status-cancelled">Rejected</span>`,
+        inactive: `<span class="status-badge status-forfeited">Deactivated</span>`,
+        out_of_stock: `<span class="status-badge status-processing">Out of Stock</span>`,
+        active: `<span class="status-badge status-paid">Active</span>`
+    };
+    return map[key];
 }
 
 let vendorProductsCache = [];
+let vendorProductsFilter = "all";
+let vendorProductsSelected = new Set();
+
+function renderVendorProductFilters() {
+    const container = document.getElementById("vendor-products-filters");
+    if (!container) return;
+    container.innerHTML = VENDOR_PRODUCT_FILTERS.map(([key, label]) => {
+        const count = key === "all" ? vendorProductsCache.length : vendorProductsCache.filter(p => vendorProductFilterKey(p) === key).length;
+        const active = vendorProductsFilter === key;
+        return `<button onclick="setVendorProductsFilter('${key}')" style="padding:6px 12px; border-radius:999px; border:1px solid ${active ? "#1a1a2e" : "#ddd"}; background:${active ? "#1a1a2e" : "#fff"}; color:${active ? "#fff" : "#333"}; font-size:12px; cursor:pointer;">${label}${count ? ` (${count})` : ""}</button>`;
+    }).join("");
+}
+
+function setVendorProductsFilter(key) {
+    vendorProductsFilter = key;
+    renderVendorProductFilters();
+    renderVendorProductsTable();
+}
+
+function updateVendorProductsBulkBar() {
+    const bar = document.getElementById("vendor-products-bulk-bar");
+    const countEl = document.getElementById("vendor-products-selected-count");
+    if (!bar || !countEl) return;
+    bar.hidden = vendorProductsSelected.size === 0;
+    countEl.textContent = `${vendorProductsSelected.size} selected`;
+}
+
+function toggleVendorProductSelect(id, checked) {
+    if (checked) vendorProductsSelected.add(Number(id));
+    else vendorProductsSelected.delete(Number(id));
+    updateVendorProductsBulkBar();
+}
+
+function toggleAllVendorProductsSelect(checked, visibleIds) {
+    if (checked) visibleIds.forEach(id => vendorProductsSelected.add(Number(id)));
+    else visibleIds.forEach(id => vendorProductsSelected.delete(Number(id)));
+    updateVendorProductsBulkBar();
+    renderVendorProductsTable();
+}
+
+async function bulkVendorProductAction(action) {
+    if (vendorProductsSelected.size === 0) return;
+    const verb = { activate: "activate", deactivate: "deactivate", delete: "delete" }[action];
+    if (!confirm(`${verb.charAt(0).toUpperCase()}${verb.slice(1)} ${vendorProductsSelected.size} product(s)?`)) return;
+
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/products/bulk", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productIds: Array.from(vendorProductsSelected), action })
+        });
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        vendorProductsSelected.clear();
+        updateVendorProductsBulkBar();
+        loadVendorProducts();
+    } catch (error) {
+        console.error("Bulk product action error:", error);
+        alert("Could not connect to server.");
+    }
+}
 
 async function loadVendorProducts() {
     try {
         const products = await vendorAuthorizedFetch("/api/vendors/products");
         vendorProductsCache = products;
-        const container = document.getElementById("vendor-products-list");
-
-        if (!products || products.length === 0) {
-            container.innerHTML = `<p class="no-data">You haven't listed any products yet.</p>`;
-            return;
-        }
-
-        container.innerHTML = `
-            <table>
-                <thead><tr><th>Product</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead>
-                <tbody>
-                    ${products.map(p => `
-                        <tr>
-                            <td data-label="Product">${p.name}</td>
-                            <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
-                            <td data-label="Stock">${p.stock}</td>
-                            <td data-label="Status">${vendorProductStatusBadge(p.status)}</td>
-                            <td data-label="Actions">
-                                <button onclick="editVendorProduct(${p.id})" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Edit</button>
-                                <button onclick="deleteVendorProduct(${p.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Delete</button>
-                            </td>
-                        </tr>
-                    `).join("")}
-                </tbody>
-            </table>
-        `;
+        vendorProductsSelected.clear();
+        updateVendorProductsBulkBar();
+        renderVendorProductFilters();
+        renderVendorProductsTable();
     } catch (error) {
         console.error("Load vendor products error:", error);
+    }
+}
+
+function renderVendorProductsTable() {
+    const container = document.getElementById("vendor-products-list");
+    if (!container) return;
+
+    if (!vendorProductsCache || vendorProductsCache.length === 0) {
+        container.innerHTML = `<p class="no-data">You haven't listed any products yet.</p>`;
+        return;
+    }
+
+    const rows = vendorProductsFilter === "all"
+        ? vendorProductsCache
+        : vendorProductsCache.filter(p => vendorProductFilterKey(p) === vendorProductsFilter);
+
+    if (rows.length === 0) {
+        container.innerHTML = `<p class="no-data">No products in this view.</p>`;
+        return;
+    }
+
+    const visibleIds = rows.map(p => p.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => vendorProductsSelected.has(Number(id)));
+
+    container.innerHTML = `
+        <table>
+            <thead><tr>
+                <th><input type="checkbox" ${allSelected ? "checked" : ""} onchange="toggleAllVendorProductsSelect(this.checked, ${JSON.stringify(visibleIds)})"></th>
+                <th>Product</th><th>SKU</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th>
+            </tr></thead>
+            <tbody>
+                ${rows.map(p => `
+                    <tr>
+                        <td><input type="checkbox" ${vendorProductsSelected.has(Number(p.id)) ? "checked" : ""} onchange="toggleVendorProductSelect(${p.id}, this.checked)"></td>
+                        <td data-label="Product">${p.name}</td>
+                        <td data-label="SKU">${p.sku || "—"}</td>
+                        <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
+                        <td data-label="Stock">${p.stock}</td>
+                        <td data-label="Status">${vendorProductStatusBadge(p)}</td>
+                        <td data-label="Actions">
+                            <button onclick="editVendorProduct(${p.id})" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Edit</button>
+                            ${p.status === "approved" ? `<button onclick="bulkVendorProductActionSingle(${p.id}, '${p.is_active ? "deactivate" : "activate"}')" style="background:${p.is_active ? "#B45309" : "#16A34A"}; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">${p.is_active ? "Deactivate" : "Activate"}</button>` : ""}
+                            <button onclick="deleteVendorProduct(${p.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Delete</button>
+                        </td>
+                    </tr>
+                `).join("")}
+            </tbody>
+        </table>
+    `;
+}
+
+// Single-row equivalent of bulkVendorProductAction, for the per-row
+// Activate/Deactivate button - reuses the same bulk endpoint with a
+// one-item array rather than duplicating the request logic.
+async function bulkVendorProductActionSingle(id, action) {
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/products/bulk", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productIds: [id], action })
+        });
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        loadVendorProducts();
+    } catch (error) {
+        console.error("Product action error:", error);
+        alert("Could not connect to server.");
     }
 }
 
 function resetVendorProductForm() {
     document.getElementById("product-id").value = "";
     document.getElementById("product-name").value = "";
+    document.getElementById("product-sku").value = "";
     document.getElementById("product-description").value = "";
     document.getElementById("product-payout").value = "";
     document.getElementById("product-stock").value = "";
@@ -242,6 +379,201 @@ function resetVendorProductForm() {
     document.getElementById("product-authenticity-confirm").checked = false;
     document.getElementById("product-submit-btn").textContent = "Submit for Approval";
     document.getElementById("product-form-status").textContent = "";
+    hideVendorVariantsPanel();
+}
+
+
+// --- Variants (Task #60: "basic variant support") --------------------------
+// A vendor-scoped, free-text version of the admin variant system in
+// admin.js (colours/sizes there come from a global catalogue with a
+// per-colour thumbnail picker - this is the simpler cut: type comma-
+// separated colour/size names, generate the colour x size grid, enter
+// stock per row. Same three backend endpoints admin.js uses
+// (saveProductOptions / generateProductVariants / updateVariantStock /
+// setVariantStockMode), now also mounted under /api/vendors/products/:id/...
+// with ownership enforced by the same canEditProduct() check the admin
+// routes rely on internally.
+
+let vendorVariantProductId = null;
+let vendorVariantStockEnabled = false;
+
+function hideVendorVariantsPanel() {
+    const panel = document.getElementById("vendor-variants-panel");
+    if (panel) panel.hidden = true;
+    vendorVariantProductId = null;
+    document.getElementById("vendor-variant-colors").value = "";
+    document.getElementById("vendor-variant-sizes").value = "";
+    document.getElementById("vendor-variant-options-status").textContent = "";
+    document.getElementById("vendor-variant-stock-area").innerHTML = "";
+}
+
+async function loadVendorVariantOptions(productId) {
+    vendorVariantProductId = productId;
+    const panel = document.getElementById("vendor-variants-panel");
+    if (panel) panel.hidden = false;
+
+    try {
+        const [optRes, productRes] = await Promise.all([
+            fetch(`${API_URL}/api/products/${productId}/options`),
+            Promise.resolve(vendorProductsCache.find(p => Number(p.id) === Number(productId)))
+        ]);
+        const opts = await optRes.json();
+
+        document.getElementById("vendor-variant-colors").value = (opts.colors || []).map(c => c.name).join(", ");
+        document.getElementById("vendor-variant-sizes").value = (opts.sizes || []).map(s => s.name).join(", ");
+        vendorVariantStockEnabled = !!(productRes && productRes.variant_stock_enabled);
+
+        renderVendorVariantStockArea(opts.colors || [], opts.sizes || [], opts.variants || []);
+    } catch (error) {
+        console.error("Load vendor variant options error:", error);
+    }
+}
+
+function renderVendorVariantStockArea(colors, sizes, variants) {
+    const area = document.getElementById("vendor-variant-stock-area");
+    if (!area) return;
+
+    const colorName = {};
+    colors.forEach(c => { colorName[c.id] = c.name; });
+    const sizeName = {};
+    sizes.forEach(s => { sizeName[s.id] = s.name; });
+
+    const mode = vendorVariantStockEnabled
+        ? `<span style="color:#166534; font-weight:600;">Variant stock active</span>`
+        : `<span style="color:#B45309; font-weight:600;">Simple stock (the Stock field above)</span>`;
+
+    if (variants.length === 0) {
+        const canGenerate = colors.length > 0 && sizes.length > 0;
+        area.innerHTML = `
+            <p style="font-size:13px; margin:0 0 10px;">Mode: ${mode}</p>
+            <p style="font-size:13px; margin:0 0 10px;">
+                No variants yet.${canGenerate ? ` Generating creates one row per colour and size - ${colors.length} × ${sizes.length} = ${colors.length * sizes.length} rows, all starting at zero stock.` : " Save at least one colour and one size first."}
+            </p>
+            ${canGenerate ? `<button onclick="generateVendorVariants()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Generate Variants</button>` : ""}
+        `;
+        return;
+    }
+
+    const inStock = variants.filter(v => Number(v.stock) > 0).length;
+
+    area.innerHTML = `
+        <p style="font-size:13px; margin:0 0 10px;">Mode: ${mode}</p>
+        <table style="width:100%; margin-bottom:12px;">
+            <thead><tr><th>Colour</th><th>Size</th><th>Stock</th></tr></thead>
+            <tbody>
+                ${variants.map(v => `
+                    <tr>
+                        <td data-label="Colour">${colorName[v.color_id] || "—"}</td>
+                        <td data-label="Size">${sizeName[v.size_id] || "—"}</td>
+                        <td data-label="Stock"><input type="number" min="0" step="1" data-variant-id="${v.id}" value="${Number(v.stock) || 0}" class="vendor-variant-stock-input" style="width:80px; padding:6px; border:1px solid #ccc; border-radius:6px;"></td>
+                    </tr>
+                `).join("")}
+            </tbody>
+        </table>
+        <p style="font-size:13px; color:#666; margin:0 0 10px;">${variants.length} variants, ${inStock} with stock.</p>
+        <button onclick="saveVendorVariantStock()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; margin-right:8px;">Save Stock</button>
+        <button onclick="generateVendorVariants()" style="background:#fff; color:#1a1a2e; border:1px solid #1a1a2e; border-radius:8px; padding:10px 16px; cursor:pointer; margin-right:8px;">Re-generate Missing</button>
+        <button onclick="toggleVendorVariantStockMode()" style="background:${vendorVariantStockEnabled ? "#B45309" : "#16A34A"}; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">${vendorVariantStockEnabled ? "Revert to Simple Stock" : "Enable Variant Stock"}</button>
+    `;
+}
+
+async function saveVendorProductOptions() {
+    if (!vendorVariantProductId) return;
+    const statusEl = document.getElementById("vendor-variant-options-status");
+    const colors = document.getElementById("vendor-variant-colors").value
+        .split(",").map(s => s.trim()).filter(Boolean).map(name => ({ name }));
+    const sizes = document.getElementById("vendor-variant-sizes").value
+        .split(",").map(s => s.trim()).filter(Boolean);
+
+    statusEl.textContent = "Saving...";
+    try {
+        const data = await vendorAuthorizedFetch(`/api/vendors/products/${vendorVariantProductId}/options`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ colors, sizes })
+        });
+        if (data.error) {
+            statusEl.textContent = data.error;
+            return;
+        }
+        statusEl.textContent = "Saved.";
+        await loadVendorVariantOptions(vendorVariantProductId);
+    } catch (error) {
+        console.error("Save vendor product options error:", error);
+        statusEl.textContent = "Could not connect to server.";
+    }
+}
+
+async function generateVendorVariants() {
+    if (!vendorVariantProductId) return;
+    try {
+        const data = await vendorAuthorizedFetch(`/api/vendors/products/${vendorVariantProductId}/variants/generate`, {
+            method: "POST"
+        });
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        alert(`${data.created} created, ${data.skipped} already existed.`);
+        await loadVendorVariantOptions(vendorVariantProductId);
+    } catch (error) {
+        console.error("Generate vendor variants error:", error);
+        alert("Could not connect to server.");
+    }
+}
+
+async function saveVendorVariantStock() {
+    if (!vendorVariantProductId) return;
+    const updates = Array.from(document.querySelectorAll(".vendor-variant-stock-input")).map(el => ({
+        variant_id: Number(el.dataset.variantId),
+        stock: Number(el.value)
+    }));
+
+    if (updates.some(u => !Number.isInteger(u.stock) || u.stock < 0)) {
+        alert("Stock values must be whole numbers of zero or more.");
+        return;
+    }
+
+    try {
+        const data = await vendorAuthorizedFetch(`/api/vendors/products/${vendorVariantProductId}/variants/stock`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ updates })
+        });
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        alert(`Saved. ${data.in_stock} of ${data.total} variants have stock (${data.total_stock} units).`);
+        await loadVendorVariantOptions(vendorVariantProductId);
+    } catch (error) {
+        console.error("Save vendor variant stock error:", error);
+        alert("Could not connect to server.");
+    }
+}
+
+async function toggleVendorVariantStockMode() {
+    if (!vendorVariantProductId) return;
+    const target = !vendorVariantStockEnabled;
+    if (target && !confirm("Enable variant stock? The storefront will use per-variant quantities instead of your product's Stock field.")) return;
+    if (!target && !confirm("Revert to simple stock? The storefront will use your product's Stock field again.")) return;
+
+    try {
+        const data = await vendorAuthorizedFetch(`/api/vendors/products/${vendorVariantProductId}/variant-stock`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ enabled: target })
+        });
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        alert(data.message);
+        await loadVendorVariantOptions(vendorVariantProductId);
+    } catch (error) {
+        console.error("Toggle vendor variant stock mode error:", error);
+        alert("Could not connect to server.");
+    }
 }
 
 // --- Live pricing preview --------------------------------------------------
@@ -315,6 +647,7 @@ async function editVendorProduct(id) {
 
     document.getElementById("product-id").value = product.id;
     document.getElementById("product-name").value = product.name || "";
+    document.getElementById("product-sku").value = product.sku || "";
     document.getElementById("product-description").value = product.description || "";
     // Older listings (added before the commission engine) never recorded
     // vendor_desired_payout - fall back to the current price so the field
@@ -332,6 +665,7 @@ async function editVendorProduct(id) {
     document.getElementById("product-submit-btn").textContent = "Save Changes";
     document.getElementById("product-form-status").textContent = "Editing an approved product returns it to pending review.";
     scheduleVendorPricingPreview();
+    loadVendorVariantOptions(product.id);
 }
 
 async function deleteVendorProduct(id) {
@@ -357,6 +691,7 @@ async function deleteVendorProduct(id) {
 async function submitVendorProductForm() {
     const id = document.getElementById("product-id").value;
     const name = document.getElementById("product-name").value.trim();
+    const sku = document.getElementById("product-sku").value.trim();
     const category_id = document.getElementById("product-category").value;
     const description = document.getElementById("product-description").value.trim();
     const desiredPayout = document.getElementById("product-payout").value;
@@ -385,6 +720,7 @@ async function submitVendorProductForm() {
 
     const formData = new FormData();
     formData.append("name", name);
+    formData.append("sku", sku);
     formData.append("category_id", category_id);
     formData.append("description", description);
     formData.append("desired_payout", desiredPayout);

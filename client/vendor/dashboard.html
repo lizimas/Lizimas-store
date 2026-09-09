@@ -107,7 +107,14 @@
 
                 <section id="tab-products" class="tab-content hidden">
                     <h2 class="admin-page-title">My Products</h2>
-                    <p class="admin-page-subtitle">Products you've listed. New listings need admin approval before they go live.</p>
+                    <p class="admin-page-subtitle">Products you've listed. New listings need admin approval before they go live. Deactivating a product pulls it off the storefront without deleting it or losing its approval.</p>
+                    <div id="vendor-products-filters" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;"></div>
+                    <div id="vendor-products-bulk-bar" hidden style="display:flex; align-items:center; gap:10px; background:#F0F4FF; border:1px solid #C7D2FE; border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:13px;">
+                        <span id="vendor-products-selected-count">0 selected</span>
+                        <button onclick="bulkVendorProductAction('activate')" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Activate</button>
+                        <button onclick="bulkVendorProductAction('deactivate')" style="background:#B45309; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Deactivate</button>
+                        <button onclick="bulkVendorProductAction('delete')" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Delete</button>
+                    </div>
                     <div class="panel">
                         <div id="vendor-products-list">Loading...</div>
                     </div>
@@ -128,6 +135,11 @@
                             <div>
                                 <label style="font-size:13px; font-weight:600; color:#333;">Product Name</label>
                                 <input type="text" id="product-name" placeholder="Accurate, specific name (include colour/size/spec if relevant)" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+
+                            <div>
+                                <label style="font-size:13px; font-weight:600; color:#333;">SKU <span style="font-weight:400; color:#888;">(your own stock code, optional)</span></label>
+                                <input type="text" id="product-sku" placeholder="e.g. your own internal product code" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                             </div>
 
                             <div>
@@ -203,6 +215,24 @@
                             <p id="product-form-status" style="font-size:13px; color:#666;"></p>
                         </div>
                     </div>
+
+                    <div id="vendor-variants-panel" class="panel" hidden>
+                        <h2>Variants <span style="font-weight:400; color:#888; font-size:13px;">(optional — colours/sizes with their own stock counts)</span></h2>
+                        <p class="admin-page-subtitle">Save your colours and sizes, generate one row per combination, then enter stock for each. Turning on variant stock replaces the single Stock field above for this product.</p>
+                        <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+                            <div style="flex:1; min-width:200px;">
+                                <label style="font-size:13px; font-weight:600; color:#333;">Colours <span style="font-weight:400; color:#888;">(comma-separated)</span></label>
+                                <input type="text" id="vendor-variant-colors" placeholder="e.g. Red, Blue, Black" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+                            <div style="flex:1; min-width:200px;">
+                                <label style="font-size:13px; font-weight:600; color:#333;">Sizes <span style="font-weight:400; color:#888;">(comma-separated)</span></label>
+                                <input type="text" id="vendor-variant-sizes" placeholder="e.g. S, M, L, XL" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+                        </div>
+                        <button onclick="saveVendorProductOptions()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; margin-right:8px;">Save Colours/Sizes</button>
+                        <p id="vendor-variant-options-status" style="font-size:13px; color:#666; margin-top:8px;"></p>
+                        <div id="vendor-variant-stock-area" style="margin-top:16px;"></div>
+                    </div>
                 </section>
 
                 <section id="tab-orders" class="tab-content hidden">
@@ -247,6 +277,6 @@
 
     <script src="../js/category-select.js?v=1"></script>
     <script src="../js/seller-panel.js?v=1"></script>
-    <script src="../js/vendor-dashboard.js?v=7"></script>
+    <script src="../js/vendor-dashboard.js?v=8"></script>
 </body>
 </html>
