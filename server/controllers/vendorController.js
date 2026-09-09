@@ -17,8 +17,12 @@ const {
     deriveVendorPromotionStatus
 } = require("../utils/vendorPromotions");
 const { buildNotification } = require("../utils/vendorNotifications");
-const { MAX_ABOUT_LENGTH, isValidAboutText } = require("../utils/vendorStorefront");
-const { uploadBuffer } = require("../utils/cloudinaryUpload");
+const {
+    MAX_ABOUT_LENGTH,
+    isValidAboutText,
+    isValidDeliveryMethod,
+    findStorefrontContactViolation
+} = require("../utils/vendorStorefront");
 const {
     MAX_SUBJECT_LENGTH,
     MAX_BODY_LENGTH,
@@ -34,7 +38,7 @@ exports.getMyVendorProfile = async (req, res) => {
         const result = await pool.query(
             `SELECT id, business_name, account_type, registration_number, national_id_number, phone,
                     physical_address, momo_number, referral_source, status, rejection_reason,
-                    submitted_at, reviewed_at, slug, logo_url, banner_url, about
+                    submitted_at, reviewed_at, slug, about, delivery_method
              FROM vendors WHERE user_id = $1`,
             [req.user.userId]
         );
@@ -49,22 +53,28 @@ exports.getMyVendorProfile = async (req, res) => {
     }
 };
 
-// A vendor's own storefront branding (Task #68) - logo, banner, and a
-// short about blurb shown on their public store page (getPublicStorefront
-// below). Kept separate from updateMyVendorProfile on purpose: that
-// endpoint is KYC/business-profile data (registration number, MoMo
-// number, address), this one is pure storefront presentation - different
-// concerns, different validation rules, no reason to overload one
-// endpoint for both.
+// A vendor's own storefront presentation (Tasks #68/#74/#75) - the about
+// blurb and delivery/payment method shown on their public store page
+// (getPublicStorefront below). Kept separate from updateMyVendorProfile on
+// purpose: that endpoint is KYC/business-profile data (registration
+// number, MoMo number, address), this one is pure storefront presentation
+// - different concerns, different validation rules, no reason to overload
+// one endpoint for both.
 //
-// Partial by design: omitting `about` entirely leaves it untouched (so a
-// vendor can update just their logo without resending their bio); sending
-// an empty string clears it. remove_logo=/remove_banner=true clears an
-// image without requiring a replacement upload.
+// No logo/banner upload here - removed from the storefront on Ryan's
+// instruction (Sept 2026); the page shows only business name + delivery
+// method + about text + the existing seller score/followers panel. Plain
+// JSON body now that there's nothing to upload.
+//
+// `about` is partial by design: omitting it entirely leaves it untouched
+// (so a vendor can update just their delivery method without resending
+// their bio); sending an empty string clears it. `about` also runs through
+// findStorefrontContactViolation (see PENDING.md) so a bio can't be used
+// to hand out a phone number or address off-platform.
 exports.updateVendorStorefront = async (req, res) => {
     try {
         const vendorRow = await pool.query(
-            "SELECT id, logo_url, banner_url, about FROM vendors WHERE user_id = $1",
+            "SELECT id, about, delivery_method FROM vendors WHERE user_id = $1",
             [req.user.userId]
         );
         if (vendorRow.rows.length === 0) {
@@ -77,23 +87,27 @@ exports.updateVendorStorefront = async (req, res) => {
         if (aboutProvided && !isValidAboutText(about)) {
             return res.status(400).json({ error: `About text must be ${MAX_ABOUT_LENGTH} characters or fewer.` });
         }
-
-        let logoUrl = req.body.remove_logo === "true" ? null : vendor.logo_url;
-        let bannerUrl = req.body.remove_banner === "true" ? null : vendor.banner_url;
-
-        if (req.files && req.files.logo && req.files.logo[0]) {
-            const uploaded = await uploadBuffer(req.files.logo[0].buffer, "lizimas-store/vendor-storefront");
-            logoUrl = uploaded.url;
+        if (aboutProvided) {
+            const violation = findStorefrontContactViolation(about);
+            if (violation) {
+                return res.status(400).json({
+                    error: `Your store bio can't include ${violation}. Customers should reach you through Lizimas Store, not directly.`
+                });
+            }
         }
-        if (req.files && req.files.banner && req.files.banner[0]) {
-            const uploaded = await uploadBuffer(req.files.banner[0].buffer, "lizimas-store/vendor-storefront");
-            bannerUrl = uploaded.url;
+
+        const deliveryMethodProvided = req.body.delivery_method !== undefined;
+        const deliveryMethod = deliveryMethodProvided
+            ? (req.body.delivery_method || null)
+            : vendor.delivery_method;
+        if (deliveryMethodProvided && !isValidDeliveryMethod(deliveryMethod)) {
+            return res.status(400).json({ error: "Delivery method must be 'cash_on_delivery' or 'payment_first'." });
         }
 
         const result = await pool.query(
-            `UPDATE vendors SET logo_url = $1, banner_url = $2, about = $3 WHERE id = $4
-             RETURNING id, business_name, slug, logo_url, banner_url, about`,
-            [logoUrl, bannerUrl, about, vendor.id]
+            `UPDATE vendors SET about = $1, delivery_method = $2 WHERE id = $3
+             RETURNING id, business_name, slug, about, delivery_method`,
+            [about, deliveryMethod, vendor.id]
         );
         res.json({ message: "Storefront updated.", vendor: result.rows[0] });
     } catch (error) {
@@ -542,7 +556,7 @@ exports.getPublicStorefront = async (req, res) => {
         const { slug } = req.params;
 
         const vendorResult = await pool.query(
-            `SELECT id, business_name, slug, logo_url, banner_url, about
+            `SELECT id, business_name, slug, about, delivery_method
              FROM vendors WHERE slug = $1 AND status = 'approved' LIMIT 1`,
             [slug]
         );

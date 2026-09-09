@@ -393,33 +393,28 @@
                 <section id="tab-storefront" class="tab-content hidden">
                     <h2 class="admin-page-title">Storefront</h2>
                     <p class="admin-page-subtitle">
-                        Your logo, banner and about text appear on your public store page.
+                        Your business name, delivery method and about text appear on your public store page.
                         <a id="vendor-storefront-view-link" href="#" target="_blank" rel="noopener">View my storefront &rarr;</a>
                     </p>
 
                     <div class="panel">
-                        <h3 style="margin:0 0 10px;">Logo</h3>
-                        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
-                            <img id="vendor-storefront-logo-preview" src="" alt="" style="width:80px; height:80px; border-radius:50%; object-fit:cover; background:#f3f4f6; display:none;">
-                            <div id="vendor-storefront-logo-placeholder" style="width:80px; height:80px; border-radius:50%; background:#e5e7eb; display:flex; align-items:center; justify-content:center; font-size:12px; color:#888;">No logo</div>
-                            <div>
-                                <input type="file" id="vendor-storefront-logo-input" accept="image/*" style="display:block; margin-bottom:6px;">
-                                <button type="button" id="vendor-storefront-remove-logo-btn" style="background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; padding:6px 12px; cursor:pointer; font-size:12px;">Remove logo</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="panel">
-                        <h3 style="margin:0 0 10px;">Banner</h3>
-                        <div id="vendor-storefront-banner-preview" style="width:100%; max-width:480px; height:120px; border-radius:8px; background:#e5e7eb no-repeat center/cover; margin-bottom:10px; display:flex; align-items:center; justify-content:center; font-size:12px; color:#888;">No banner</div>
-                        <input type="file" id="vendor-storefront-banner-input" accept="image/*" style="display:block; margin-bottom:6px;">
-                        <button type="button" id="vendor-storefront-remove-banner-btn" style="background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; padding:6px 12px; cursor:pointer; font-size:12px;">Remove banner</button>
+                        <h3 style="margin:0 0 10px;">Delivery / Payment Method</h3>
+                        <p style="margin:0 0 10px; font-size:13px; color:#666;">Shown to customers as a badge next to your business name.</p>
+                        <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
+                            <input type="radio" name="vendor-delivery-method" id="vendor-delivery-method-cod" value="cash_on_delivery">
+                            &#128666; Cash on Delivery &mdash; customer pays the rider on arrival
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                            <input type="radio" name="vendor-delivery-method" id="vendor-delivery-method-prepay" value="payment_first">
+                            &#128179; Payment First &mdash; customer pays before dispatch
+                        </label>
                     </div>
 
                     <div class="panel">
                         <h3 style="margin:0 0 10px;">About</h3>
                         <textarea id="vendor-storefront-about" rows="5" maxlength="1000" placeholder="Tell customers a little about your store..." style="width:100%; padding:8px; box-sizing:border-box;"></textarea>
                         <div style="font-size:12px; color:#888; margin-top:4px;"><span id="vendor-storefront-about-count">0</span>/1000</div>
+                        <div style="font-size:12px; color:#888; margin-top:4px;">Don't include a phone number, WhatsApp, or your shop's address &mdash; customers should reach you through Lizimas Store.</div>
                     </div>
 
                     <button type="button" id="vendor-storefront-save-btn" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:12px 20px; cursor:pointer; font-weight:600;">Save Storefront</button>

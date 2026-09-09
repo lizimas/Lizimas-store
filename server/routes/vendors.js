@@ -71,7 +71,7 @@ router.use(requireAuth, requireVendor);
 
 router.get("/me", getMyVendorProfile);
 router.patch("/me", updateMyVendorProfile);
-router.patch("/me/storefront", upload.fields([{ name: "logo", maxCount: 1 }, { name: "banner", maxCount: 1 }]), updateVendorStorefront);
+router.patch("/me/storefront", updateVendorStorefront);
 router.get("/orders", getMyVendorOrders);
 router.patch("/order-items/:orderItemId/stage", advanceVendorOrderStage);
 router.get("/dashboard-summary", getVendorDashboardSummary);

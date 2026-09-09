@@ -952,3 +952,25 @@ there's no pay-to-play risk of it being abused or gamed):
   DESC`). Fine at current catalogue scale; worth a "how many sponsored
   slots, and how do ties resolve" pass if sponsored placements ever
   become a real revenue line with many concurrent sponsors.
+
+
+## Storefront redesign: delivery method badge, logo/banner removed, bio content filter (September 2026)
+
+Three related corrections from Ryan on the storefront page (lizimasstore.com/store/:slug), all in one pass since they touch the same page and the same `updateVendorStorefront` endpoint.
+
+**Migrations to run:**
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/076_vendor_delivery_method.sql
+
+**1. Delivery/payment method badge (Task #74).** A vendor now sets, from their dashboard's Storefront tab, whether they do Cash on Delivery or Payment First - shown as a small badge right under the business name on the public storefront. Kept to exactly these two options (`vendors.delivery_method`, a real CHECK constraint, not free text) since the point is a customer can read it at a glance; a vendor with neither selected just shows no badge rather than a guess. Demoed to Ryan as a static mockup before building, confirmed with "thats perfect we go with that."
+
+**2. Logo and banner removed from the storefront (Ryan: "remove logo and banner on their page").** The storefront page now shows only: business name, the delivery-method badge, the about text, and the existing seller-score/followers panel - no logo, no banner. Removed end-to-end: the upload UI in the vendor dashboard, the multipart upload route/controller code (Cloudinary `uploadBuffer` calls), the `<img>`/fallback-circle markup on `client/store.html`, the `og:image` meta tag on shared storefront links, and the now-dead `.store-banner`/`.store-logo*` CSS. `vendors.logo_url`/`banner_url` are left in place in the database (non-destructive - no reason to drop columns over a UI change) but nothing reads or writes them anymore. `PATCH /api/vendors/me/storefront` is now a plain JSON body (`{about, delivery_method}`) instead of multipart, since there's nothing left to upload.
+
+**3. Storefront bio content filter (Task #75) - "vendors should not put their number or actual store location [in their bio]; the system should decline the request."** The About text a vendor writes for their public storefront is now checked, at save time, for three things, and the save is rejected outright (not silently stripped) if it trips:
+- **A phone number** - matches the common written forms of a Ugandan mobile number (`0700123456`, `0700 123 456`, `+256 700 123 456`, `256700123456`, or the bare 9-digit subscriber number). Deliberately anchored on a leading `0`/`+256`/`256` (or exactly 9 digits starting with `7`) rather than "any long digit run," specifically so a price like "UGX 1,500,000" in a bio doesn't false-positive as a phone number.
+- **Off-platform contact phrasing** - "WhatsApp," "wa.me/...," "call me," "message me," "DM me," etc., even without a number attached.
+- **Address/location phrasing** - "Plot 45," "Shop No. 12," "located at," "find/visit us at," or raw GPS-style coordinates.
+
+**Known limitation, stated plainly rather than oversold**: this is a keyword/pattern filter, not a language model or a geocoder. It reliably catches numbers and explicit address phrasing, but it will not catch every way someone could describe a phone number in words ("zero seven double-oh...") or an indirect location ("behind the big mosque past the roundabout"). That's an inherent limit of regex-based text filtering, not a bug to fix later - closing that gap for real would need a much heavier NLP/geocoding pipeline. Admin's existing vendor/product review is still the backstop for anything a vendor phrases around the filter. Currently scoped to the storefront About field only (where this came up); the same `findStorefrontContactViolation` helper in `server/utils/vendorStorefront.js` is ready to reuse on product descriptions/titles too if that turns out to be a problem there as well.
+
+**What shipped:** `migrations/076_vendor_delivery_method.sql`; `server/utils/vendorStorefront.js` extended with `DELIVERY_METHODS`/`isValidDeliveryMethod`/`findStorefrontContactViolation` (9 new tests, 170 total in the suite); `updateVendorStorefront`/`getMyVendorProfile`/`getPublicStorefront` in `vendorController.js` updated; `PATCH /api/vendors/me/storefront` route no longer takes file uploads; vendor dashboard Storefront tab rebuilt (Delivery/Payment Method radio buttons + About, no Logo/Banner panels); `client/store.html`/`store.js`/`style.css` updated to drop the logo/banner and add the delivery badge; `server/routes/store-page.js`'s social-share meta tags no longer reference a banner/logo image.

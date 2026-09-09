@@ -1,7 +1,9 @@
 // Public vendor storefront (client/store.html). Reads the vendor slug from
 // the pretty URL server/routes/store-page.js serves (/store/<slug>), or from
 // a ?slug= query string as a fallback for local testing, then renders the
-// vendor's banner/logo/about and their live catalogue.
+// vendor's about text, delivery/payment method badge, and their live
+// catalogue. No logo/banner - removed from the storefront on Ryan's
+// instruction (Sept 2026).
 //
 // Product cards are a deliberately simplified copy of buildProductCard()
 // in products.js (same .product-card/.product-grid markup so the styling
@@ -50,26 +52,23 @@ function stBuildProductCard(product) {
     return card;
 }
 
+const STORE_DELIVERY_LABELS = {
+    cash_on_delivery: { text: "\ud83d\ude9a Cash on Delivery", className: "cod" },
+    payment_first: { text: "\ud83d\udcb3 Payment First", className: "prepay" }
+};
+
 function stRenderVendor(vendor) {
     document.getElementById("store-name").textContent = vendor.business_name || "";
     document.title = `${vendor.business_name} | Lizimas Store`;
 
-    const bannerEl = document.getElementById("store-banner");
-    if (vendor.banner_url) {
-        bannerEl.style.backgroundImage = `url("${vendor.banner_url}")`;
-    }
-
-    const logoImg = document.getElementById("store-logo-img");
-    const logoFallback = document.getElementById("store-logo-fallback");
-    if (vendor.logo_url) {
-        logoImg.src = vendor.logo_url;
-        logoImg.alt = vendor.business_name || "";
-        logoImg.hidden = false;
-        logoFallback.hidden = true;
+    const badgeEl = document.getElementById("store-delivery-badge");
+    const badgeInfo = STORE_DELIVERY_LABELS[vendor.delivery_method];
+    if (badgeInfo) {
+        badgeEl.textContent = badgeInfo.text;
+        badgeEl.className = `store-delivery-badge ${badgeInfo.className}`;
+        badgeEl.hidden = false;
     } else {
-        logoFallback.textContent = (vendor.business_name || "?").trim().charAt(0).toUpperCase();
-        logoFallback.hidden = false;
-        logoImg.hidden = true;
+        badgeEl.hidden = true;
     }
 
     const aboutEl = document.getElementById("store-about");
