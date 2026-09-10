@@ -50,7 +50,7 @@
         <div class="vm-fab-row">
             <div class="vm-fab-cluster">
                 <button class="vm-fab vm-fab-outline" title="Filters"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></button>
-                <button class="vm-fab vm-fab-gold-outline" title="Add product (desktop only for now)" onclick="alert('Adding a new product needs a bigger screen for now \u2014 switch to desktop.')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+                <button class="vm-fab vm-fab-gold-outline" title="Add product (desktop only for now)" onclick="vmShowScreen('add-product')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
                 <button class="vm-fab vm-fab-gold" title="Export CSV" onclick="vmExportProductsCsv()"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="m6 11 6 6 6-6"/><path d="M5 21h14"/></svg></button>
             </div>
         </div>
@@ -71,7 +71,7 @@
                 <span class="vm-list-row-label">Stock Recommendation</span>
                 <span class="vm-badge-soon">Coming soon</span>
             </div>
-            <button class="vm-list-row" onclick="alert('Promotions needs a bigger screen for now \u2014 switch to desktop.')">
+            <button class="vm-list-row" onclick="vmShowScreen('promotions')">
                 <span class="vm-list-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 13v-2Z"/><path d="M11.6 16.8 13 21h-3l-1.4-4.8"/></svg></span>
                 <span class="vm-list-row-label">Promotions</span>
                 <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
@@ -81,7 +81,7 @@
                 <span class="vm-list-row-label">Advertise your Products</span>
                 <span class="vm-badge-soon">Coming soon</span>
             </div>
-            <button class="vm-list-row" onclick="alert('Account Statements needs a bigger screen for now \u2014 switch to desktop.')">
+            <button class="vm-list-row" onclick="vmShowScreen('wallet')">
                 <span class="vm-list-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg></span>
                 <span class="vm-list-row-label">Account Statements</span>
                 <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
@@ -96,7 +96,7 @@
                 <span class="vm-list-row-label">Settings</span>
                 <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
             </button>
-            <button class="vm-list-row" onclick="alert('Profile needs a bigger screen for now \u2014 switch to desktop.')">
+            <button class="vm-list-row" onclick="vmShowScreen('profile')">
                 <span class="vm-list-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></span>
                 <span class="vm-list-row-label">Profile</span>
                 <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
@@ -189,6 +189,93 @@
         <div class="vm-btn-row" id="vm-holiday-off-actions" hidden>
             <button class="vm-btn-primary" style="background:#fff; border:1.5px solid #DC2626; color:#DC2626;" onclick="vmTurnOffHolidayMode()">Turn Off Holiday Mode</button>
         </div>
+    </div>
+
+    <!-- Add Product ----------------------------------------------------------- -->
+    <div class="vm-screen" id="vm-screen-add-product">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Add Product</span></div>
+        <div class="vm-card">
+            <div class="vm-card-subtitle">Core details only for now &mdash; add brand, warranty and other extras from a larger screen once the product exists.</div>
+            <div class="vm-field">
+                <label class="vm-field-label">Product Name</label>
+                <input type="text" id="vm-product-name" class="vm-field-input" placeholder="e.g. Men's Leather Belt">
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">Category</label>
+                <select id="vm-product-category" class="vm-field-input" onchange="vmSchedulePricingPreview()"><option value="">Loading...</option></select>
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">Description</label>
+                <textarea id="vm-product-description" class="vm-field-input" rows="3" placeholder="Describe your product"></textarea>
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">Your Payout (UGX)</label>
+                <input type="number" id="vm-product-payout" class="vm-field-input" placeholder="Amount you want to be paid" oninput="vmSchedulePricingPreview()">
+            </div>
+            <div class="vm-note vm-note-info" id="vm-pricing-preview" style="display:none; margin-bottom:14px;">
+                Customer price: UGX <strong><span id="vm-preview-customer-price">0</span></strong><br>
+                Your payout: UGX <strong><span id="vm-preview-payout">0</span></strong>
+            </div>
+            <div class="vm-note" id="vm-pricing-preview-error" style="display:none; margin-bottom:14px; background:#fce8e6; color:#c5221f;"></div>
+            <div class="vm-field">
+                <label class="vm-field-label">Stock</label>
+                <input type="number" id="vm-product-stock" class="vm-field-input" placeholder="Quantity available">
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">Package Size</label>
+                <input type="text" id="vm-product-package-size" class="vm-field-input" placeholder="e.g. 20 x 15 x 5 cm">
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">Photos</label>
+                <input type="file" id="vm-product-images" class="vm-field-input" accept="image/*" multiple>
+            </div>
+            <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; color:#555; margin:14px 0;">
+                <input type="checkbox" id="vm-product-authenticity-confirm" style="margin-top:2px;">
+                <span>I confirm this product is authentic and accurately described.</span>
+            </label>
+            <button class="vm-btn-primary" id="vm-product-submit-btn" onclick="vmSubmitProduct()">Save Product</button>
+            <div class="vm-btn-help" id="vm-product-form-status"></div>
+        </div>
+    </div>
+
+    <!-- Promotions -------------------------------------------------------------- -->
+    <div class="vm-screen" id="vm-screen-promotions">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Promotions</span></div>
+        <div class="vm-card">
+            <div class="vm-card-title">Propose a Promotion</div>
+            <div class="vm-field">
+                <label class="vm-field-label">Product</label>
+                <select id="vm-promo-product" class="vm-field-input"><option value="">Loading...</option></select>
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">Sale Price (UGX)</label>
+                <input type="number" id="vm-promo-price" class="vm-field-input" placeholder="e.g. 25000">
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">Starts</label>
+                <input type="datetime-local" id="vm-promo-starts" class="vm-field-input">
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">Ends</label>
+                <input type="datetime-local" id="vm-promo-ends" class="vm-field-input">
+            </div>
+            <button class="vm-btn-primary" onclick="vmSubmitPromotion()">Submit for Review</button>
+            <div class="vm-btn-help" id="vm-promo-status"></div>
+        </div>
+        <div class="vm-card-title" style="margin:18px 14px 8px;">Your Promotions</div>
+        <div id="vm-promotions-list" style="margin:0 14px 24px;"><div class="vm-loading-state">Loading...</div></div>
+    </div>
+
+    <!-- Account Statements (Wallet) ---------------------------------------------- -->
+    <div class="vm-screen" id="vm-screen-wallet">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Account Statements</span></div>
+        <div id="vm-wallet-body"><div class="vm-loading-state">Loading...</div></div>
+    </div>
+
+    <!-- Profile ------------------------------------------------------------------- -->
+    <div class="vm-screen" id="vm-screen-profile">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Profile</span></div>
+        <div id="vm-profile-body"><div class="vm-loading-state">Loading...</div></div>
     </div>
 
     <div class="vm-bottom-nav">

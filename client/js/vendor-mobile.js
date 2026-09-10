@@ -36,7 +36,7 @@ function vmShowScreen(name, opts) {
     if (!opts.isBack && !VM_NAV_SCREENS.includes(name)) {
         vmNavStack.push(name);
     } else if (VM_NAV_SCREENS.includes(name)) {
-        vmNavStack = ["menu"];
+        vmNavStack = [name];
     }
 
     if (name === "home") vmLoadHome();
@@ -45,6 +45,10 @@ function vmShowScreen(name, opts) {
     if (name === "menu") vmLoadMenu();
     if (name === "settings") vmLoadSettings();
     if (name === "holiday-mode") vmLoadHolidayMode();
+    if (name === "add-product") vmLoadAddProduct();
+    if (name === "promotions") vmLoadPromotions();
+    if (name === "wallet") vmLoadWallet();
+    if (name === "profile") vmLoadProfile();
 }
 
 function vmGoBack() {
@@ -465,6 +469,379 @@ async function vmTurnOffHolidayMode() {
     } catch (error) {
         console.error("vmTurnOffHolidayMode error:", error);
         alert("Could not update Holiday Mode.");
+    }
+}
+
+// --- Add Product (quick-add: core fields only) ---------------------------
+// A focused subset of the desktop Add Product form (name/category/
+// description/payout/stock/package size/photos/authenticity) - brand,
+// warranty, GTIN, MPN and variants stay desktop-only for now, added from
+// there once the product exists. Posts to the SAME /api/vendors/products
+// endpoint submitVendorProductForm() uses, just via its own vm- prefixed
+// fields rather than sharing DOM ids with the desktop form (two elements
+// sharing one id would break whichever form runs second).
+
+let vmPricingPreviewTimer = null;
+
+async function vmLoadAddProduct() {
+    if (!staffCategoriesLoaded) {
+        try {
+            const response = await fetch(`${API_URL}/api/products/categories`);
+            staffCategories = await response.json();
+            staffCategoriesLoaded = true;
+        } catch (error) {
+            console.error("vmLoadAddProduct categories error:", error);
+        }
+    }
+    const select = document.getElementById("vm-product-category");
+    if (select && staffCategories) select.innerHTML = buildGroupedCategoryOptions(staffCategories);
+    document.getElementById("vm-product-form-status").textContent = "";
+}
+
+function vmSchedulePricingPreview() {
+    clearTimeout(vmPricingPreviewTimer);
+    vmPricingPreviewTimer = setTimeout(vmUpdatePricingPreview, 400);
+}
+
+function vmHidePricingPreview() {
+    document.getElementById("vm-pricing-preview").style.display = "none";
+    document.getElementById("vm-pricing-preview-error").style.display = "none";
+}
+
+async function vmUpdatePricingPreview() {
+    const payoutRaw = document.getElementById("vm-product-payout").value;
+    const categoryId = document.getElementById("vm-product-category").value;
+    const previewEl = document.getElementById("vm-pricing-preview");
+    const errorEl = document.getElementById("vm-pricing-preview-error");
+
+    const payout = Number(payoutRaw);
+    if (!payoutRaw || !(payout > 0)) { vmHidePricingPreview(); return; }
+
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/pricing/preview", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ desired_payout: payout, category_id: categoryId || null })
+        });
+        if (result.error) {
+            errorEl.textContent = result.error;
+            errorEl.style.display = "block";
+            previewEl.style.display = "none";
+            return;
+        }
+        errorEl.style.display = "none";
+        previewEl.style.display = "block";
+        document.getElementById("vm-preview-customer-price").textContent = Number(result.customer_price).toLocaleString();
+        document.getElementById("vm-preview-payout").textContent = Number(result.vendor_payout).toLocaleString();
+    } catch (error) {
+        console.error("vmUpdatePricingPreview error:", error);
+    }
+}
+
+async function vmSubmitProduct() {
+    const name = document.getElementById("vm-product-name").value.trim();
+    const category_id = document.getElementById("vm-product-category").value;
+    const description = document.getElementById("vm-product-description").value.trim();
+    const desiredPayout = document.getElementById("vm-product-payout").value;
+    const stock = document.getElementById("vm-product-stock").value;
+    const packageSize = document.getElementById("vm-product-package-size").value;
+    const imageFiles = document.getElementById("vm-product-images").files;
+    const statusEl = document.getElementById("vm-product-form-status");
+    const submitBtn = document.getElementById("vm-product-submit-btn");
+
+    if (!name || !desiredPayout || !stock) {
+        statusEl.textContent = "Name, payout, and stock are required.";
+        return;
+    }
+    if (!document.getElementById("vm-product-authenticity-confirm").checked) {
+        statusEl.textContent = "Please confirm the authenticity statement to continue.";
+        return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.style.opacity = "0.6";
+    statusEl.textContent = "Saving...";
+
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("category_id", category_id);
+    formData.append("description", description);
+    formData.append("desired_payout", desiredPayout);
+    formData.append("stock", stock);
+    formData.append("package_size", packageSize);
+    for (const file of imageFiles) formData.append("images", file);
+
+    try {
+        const token = getVendorToken();
+        const response = await fetch(`${API_URL}/api/vendors/products`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${token}` },
+            body: formData
+        });
+        const data = await response.json();
+        submitBtn.disabled = false;
+        submitBtn.style.opacity = "1";
+
+        if (!response.ok) {
+            statusEl.textContent = data.error || "Could not save product.";
+            return;
+        }
+
+        // Reset the quick-add form for next time.
+        ["vm-product-name", "vm-product-description", "vm-product-payout", "vm-product-stock"].forEach(id => document.getElementById(id).value = "");
+        document.getElementById("vm-product-images").value = "";
+        document.getElementById("vm-product-authenticity-confirm").checked = false;
+        vmHidePricingPreview();
+
+        vmShowScreen("products");
+    } catch (error) {
+        console.error("vmSubmitProduct error:", error);
+        submitBtn.disabled = false;
+        submitBtn.style.opacity = "1";
+        statusEl.textContent = "Could not connect to server.";
+    }
+}
+
+// --- Promotions ------------------------------------------------------------
+// Reuses VENDOR_PROMO_STATUS_CLASS/VENDOR_PROMO_STATUS_LABEL and vendorEsc
+// from vendor-dashboard.js; posts to the same /api/vendors/promotions
+// endpoint submitVendorPromotion() uses, via its own vm- ids.
+
+async function vmLoadPromotions() {
+    await Promise.all([vmPopulatePromoProductSelect(), vmLoadPromotionsList()]);
+}
+
+async function vmPopulatePromoProductSelect() {
+    const select = document.getElementById("vm-promo-product");
+    try {
+        const products = await vendorAuthorizedFetch("/api/vendors/products");
+        if (products.error) return;
+        const eligible = products.filter(p => p.status === "approved" && !p.admin_restricted);
+        select.innerHTML = eligible.length === 0
+            ? '<option value="">No eligible products</option>'
+            : eligible.map(p => `<option value="${p.id}">${vendorEsc(p.name)} (${vmFmtUgx(p.price)})</option>`).join("");
+    } catch (error) {
+        console.error("vmPopulatePromoProductSelect error:", error);
+    }
+}
+
+async function vmSubmitPromotion() {
+    const productId = document.getElementById("vm-promo-product").value;
+    const salePrice = Number(document.getElementById("vm-promo-price").value);
+    const startsAt = document.getElementById("vm-promo-starts").value;
+    const endsAt = document.getElementById("vm-promo-ends").value;
+    const statusEl = document.getElementById("vm-promo-status");
+
+    if (!productId) { statusEl.textContent = "Choose a product first."; return; }
+    if (!salePrice || salePrice <= 0) { statusEl.textContent = "Enter a sale price."; return; }
+    if (!startsAt || !endsAt) { statusEl.textContent = "Choose a start and end time."; return; }
+
+    statusEl.textContent = "Submitting...";
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/promotions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                product_id: Number(productId),
+                proposed_sale_price: salePrice,
+                starts_at: new Date(startsAt).toISOString(),
+                ends_at: new Date(endsAt).toISOString()
+            })
+        });
+        if (data.error) { statusEl.textContent = data.error; return; }
+        statusEl.textContent = "Submitted for review.";
+        document.getElementById("vm-promo-price").value = "";
+        document.getElementById("vm-promo-starts").value = "";
+        document.getElementById("vm-promo-ends").value = "";
+        await vmLoadPromotionsList();
+    } catch (error) {
+        console.error("vmSubmitPromotion error:", error);
+        statusEl.textContent = "Could not connect to server.";
+    }
+}
+
+function vmPromotionCard(r) {
+    return `<div class="vm-order-card">
+        <div class="vm-order-card-top">
+            <span class="vm-order-no">${vendorEsc(r.product_name)}</span>
+            <span class="status-badge ${VENDOR_PROMO_STATUS_CLASS[r.resolutionStatus] || ""}">${VENDOR_PROMO_STATUS_LABEL[r.resolutionStatus] || r.resolutionStatus}</span>
+        </div>
+        <div class="vm-order-bottom" style="margin-bottom:4px;">
+            <span style="text-decoration:line-through; color:#888;">${vmFmtUgx(r.original_price)}</span>
+            <span class="vm-order-amount">${vmFmtUgx(r.proposed_sale_price)}</span>
+        </div>
+        <div class="vm-order-meta">${new Date(r.starts_at).toLocaleDateString()} &ndash; ${new Date(r.ends_at).toLocaleDateString()}</div>
+        ${r.homepage_featured ? '<span class="status-badge status-paid" style="margin-top:6px; display:inline-block;">Featured</span>' : ""}
+        ${r.rejection_reason ? `<div style="font-size:11px; color:#991B1B; margin-top:6px;">${vendorEsc(r.rejection_reason)}</div>` : ""}
+    </div>`;
+}
+
+async function vmLoadPromotionsList() {
+    const box = document.getElementById("vm-promotions-list");
+    box.innerHTML = '<div class="vm-loading-state">Loading...</div>';
+    try {
+        const rows = await vendorAuthorizedFetch("/api/vendors/promotions");
+        if (rows.error) { box.innerHTML = `<div class="vm-loading-state">${vendorEsc(rows.error)}</div>`; return; }
+        if (rows.length === 0) { box.innerHTML = '<div class="vm-empty-state">No promotions proposed yet.</div>'; return; }
+        box.innerHTML = rows.map(vmPromotionCard).join("");
+    } catch (error) {
+        console.error("vmLoadPromotionsList error:", error);
+        box.innerHTML = '<div class="vm-loading-state">Could not load promotions.</div>';
+    }
+}
+
+// --- Account Statements (Wallet) --------------------------------------------
+// Reuses VENDOR_PAYOUT_STATUS_CLASS/LABEL and vendorEsc from
+// vendor-dashboard.js; same /api/vendors/wallet and
+// /api/vendors/wallet/payout-requests endpoints requestVendorPayout() uses.
+
+let vmWalletEligible = false;
+
+async function vmLoadWallet() {
+    const el = document.getElementById("vm-wallet-body");
+    el.innerHTML = '<div class="vm-loading-state">Loading...</div>';
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/wallet");
+        if (data.error) { el.innerHTML = `<div class="vm-loading-state">${vendorEsc(data.error)}</div>`; return; }
+        vmWalletEligible = !!data.eligibility.allowed;
+        el.innerHTML = vmRenderWallet(data);
+    } catch (error) {
+        console.error("vmLoadWallet error:", error);
+        el.innerHTML = '<div class="vm-loading-state">Could not load your wallet.</div>';
+    }
+}
+
+function vmRenderWallet(data) {
+    const b = data.balance;
+    const summary = `<div class="vm-card">
+        <div class="vm-stat-row">${vmStatTile("Available Balance", vmFmtUgx(b.available), "var(--vm-green-text)")}${vmStatTile("Pending", vmFmtUgx(b.pending), "var(--vm-amber-text)")}</div>
+        <div class="vm-stat-row">${vmStatTile("Requested", vmFmtUgx(b.requestedTotal))}${vmStatTile("Paid Out to Date", vmFmtUgx(b.paidOutTotal))}</div>
+        <div style="font-size:12px; color:#666; margin:12px 0 14px; line-height:1.5;">
+            MoMo number on file: ${data.momoNumber ? vendorEsc(data.momoNumber) : '<span style="color:var(--vm-red);">none - add one in Profile first</span>'}<br>
+            Minimum payout: ${vmFmtUgx(data.minPayout)}
+        </div>
+        <button class="vm-btn-primary" id="vm-request-payout-btn" onclick="vmRequestPayout()" ${data.eligibility.allowed ? "" : "disabled"}>Request Payout</button>
+        ${!data.eligibility.allowed ? `<div class="vm-btn-help">${vendorEsc(data.eligibility.reason)}</div>` : ""}
+    </div>`;
+
+    const historyRows = data.payouts.length === 0
+        ? '<div class="vm-empty-state">No payout requests yet.</div>'
+        : data.payouts.map(p => `<div class="vm-order-card">
+            <div class="vm-order-card-top"><span class="vm-order-no">${new Date(p.requestedAt).toLocaleDateString()}</span><span class="status-badge ${VENDOR_PAYOUT_STATUS_CLASS[p.status] || ""}">${VENDOR_PAYOUT_STATUS_LABEL[p.status] || p.status}</span></div>
+            <div class="vm-order-bottom"><span class="vm-order-amount">${vmFmtUgx(p.amount)}</span><span>${vendorEsc(p.momoNumber || "-")}</span></div>
+            ${p.reference ? `<div class="vm-order-meta">Ref: ${vendorEsc(p.reference)}</div>` : ""}
+        </div>`).join("");
+    const history = `<div class="vm-card-title" style="margin:0 14px 8px;">Payout History</div>` + historyRows;
+
+    const adjustRows = data.adjustments.length === 0
+        ? '<div class="vm-empty-state">No balance adjustments.</div>'
+        : data.adjustments.map(a => `<div class="vm-order-card">
+            <div class="vm-order-card-top"><span class="vm-order-no">${new Date(a.createdAt).toLocaleDateString()}</span><span class="vm-order-amount" style="color:${a.amount >= 0 ? "var(--vm-green-text)" : "var(--vm-red)"};">${a.amount >= 0 ? "+" : ""}${vmFmtUgx(a.amount)}</span></div>
+            <div class="vm-order-meta">${vendorEsc(a.reason)}</div>
+        </div>`).join("");
+    const adjustments = `<div class="vm-card-title" style="margin:18px 14px 8px;">Balance Adjustments</div>` + adjustRows;
+
+    return summary + history + adjustments;
+}
+
+async function vmRequestPayout() {
+    if (!confirm("Request a payout of your full available balance via MoMo?")) return;
+    const btn = document.getElementById("vm-request-payout-btn");
+    if (btn) btn.disabled = true;
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/wallet/payout-requests", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({})
+        });
+        if (data.error) { alert(data.error); if (btn) btn.disabled = false; return; }
+        alert("Payout requested. Lizimas will review it and send your MoMo transfer.");
+        await vmLoadWallet();
+    } catch (error) {
+        console.error("vmRequestPayout error:", error);
+        alert("Could not connect to server.");
+        if (btn) btn.disabled = false;
+    }
+}
+
+// --- Profile ----------------------------------------------------------------
+// Merges what the desktop splits across two tabs (Overview's profile
+// details + Account's notices/logout) into one mobile screen, plus the
+// editable MoMo number saveVendorMomoNumber() already exposes on desktop.
+// Reuses VENDOR_NOTICE_CLASS/LABEL and vendorEsc.
+
+async function vmLoadProfile() {
+    const el = document.getElementById("vm-profile-body");
+    el.innerHTML = '<div class="vm-loading-state">Loading...</div>';
+    try {
+        const [v, notices] = await Promise.all([
+            vendorAuthorizedFetch("/api/vendors/me"),
+            vendorAuthorizedFetch("/api/vendors/compliance-notices")
+        ]);
+        if (v.error) { el.innerHTML = `<div class="vm-loading-state">${vendorEsc(v.error)}</div>`; return; }
+        el.innerHTML = vmRenderProfile(v, Array.isArray(notices) ? notices : []);
+        const momoInput = document.getElementById("vm-momo-input");
+        if (momoInput) momoInput.value = v.momo_number || "";
+    } catch (error) {
+        console.error("vmLoadProfile error:", error);
+        el.innerHTML = '<div class="vm-loading-state">Could not load your profile.</div>';
+    }
+}
+
+function vmNoticeCard(n) {
+    return `<div class="vm-order-card">
+        <div class="vm-order-card-top"><span class="vm-order-no">${new Date(n.created_at).toLocaleDateString()}</span><span class="status-badge ${VENDOR_NOTICE_CLASS[n.action_type] || ""}">${VENDOR_NOTICE_LABEL[n.action_type] || n.action_type}</span></div>
+        <div class="vm-order-meta">${vendorEsc(n.reason)}${n.product_name ? ` (${vendorEsc(n.product_name)})` : ""}</div>
+    </div>`;
+}
+
+function vmRenderProfile(v, notices) {
+    const s = vmStatusCopy(v.status);
+    const statusCard = `<div class="vm-card"><div style="display:inline-block; padding:6px 14px; border-radius:999px; background:${s.bg}; color:${s.color}; font-weight:700; font-size:13px;">${s.text}</div></div>`;
+
+    const rows = [
+        ["Shop Name", v.business_name || "-"],
+        ["Account Type", v.account_type === "company" ? "Company" : v.account_type === "individual" ? "Individual" : "-"],
+        ["Phone", v.phone || "-"],
+        ["Location", v.physical_address || "-"],
+        ["Applied", v.submitted_at ? new Date(v.submitted_at).toLocaleDateString() : "-"]
+    ].map(([label, value]) => `<div style="display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid #f0f1f4;"><span style="font-size:12.5px; color:#888;">${label}</span><span style="font-size:13px; font-weight:600; color:var(--vm-navy); text-align:right;">${vendorEsc(value)}</span></div>`).join("");
+    const detailsCard = `<div class="vm-card"><div class="vm-card-title">Your Details</div>${rows}</div>`;
+
+    const momoCard = `<div class="vm-card">
+        <div class="vm-card-title">MoMo Payout Number</div>
+        <div class="vm-card-subtitle">Where your payouts are sent</div>
+        <input type="text" id="vm-momo-input" class="vm-field-input" placeholder="e.g. 07XXXXXXXX" style="margin-bottom:10px;">
+        <button class="vm-btn-primary" onclick="vmSaveMomoNumber()">Save</button>
+        <div class="vm-btn-help" id="vm-momo-status"></div>
+    </div>`;
+
+    const noticesCard = `<div class="vm-card"><div class="vm-card-title">Notices</div>${notices.length === 0 ? '<div style="font-size:12.5px; color:#888;">No notices on your account.</div>' : notices.map(vmNoticeCard).join("")}</div>`;
+
+    const logoutRow = `<div class="vm-card" style="padding:4px 16px;"><button class="vm-list-row vm-danger" onclick="vendorLogout()">
+        <span class="vm-list-row-label">Logout</span>
+    </button></div>`;
+
+    return statusCard + detailsCard + momoCard + noticesCard + logoutRow;
+}
+
+async function vmSaveMomoNumber() {
+    const statusEl = document.getElementById("vm-momo-status");
+    const momo_number = document.getElementById("vm-momo-input").value.trim();
+    statusEl.style.color = "#555";
+    statusEl.textContent = "Saving...";
+    try {
+        await vendorAuthorizedFetch("/api/vendors/me", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ momo_number: momo_number || null })
+        });
+        statusEl.style.color = "var(--vm-green-text)";
+        statusEl.textContent = "Saved.";
+    } catch (error) {
+        console.error("vmSaveMomoNumber error:", error);
+        statusEl.style.color = "var(--vm-red)";
+        statusEl.textContent = "Could not save. Please try again.";
     }
 }
 
