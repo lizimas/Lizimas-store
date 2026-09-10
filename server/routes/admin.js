@@ -101,6 +101,9 @@ const {
     escalateVendorMessageAdmin,
     unescalateVendorMessageAdmin
 } = require("../controllers/vendorController");
+const {
+    listVendorKycAdmin, getVendorKycAdminDetail, reviewVendorKycAdmin
+} = require("../controllers/vendorKycController");
 
 const {
     generateCode,
@@ -206,6 +209,15 @@ router.get("/vendors/pending", getPendingVendors);
 router.get("/vendors", getAllVendors);
 router.patch("/vendors/:id/approve", approveVendor);
 router.patch("/vendors/:id/reject", rejectVendor);
+
+// Vendor KYC & Compliance Profile review (Ryan, Sept 2026) - separate
+// from vendor approval above: approval means "allowed to sell," KYC
+// status means "identity/business registration verified." Admin-only,
+// same as the rest of this section - KYC data is more sensitive than
+// vendor messages (which customer_support also reaches, above the gate).
+router.get("/vendors/kyc", listVendorKycAdmin);
+router.get("/vendors/:id/kyc", getVendorKycAdminDetail);
+router.patch("/vendors/:id/kyc/review", reviewVendorKycAdmin);
 
 // Vendor Wallet & Payouts (Task #61).
 router.get("/vendor-payouts", getVendorPayoutRequests);

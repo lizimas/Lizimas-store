@@ -97,31 +97,47 @@
                         <div id="vendor-seller-score-container" class="seller-panel" style="border:none; padding:0; margin:0;">Loading...</div>
                     </div>
 
-                    <div class="panel hidden" id="vendor-verification-panel">
-                        <h2>Complete Verification</h2>
-                        <p class="admin-page-subtitle" id="vendor-verification-intro">Just one more step to finish setting up your shop.</p>
+                    <div class="panel" id="vendor-kyc-panel">
+                        <h2>Identity &amp; Business Verification</h2>
+                        <p class="admin-page-subtitle">Verifying your ID or business registration lets Lizimas Store confirm you're a real, trustworthy seller.</p>
 
-                        <div style="display:flex; flex-direction:column; gap:12px; max-width:420px;">
-
-                            <div class="hidden" id="vendor-verification-regnum-group">
-                                <label style="font-size:13px; font-weight:600; color:#333;">URSB Business Registration Number</label>
-                                <input type="text" id="vendor-verification-regnum" placeholder="Your registered business number" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                            </div>
-
-                            <div class="hidden" id="vendor-verification-natid-group">
-                                <label style="font-size:13px; font-weight:600; color:#333;">National ID Number</label>
-                                <input type="text" id="vendor-verification-natid" placeholder="For identity verification (KYC)" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                            </div>
-
-                            <div>
-                                <label style="font-size:13px; font-weight:600; color:#333;">Mobile Money Payout Number</label>
-                                <input type="tel" id="vendor-verification-momo" placeholder="Where your payouts will be sent" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                            </div>
-
-                            <p id="vendor-verification-status" style="color:#DC2626; font-size:13px; margin:0;"></p>
-
-                            <button onclick="submitVendorVerification()" style="background:#16264f; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; width:fit-content;">Save</button>
+                        <div style="margin-bottom:12px;">
+                            <span id="vendor-kyc-status-badge" class="status-badge">Loading...</span>
                         </div>
+
+                        <p id="vendor-kyc-review-note" class="hidden" style="background:#FEF3C7; color:#92400E; padding:10px 12px; border-radius:8px; font-size:13px; margin:0 0 12px 0;"></p>
+
+                        <div id="vendor-kyc-form" class="hidden" style="display:flex; flex-direction:column; gap:12px; max-width:420px;">
+                            <div class="hidden" id="vendor-kyc-regnum-group">
+                                <label style="font-size:13px; font-weight:600; color:#333;">URSB Business Registration Number</label>
+                                <input type="text" id="vendor-kyc-regnum" placeholder="Your registered business number" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+
+                            <div class="hidden" id="vendor-kyc-natid-group">
+                                <label style="font-size:13px; font-weight:600; color:#333;">National ID Number</label>
+                                <input type="text" id="vendor-kyc-natid" placeholder="For identity verification (KYC)" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+
+                            <p id="vendor-kyc-status-msg" style="color:#DC2626; font-size:13px; margin:0;"></p>
+
+                            <button onclick="submitVendorKyc()" style="background:#16264f; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; width:fit-content;">Submit for review</button>
+                        </div>
+
+                        <div id="vendor-kyc-locked-view" class="hidden">
+                            <p id="vendor-kyc-locked-text" style="font-size:13px; color:#555; margin:0;"></p>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Payout Number</h2>
+                        <p class="admin-page-subtitle">Where your Mobile Money payouts are sent.</p>
+                        <div style="display:flex; gap:10px; align-items:flex-end; max-width:420px; flex-wrap:wrap;">
+                            <div style="flex:1; min-width:180px;">
+                                <input type="tel" id="vendor-momo-input" placeholder="e.g. 0700123456" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+                            <button onclick="saveVendorMomoNumber()" style="background:#16264f; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Save</button>
+                        </div>
+                        <p id="vendor-momo-status" style="font-size:13px; margin:8px 0 0 0;"></p>
                     </div>
 
                     <div class="panel">
@@ -470,6 +486,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
     <script src="../js/category-select.js?v=1"></script>
     <script src="../js/seller-panel.js?v=1"></script>
-    <script src="../js/vendor-dashboard.js?v=16"></script>
+    <script src="../js/vendor-dashboard.js?v=17"></script>
 </body>
 </html>

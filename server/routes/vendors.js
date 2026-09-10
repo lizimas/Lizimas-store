@@ -16,6 +16,7 @@ const {
     updateVendorStorefront,
     getMyVendorMessages, getMyVendorMessageThread, createVendorMessage, replyToVendorMessage
 } = require("../controllers/vendorController");
+const { getMyKyc, updateMyKyc } = require("../controllers/vendorKycController");
 const {
     addProduct,
     updateProduct,
@@ -72,6 +73,11 @@ router.use(requireAuth, requireVendor);
 router.get("/me", getMyVendorProfile);
 router.patch("/me", updateMyVendorProfile);
 router.patch("/me/storefront", updateVendorStorefront);
+
+// Vendor KYC & Compliance Profile - identity/business-registration
+// verification, separate from the profile above (Ryan, Sept 2026).
+router.get("/me/kyc", getMyKyc);
+router.patch("/me/kyc", updateMyKyc);
 router.get("/orders", getMyVendorOrders);
 router.patch("/order-items/:orderItemId/stage", advanceVendorOrderStage);
 router.get("/dashboard-summary", getVendorDashboardSummary);

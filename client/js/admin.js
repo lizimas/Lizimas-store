@@ -1669,6 +1669,7 @@ function setupTabs() {
                 loadPendingVendorPromotions();
                 loadApprovedVendorPromotions();
                 loadVendorMessagesAdmin();
+                loadVendorKycAdmin();
             }
 
             if (button.dataset.tab === "team-messages") {
@@ -7185,6 +7186,165 @@ async function toggleVendorMessageEscalatedAdmin() {
         loadVendorMessageThreadAdmin();
     } catch (error) {
         console.error("Toggle vendor message escalated error:", error);
+        alert("Something went wrong.");
+    }
+}
+// --- Vendor KYC & Compliance Profile review (Ryan, Sept 2026) --------------
+// Identity/business-registration verification - separate from vendor
+// approval (Pending Vendor Applications above): approval means "allowed
+// to sell," KYC status means "identity/business registration verified."
+
+const VENDOR_KYC_ADMIN_VIEWS = [
+    { status: "submitted", label: "Submitted" },
+    { status: "under_review", label: "Under Review" },
+    { status: "action_required", label: "Action Required" },
+    { status: "verified", label: "Verified" },
+    { status: "rejected", label: "Rejected" },
+    { status: "suspended", label: "Suspended" },
+    { status: "", label: "All" }
+];
+
+const VENDOR_KYC_ADMIN_BADGE = {
+    not_started: { cls: "status-forfeited", label: "Not started" },
+    submitted: { cls: "status-new", label: "Submitted" },
+    under_review: { cls: "status-processing", label: "Under review" },
+    action_required: { cls: "status-pending", label: "Action required" },
+    verified: { cls: "status-paid", label: "Verified" },
+    rejected: { cls: "status-cancelled", label: "Rejected" },
+    suspended: { cls: "status-cancelled", label: "Suspended" }
+};
+
+let vendorKycAdminFilter = "submitted";
+
+async function loadVendorKycAdmin(status) {
+    if (status !== undefined) vendorKycAdminFilter = status;
+
+    const filterBar = document.getElementById("vendor-kyc-admin-filters");
+    filterBar.innerHTML = VENDOR_KYC_ADMIN_VIEWS.map(v => {
+        const active = v.status === vendorKycAdminFilter;
+        const style = active
+            ? "background:#16264f; color:#fff; border:none;"
+            : "background:#F3F4F6; color:#374151; border:1px solid #D1D5DB;";
+        return `<button onclick="loadVendorKycAdmin('${v.status}')" style="${style} border-radius:999px; padding:6px 14px; font-size:13px; cursor:pointer;">${v.label}</button>`;
+    }).join("");
+
+    try {
+        const qs = vendorKycAdminFilter ? `?status=${vendorKycAdminFilter}` : "";
+        const rows = await authorizedFetch(`/api/admin/vendors/kyc${qs}`);
+        const container = document.getElementById("vendor-kyc-admin-list");
+
+        if (!rows || rows.length === 0) {
+            container.innerHTML = `<p class="no-data">No vendors in this KYC status.</p>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Business</th><th>Type</th><th>KYC Status</th><th>Reviewed</th><th>Actions</th></tr></thead>
+                <tbody>
+                    ${rows.map(v => {
+                        const info = VENDOR_KYC_ADMIN_BADGE[v.kyc_status] || VENDOR_KYC_ADMIN_BADGE.not_started;
+                        return `
+                        <tr>
+                            <td data-label="Business">${v.business_name}</td>
+                            <td data-label="Type">${v.account_type === "company" ? "Company" : v.account_type === "individual" ? "Individual" : "-"}</td>
+                            <td data-label="KYC Status"><span class="status-badge ${info.cls}">${info.label}</span></td>
+                            <td data-label="Reviewed">${v.reviewed_at ? new Date(v.reviewed_at).toLocaleDateString() : "-"}</td>
+                            <td data-label="Actions">
+                                <button onclick="openVendorKycReviewModal(${v.vendor_id})" style="background:#16264f; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Review</button>
+                            </td>
+                        </tr>
+                    `; }).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load vendor KYC admin error:", error);
+    }
+}
+
+const VENDOR_KYC_ADMIN_TRANSITIONS = {
+    not_started: [],
+    submitted: ["under_review", "verified", "rejected", "action_required"],
+    under_review: ["verified", "rejected", "action_required"],
+    action_required: ["under_review", "verified", "rejected"],
+    verified: ["suspended"],
+    rejected: ["under_review"],
+    suspended: ["verified", "rejected"]
+};
+
+async function openVendorKycReviewModal(vendorId) {
+    try {
+        const detail = await authorizedFetch(`/api/admin/vendors/${vendorId}/kyc`);
+        const info = VENDOR_KYC_ADMIN_BADGE[detail.kyc_status] || VENDOR_KYC_ADMIN_BADGE.not_started;
+
+        const idLabel = detail.account_type === "company" ? "Registration Number" : "National ID Number";
+        const idValue = detail.account_type === "company" ? detail.registration_number : detail.national_id_number;
+
+        const transitionButtons = VENDOR_KYC_ADMIN_TRANSITIONS[detail.kyc_status] || [];
+
+        const auditHtml = (detail.audit_log || []).map(a => `
+            <div style="font-size:12px; color:#666; padding:6px 0; border-bottom:1px solid #eee;">
+                <strong>${a.from_status || "(none)"} &rarr; ${a.to_status}</strong>
+                ${a.changed_by_name ? ` by ${a.changed_by_name}` : " by vendor"}
+                &middot; ${new Date(a.created_at).toLocaleString()}
+                ${a.note ? `<br>${a.note}` : ""}
+            </div>
+        `).join("") || `<p style="font-size:12px; color:#999;">No history yet.</p>`;
+
+        const bodyHtml = `
+            <div style="margin-bottom:12px;">
+                <span class="status-badge ${info.cls}">${info.label}</span>
+            </div>
+            <table style="margin-bottom:14px;">
+                <tbody>
+                    <tr><td style="font-weight:600; padding:4px 12px 4px 0;">${idLabel}</td><td>${idValue || "-"}</td></tr>
+                    <tr><td style="font-weight:600; padding:4px 12px 4px 0;">Account Type</td><td>${detail.account_type === "company" ? "Company" : "Individual"}</td></tr>
+                </tbody>
+            </table>
+            ${transitionButtons.length > 0 ? `
+                <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Move to:</label>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                    ${transitionButtons.map(t => `<button onclick="reviewVendorKyc(${vendorId}, '${t}')" style="background:#16264f; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;">${(VENDOR_KYC_ADMIN_BADGE[t] || {}).label || t}</button>`).join("")}
+                </div>
+                <textarea id="vendor-kyc-review-note-input" placeholder="Note (shown to the vendor for Action Required/Rejected)" style="width:100%; min-height:60px; padding:8px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box; margin-bottom:10px;"></textarea>
+            ` : `<p style="font-size:13px; color:#999;">This vendor hasn't submitted any KYC information yet.</p>`}
+            <h3 style="font-size:14px; margin:14px 0 6px;">History</h3>
+            ${auditHtml}
+        `;
+
+        openGenericModal(`KYC Review — ${detail.business_name}`, bodyHtml);
+    } catch (error) {
+        console.error("Open vendor KYC review modal error:", error);
+        alert("Could not load KYC details.");
+    }
+}
+
+async function reviewVendorKyc(vendorId, newStatus) {
+    const noteEl = document.getElementById("vendor-kyc-review-note-input");
+    const note = noteEl ? noteEl.value.trim() : "";
+
+    if ((newStatus === "action_required" || newStatus === "rejected") && !note) {
+        alert("Please add a note explaining what's needed or why this was rejected.");
+        return;
+    }
+
+    try {
+        const token = getToken();
+        const res = await fetch(`${API_URL}/api/admin/vendors/${vendorId}/kyc/review`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ kyc_status: newStatus, note: note || null })
+        });
+        const data = await res.json();
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        closeGenericModal();
+        loadVendorKycAdmin();
+    } catch (error) {
+        console.error("Review vendor KYC error:", error);
         alert("Something went wrong.");
     }
 }

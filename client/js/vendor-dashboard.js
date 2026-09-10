@@ -49,7 +49,7 @@ function setupVendorTabs() {
             button.classList.add("active");
             document.getElementById(`tab-${button.dataset.tab}`).classList.remove("hidden");
 
-            if (button.dataset.tab === "overview") loadVendorStatus();
+            if (button.dataset.tab === "overview") { loadVendorStatus(); loadVendorKyc(); }
             if (button.dataset.tab === "products") loadVendorProducts();
             if (button.dataset.tab === "add-product" && staffCategoriesLoaded === false) loadVendorCategories();
             if (button.dataset.tab === "orders") loadVendorOrders();
@@ -99,15 +99,11 @@ async function loadVendorStatus() {
             ${extra}
         `;
 
-        const idLabel = v.account_type === "company" ? "Registration Number" : "National ID Number";
-        const idValue = v.account_type === "company" ? v.registration_number : v.national_id_number;
-
         document.getElementById("vendor-profile-details").innerHTML = `
             <table>
                 <tbody>
                     <tr><td style="font-weight:600; padding:6px 12px 6px 0;">Shop Name</td><td>${v.business_name || "-"}</td></tr>
                     <tr><td style="font-weight:600; padding:6px 12px 6px 0;">Account Type</td><td>${v.account_type === "company" ? "Company" : v.account_type === "individual" ? "Individual" : "-"}</td></tr>
-                    <tr><td style="font-weight:600; padding:6px 12px 6px 0;">${idLabel}</td><td>${idValue || "-"}</td></tr>
                     <tr><td style="font-weight:600; padding:6px 12px 6px 0;">Phone</td><td>${v.phone || "-"}</td></tr>
                     <tr><td style="font-weight:600; padding:6px 12px 6px 0;">Location</td><td>${v.physical_address || "-"}</td></tr>
                     <tr><td style="font-weight:600; padding:6px 12px 6px 0;">MoMo Payout Number</td><td>${v.momo_number || "-"}</td></tr>
@@ -116,38 +112,106 @@ async function loadVendorStatus() {
             </table>
         `;
 
-        const verificationPanel = document.getElementById("vendor-verification-panel");
-        const needsRegNum = v.account_type === "company" && !v.registration_number;
-        const needsNatId = v.account_type === "individual" && !v.national_id_number;
-
-        if (needsRegNum || needsNatId) {
-            verificationPanel.classList.remove("hidden");
-            document.getElementById("vendor-verification-regnum-group").classList.toggle("hidden", !needsRegNum);
-            document.getElementById("vendor-verification-natid-group").classList.toggle("hidden", !needsNatId);
-            document.getElementById("vendor-verification-momo").value = v.momo_number || "";
-        } else {
-            verificationPanel.classList.add("hidden");
-        }
+        document.getElementById("vendor-momo-input").value = v.momo_number || "";
     } catch (error) {
         console.error("Load vendor status error:", error);
     }
 }
 
-async function submitVendorVerification() {
-    const statusEl = document.getElementById("vendor-verification-status");
-    const momo_number = document.getElementById("vendor-verification-momo").value.trim();
+async function saveVendorMomoNumber() {
+    const statusEl = document.getElementById("vendor-momo-status");
+    const momo_number = document.getElementById("vendor-momo-input").value.trim();
 
-    const body = { momo_number: momo_number || null };
+    statusEl.style.color = "#555";
+    statusEl.textContent = "Saving...";
+
+    try {
+        await vendorAuthorizedFetch("/api/vendors/me", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ momo_number: momo_number || null })
+        });
+        statusEl.style.color = "#067647";
+        statusEl.textContent = "Saved.";
+    } catch (error) {
+        console.error("Save vendor momo number error:", error);
+        statusEl.style.color = "#DC2626";
+        statusEl.textContent = "Could not save. Please try again.";
+    }
+}
+
+// --- Vendor KYC & Compliance Profile (Ryan, Sept 2026) ----------------------
+// Identity/business-registration verification - separate from the plain
+// business profile above. See server/utils/vendorKyc.js for the status
+// values and server/controllers/vendorKycController.js for the API.
+
+const VENDOR_KYC_BADGE = {
+    not_started:     { cls: "status-forfeited",  label: "Not started" },
+    submitted:        { cls: "status-new",        label: "Submitted - awaiting review" },
+    under_review:     { cls: "status-processing", label: "Under review" },
+    action_required:  { cls: "status-pending",    label: "Action required" },
+    verified:         { cls: "status-paid",       label: "Verified" },
+    rejected:         { cls: "status-cancelled",  label: "Rejected" },
+    suspended:        { cls: "status-cancelled",  label: "Suspended" }
+};
+
+async function loadVendorKyc() {
+    try {
+        const k = await vendorAuthorizedFetch("/api/vendors/me/kyc");
+
+        const badge = document.getElementById("vendor-kyc-status-badge");
+        const info = VENDOR_KYC_BADGE[k.kyc_status] || VENDOR_KYC_BADGE.not_started;
+        badge.className = "status-badge " + info.cls;
+        badge.textContent = info.label;
+
+        const noteEl = document.getElementById("vendor-kyc-review-note");
+        if (k.review_note && (k.kyc_status === "action_required" || k.kyc_status === "rejected")) {
+            noteEl.textContent = (k.kyc_status === "rejected" ? "Rejected: " : "Action needed: ") + k.review_note;
+            noteEl.classList.remove("hidden");
+        } else {
+            noteEl.classList.add("hidden");
+        }
+
+        const formEl = document.getElementById("vendor-kyc-form");
+        const lockedEl = document.getElementById("vendor-kyc-locked-view");
+
+        if (k.editable) {
+            formEl.classList.remove("hidden");
+            lockedEl.classList.add("hidden");
+            const needsRegNum = k.account_type === "company";
+            const needsNatId = k.account_type === "individual";
+            document.getElementById("vendor-kyc-regnum-group").classList.toggle("hidden", !needsRegNum);
+            document.getElementById("vendor-kyc-natid-group").classList.toggle("hidden", !needsNatId);
+            document.getElementById("vendor-kyc-regnum").value = k.registration_number || "";
+            document.getElementById("vendor-kyc-natid").value = k.national_id_number || "";
+        } else {
+            formEl.classList.add("hidden");
+            lockedEl.classList.remove("hidden");
+            const lockedText = document.getElementById("vendor-kyc-locked-text");
+            if (k.kyc_status === "verified") {
+                lockedText.textContent = "Your identity/business registration is verified. Contact support if anything needs to change.";
+            } else {
+                lockedText.textContent = "Your information is with Lizimas Store for review - we'll let you know once it's checked.";
+            }
+        }
+    } catch (error) {
+        console.error("Load vendor KYC error:", error);
+    }
+}
+
+async function submitVendorKyc() {
+    const statusEl = document.getElementById("vendor-kyc-status-msg");
+    const body = {};
 
     if (vendorAccountType === "company") {
-        const registration_number = document.getElementById("vendor-verification-regnum").value.trim();
+        const registration_number = document.getElementById("vendor-kyc-regnum").value.trim();
         if (!registration_number) {
             statusEl.textContent = "Please enter your URSB registration number.";
             return;
         }
         body.registration_number = registration_number;
     } else if (vendorAccountType === "individual") {
-        const national_id_number = document.getElementById("vendor-verification-natid").value.trim();
+        const national_id_number = document.getElementById("vendor-kyc-natid").value.trim();
         if (!national_id_number) {
             statusEl.textContent = "Please enter your national ID number.";
             return;
@@ -156,21 +220,26 @@ async function submitVendorVerification() {
     }
 
     statusEl.style.color = "#DC2626";
-    statusEl.textContent = "Saving...";
+    statusEl.textContent = "Submitting...";
 
     try {
-        await vendorAuthorizedFetch("/api/vendors/me", {
+        const data = await vendorAuthorizedFetch("/api/vendors/me/kyc", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body)
         });
+        if (data.error) {
+            statusEl.style.color = "#DC2626";
+            statusEl.textContent = data.error;
+            return;
+        }
         statusEl.style.color = "#067647";
-        statusEl.textContent = "Saved.";
-        loadVendorStatus();
+        statusEl.textContent = "Submitted for review.";
+        loadVendorKyc();
     } catch (error) {
-        console.error("Submit vendor verification error:", error);
+        console.error("Submit vendor KYC error:", error);
         statusEl.style.color = "#DC2626";
-        statusEl.textContent = "Could not save. Please try again.";
+        statusEl.textContent = "Could not submit. Please try again.";
     }
 }
 
@@ -1999,6 +2068,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     setupVendorTabs();
     loadVendorStatus();
+    loadVendorKyc();
     loadVendorDashboardSummary();
     loadVendorCategories();
     loadVendorPromotions();

@@ -32,11 +32,16 @@ const {
     deriveStatusAfterReply
 } = require("../utils/vendorMessages");
 
-// The logged-in vendor's own KYC/business profile and review status.
+// The logged-in vendor's own business profile and review status.
+// registration_number/national_id_number moved to the separate,
+// encrypted vendor_kyc table (GET /api/vendors/me/kyc) - Sept 2026's
+// Vendor KYC rework. vendors.registration_number/national_id_number
+// columns still exist but are legacy/frozen; nothing reads them here
+// anymore.
 exports.getMyVendorProfile = async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT id, business_name, account_type, registration_number, national_id_number, phone,
+            `SELECT id, business_name, account_type, phone,
                     physical_address, momo_number, referral_source, status, rejection_reason,
                     submitted_at, reviewed_at, slug, about, delivery_method
              FROM vendors WHERE user_id = $1`,
@@ -115,11 +120,11 @@ exports.updateVendorStorefront = async (req, res) => {
     }
 };
 
-// The verification step that follows registration + first login: an
-// Individual vendor supplies their national ID, a Company vendor supplies
-// their URSB registration number, and either can add/update their MoMo
-// payout number. Kept separate from registration so a prospective vendor
-// can create an account and sign in before hunting down these documents.
+// Payout number and address - identity/business-registration numbers
+// moved to the separate, encrypted vendor_kyc table (PATCH
+// /api/vendors/me/kyc) as of the Sept 2026 Vendor KYC rework. Kept
+// separate from registration so a prospective vendor can create an
+// account and sign in before setting these up.
 exports.updateMyVendorProfile = async (req, res) => {
     try {
         const vendorRow = await pool.query(
@@ -131,56 +136,17 @@ exports.updateMyVendorProfile = async (req, res) => {
         }
         const vendor = vendorRow.rows[0];
 
-        const { registration_number, national_id_number, momo_number, physical_address } = req.body;
-
-        if (vendor.account_type === "company" && registration_number !== undefined && !registration_number) {
-            return res.status(400).json({ error: "Registration number cannot be blank." });
-        }
-        if (vendor.account_type === "individual" && national_id_number !== undefined && !national_id_number) {
-            return res.status(400).json({ error: "National ID number cannot be blank." });
-        }
-
-        // One account per business: a registration number or national ID
-        // that's already tied to another APPROVED vendor can't be reused.
-        // Pending/rejected vendors don't block this - only an approved
-        // account counts as "this business already has an account". The
-        // partial unique index in migration 054 is the final authority;
-        // this is just an earlier, friendlier version of the same check.
-        if (registration_number) {
-            const dupe = await pool.query(
-                "SELECT id FROM vendors WHERE status = 'approved' AND id != $1 AND LOWER(TRIM(registration_number)) = LOWER(TRIM($2))",
-                [vendor.id, registration_number]
-            );
-            if (dupe.rows.length > 0) {
-                return res.status(409).json({
-                    error: "This registration number is already associated with another approved vendor account."
-                });
-            }
-        }
-        if (national_id_number) {
-            const dupe = await pool.query(
-                "SELECT id FROM vendors WHERE status = 'approved' AND id != $1 AND LOWER(TRIM(national_id_number)) = LOWER(TRIM($2))",
-                [vendor.id, national_id_number]
-            );
-            if (dupe.rows.length > 0) {
-                return res.status(409).json({
-                    error: "This national ID is already associated with another approved vendor account."
-                });
-            }
-        }
+        const { momo_number, physical_address } = req.body;
 
         const result = await pool.query(
             `UPDATE vendors SET
-                registration_number = COALESCE($1, registration_number),
-                national_id_number = COALESCE($2, national_id_number),
-                momo_number = COALESCE($3, momo_number),
-                physical_address = COALESCE($4, physical_address)
-             WHERE id = $5
-             RETURNING id, business_name, account_type, registration_number, national_id_number,
+                momo_number = COALESCE($1, momo_number),
+                physical_address = COALESCE($2, physical_address)
+             WHERE id = $3
+             RETURNING id, business_name, account_type,
                        phone, physical_address, momo_number, referral_source, status, rejection_reason,
                        submitted_at, reviewed_at`,
-            [registration_number || null, national_id_number || null, momo_number || null,
-                physical_address || null, vendor.id]
+            [momo_number || null, physical_address || null, vendor.id]
         );
 
         res.json(result.rows[0]);

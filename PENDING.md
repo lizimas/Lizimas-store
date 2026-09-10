@@ -1020,3 +1020,41 @@ Ryan supplied a Jumia Uganda 2025-benchmarked rate card (20 categories) and aske
 **What's intentionally NOT covered, per Ryan's explicit decision ("15% default until category exists")**: Cameras, Tablets, Beauty Appliances (as distinct from Health & Beauty), Sporting Goods, Musical Instruments, Auto & Moto, and Luggage & Travel Gear do not exist as categories anywhere in Lizimas' live catalog. There's no `category_id` to attach a rate to, so these fall through to the 15% marketplace default automatically and will pick up their own rate the moment a matching category is created - no placeholder categories were created preemptively. Smartwatches (a leaf under Mobiles & Gadgets) also wasn't part of the rate card and was left uncovered the same way.
 
 **What shipped:** `migrations/078_category_commission_rates.sql` - 34 `commission_rules` rows (branch-level and leaf-level), inserted idempotently (`WHERE NOT EXISTS`) against the existing unique-active-rule-per-category constraint. No application code changes - the admin Categories tab's existing "Rate" column and per-category edit form already display and let Ryan adjust every one of these rows.
+
+## Vendor KYC & Compliance Profile - Stage 1 (September 2026)
+
+Ryan's proposal, modeled on Jumia's vendor verification approach: give every vendor a private KYC profile separate from their public storefront, a formal status workflow, and an audit trail - "a much stronger vendor-control system than simply asking vendors to upload an ID during registration." Scoped explicitly with Ryan into stages, reviewed one at a time. **This is Stage 1 only**: the KYC profile, status workflow, and audit trail, built on data already collected today (national ID number / business registration number). Document upload (Stage 2) and a public "Verified" badge on the storefront (Stage 3) are deliberately not built yet.
+
+**Before running anything below, generate and set the encryption key on Render:**
+
+    openssl rand -hex 32
+
+Set the output as `KYC_ENCRYPTION_KEY` on Render's Environment tab (Web Service -> Environment). Do this before running the migration or backfill - the backfill script encrypts existing vendor data with this key immediately. Do not share this key or paste it anywhere it could leak (same handling as `RENDER_DB`); losing it makes all encrypted KYC data permanently unreadable, with no recovery path.
+
+**Migration to run (after the key is set):**
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/079_vendor_kyc.sql
+
+**Then the one-time backfill (same key as above):**
+
+    DATABASE_URL="$RENDER_DB" KYC_ENCRYPTION_KEY="<the same 64-char hex key>" node scripts/backfill-vendor-kyc.js
+
+**What the backfill does, per Ryan's explicit decision ("reset them to NOT_STARTED / SUBMITTED")**: no existing vendor is grandfathered in as Verified. For every vendor, it encrypts and copies over whatever `registration_number`/`national_id_number` already exists in `vendors` into the new `vendor_kyc` table: a vendor with that data on file lands on `submitted` (needs a first review), a vendor with neither lands on `not_started`. **Every vendor - even ones approved and selling today - will need an admin KYC review pass after this runs.** Nothing on the vendor-approval side (whether they're allowed to sell) changes; this is a separate status running in parallel.
+
+**Data model:** `vendor_kyc` (one row per vendor - `kyc_status`, `identity_verified`/`business_verified` flags, encrypted `national_id_number`/`registration_number`, `review_note`, `reviewed_by`/`reviewed_at`) and `vendor_kyc_audit_log` (every status change: from/to status, who changed it - null for a vendor's own submission - note, timestamp). The old `vendors.national_id_number`/`registration_number` columns are left in place untouched (frozen/legacy - not dropped, not written to anymore) rather than migrated away, since nothing reads them for KYC purposes going forward.
+
+**Encryption**, per Ryan's decision ("yes, encrypt at rest"): application-level AES-256-GCM (`server/utils/encryption.js`), not database-level `pgcrypto` - encrypt/decrypt happens in Node before the value ever reaches Postgres. Since a random IV means the same plaintext encrypts to a different value every time (by design - this is what stops the ciphertext itself leaking patterns), the old "one verified vendor per ID/registration number" dedup check couldn't run as a SQL uniqueness constraint on the encrypted column directly. Fixed with a second, deterministic HMAC-SHA256 "lookup hash" stored alongside each encrypted value (normalized the same way the old plaintext check was - trimmed, lowercased) - partial unique indexes sit on the hash columns, scoped to `kyc_status = 'verified'`, so the "no duplicate verified ID" rule still holds without ever putting a unique index on ciphertext.
+
+**Status workflow** - seven states (`server/utils/vendorKyc.js`): `not_started` -> `submitted` -> `under_review` -> `verified` (or `rejected`/`action_required` along the way), plus `suspended` for pulling back a previously-verified vendor. A vendor can edit their own KYC info only while it's `not_started`, `action_required`, or `rejected` - once submitted it's locked from their side until an admin acts on it. Admin transitions are restricted to sensible moves (e.g. `verified` can only go to `suspended`, never skip back to `rejected` directly; `not_started` can't be pushed straight to `verified` by an admin - the vendor has to submit first).
+
+**Where it lives:**
+- Vendor dashboard, Overview tab - the old one-time "verification nudge" panel (which auto-hid itself once any data was entered) is replaced with a persistent, status-driven panel: shows the current KYC status as a badge, an admin's review note when there is one, and either an editable form or a locked "under review" view depending on status. Payout number (momo) editing was pulled out into its own small panel on the same tab, since payment info is intentionally outside KYC scope for now and still needed to stay editable.
+- Admin, Vendors tab - new "Vendor KYC Review" panel, filterable by status, with a review modal per vendor showing their ID/registration number, the available next-status buttons for their current state, a required note field for Action Required/Rejected, and the full audit history for that vendor.
+
+**API:** `GET/PATCH /api/vendors/me/kyc` (vendor's own profile); `GET /api/admin/vendors/kyc` (list, filterable), `GET /api/admin/vendors/:id/kyc` (detail + audit log), `PATCH /api/admin/vendors/:id/kyc/review` (admin) - all three admin-only (no `customer_support` access), since KYC data is more sensitive than the vendor messages support already handles.
+
+**What shipped:** `migrations/079_vendor_kyc.sql`; `server/utils/encryption.js` (11 tests) and `server/utils/vendorKyc.js` (12 tests) - 195 total in the suite now; `server/controllers/vendorKycController.js`; `scripts/backfill-vendor-kyc.js`; routes added to `vendors.js` and `admin.js`; `vendorController.js`'s `getMyVendorProfile`/`updateMyVendorProfile` no longer read/write `registration_number`/`national_id_number` (moved to `vendor_kyc`); vendor dashboard and admin panel UI as described above.
+
+**Known minor limitation, noted rather than fixed in this pass**: the existing "Pending Vendor Applications" panel (vendor *approval*, not KYC - a different admin view, unchanged in this work) still shows `registration_number`/`national_id_number` badges pulled from the now-frozen `vendors` table columns. Those will go stale over time as vendors update their KYC info through the new flow instead. Left as-is to keep this change scoped to KYC; worth revisiting if that approval panel's ID display becomes confusing in practice.
+
+**Next up, when Ryan is ready:** Stage 2 (document upload) and Stage 3 (public "Verified" storefront badge) - not started, by design.
