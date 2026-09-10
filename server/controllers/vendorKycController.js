@@ -184,9 +184,11 @@ exports.listVendorKycAdmin = async (req, res) => {
         }
         const result = await pool.query(
             `SELECT v.id AS vendor_id, v.business_name, v.account_type, v.status AS vendor_status,
+                    v.phone, v.submitted_at, u.name AS owner_name, u.email AS owner_email,
                     COALESCE(k.kyc_status, 'not_started') AS kyc_status,
                     k.identity_verified, k.business_verified, k.reviewed_at
              FROM vendors v
+             JOIN users u ON u.id = v.user_id
              LEFT JOIN vendor_kyc k ON k.vendor_id = v.id
              ${where}
              ORDER BY
@@ -210,7 +212,9 @@ exports.getVendorKycAdminDetail = async (req, res) => {
     try {
         const { id } = req.params;
         const vendorRow = await pool.query(
-            "SELECT id, business_name, account_type FROM vendors WHERE id = $1",
+            `SELECT v.id, v.business_name, v.account_type, v.phone, v.submitted_at,
+                    u.name AS owner_name, u.email AS owner_email
+             FROM vendors v JOIN users u ON u.id = v.user_id WHERE v.id = $1`,
             [id]
         );
         if (vendorRow.rows.length === 0) {
@@ -239,6 +243,10 @@ exports.getVendorKycAdminDetail = async (req, res) => {
             vendor_id: vendor.id,
             business_name: vendor.business_name,
             account_type: vendor.account_type,
+            owner_name: vendor.owner_name,
+            owner_email: vendor.owner_email,
+            phone: vendor.phone,
+            submitted_at: vendor.submitted_at,
             kyc_status: kyc ? kyc.kyc_status : "not_started",
             identity_verified: kyc ? kyc.identity_verified : false,
             business_verified: kyc ? kyc.business_verified : false,

@@ -7240,15 +7240,17 @@ async function loadVendorKycAdmin(status) {
 
         container.innerHTML = `
             <table>
-                <thead><tr><th>Business</th><th>Type</th><th>KYC Status</th><th>Reviewed</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Business</th><th>Owner</th><th>Type</th><th>KYC Status</th><th>Applied</th><th>Reviewed</th><th>Actions</th></tr></thead>
                 <tbody>
                     ${rows.map(v => {
                         const info = VENDOR_KYC_ADMIN_BADGE[v.kyc_status] || VENDOR_KYC_ADMIN_BADGE.not_started;
                         return `
                         <tr>
                             <td data-label="Business">${v.business_name}</td>
+                            <td data-label="Owner">${v.owner_name || "-"}<br><span style="font-size:12px; color:#666;">${v.owner_email || ""}${v.phone ? ` &middot; ${v.phone}` : ""}</span></td>
                             <td data-label="Type">${v.account_type === "company" ? "Company" : v.account_type === "individual" ? "Individual" : "-"}</td>
                             <td data-label="KYC Status"><span class="status-badge ${info.cls}">${info.label}</span></td>
+                            <td data-label="Applied">${v.submitted_at ? new Date(v.submitted_at).toLocaleDateString() : "-"}</td>
                             <td data-label="Reviewed">${v.reviewed_at ? new Date(v.reviewed_at).toLocaleDateString() : "-"}</td>
                             <td data-label="Actions">
                                 <button onclick="openVendorKycReviewModal(${v.vendor_id})" style="background:#16264f; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Review</button>
@@ -7298,6 +7300,10 @@ async function openVendorKycReviewModal(vendorId) {
             </div>
             <table style="margin-bottom:14px;">
                 <tbody>
+                    <tr><td style="font-weight:600; padding:4px 12px 4px 0;">Owner</td><td>${detail.owner_name || "-"}</td></tr>
+                    <tr><td style="font-weight:600; padding:4px 12px 4px 0;">Email</td><td>${detail.owner_email || "-"}</td></tr>
+                    <tr><td style="font-weight:600; padding:4px 12px 4px 0;">Phone</td><td>${detail.phone || "-"}</td></tr>
+                    <tr><td style="font-weight:600; padding:4px 12px 4px 0;">Applied</td><td>${detail.submitted_at ? new Date(detail.submitted_at).toLocaleDateString() : "-"}</td></tr>
                     <tr><td style="font-weight:600; padding:4px 12px 4px 0;">${idLabel}</td><td>${idValue || "-"}</td></tr>
                     <tr><td style="font-weight:600; padding:4px 12px 4px 0;">Account Type</td><td>${detail.account_type === "company" ? "Company" : "Individual"}</td></tr>
                 </tbody>
