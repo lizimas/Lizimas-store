@@ -6,7 +6,7 @@
 <meta charset="UTF-8">
 <title>Become a Vendor - Lizimas Store</title>
 <link rel="stylesheet" href="css/style.css?v=66">
-<link rel="stylesheet" href="css/auth.css?v=12">
+<link rel="stylesheet" href="css/auth.css?v=13">
 </head>
 
 <body>
@@ -58,15 +58,64 @@
             <div class="vendor-wizard-dot is-active" data-dot="1"></div>
             <div class="vendor-wizard-line"></div>
             <div class="vendor-wizard-dot" data-dot="2"></div>
+            <div class="vendor-wizard-line"></div>
+            <div class="vendor-wizard-dot" data-dot="3"></div>
+            <div class="vendor-wizard-line"></div>
+            <div class="vendor-wizard-dot" data-dot="4"></div>
         </div>
 
         <div class="auth-card-head" style="padding-top:2px;">
-            <h2 class="auth-title" id="wizard-title">Create Your Account</h2>
-            <p class="auth-subtitle" id="wizard-subtitle">Let's start with a few details about you.</p>
+            <h2 class="auth-title" id="wizard-title">Verify Your Email</h2>
+            <p class="auth-subtitle" id="wizard-subtitle">We'll send you a code to confirm it's really you.</p>
         </div>
 
-        <!-- Step 1: Account -->
-        <div id="wizard-step-1" class="wizard-step">
+        <!-- Step 1: Email -->
+        <div id="wizard-step-email" class="wizard-step">
+
+            <div class="auth-field">
+                <label class="auth-label" for="reg-email">Email Address</label>
+                <span class="auth-input-wrap">
+                    <input id="reg-email" type="email" placeholder="Enter your email address" autocomplete="email">
+                </span>
+                <p class="auth-hint">This cannot be changed once your application is submitted, so please double-check it.</p>
+            </div>
+
+            <p id="email-step-status" class="auth-error"></p>
+
+            <button class="auth-submit" id="send-code-btn" onclick="vendorSendRegistrationCode()">Send verification code</button>
+
+            <p class="auth-foot">
+                Already applied? <a href="vendor-login.html">Sign in</a>
+            </p>
+
+        </div>
+
+        <!-- Step 2: Verify code -->
+        <div id="wizard-step-code" class="wizard-step hidden">
+
+            <div class="auth-otp-email-row">
+                <span>Code sent to <strong id="code-step-email"></strong></span>
+                <button type="button" onclick="vendorWizardGoToEmail()">Change email</button>
+            </div>
+
+            <div class="auth-field">
+                <label class="auth-label" for="reg-code">6-Digit Code</label>
+                <input id="reg-code" class="auth-otp-input" type="text" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code">
+                <p class="auth-hint">The code expires 10 minutes after it's sent.</p>
+            </div>
+
+            <p id="code-step-status" class="auth-error"></p>
+
+            <button class="auth-submit" id="verify-code-btn" onclick="vendorVerifyRegistrationCode()">Verify</button>
+
+            <div class="auth-otp-resend">
+                <button type="button" id="resend-code-btn" onclick="vendorSendRegistrationCode(true)">Resend code</button>
+            </div>
+
+        </div>
+
+        <!-- Step 3: Personal Information -->
+        <div id="wizard-step-personal" class="wizard-step hidden">
 
             <div class="auth-field">
                 <label class="auth-label" for="reg-name">Your Full Name</label>
@@ -76,39 +125,41 @@
             </div>
 
             <div class="auth-field">
-                <label class="auth-label" for="reg-email">Email Address</label>
-                <span class="auth-input-wrap">
-                    <input id="reg-email" type="email" placeholder="Enter your email address" autocomplete="email">
-                </span>
-            </div>
-
-            <div class="auth-field">
                 <label class="auth-label" for="reg-phone">Phone Number</label>
-                <span class="auth-input-wrap">
-                    <input id="reg-phone" type="tel" placeholder="+256 7XX XXX XXX" autocomplete="tel">
-                </span>
+                <div class="auth-phone-row">
+                    <span class="phone-prefix" data-lz-phone-for="reg-phone">+256</span>
+                    <span class="auth-input-wrap">
+                        <input id="reg-phone" type="tel" placeholder="7XX XXX XXX" inputmode="numeric" autocomplete="tel-national" data-lz-phone data-lz-phone-default="UG">
+                    </span>
+                </div>
             </div>
 
             <div class="auth-field">
                 <label class="auth-label" for="reg-password">Password</label>
                 <span class="auth-input-wrap">
-                    <input id="reg-password" type="password" placeholder="Create a strong password" autocomplete="new-password">
+                    <input id="reg-password" type="password" placeholder="Create a strong password" autocomplete="new-password" data-lz-strength>
                 </span>
-                <p class="auth-hint">Use 8+ characters with a mix of letters, numbers &amp; symbols.</p>
+                <p class="auth-hint">At least 8 characters, with an uppercase letter, a lowercase letter, a number, and a symbol.</p>
             </div>
 
-            <p id="step1-status" class="auth-error"></p>
+            <div class="auth-field">
+                <label class="auth-label" for="reg-password-confirm">Confirm Password</label>
+                <span class="auth-input-wrap">
+                    <input id="reg-password-confirm" type="password" placeholder="Re-enter your password" autocomplete="new-password">
+                </span>
+            </div>
 
-            <button class="auth-submit" onclick="vendorWizardGoToStep2()">Continue</button>
+            <p id="personal-step-status" class="auth-error"></p>
 
-            <p class="auth-foot">
-                Already applied? <a href="vendor-login.html">Sign in</a>
-            </p>
+            <div class="auth-wizard-nav">
+                <button class="auth-back-btn" onclick="vendorWizardGoToCode()">Back</button>
+                <button class="auth-submit" style="flex:1 1 auto;" onclick="vendorWizardGoToShop()">Continue</button>
+            </div>
 
         </div>
 
-        <!-- Step 2: Shop Information -->
-        <div id="wizard-step-2" class="wizard-step hidden">
+        <!-- Step 4: Shop Information -->
+        <div id="wizard-step-shop" class="wizard-step hidden">
 
             <div class="auth-field">
                 <label class="auth-label">Account Type</label>
@@ -147,7 +198,7 @@
             </div>
 
             <div class="auth-field">
-                <label class="auth-label" for="reg-referral">How did you hear about Lizimas Store? <span class="auth-optional">(optional)</span></label>
+                <label class="auth-label" for="reg-referral">How did you hear about Lizimas Store?</label>
                 <span class="auth-input-wrap">
                     <select id="reg-referral" style="border:none; background:transparent; width:100%; font-size:15px; color:inherit; outline:none;">
                         <option value="">Select an option</option>
@@ -173,7 +224,7 @@
             <p id="register-status" class="auth-error"></p>
 
             <div class="auth-wizard-nav">
-                <button class="auth-back-btn" onclick="vendorWizardGoToStep1()">Back</button>
+                <button class="auth-back-btn" onclick="vendorWizardGoToPersonal()">Back</button>
                 <button class="auth-submit" style="flex:1 1 auto;" onclick="registerVendor()">Submit</button>
             </div>
 
@@ -183,6 +234,44 @@
 
 </div>
 
-<script src="js/vendor-auth.js?v=2"></script>
+<!-- Instructions modal - shown once, before the email step -->
+<div id="wizard-instructions-modal" class="auth-modal-overlay">
+    <div class="auth-modal-card">
+        <h3 class="auth-modal-title">Before you start</h3>
+        <div class="auth-modal-body">
+            <p>Selling on Lizimas Store only takes a few minutes. A couple of things to know first:</p>
+            <ul>
+                <li>You'll need a valid email address and phone number - we use them to verify your application and to stay in touch about it.</li>
+                <li><strong>Your email address cannot be changed once you've registered</strong>, so double-check it before continuing.</li>
+                <li>We'll send a verification code to that email on the next step - keep the inbox handy.</li>
+                <li>Every field in this form is required, and your account is only created once you submit the final step.</li>
+            </ul>
+        </div>
+        <div class="auth-modal-actions">
+            <button class="auth-submit" onclick="vendorDismissInstructions()">Got it, let's start</button>
+        </div>
+    </div>
+</div>
+
+<!-- Account type confirmation modal -->
+<div id="account-type-confirm-modal" class="auth-modal-overlay hidden">
+    <div class="auth-modal-card">
+        <h3 class="auth-modal-title">Are you sure?</h3>
+        <div class="auth-modal-body">
+            <p id="account-type-confirm-text"></p>
+            <p>You won't be able to change this after your application is submitted.</p>
+        </div>
+        <div class="auth-modal-actions">
+            <button class="auth-back-btn" onclick="vendorCancelAccountType()">No, go back</button>
+            <button class="auth-submit" onclick="vendorConfirmAccountType()">Yes, continue</button>
+        </div>
+    </div>
+</div>
+
+<script src="js/vendor-auth.js?v=3"></script>
+<script src="js/password-toggle.js?v=2"></script>
+<script src="js/password-strength.js?v=1"></script>
+<script src="js/lz-phone-input.js?v=5"></script>
+<script src="js/auth-enter.js?v=2"></script>
 </body>
 </html>

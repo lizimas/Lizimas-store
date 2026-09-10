@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { registerVendor, vendorLogin } = require("../controllers/authController");
+const { registerVendor, vendorLogin, requestVendorRegistrationCode, verifyVendorRegistrationCode } = require("../controllers/authController");
 const {
     getMyVendorProfile, getMyVendorOrders, updateMyVendorProfile, getPublicStorefront,
     followVendor, unfollowVendor, getFollowStatus, getVendorDashboardSummary,
@@ -45,11 +45,14 @@ const { previewPricing } = require("../controllers/commissionController");
 const { getVendorReviews, respondToReview } = require("../controllers/reviewController");
 
 const { requireAuth, requireVendor } = require("../middleware/authMiddleware");
+const { otpLimiter } = require("../middleware/rateLimiter");
 const upload = require("../middleware/upload");
 
 // Public: a prospective vendor applies, then logs in to check status/manage
 // listings once approved. Login itself is unrestricted by status - the
 // portal below decides what a pending/rejected vendor is allowed to do.
+router.post("/register/send-code", otpLimiter, requestVendorRegistrationCode);
+router.post("/register/verify-code", otpLimiter, verifyVendorRegistrationCode);
 router.post("/register", registerVendor);
 router.post("/login", vendorLogin);
 

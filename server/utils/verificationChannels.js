@@ -63,6 +63,18 @@ function isValidEmail(value) {
     return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+/*
+ * Vendor registration (and anywhere else that wants it) requires a
+ * password with some real complexity, not just length -- this mirrors
+ * the rule shown to applicants in the registration wizard's hint text
+ * so the client and server can never disagree about what "strong
+ * enough" means.
+ */
+function isStrongPassword(value) {
+    return typeof value === "string" &&
+        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(value);
+}
+
 /* ------------------------------------------------------------------ */
 /* Channels                                                            */
 /* ------------------------------------------------------------------ */
@@ -263,5 +275,6 @@ module.exports = {
     normaliseTarget,
     normalisePhone,
     isValidEmail,
+    isStrongPassword,
     sendCode
 };

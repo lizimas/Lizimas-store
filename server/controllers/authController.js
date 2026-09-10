@@ -17,7 +17,7 @@ function uploadProfilePhotoToCloudinary(fileBuffer) {
     });
 }
 const { sendStaffInviteEmail, sendAdminLoginAlert, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendVendorApplicationReceivedEmail } = require("../utils/mailer");
-const { isValidEmail } = require("../utils/verificationChannels");
+const { isValidEmail, isStrongPassword } = require("../utils/verificationChannels");
 
 const { issueDeviceCookie } = require("../utils/deviceTrust");
 
@@ -246,9 +246,129 @@ async function vendorLogin(req, res) {
 // so existing vendors' recorded acceptance stays tied to the version they saw.
 const VENDOR_POLICY_VERSION = "2026-09";
 
+// --- Vendor registration: email verification (OTP) -----------------------
+//
+// The registration wizard verifies the applicant's email address BEFORE
+// collecting anything else, and no users/vendors row is created until the
+// very final submit. Pending codes therefore live in their own table
+// (vendor_registration_otp, migration 080) rather than on `users`, since
+// there is no user row yet to attach them to. Verifying a code mints a
+// short-lived signed token (mirroring the pendingToken pattern used for
+// login 2FA/device approval elsewhere in this file) that registerVendor
+// below requires and re-verifies before it will create anything.
+
+async function requestVendorRegistrationCode(req, res) {
+    try {
+        const { email } = req.body;
+
+        if (!email || !isValidEmail(email)) {
+            return res.status(400).json({ error: "Please enter a valid email address." });
+        }
+        const normalisedEmail = email.trim().toLowerCase();
+
+        const existingUser = await pool.query(
+            "SELECT id FROM users WHERE LOWER(email) = $1",
+            [normalisedEmail]
+        );
+        if (existingUser.rows.length > 0) {
+            return res.status(409).json({ error: "An account with this email already exists. Please log in instead." });
+        }
+
+        const existingCode = await pool.query(
+            "SELECT last_sent_at FROM vendor_registration_otp WHERE email = $1",
+            [normalisedEmail]
+        );
+        if (existingCode.rows.length > 0 && existingCode.rows[0].last_sent_at) {
+            const elapsed = Date.now() - new Date(existingCode.rows[0].last_sent_at).getTime();
+            if (elapsed < 60000) {
+                const wait = Math.ceil((60000 - elapsed) / 1000);
+                return res.status(429).json({ error: `Please wait ${wait} seconds before requesting another code.` });
+            }
+        }
+
+        const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+        const hash = await bcrypt.hash(code, 10);
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+        await pool.query(
+            `INSERT INTO vendor_registration_otp (email, code_hash, expires_at, attempts, last_sent_at, verified_at)
+             VALUES ($1, $2, $3, 0, NOW(), NULL)
+             ON CONFLICT (email) DO UPDATE
+                SET code_hash = $2, expires_at = $3, attempts = 0, last_sent_at = NOW(), verified_at = NULL`,
+            [normalisedEmail, hash, expiresAt]
+        );
+
+        try {
+            await sendTwoFactorCodeEmail(normalisedEmail, code);
+        } catch (err) {
+            console.error("Vendor registration code email failed:", err);
+            return res.status(500).json({ error: "Could not send the verification code. Please try again in a moment." });
+        }
+
+        res.json({ message: "A verification code has been sent to your email." });
+    } catch (error) {
+        console.error("requestVendorRegistrationCode error:", error);
+        res.status(500).json({ error: "Something went wrong. Please try again." });
+    }
+}
+
+async function verifyVendorRegistrationCode(req, res) {
+    try {
+        const { email, code } = req.body;
+
+        if (!email || !code) {
+            return res.status(400).json({ error: "Email and code are required." });
+        }
+        const normalisedEmail = email.trim().toLowerCase();
+
+        const result = await pool.query(
+            "SELECT code_hash, expires_at, attempts FROM vendor_registration_otp WHERE email = $1",
+            [normalisedEmail]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({ error: "Please request a verification code first." });
+        }
+
+        const record = result.rows[0];
+
+        if (!record.expires_at || new Date(record.expires_at) < new Date()) {
+            await pool.query("DELETE FROM vendor_registration_otp WHERE email = $1", [normalisedEmail]);
+            return res.status(401).json({ error: "That code has expired. Please request a new one." });
+        }
+
+        if (record.attempts >= 5) {
+            await pool.query("DELETE FROM vendor_registration_otp WHERE email = $1", [normalisedEmail]);
+            return res.status(429).json({ error: "Too many attempts. Please request a new code." });
+        }
+
+        const match = await bcrypt.compare(String(code), record.code_hash);
+        if (!match) {
+            await pool.query("UPDATE vendor_registration_otp SET attempts = attempts + 1 WHERE email = $1", [normalisedEmail]);
+            return res.status(401).json({ error: "Invalid code. Please try again." });
+        }
+
+        await pool.query(
+            "UPDATE vendor_registration_otp SET verified_at = NOW(), attempts = 0 WHERE email = $1",
+            [normalisedEmail]
+        );
+
+        const registrationToken = jwt.sign(
+            { pendingVendorRegistration: true, email: normalisedEmail },
+            JWT_SECRET,
+            { expiresIn: "30m" }
+        );
+
+        res.json({ verified: true, registrationToken });
+    } catch (error) {
+        console.error("verifyVendorRegistrationCode error:", error);
+        res.status(500).json({ error: "Something went wrong. Please try again." });
+    }
+}
+
 async function registerVendor(req, res) {
     const { name, email, password, phone, business_name, account_type,
-            physical_address, referral_source, accept_policies } = req.body;
+            physical_address, referral_source, accept_policies, registrationToken } = req.body;
 
     if (!name || !email || !password || !phone || !business_name) {
         return res.status(400).json({
@@ -258,6 +378,20 @@ async function registerVendor(req, res) {
 
     if (!isValidEmail(email)) {
         return res.status(400).json({ error: "Please enter a valid email address." });
+    }
+
+    if (!physical_address) {
+        return res.status(400).json({ error: "Please enter your shop location." });
+    }
+
+    if (!referral_source) {
+        return res.status(400).json({ error: "Please tell us how you heard about Lizimas Store." });
+    }
+
+    if (!isStrongPassword(password)) {
+        return res.status(400).json({
+            error: "Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character."
+        });
     }
 
     if (account_type !== "individual" && account_type !== "company") {
@@ -270,6 +404,23 @@ async function registerVendor(req, res) {
         return res.status(400).json({
             error: "You must accept the Lizimas Store vendor policies to register."
         });
+    }
+
+    const normalisedEmail = email.trim().toLowerCase();
+
+    if (!registrationToken) {
+        return res.status(401).json({ error: "Please verify your email address before submitting." });
+    }
+
+    let decodedRegistration;
+    try {
+        decodedRegistration = jwt.verify(registrationToken, JWT_SECRET);
+    } catch (err) {
+        return res.status(401).json({ error: "Your email verification has expired. Please verify your email again." });
+    }
+
+    if (!decodedRegistration.pendingVendorRegistration || decodedRegistration.email !== normalisedEmail) {
+        return res.status(401).json({ error: "Your email verification does not match this email address. Please verify again." });
     }
 
     const client = await pool.connect();
@@ -333,6 +484,9 @@ async function registerVendor(req, res) {
         const newVendor = vendorResult.rows[0];
 
         await client.query("COMMIT");
+
+        pool.query("DELETE FROM vendor_registration_otp WHERE email = $1", [normalisedEmail])
+            .catch(err => console.error("Vendor registration OTP cleanup failed:", err));
 
         sendVendorApplicationReceivedEmail(newUser.email, newUser.name, business_name)
             .catch(err => console.error("Vendor application received email failed:", err));
@@ -1463,6 +1617,8 @@ module.exports = {
     staffLogin,
     vendorLogin,
     registerVendor,
+    requestVendorRegistrationCode,
+    verifyVendorRegistrationCode,
     forgotPassword,
     resetPassword,
     forcePasswordReset,

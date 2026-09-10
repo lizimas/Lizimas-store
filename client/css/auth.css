@@ -770,3 +770,137 @@
 }
 
 .auth-back-btn:hover { border-color: #c7c7c7; }
+
+/* ------------------------------------------------------------------ */
+/* Vendor registration wizard: modals (instructions / confirm-choice)  */
+/*                                                                     */
+/* Both are the same overlay + card shell; only the body content and  */
+/* button set differ between them.                                    */
+/* ------------------------------------------------------------------ */
+
+.auth-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 27, 61, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 200;
+}
+
+.auth-modal-card {
+    background: #ffffff;
+    border-radius: 18px;
+    max-width: 420px;
+    width: 100%;
+    padding: 26px 22px 22px;
+    box-shadow: 0 12px 40px rgba(15, 27, 61, 0.22);
+}
+
+.auth-modal-title {
+    font-size: 19px;
+    font-weight: 700;
+    color: #0f1b3d;
+    margin: 0 0 10px;
+}
+
+.auth-modal-body {
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: #444b59;
+    margin: 0 0 8px;
+}
+
+.auth-modal-body p { margin: 0 0 10px; }
+.auth-modal-body p:last-child { margin-bottom: 0; }
+
+.auth-modal-body ul {
+    margin: 0 0 10px;
+    padding-left: 20px;
+}
+
+.auth-modal-body li { margin-bottom: 6px; }
+
+.auth-modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.auth-modal-actions .auth-submit,
+.auth-modal-actions .auth-back-btn {
+    margin-top: 0;
+    flex: 1 1 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Vendor registration wizard: OTP code entry                         */
+/* ------------------------------------------------------------------ */
+
+.auth-otp-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 15px;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 8px;
+    text-align: center;
+    color: #0f1b3d;
+    background: #ffffff;
+    border: 1px solid #dfe3ec;
+    border-radius: 12px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.auth-otp-input:focus {
+    border-color: #0f1b3d;
+    box-shadow: 0 0 0 3px rgba(15, 27, 61, 0.08);
+}
+
+.auth-otp-email-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13.5px;
+    color: #6b7280;
+    margin: 0 0 14px;
+}
+
+.auth-otp-email-row strong { color: #0f1b3d; font-weight: 600; }
+
+.auth-otp-email-row button {
+    background: none;
+    border: 0;
+    padding: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f1b3d;
+    text-decoration: underline;
+    cursor: pointer;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.auth-otp-resend {
+    text-align: center;
+    margin-top: 14px;
+}
+
+.auth-otp-resend button {
+    background: none;
+    border: 0;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #0f1b3d;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.auth-otp-resend button:disabled {
+    color: #9aa1ae;
+    text-decoration: none;
+    cursor: default;
+}
