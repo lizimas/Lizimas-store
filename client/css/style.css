@@ -2136,6 +2136,18 @@ width:90%;
     color: #ffffff;
 }
 
+.product-badge.sponsored {
+    left: auto;
+    right: 15px;
+    top: 15px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #6b7280;
+    font-weight: 500;
+    font-size: 11px;
+    padding: 4px 10px;
+    border: 1px solid #e5e7eb;
+}
+
 .product-rating {
     color: #fbbf24;
     font-size: 14px;
@@ -5397,15 +5409,6 @@ body.sheet-open {
 .store-back-btn { background: none; border: none; font-size: 22px; cursor: pointer; }
 .store-cart-btn { text-decoration: none; color: #000; font-size: 16px; }
 
-.store-banner {
-    width: 100%;
-    height: 220px;
-    background: #1a1a2e;
-    background-size: cover;
-    background-position: center;
-    position: relative;
-}
-
 .store-header {
     max-width: 1100px;
     margin: 0 auto;
@@ -5416,35 +5419,29 @@ body.sheet-open {
     transform: translateY(-40px);
 }
 
-.store-logo {
-    width: 88px;
-    height: 88px;
-    border-radius: 50%;
-    background: #fff;
-    border: 4px solid #fff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    object-fit: cover;
-    flex-shrink: 0;
-}
-.store-logo-fallback {
-    width: 88px;
-    height: 88px;
-    border-radius: 50%;
-    background: #F5C518;
-    border: 4px solid #fff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-    font-weight: 700;
-    color: #1a1a2e;
-    flex-shrink: 0;
-}
-
 .store-identity { padding-bottom: 10px; }
 .store-name { margin: 0; font-size: 24px; font-weight: 700; color: #1a1a2e; }
 .store-tagline { margin: 4px 0 0; font-size: 13px; color: #666; }
+
+/* No logo/banner on the storefront (removed Sept 2026) - the header sits
+   flush under the topbar instead of overlapping a banner image. */
+.store-header-no-banner { transform: none; padding-top: 20px; }
+
+/* Delivery/payment method badge (Task #74) - vendor-set, shown right
+   under the business name so a customer knows at a glance how orders are
+   fulfilled, without exposing anything else about the vendor. */
+.store-delivery-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 20px;
+}
+.store-delivery-badge.cod { background: #DCFCE7; color: #166534; }
+.store-delivery-badge.prepay { background: #FEF3C7; color: #92400E; }
 
 .store-about {
     max-width: 1100px;
@@ -5476,7 +5473,6 @@ body.sheet-open {
 
 @media (max-width: 600px) {
     .store-header { transform: translateY(-30px); gap: 12px; }
-    .store-logo, .store-logo-fallback { width: 64px; height: 64px; font-size: 24px; }
     .store-name { font-size: 19px; }
 }
 

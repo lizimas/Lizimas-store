@@ -169,16 +169,12 @@ Render):
   ~200-node category tree, and picking the mapping is a pricing decision, not
   a technical one. Everything runs on the single 15% marketplace default
   until real rates are set from the new admin screen.
-- **No UI for a vendor to set their own logo/banner/about.** The columns and
-  the storefront page both exist and work, but nothing writes to them yet —
-  every store currently shows the plain fallback (initial-letter avatar, dark
-  banner, no about text) until a follow-up adds that to the vendor dashboard
-  (or they're set directly in the database).
-- **Order-time commission locking is not wired up.** `order_items` doesn't
-  yet copy `commission_rate`/`fixed_fee`/`pricing_rule_version` at the moment
-  an order is placed (spec section 33) — the versioned `commission_rules`
-  table is what makes that possible later, but nothing consumes it at
-  checkout yet.
+- ~~No UI for a vendor to set their own logo/banner/about.~~ **Fixed
+  (September 2026, Task #68) — see the "Vendor storefront branding UI"
+  section below.**
+- ~~Order-time commission locking is not wired up.~~ **Fixed (September
+  2026, Task #67) — see the "Order-time commission locking" section
+  below.**
 
 **Explicitly out of scope for this slice** (per the "commission engine +
 storefront first" decision — build only if asked): order-splitting into a
@@ -669,11 +665,9 @@ promotion competes with admin's own flash sales the same way multiple
 admin campaigns already would - featuring is "eligible to show", not "will
 definitely show."
 
-**`sponsored`** (admin-only flag): stored, toggleable, but has no
-placement mechanic wired to it in this pass - there's no sponsored
-carousel or search-boost anywhere in the codebase to hook it into.
-Reserved for a real sponsored-placement feature later, same "wired but not
-yet surfaced" scoping as `createVendorLedgerAdjustment` in Task #61.
+~~`sponsored` (admin-only flag): stored, toggleable, but has no placement
+mechanic wired to it in this pass.~~ **Fixed (September 2026, Task #73)**
+- see the "Sponsored placement mechanic" section below.
 
 **Known limitation carried over from the existing flash-sale system, not
 new here**: the general product catalogue/search (`getProducts`,
@@ -726,20 +720,21 @@ without either picking one variant arbitrarily or notifying once per
 variant, both of which felt like the wrong default. Revisit if variant
 products turn out to need their own low-stock signal.
 
-**`product_rejected` reason is a generic fallback, not the admin's actual
-reason** - the existing product-rejection flow (`rejectProduct` in
-`productController.js`, wired from `client/js/admin.js`) has never
-collected a rejection reason from the admin; that's a pre-existing gap,
-not something this task introduced or fixed, so the notification uses
-"Contact Lizimas Store support for details." Worth a follow-up: add a
-reason field to the reject-product flow so this (and the vendor-facing
-product list) can show something real.
+~~`product_rejected` reason is a generic fallback, not the admin's actual
+reason.~~ **Fixed (September 2026, Task #69)** - `rejectProduct` now
+takes a `reason` from admin (`client/js/admin.js` prompts for one, same
+pattern as every other reason-collecting admin action), stores it on the
+new `products.rejection_reason` column (migration 073), passes the real
+text into the `product_rejected` notification instead of the generic
+fallback, and shows it under the "Rejected" badge on the vendor's own
+product list.
 
-**No notification for return/refund decisions** (Task #62) - a deliberate
-scope cut for this pass, not an oversight. A vendor already sees refund
-outcomes directly in their "Returns & Refunds" tab, so this is a smaller
-gap than the others; add `refund_decision` as a seventh notification type
-if it turns out vendors want a push rather than having to check that tab.
+~~No notification for return/refund decisions.~~ **Fixed (September
+2026, Task #70)** - `refund_decision` is now a seventh
+`vendor_notifications` type (migration 074), hooked into
+`approveReturnRefund`/`denyReturnRefund` in `fulfilmentController.js`. A
+vendor still sees the outcome in their Returns & Refunds tab too - this
+just adds the push instead of requiring them to go check.
 
 **Reports tab**: fixed 30-day range, no custom date picker - deliberately
 simpler than admin's analytics/performance tabs, which already have one.
@@ -749,14 +744,317 @@ balance in Task #61), `topProducts` (top 5 by revenue), `orderStatusBreakdown`,
 and `payoutSummary` (from `vendor_payouts`). Rendered with the same
 Chart.js 4.5.1 UMD build already used for admin's analytics chart.
 
-**Still-open gap, carried forward rather than folded in here: vendor-to-admin
-messaging.** A prior pass flagged that vendors have no channel to ask
-admin a question or flag an issue outside of the specific structured flows
-that already exist (return responses, compliance notices, promotion
-proposals). This pass added a *notification feed* (admin/system -> vendor,
-one-way) rather than a *messaging channel* (two-way, freeform) - the two
-are different features solving different problems, and building a real
-inbox/thread system properly (who can start a thread, does admin see one
-merged queue across all vendors, does it need its own read/unread state)
-is enough scope that it doesn't belong bolted onto this task. Recommend
-tracking it as its own future task rather than expanding this one further.
+~~Still-open gap: vendor-to-admin messaging.~~ **Fixed (September 2026,
+Task #71)** - see the "Vendor-to-Admin Messaging" section below.
+
+
+## Order-time commission locking (September 2026)
+
+Closes a gap flagged since the original commission-engine slice: every
+vendor earnings figure (dashboard summary, wallet balance) was computed by
+joining `order_items` back to `products` and using that product's CURRENT
+`commission_rate_applied`/`fixed_fee_applied` — not what actually applied
+at the moment the order was placed. In practice that meant an old,
+already-delivered order's earnings could silently shift later if a vendor
+edited their listing price (which recomputes the product's commission
+snapshot) or if a category's commission rate changed — exactly the
+retroactive-distortion risk the versioned `commission_rules` table
+(migration 061) was built to prevent, but nothing was actually copying its
+values onto an order.
+
+**Migration to run:**
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/072_order_item_commission_lock.sql
+
+**What changed:**
+- `migrations/072_order_item_commission_lock.sql` — adds
+  `commission_rate_applied`/`fixed_fee_applied`/`commission_rule_id` to
+  `order_items`, mirroring the same three columns migration 063 already
+  added to `products`.
+- `checkoutController.js` — both the variant and plain-product item
+  branches now select those three columns off the product row and copy
+  them straight onto the new `order_items` columns at insert time. This is
+  a snapshot of the product's commission fields as they stand at the exact
+  moment of purchase — checkout does not re-run the commission engine or
+  re-resolve a rate, it just locks in whatever was already true of that
+  listing.
+- `getVendorDashboardSummary`'s earnings query and `loadVendorWalletData`
+  (both in `vendorController.js`) now read
+  `COALESCE(oi.commission_rate_applied, p.commission_rate_applied)` (and
+  the same for the fixed fee) instead of reading straight from `products`.
+  **Why COALESCE and not just `oi.*`**: every order placed before this
+  migration has NULL in those new columns — falling back to the product's
+  current snapshot for those old rows means historical numbers don't
+  change at all on the day this ships; only orders placed from now on are
+  actually locked. This is a deliberate one-way migration boundary, not a
+  backfill — backfilling old orders would require knowing what rate
+  actually applied to each one at the time, which isn't recoverable now
+  that `commission_rules` rows get expired-and-reinserted rather than kept
+  as a full history per order. If exact historical accuracy for pre-#67
+  orders ever matters, that's a data problem, not a code one — flagging
+  here rather than guessing.
+- Two stale code comments (`vendorController.js`, `vendorWallet.js`) that
+  said commission locking "isn't wired up yet" are corrected to describe
+  the fix.
+
+**No checkout behavior changed** — the customer-facing price, the
+discount/flash-sale/promotion price resolution, and every other part of
+placing an order are untouched. This only affects what gets stored
+alongside each `order_items` row and which numbers vendor-earnings
+reporting reads back.
+
+
+## Vendor storefront branding UI (September 2026)
+
+Closes the other gap flagged since the commission-engine slice: the
+`vendors.logo_url`/`banner_url`/`about` columns (migration 062) and the
+public storefront page (`/store/:slug`) both existed and worked, but
+nothing let a vendor actually set them — every store showed the plain
+fallback (initial-letter avatar, dark banner, no bio) regardless of what
+the vendor wanted their store to look like.
+
+**What shipped:**
+- `server/utils/vendorStorefront.js` — `isValidAboutText`/
+  `MAX_ABOUT_LENGTH` (1000 chars — a starting point, tune in one place,
+  same spirit as every other tunable default in this codebase). 5 tests.
+- `vendorController.js`'s `updateVendorStorefront` (new) — a dedicated
+  `PATCH /api/vendors/me/storefront`, kept deliberately separate from the
+  existing `updateMyVendorProfile` (KYC/business data): different concern,
+  different validation, no reason to overload one endpoint for both.
+  Multipart, and partial by design — omitting `about` leaves it untouched
+  (so a vendor can update just their logo without resending their bio),
+  an empty string clears it, and `remove_logo=true`/`remove_banner=true`
+  clears an image without requiring a replacement upload. Reuses the
+  existing 5MB image-only multer instance and `uploadBuffer` Cloudinary
+  helper (same pattern as return-evidence photos, Task #62).
+- `getMyVendorProfile`'s SELECT now also returns `slug`/`logo_url`/
+  `banner_url`/`about`, so the dashboard can prefill the form from the
+  same call it already makes.
+- Vendor dashboard: new "Storefront" tab — logo (circular preview +
+  upload + remove), banner (cover preview + upload + remove), an about
+  textarea with a live 1000-char counter, a "View my storefront" link
+  that points at the vendor's own `/store/:slug`, and a Save button. A
+  newly-chosen file previews immediately via `URL.createObjectURL`
+  before upload; clicking Remove clears the preview optimistically and
+  is only actually sent to the server if no replacement file is chosen
+  before Save.
+
+**Nothing about the storefront's public rendering changed** — `store.js`
+already handled the "field is set" vs. "field is null" cases gracefully
+(that fallback behavior is exactly why this was a UI-only gap, not a
+backend one).
+
+
+## Vendor-to-Admin Messaging (September 2026)
+
+Closes the gap flagged in Task #65: vendors had a one-way notification
+feed (admin/system -> vendor) but no channel to raise a question or issue
+back the other way, outside the specific structured flows that already
+exist (return responses, compliance notices, promotion proposals).
+
+**Migration to run:**
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/075_vendor_messages.sql
+
+**Design decisions made (documented here rather than guessed at silently,
+same as every other tunable/decided default in this file):**
+
+- **A lightweight ticket/thread model, not real-time chat.** A vendor
+  opens one thread per issue with a subject + first message; either side
+  can reply within it. No websockets, no typing indicators, no per-reply
+  read receipts - the existing Team Messages system (Tasks #27-38) is
+  the real-time Messenger-style tool for internal staff chat; this is
+  deliberately a simpler, ticket-style channel for an external party.
+- **Status is admin-managed triage, not a hard lock.** `open`/`resolved`
+  on `vendor_messages` doesn't block replying either way - a vendor can
+  always follow up on a "resolved" thread (which auto-reopens it, since
+  a follow-up obviously means it wasn't actually resolved), and admin's
+  reply never changes status on its own (`deriveStatusAfterReply`) so
+  admin can add a note to a closed thread without it silently reopening
+  under them. Resolving/reopening stays a separate, explicit admin
+  button.
+- **No second unread-tracking system.** A vendor's existing notification
+  bell (`vendor_notifications`, Tasks #65/#70) gains an 8th type,
+  `admin_message`, fired whenever admin replies - that's what tells a
+  vendor to check their Messages tab. Admin's inbox is a plain list
+  (open by default, a button to switch to resolved) with no unread
+  counting, the same shape as every other admin queue panel in this
+  codebase (pending promotions, payout requests, return refunds). Adding
+  a proper unread-count system for admin was considered and deliberately
+  left out - it would need per-admin-user read state (which staff member
+  saw which reply), which is a bigger feature than this ticket model
+  needs for a first version.
+- **One merged inbox across all vendors for admin**, not per-vendor
+  panels - a `JOIN vendors` on the list query, filterable by status.
+
+**What shipped:**
+- `migrations/075_vendor_messages.sql` - `vendor_messages` (id, vendor_id,
+  subject, status, timestamps) and `vendor_message_replies` (id,
+  vendor_message_id, sender_role, sender_user_id, body, created_at).
+  Also extends `vendor_notifications.type` with `admin_message`, using
+  the same "look up the real constraint name via `pg_constraint`" pattern
+  Task #70 established, rather than guessing the auto-generated name.
+- `server/utils/vendorMessages.js` - `isValidMessageSubject`/
+  `isValidMessageBody` (length caps: 150/2000 chars, tune in one place
+  like everything else), `isValidMessageStatus`, `deriveStatusAfterReply`.
+  7 tests.
+- `vendorController.js` - vendor side: `getMyVendorMessages`,
+  `getMyVendorMessageThread`, `createVendorMessage`,
+  `replyToVendorMessage` (all scoped to the logged-in vendor's own
+  threads). Admin side: `getVendorMessagesAdmin` (the merged inbox),
+  `getVendorMessageThreadAdmin` (any vendor's thread),
+  `replyToVendorMessageAdmin` (fires the `admin_message` notification),
+  `resolveVendorMessageAdmin`, `reopenVendorMessageAdmin`.
+- Vendor dashboard: new "Messages" tab - a "New Message" form, a list of
+  the vendor's own threads, and a detail view (conversation + reply box)
+  shown in place of the list when a thread is opened.
+- Admin: new "Vendor Messages" panel on the Vendors tab - Open/Resolved
+  filter buttons, a merged list across every vendor, and the same
+  detail-view-in-place-of-list pattern with a Reply box and a Mark
+  Resolved/Reopen toggle.
+
+
+## Sponsored placement mechanic (September 2026)
+
+Closes the last gap from Task #64: `vendor_promotions.sponsored` was
+stored and admin-toggleable but had no actual placement effect - no
+sponsored carousel or search-boost anywhere in the codebase to hook it
+into.
+
+**Design kept deliberately minimal** - no new carousel, no separate
+"Sponsored Products" page, no auction/bidding (this stays an admin-only
+flag, per Task #64's original decision - not vendor self-service, so
+there's no pay-to-play risk of it being abused or gamed):
+
+- **What sponsored does now**: while a promotion is `sponsored = true`
+  AND currently active (approved, within its `starts_at`/`ends_at`
+  window - see `isSponsoredAndActive` in `server/utils/
+  vendorPromotions.js`, 3 new tests), its product is boosted to the top
+  of every category listing and search result
+  (`productController.js`'s `getProducts`, `ORDER BY is_sponsored DESC,
+  products.id DESC`) and gets a small "Sponsored" tag on its card
+  (top-right corner, distinct from the existing New/Sale/Out-of-Stock
+  badge which sits top-left - a product can carry both at once). The
+  same boost+tag applies on the vendor's own storefront page
+  (`getPublicStorefront`), for consistency, though the effect matters
+  less there since a storefront is already scoped to one vendor.
+- **Why boost-to-top rather than a separate carousel**: a dedicated
+  "Sponsored Products" rail is a bigger UI commitment (where does it
+  live on the homepage, how many slots, does it rotate) that nothing in
+  Ryan's original gap-analysis asked for by name - "sponsored" was
+  always the *word* used, without a specific mechanic attached. Boosting
+  existing listings mirrors real placement-boost systems (Amazon/Jumia
+  sponsored results at the top of search) and reuses every existing
+  rendering path with zero new customer-facing screens.
+- **No time/frequency cap, no rotation logic between multiple sponsored
+  products** - if several products are sponsored at once, all of them
+  sort ahead of non-sponsored results (ties broken by the existing `id
+  DESC`). Fine at current catalogue scale; worth a "how many sponsored
+  slots, and how do ties resolve" pass if sponsored placements ever
+  become a real revenue line with many concurrent sponsors.
+
+
+## Storefront redesign: delivery method badge, logo/banner removed, bio content filter (September 2026)
+
+Three related corrections from Ryan on the storefront page (lizimasstore.com/store/:slug), all in one pass since they touch the same page and the same `updateVendorStorefront` endpoint.
+
+**Migrations to run:**
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/076_vendor_delivery_method.sql
+
+**1. Delivery/payment method badge (Task #74).** A vendor now sets, from their dashboard's Storefront tab, whether they do Cash on Delivery or Payment First - shown as a small badge right under the business name on the public storefront. Kept to exactly these two options (`vendors.delivery_method`, a real CHECK constraint, not free text) since the point is a customer can read it at a glance; a vendor with neither selected just shows no badge rather than a guess. Demoed to Ryan as a static mockup before building, confirmed with "thats perfect we go with that."
+
+**2. Logo and banner removed from the storefront (Ryan: "remove logo and banner on their page").** The storefront page now shows only: business name, the delivery-method badge, the about text, and the existing seller-score/followers panel - no logo, no banner. Removed end-to-end: the upload UI in the vendor dashboard, the multipart upload route/controller code (Cloudinary `uploadBuffer` calls), the `<img>`/fallback-circle markup on `client/store.html`, the `og:image` meta tag on shared storefront links, and the now-dead `.store-banner`/`.store-logo*` CSS. `vendors.logo_url`/`banner_url` are left in place in the database (non-destructive - no reason to drop columns over a UI change) but nothing reads or writes them anymore. `PATCH /api/vendors/me/storefront` is now a plain JSON body (`{about, delivery_method}`) instead of multipart, since there's nothing left to upload.
+
+**3. Storefront bio content filter (Task #75) - "vendors should not put their number or actual store location [in their bio]; the system should decline the request."** The About text a vendor writes for their public storefront is now checked, at save time, for three things, and the save is rejected outright (not silently stripped) if it trips:
+- **A phone number** - matches the common written forms of a Ugandan mobile number (`0700123456`, `0700 123 456`, `+256 700 123 456`, `256700123456`, or the bare 9-digit subscriber number). Deliberately anchored on a leading `0`/`+256`/`256` (or exactly 9 digits starting with `7`) rather than "any long digit run," specifically so a price like "UGX 1,500,000" in a bio doesn't false-positive as a phone number.
+- **Off-platform contact phrasing** - "WhatsApp," "wa.me/...," "call me," "message me," "DM me," etc., even without a number attached.
+- **Address/location phrasing** - "Plot 45," "Shop No. 12," "located at," "find/visit us at," or raw GPS-style coordinates.
+
+**Known limitation, stated plainly rather than oversold**: this is a keyword/pattern filter, not a language model or a geocoder. It reliably catches numbers and explicit address phrasing, but it will not catch every way someone could describe a phone number in words ("zero seven double-oh...") or an indirect location ("behind the big mosque past the roundabout"). That's an inherent limit of regex-based text filtering, not a bug to fix later - closing that gap for real would need a much heavier NLP/geocoding pipeline. Admin's existing vendor/product review is still the backstop for anything a vendor phrases around the filter. Currently scoped to the storefront About field only (where this came up); the same `findStorefrontContactViolation` helper in `server/utils/vendorStorefront.js` is ready to reuse on product descriptions/titles too if that turns out to be a problem there as well.
+
+**What shipped:** `migrations/076_vendor_delivery_method.sql`; `server/utils/vendorStorefront.js` extended with `DELIVERY_METHODS`/`isValidDeliveryMethod`/`findStorefrontContactViolation` (9 new tests, 170 total in the suite); `updateVendorStorefront`/`getMyVendorProfile`/`getPublicStorefront` in `vendorController.js` updated; `PATCH /api/vendors/me/storefront` route no longer takes file uploads; vendor dashboard Storefront tab rebuilt (Delivery/Payment Method radio buttons + About, no Logo/Banner panels); `client/store.html`/`store.js`/`style.css` updated to drop the logo/banner and add the delivery badge; `server/routes/store-page.js`'s social-share meta tags no longer reference a banner/logo image.
+
+
+## Vendor messages route to support, not admin directly (Task #76, September 2026)
+
+Ryan's correction: "vendors to communicate with support team not admin directly, unless required then the support team will redial them to admin." Builds on the vendor-to-admin messaging channel from Task #71.
+
+**Migration to run:**
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/077_vendor_messages_escalation.sql
+
+**What changed:** the Vendor Messages panel (Admin -> Vendors tab) is no longer admin-only - it's now gated by the existing `requireSupportOrAdmin` middleware (already used for live chat), so a `customer_support` staff account sees and works the same inbox admin does. Nothing changed on the vendor side of the channel (`client/vendor/dashboard.html`'s Messages tab) - a vendor still just opens a thread; who on the other end reads/replies to it is an internal routing question, not something the vendor needs to know about.
+
+**Escalation, not reassignment.** Rather than moving a thread to a separate "admin" bucket, a support agent (or admin) flags it with a new `vendor_messages.escalated_at` timestamp - the thread stays in the one shared inbox, and escalated ones surface in a third filter view (Open / **Escalated** / Resolved) alongside the existing two. This was the simpler of two designs considered: a real reassignment/ownership model (support hands off a thread, someone "owns" it) would need per-thread assignee tracking and a notion of unclaimed vs claimed threads - more machinery than a small team needs right now. A flag that both roles can see and toggle is enough to get admin's attention on the threads that need it, and costs nothing extra to build on top of the inbox that already exists.
+
+**Both roles can escalate/un-escalate** - not gated to support-only in the UI, since the frontend has no existing concept of "which staff role is currently logged in" to gate a button by (nothing else in the codebase needed that distinction before now), and admin flagging their own thread for follow-up is harmless. If Ryan wants this tightened to support-only later, it's a small addition once there's a reason to build role-awareness into the admin frontend generally.
+
+**What shipped:** `migrations/077_vendor_messages_escalation.sql`; `server/utils/vendorMessages.js` gets `MESSAGE_ADMIN_VIEWS`/`isValidMessageAdminView` (2 new tests, 172 total in the suite); `getVendorMessagesAdmin`/`getVendorMessageThreadAdmin` in `vendorController.js` updated for the three-way view and `escalated_at`; new `escalateVendorMessageAdmin`/`unescalateVendorMessageAdmin`; the five existing vendor-messages routes in `server/routes/admin.js` moved ahead of the router-wide `requireAdmin` gate with their own `requireSupportOrAdmin` check, plus the two new escalate/unescalate routes; Admin UI gets a third "Escalated" filter button and an "Escalate to Admin"/"Un-escalate" toggle in the thread view; the staff-creation dropdown's Customer Support option label updated from "(live chat only)" since it now covers vendor messages too.
+
+
+## Real per-category commission rates (Task #72, September 2026)
+
+Ryan supplied a Jumia Uganda 2025-benchmarked rate card (20 categories) and asked for it to be "editable from the admin panel." The admin Categories tab already had a per-category "Rate" editor wired to `commission_rules` since Task #52/53 - nothing new to build there. The actual work was mapping Ryan's 20 Jumia-style buckets onto Lizimas' real category tree, which doesn't look anything like Jumia's flat ~20-category structure (fetched live from `GET /api/products/categories` in production - 230 categories, 6 top-level, 3 levels deep).
+
+**Migration to run:**
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/078_category_commission_rates.sql
+
+**How the rate lookup works** (`server/utils/commissionEngine.js`, `getActiveCommissionRule`): a product's own category is checked first, then its parent, then grandparent, and so on up to the marketplace-wide default (`category_id IS NULL`, currently 15%). This means one rule on a branch category (e.g. "Apparel & Boutique") covers every leaf underneath it, and a rule on a specific leaf always wins over anything set higher up the tree. Migration 078 uses both: branch-level rules where a whole subtree shares one rate, and leaf-level overrides where a subtree needs to be split or a specific product type needs to break from its parent's rate.
+
+**Rates applied**, confirmed with Ryan against his rate card:
+- Mobile Phones 6% (Smartphones, Feature Phones) / Electronics Accessories 17% (phone cases, screen protectors, chargers, power banks) - split out of the "Mobiles & Gadgets" branch, which has no rule of its own.
+- Laptops/Desktops/Monitors 10% / Electronics Accessories 17% (printers, keyboards & mice, laptop bags) - split out of "Computers & Accessories."
+- Electronics Accessories 17% - the whole "IT Accessories" branch (cables, routers, storage, UPS, webcams).
+- Televisions 8% (Smart/LED/UHD TVs) / Electronics Accessories 17% (TV mounts, TV accessories) - split out of "TV."
+- Small Appliances 7% - both "Home Appliances" (fans, irons, sewing machines, vacuums, water dispensers) and "Kitchen Appliances" (blenders, kettles, microwaves, rice cookers, etc.) - Ryan's call, since Kitchen Appliances wasn't its own row on the rate card and these are all countertop/portable items, not the Large Appliances below.
+- Large Appliances 10% - "Major Appliances" branch (cookers, gas cylinders, fridges, washing machines).
+- Home 12% - Home Furniture, Décor, Cooking & Dining, Outdoor Furniture branches.
+- Fashion & Sportswear 12% (same rate for both) - the entire "Apparel & Boutique" top-level branch in one rule (clothing, sunglasses, bags & accessories, sportswear).
+- Grocery & Health & Beauty 15% - explicit rule on "Supermarket" (matches the marketplace default numerically, but recorded explicitly rather than left implicit, since Ryan's rate card treats it as a deliberate rate, not a fallback).
+- Toys & Games 10% - carved out of Supermarket's 15% for the "Toys" branch.
+- Baby Products 15% - scattered across four unrelated branches with no single category to unify under (Baby Care under Personal Care, Baby Clothing under Children's Clothing, Baby & Toddler Toys under Toys, Baby's Food & Milk under Groceries). Baby Care and Baby's Food & Milk already land on 15% via Supermarket's rate; Baby Clothing and Baby & Toddler Toys needed explicit leaf-level overrides back to 15% since they'd otherwise inherit Fashion's 12% and Toys' 10% respectively.
+- Gaming, Sounds & Audio, Books & Stationery, Cleaning & Essentials - not on Ryan's rate card at all. Given explicit rules at the 15% marketplace default anyway, for a clear audited record rather than leaving them to an implicit fallback.
+
+**What's intentionally NOT covered, per Ryan's explicit decision ("15% default until category exists")**: Cameras, Tablets, Beauty Appliances (as distinct from Health & Beauty), Sporting Goods, Musical Instruments, Auto & Moto, and Luggage & Travel Gear do not exist as categories anywhere in Lizimas' live catalog. There's no `category_id` to attach a rate to, so these fall through to the 15% marketplace default automatically and will pick up their own rate the moment a matching category is created - no placeholder categories were created preemptively. Smartwatches (a leaf under Mobiles & Gadgets) also wasn't part of the rate card and was left uncovered the same way.
+
+**What shipped:** `migrations/078_category_commission_rates.sql` - 34 `commission_rules` rows (branch-level and leaf-level), inserted idempotently (`WHERE NOT EXISTS`) against the existing unique-active-rule-per-category constraint. No application code changes - the admin Categories tab's existing "Rate" column and per-category edit form already display and let Ryan adjust every one of these rows.
+
+## Vendor KYC & Compliance Profile - Stage 1 (September 2026)
+
+Ryan's proposal, modeled on Jumia's vendor verification approach: give every vendor a private KYC profile separate from their public storefront, a formal status workflow, and an audit trail - "a much stronger vendor-control system than simply asking vendors to upload an ID during registration." Scoped explicitly with Ryan into stages, reviewed one at a time. **This is Stage 1 only**: the KYC profile, status workflow, and audit trail, built on data already collected today (national ID number / business registration number). Document upload (Stage 2) and a public "Verified" badge on the storefront (Stage 3) are deliberately not built yet.
+
+**Before running anything below, generate and set the encryption key on Render:**
+
+    openssl rand -hex 32
+
+Set the output as `KYC_ENCRYPTION_KEY` on Render's Environment tab (Web Service -> Environment). Do this before running the migration or backfill - the backfill script encrypts existing vendor data with this key immediately. Do not share this key or paste it anywhere it could leak (same handling as `RENDER_DB`); losing it makes all encrypted KYC data permanently unreadable, with no recovery path.
+
+**Migration to run (after the key is set):**
+
+    DATABASE_URL="$RENDER_DB" node scripts/run-migrations.js migrations/079_vendor_kyc.sql
+
+**Then the one-time backfill (same key as above):**
+
+    DATABASE_URL="$RENDER_DB" KYC_ENCRYPTION_KEY="<the same 64-char hex key>" node scripts/backfill-vendor-kyc.js
+
+**What the backfill does, per Ryan's explicit decision ("reset them to NOT_STARTED / SUBMITTED")**: no existing vendor is grandfathered in as Verified. For every vendor, it encrypts and copies over whatever `registration_number`/`national_id_number` already exists in `vendors` into the new `vendor_kyc` table: a vendor with that data on file lands on `submitted` (needs a first review), a vendor with neither lands on `not_started`. **Every vendor - even ones approved and selling today - will need an admin KYC review pass after this runs.** Nothing on the vendor-approval side (whether they're allowed to sell) changes; this is a separate status running in parallel.
+
+**Data model:** `vendor_kyc` (one row per vendor - `kyc_status`, `identity_verified`/`business_verified` flags, encrypted `national_id_number`/`registration_number`, `review_note`, `reviewed_by`/`reviewed_at`) and `vendor_kyc_audit_log` (every status change: from/to status, who changed it - null for a vendor's own submission - note, timestamp). The old `vendors.national_id_number`/`registration_number` columns are left in place untouched (frozen/legacy - not dropped, not written to anymore) rather than migrated away, since nothing reads them for KYC purposes going forward.
+
+**Encryption**, per Ryan's decision ("yes, encrypt at rest"): application-level AES-256-GCM (`server/utils/encryption.js`), not database-level `pgcrypto` - encrypt/decrypt happens in Node before the value ever reaches Postgres. Since a random IV means the same plaintext encrypts to a different value every time (by design - this is what stops the ciphertext itself leaking patterns), the old "one verified vendor per ID/registration number" dedup check couldn't run as a SQL uniqueness constraint on the encrypted column directly. Fixed with a second, deterministic HMAC-SHA256 "lookup hash" stored alongside each encrypted value (normalized the same way the old plaintext check was - trimmed, lowercased) - partial unique indexes sit on the hash columns, scoped to `kyc_status = 'verified'`, so the "no duplicate verified ID" rule still holds without ever putting a unique index on ciphertext.
+
+**Status workflow** - seven states (`server/utils/vendorKyc.js`): `not_started` -> `submitted` -> `under_review` -> `verified` (or `rejected`/`action_required` along the way), plus `suspended` for pulling back a previously-verified vendor. A vendor can edit their own KYC info only while it's `not_started`, `action_required`, or `rejected` - once submitted it's locked from their side until an admin acts on it. Admin transitions are restricted to sensible moves (e.g. `verified` can only go to `suspended`, never skip back to `rejected` directly; `not_started` can't be pushed straight to `verified` by an admin - the vendor has to submit first).
+
+**Where it lives:**
+- Vendor dashboard, Overview tab - the old one-time "verification nudge" panel (which auto-hid itself once any data was entered) is replaced with a persistent, status-driven panel: shows the current KYC status as a badge, an admin's review note when there is one, and either an editable form or a locked "under review" view depending on status. Payout number (momo) editing was pulled out into its own small panel on the same tab, since payment info is intentionally outside KYC scope for now and still needed to stay editable.
+- Admin, Vendors tab - new "Vendor KYC Review" panel, filterable by status, with a review modal per vendor showing their ID/registration number, the available next-status buttons for their current state, a required note field for Action Required/Rejected, and the full audit history for that vendor.
+
+**API:** `GET/PATCH /api/vendors/me/kyc` (vendor's own profile); `GET /api/admin/vendors/kyc` (list, filterable), `GET /api/admin/vendors/:id/kyc` (detail + audit log), `PATCH /api/admin/vendors/:id/kyc/review` (admin) - all three admin-only (no `customer_support` access), since KYC data is more sensitive than the vendor messages support already handles.
+
+**What shipped:** `migrations/079_vendor_kyc.sql`; `server/utils/encryption.js` (11 tests) and `server/utils/vendorKyc.js` (12 tests) - 195 total in the suite now; `server/controllers/vendorKycController.js`; `scripts/backfill-vendor-kyc.js`; routes added to `vendors.js` and `admin.js`; `vendorController.js`'s `getMyVendorProfile`/`updateMyVendorProfile` no longer read/write `registration_number`/`national_id_number` (moved to `vendor_kyc`); vendor dashboard and admin panel UI as described above.
+
+**Known minor limitation, noted rather than fixed in this pass**: the existing "Pending Vendor Applications" panel (vendor *approval*, not KYC - a different admin view, unchanged in this work) still shows `registration_number`/`national_id_number` badges pulled from the now-frozen `vendors` table columns. Those will go stale over time as vendors update their KYC info through the new flow instead. Left as-is to keep this change scoped to KYC; worth revisiting if that approval panel's ID display becomes confusing in practice.
+
+**Next up, when Ryan is ready:** Stage 2 (document upload) and Stage 3 (public "Verified" storefront badge) - not started, by design.

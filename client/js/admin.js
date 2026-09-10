@@ -1668,6 +1668,8 @@ function setupTabs() {
                 loadVendorCompliancePanel();
                 loadPendingVendorPromotions();
                 loadApprovedVendorPromotions();
+                loadVendorMessagesAdmin();
+                loadVendorKycAdmin();
             }
 
             if (button.dataset.tab === "team-messages") {
@@ -2346,12 +2348,14 @@ async function approvePendingProduct(id) {
 }
 
 async function rejectPendingProduct(id) {
-    if (!confirm("Reject this product submission?")) return;
+    const reason = prompt("Reason for rejecting this product (shown to the vendor):");
+    if (!reason) return;
     try {
         const token = getToken();
         await fetch(`${API_URL}/api/admin/products/${id}/reject`, {
             method: "PATCH",
-            headers: { "Authorization": `Bearer ${token}` }
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ reason })
         });
         loadPendingProducts();
     } catch (error) {
@@ -7031,4 +7035,316 @@ function initAnalyticsAndPerformance() {
             lzStaffPerfData.map(s => [s.name, s.role, s.productCount, s.productViews, s.unitsSold, s.ordersCount, s.revenue])
         );
     });
+}
+
+// --- Vendor-to-Admin Messaging (Task #71/#76): support inbox -------------
+// Vendor threads route to customer_support by default (Ryan, Sept 2026) -
+// this same panel is reachable by both customer_support and admin
+// (requireSupportOrAdmin on the server side), so whichever of them opens
+// it sees the same three views: Open, Escalated, Resolved. Escalating a
+// thread doesn't move it anywhere - it just flags it (escalated_at) so it
+// shows up in the Escalated view for whoever is watching, admin included.
+
+let vendorMessagesAdminFilter = "open";
+let vendorMessagesAdminOpenThreadId = null;
+
+async function loadVendorMessagesAdmin(view) {
+    if (view) vendorMessagesAdminFilter = view;
+    const openBtn = document.getElementById("vendor-messages-filter-open");
+    const escalatedBtn = document.getElementById("vendor-messages-filter-escalated");
+    const resolvedBtn = document.getElementById("vendor-messages-filter-resolved");
+    if (openBtn && escalatedBtn && resolvedBtn) {
+        const activeStyle = "background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer; margin-right:6px;";
+        const inactiveStyle = "background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer; margin-right:6px;";
+        openBtn.setAttribute("style", vendorMessagesAdminFilter === "open" ? activeStyle : inactiveStyle);
+        escalatedBtn.setAttribute("style", vendorMessagesAdminFilter === "escalated" ? activeStyle : inactiveStyle);
+        resolvedBtn.setAttribute("style", (vendorMessagesAdminFilter === "resolved" ? activeStyle : inactiveStyle).replace("margin-right:6px;", ""));
+    }
+
+    const box = document.getElementById("vendor-messages-admin-list");
+    if (!box) return;
+    try {
+        const rows = await authorizedFetch(`/api/admin/vendor-messages?view=${vendorMessagesAdminFilter}`);
+        if (rows.error) {
+            box.innerHTML = `<p>${rows.error}</p>`;
+            return;
+        }
+        if (rows.length === 0) {
+            box.innerHTML = `<p style="color:#888;">No ${vendorMessagesAdminFilter} threads.</p>`;
+            return;
+        }
+        box.innerHTML = `
+            <table style="width:100%;">
+                <thead><tr><th>Vendor</th><th>Subject</th><th>Replies</th><th>Last Update</th></tr></thead>
+                <tbody>
+                    ${rows.map(m => `
+                        <tr onclick="openVendorMessageThreadAdmin(${m.id})" style="cursor:pointer;">
+                            <td>${m.vendor_business_name}</td>
+                            <td>${m.subject}${m.escalated_at ? ' <span style="background:#FEF3C7; color:#92400E; font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px; margin-left:6px;">Escalated</span>' : ""}</td>
+                            <td>${m.reply_count}</td>
+                            <td>${new Date(m.updated_at).toLocaleString()}</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>`;
+    } catch (error) {
+        console.error("Load admin vendor messages error:", error);
+        box.innerHTML = "<p>Could not connect to server.</p>";
+    }
+}
+
+async function openVendorMessageThreadAdmin(id) {
+    vendorMessagesAdminOpenThreadId = id;
+    document.getElementById("vendor-messages-admin-list-view").hidden = true;
+    document.getElementById("vendor-messages-admin-thread-view").hidden = false;
+    await loadVendorMessageThreadAdmin();
+}
+
+function closeVendorMessageThreadAdmin() {
+    vendorMessagesAdminOpenThreadId = null;
+    document.getElementById("vendor-messages-admin-thread-view").hidden = true;
+    document.getElementById("vendor-messages-admin-list-view").hidden = false;
+    loadVendorMessagesAdmin();
+}
+
+async function loadVendorMessageThreadAdmin() {
+    if (!vendorMessagesAdminOpenThreadId) return;
+    try {
+        const data = await authorizedFetch(`/api/admin/vendor-messages/${vendorMessagesAdminOpenThreadId}`);
+        if (data.error) return;
+        document.getElementById("vendor-message-admin-thread-subject").textContent = `${data.thread.vendor_business_name} - ${data.thread.subject}`;
+        document.getElementById("vendor-message-admin-thread-status").textContent =
+            `${data.thread.status === "resolved" ? "Resolved" : "Open"} · opened ${new Date(data.thread.created_at).toLocaleDateString()}` +
+            (data.thread.escalated_at ? ` · escalated ${new Date(data.thread.escalated_at).toLocaleDateString()}` : "");
+        const resolveBtn = document.getElementById("vendor-message-admin-resolve-btn");
+        resolveBtn.textContent = data.thread.status === "resolved" ? "Reopen" : "Mark Resolved";
+        const escalateBtn = document.getElementById("vendor-message-admin-escalate-btn");
+        escalateBtn.textContent = data.thread.escalated_at ? "Un-escalate" : "Escalate to Admin";
+
+        const repliesBox = document.getElementById("vendor-message-admin-thread-replies");
+        repliesBox.innerHTML = data.replies.map(r => `
+            <div style="padding:8px 10px; border-radius:8px; margin-bottom:8px; max-width:85%; ${r.sender_role === "admin" ? "background:#F3F4F6; margin-left:auto;" : "background:#EEF2FF; margin-right:auto;"}">
+                <div style="font-size:11px; font-weight:600; color:#555; margin-bottom:2px;">${r.sender_role === "admin" ? "You" : data.thread.vendor_business_name}</div>
+                <div>${r.body}</div>
+                <div style="font-size:10px; color:#999; margin-top:2px;">${new Date(r.created_at).toLocaleString()}</div>
+            </div>
+        `).join("");
+    } catch (error) {
+        console.error("Load admin vendor message thread error:", error);
+    }
+}
+
+async function sendVendorMessageReplyAdmin() {
+    const bodyEl = document.getElementById("vendor-message-admin-reply-body");
+    const statusEl = document.getElementById("vendor-message-admin-reply-status");
+    const body = bodyEl.value.trim();
+    if (!body || !vendorMessagesAdminOpenThreadId) return;
+    try {
+        const token = getToken();
+        await fetch(`${API_URL}/api/admin/vendor-messages/${vendorMessagesAdminOpenThreadId}/replies`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ body })
+        });
+        bodyEl.value = "";
+        statusEl.textContent = "";
+        loadVendorMessageThreadAdmin();
+    } catch (error) {
+        console.error("Send admin vendor message reply error:", error);
+        statusEl.style.color = "#DC2626";
+        statusEl.textContent = "Could not connect to server.";
+    }
+}
+
+async function toggleVendorMessageResolvedAdmin() {
+    if (!vendorMessagesAdminOpenThreadId) return;
+    try {
+        const token = getToken();
+        const resolveBtn = document.getElementById("vendor-message-admin-resolve-btn");
+        const action = resolveBtn.textContent === "Reopen" ? "reopen" : "resolve";
+        await fetch(`${API_URL}/api/admin/vendor-messages/${vendorMessagesAdminOpenThreadId}/${action}`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        loadVendorMessageThreadAdmin();
+    } catch (error) {
+        console.error("Toggle vendor message resolved error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function toggleVendorMessageEscalatedAdmin() {
+    if (!vendorMessagesAdminOpenThreadId) return;
+    try {
+        const token = getToken();
+        const escalateBtn = document.getElementById("vendor-message-admin-escalate-btn");
+        const action = escalateBtn.textContent === "Un-escalate" ? "unescalate" : "escalate";
+        await fetch(`${API_URL}/api/admin/vendor-messages/${vendorMessagesAdminOpenThreadId}/${action}`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        loadVendorMessageThreadAdmin();
+    } catch (error) {
+        console.error("Toggle vendor message escalated error:", error);
+        alert("Something went wrong.");
+    }
+}
+// --- Vendor KYC & Compliance Profile review (Ryan, Sept 2026) --------------
+// Identity/business-registration verification - separate from vendor
+// approval (Pending Vendor Applications above): approval means "allowed
+// to sell," KYC status means "identity/business registration verified."
+
+const VENDOR_KYC_ADMIN_VIEWS = [
+    { status: "submitted", label: "Submitted" },
+    { status: "under_review", label: "Under Review" },
+    { status: "action_required", label: "Action Required" },
+    { status: "verified", label: "Verified" },
+    { status: "rejected", label: "Rejected" },
+    { status: "suspended", label: "Suspended" },
+    { status: "", label: "All" }
+];
+
+const VENDOR_KYC_ADMIN_BADGE = {
+    not_started: { cls: "status-forfeited", label: "Not started" },
+    submitted: { cls: "status-new", label: "Submitted" },
+    under_review: { cls: "status-processing", label: "Under review" },
+    action_required: { cls: "status-pending", label: "Action required" },
+    verified: { cls: "status-paid", label: "Verified" },
+    rejected: { cls: "status-cancelled", label: "Rejected" },
+    suspended: { cls: "status-cancelled", label: "Suspended" }
+};
+
+let vendorKycAdminFilter = "submitted";
+
+async function loadVendorKycAdmin(status) {
+    if (status !== undefined) vendorKycAdminFilter = status;
+
+    const filterBar = document.getElementById("vendor-kyc-admin-filters");
+    filterBar.innerHTML = VENDOR_KYC_ADMIN_VIEWS.map(v => {
+        const active = v.status === vendorKycAdminFilter;
+        const style = active
+            ? "background:#16264f; color:#fff; border:none;"
+            : "background:#F3F4F6; color:#374151; border:1px solid #D1D5DB;";
+        return `<button onclick="loadVendorKycAdmin('${v.status}')" style="${style} border-radius:999px; padding:6px 14px; font-size:13px; cursor:pointer;">${v.label}</button>`;
+    }).join("");
+
+    try {
+        const qs = vendorKycAdminFilter ? `?status=${vendorKycAdminFilter}` : "";
+        const rows = await authorizedFetch(`/api/admin/vendors/kyc${qs}`);
+        const container = document.getElementById("vendor-kyc-admin-list");
+
+        if (!rows || rows.length === 0) {
+            container.innerHTML = `<p class="no-data">No vendors in this KYC status.</p>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Business</th><th>Type</th><th>KYC Status</th><th>Reviewed</th><th>Actions</th></tr></thead>
+                <tbody>
+                    ${rows.map(v => {
+                        const info = VENDOR_KYC_ADMIN_BADGE[v.kyc_status] || VENDOR_KYC_ADMIN_BADGE.not_started;
+                        return `
+                        <tr>
+                            <td data-label="Business">${v.business_name}</td>
+                            <td data-label="Type">${v.account_type === "company" ? "Company" : v.account_type === "individual" ? "Individual" : "-"}</td>
+                            <td data-label="KYC Status"><span class="status-badge ${info.cls}">${info.label}</span></td>
+                            <td data-label="Reviewed">${v.reviewed_at ? new Date(v.reviewed_at).toLocaleDateString() : "-"}</td>
+                            <td data-label="Actions">
+                                <button onclick="openVendorKycReviewModal(${v.vendor_id})" style="background:#16264f; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Review</button>
+                            </td>
+                        </tr>
+                    `; }).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("Load vendor KYC admin error:", error);
+    }
+}
+
+const VENDOR_KYC_ADMIN_TRANSITIONS = {
+    not_started: [],
+    submitted: ["under_review", "verified", "rejected", "action_required"],
+    under_review: ["verified", "rejected", "action_required"],
+    action_required: ["under_review", "verified", "rejected"],
+    verified: ["suspended"],
+    rejected: ["under_review"],
+    suspended: ["verified", "rejected"]
+};
+
+async function openVendorKycReviewModal(vendorId) {
+    try {
+        const detail = await authorizedFetch(`/api/admin/vendors/${vendorId}/kyc`);
+        const info = VENDOR_KYC_ADMIN_BADGE[detail.kyc_status] || VENDOR_KYC_ADMIN_BADGE.not_started;
+
+        const idLabel = detail.account_type === "company" ? "Registration Number" : "National ID Number";
+        const idValue = detail.account_type === "company" ? detail.registration_number : detail.national_id_number;
+
+        const transitionButtons = VENDOR_KYC_ADMIN_TRANSITIONS[detail.kyc_status] || [];
+
+        const auditHtml = (detail.audit_log || []).map(a => `
+            <div style="font-size:12px; color:#666; padding:6px 0; border-bottom:1px solid #eee;">
+                <strong>${a.from_status || "(none)"} &rarr; ${a.to_status}</strong>
+                ${a.changed_by_name ? ` by ${a.changed_by_name}` : " by vendor"}
+                &middot; ${new Date(a.created_at).toLocaleString()}
+                ${a.note ? `<br>${a.note}` : ""}
+            </div>
+        `).join("") || `<p style="font-size:12px; color:#999;">No history yet.</p>`;
+
+        const bodyHtml = `
+            <div style="margin-bottom:12px;">
+                <span class="status-badge ${info.cls}">${info.label}</span>
+            </div>
+            <table style="margin-bottom:14px;">
+                <tbody>
+                    <tr><td style="font-weight:600; padding:4px 12px 4px 0;">${idLabel}</td><td>${idValue || "-"}</td></tr>
+                    <tr><td style="font-weight:600; padding:4px 12px 4px 0;">Account Type</td><td>${detail.account_type === "company" ? "Company" : "Individual"}</td></tr>
+                </tbody>
+            </table>
+            ${transitionButtons.length > 0 ? `
+                <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Move to:</label>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                    ${transitionButtons.map(t => `<button onclick="reviewVendorKyc(${vendorId}, '${t}')" style="background:#16264f; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;">${(VENDOR_KYC_ADMIN_BADGE[t] || {}).label || t}</button>`).join("")}
+                </div>
+                <textarea id="vendor-kyc-review-note-input" placeholder="Note (shown to the vendor for Action Required/Rejected)" style="width:100%; min-height:60px; padding:8px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box; margin-bottom:10px;"></textarea>
+            ` : `<p style="font-size:13px; color:#999;">This vendor hasn't submitted any KYC information yet.</p>`}
+            <h3 style="font-size:14px; margin:14px 0 6px;">History</h3>
+            ${auditHtml}
+        `;
+
+        openGenericModal(`KYC Review — ${detail.business_name}`, bodyHtml);
+    } catch (error) {
+        console.error("Open vendor KYC review modal error:", error);
+        alert("Could not load KYC details.");
+    }
+}
+
+async function reviewVendorKyc(vendorId, newStatus) {
+    const noteEl = document.getElementById("vendor-kyc-review-note-input");
+    const note = noteEl ? noteEl.value.trim() : "";
+
+    if ((newStatus === "action_required" || newStatus === "rejected") && !note) {
+        alert("Please add a note explaining what's needed or why this was rejected.");
+        return;
+    }
+
+    try {
+        const token = getToken();
+        const res = await fetch(`${API_URL}/api/admin/vendors/${vendorId}/kyc/review`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ kyc_status: newStatus, note: note || null })
+        });
+        const data = await res.json();
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        closeGenericModal();
+        loadVendorKycAdmin();
+    } catch (error) {
+        console.error("Review vendor KYC error:", error);
+        alert("Something went wrong.");
+    }
 }

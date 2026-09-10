@@ -193,11 +193,16 @@ exports.getProducts = async (req, res) => {
                      WHERE pi.product_id = products.id
                      ORDER BY COALESCE(pi.display_order, 999999) ASC, pi.id ASC
                      OFFSET 1 LIMIT 1
-                    ) AS hover_image
+                    ) AS hover_image,
+                    EXISTS (
+                        SELECT 1 FROM vendor_promotions vp
+                        WHERE vp.product_id = products.id AND vp.sponsored = true
+                          AND vp.status = 'approved' AND vp.starts_at <= now() AND vp.ends_at >= now()
+                    ) AS is_sponsored
              FROM products
              LEFT JOIN categories ON products.category_id = categories.id
              WHERE products.status = 'approved' AND products.is_active = true AND products.admin_restricted = false AND products.deleted_at IS NULL${filter}
-             ORDER BY products.id DESC`,
+             ORDER BY is_sponsored DESC, products.id DESC`,
             params
         );
 
@@ -1085,18 +1090,22 @@ exports.approveProduct = async (req, res) => {
 exports.rejectProduct = async (req, res) => {
     try {
         const { id } = req.params;
+        // Optional on purpose - admin.js prompts for one but doesn't force
+        // it, same as every other reason-collecting admin action in this
+        // codebase (warnVendorAccount, rejectVendorApplication, ...).
+        const reason = req.body && req.body.reason ? String(req.body.reason).trim() : null;
         const result = await pool.query(
-            `UPDATE products SET status = 'rejected' WHERE id = $1 RETURNING *`,
-            [id]
+            `UPDATE products SET status = 'rejected', rejection_reason = $2 WHERE id = $1 RETURNING *`,
+            [id, reason]
         );
         if (result.rows.length === 0) {
             return res.status(404).json({ error: "Product not found." });
         }
-        logActivity(req.user.userId, "rejected_product", "product", Number(id), `Rejected "${result.rows[0].name}"`);
+        logActivity(req.user.userId, "rejected_product", "product", Number(id), `Rejected "${result.rows[0].name}"${reason ? `: ${reason}` : ""}`);
         if (result.rows[0].vendor_id) {
             await createVendorNotification(result.rows[0].vendor_id, "product_rejected", {
                 productName: result.rows[0].name,
-                reason: "Contact Lizimas Store support for details."
+                reason: reason || "Contact Lizimas Store support for details."
             });
         }
         res.json({ message: "Product rejected.", product: result.rows[0] });

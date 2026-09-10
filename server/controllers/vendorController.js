@@ -17,14 +17,33 @@ const {
     deriveVendorPromotionStatus
 } = require("../utils/vendorPromotions");
 const { buildNotification } = require("../utils/vendorNotifications");
+const {
+    MAX_ABOUT_LENGTH,
+    isValidAboutText,
+    isValidDeliveryMethod,
+    findStorefrontContactViolation
+} = require("../utils/vendorStorefront");
+const {
+    MAX_SUBJECT_LENGTH,
+    MAX_BODY_LENGTH,
+    isValidMessageSubject,
+    isValidMessageBody,
+    isValidMessageAdminView,
+    deriveStatusAfterReply
+} = require("../utils/vendorMessages");
 
-// The logged-in vendor's own KYC/business profile and review status.
+// The logged-in vendor's own business profile and review status.
+// registration_number/national_id_number moved to the separate,
+// encrypted vendor_kyc table (GET /api/vendors/me/kyc) - Sept 2026's
+// Vendor KYC rework. vendors.registration_number/national_id_number
+// columns still exist but are legacy/frozen; nothing reads them here
+// anymore.
 exports.getMyVendorProfile = async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT id, business_name, account_type, registration_number, national_id_number, phone,
+            `SELECT id, business_name, account_type, phone,
                     physical_address, momo_number, referral_source, status, rejection_reason,
-                    submitted_at, reviewed_at
+                    submitted_at, reviewed_at, slug, about, delivery_method
              FROM vendors WHERE user_id = $1`,
             [req.user.userId]
         );
@@ -39,11 +58,73 @@ exports.getMyVendorProfile = async (req, res) => {
     }
 };
 
-// The verification step that follows registration + first login: an
-// Individual vendor supplies their national ID, a Company vendor supplies
-// their URSB registration number, and either can add/update their MoMo
-// payout number. Kept separate from registration so a prospective vendor
-// can create an account and sign in before hunting down these documents.
+// A vendor's own storefront presentation (Tasks #68/#74/#75) - the about
+// blurb and delivery/payment method shown on their public store page
+// (getPublicStorefront below). Kept separate from updateMyVendorProfile on
+// purpose: that endpoint is KYC/business-profile data (registration
+// number, MoMo number, address), this one is pure storefront presentation
+// - different concerns, different validation rules, no reason to overload
+// one endpoint for both.
+//
+// No logo/banner upload here - removed from the storefront on Ryan's
+// instruction (Sept 2026); the page shows only business name + delivery
+// method + about text + the existing seller score/followers panel. Plain
+// JSON body now that there's nothing to upload.
+//
+// `about` is partial by design: omitting it entirely leaves it untouched
+// (so a vendor can update just their delivery method without resending
+// their bio); sending an empty string clears it. `about` also runs through
+// findStorefrontContactViolation (see PENDING.md) so a bio can't be used
+// to hand out a phone number or address off-platform.
+exports.updateVendorStorefront = async (req, res) => {
+    try {
+        const vendorRow = await pool.query(
+            "SELECT id, about, delivery_method FROM vendors WHERE user_id = $1",
+            [req.user.userId]
+        );
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendor = vendorRow.rows[0];
+
+        const aboutProvided = req.body.about !== undefined;
+        const about = aboutProvided ? req.body.about : vendor.about;
+        if (aboutProvided && !isValidAboutText(about)) {
+            return res.status(400).json({ error: `About text must be ${MAX_ABOUT_LENGTH} characters or fewer.` });
+        }
+        if (aboutProvided) {
+            const violation = findStorefrontContactViolation(about);
+            if (violation) {
+                return res.status(400).json({
+                    error: `Your store bio can't include ${violation}. Customers should reach you through Lizimas Store, not directly.`
+                });
+            }
+        }
+
+        const deliveryMethodProvided = req.body.delivery_method !== undefined;
+        const deliveryMethod = deliveryMethodProvided
+            ? (req.body.delivery_method || null)
+            : vendor.delivery_method;
+        if (deliveryMethodProvided && !isValidDeliveryMethod(deliveryMethod)) {
+            return res.status(400).json({ error: "Delivery method must be 'cash_on_delivery' or 'payment_first'." });
+        }
+
+        const result = await pool.query(
+            `UPDATE vendors SET about = $1, delivery_method = $2 WHERE id = $3
+             RETURNING id, business_name, slug, about, delivery_method`,
+            [about, deliveryMethod, vendor.id]
+        );
+        res.json({ message: "Storefront updated.", vendor: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Payout number and address - identity/business-registration numbers
+// moved to the separate, encrypted vendor_kyc table (PATCH
+// /api/vendors/me/kyc) as of the Sept 2026 Vendor KYC rework. Kept
+// separate from registration so a prospective vendor can create an
+// account and sign in before setting these up.
 exports.updateMyVendorProfile = async (req, res) => {
     try {
         const vendorRow = await pool.query(
@@ -55,56 +136,17 @@ exports.updateMyVendorProfile = async (req, res) => {
         }
         const vendor = vendorRow.rows[0];
 
-        const { registration_number, national_id_number, momo_number, physical_address } = req.body;
-
-        if (vendor.account_type === "company" && registration_number !== undefined && !registration_number) {
-            return res.status(400).json({ error: "Registration number cannot be blank." });
-        }
-        if (vendor.account_type === "individual" && national_id_number !== undefined && !national_id_number) {
-            return res.status(400).json({ error: "National ID number cannot be blank." });
-        }
-
-        // One account per business: a registration number or national ID
-        // that's already tied to another APPROVED vendor can't be reused.
-        // Pending/rejected vendors don't block this - only an approved
-        // account counts as "this business already has an account". The
-        // partial unique index in migration 054 is the final authority;
-        // this is just an earlier, friendlier version of the same check.
-        if (registration_number) {
-            const dupe = await pool.query(
-                "SELECT id FROM vendors WHERE status = 'approved' AND id != $1 AND LOWER(TRIM(registration_number)) = LOWER(TRIM($2))",
-                [vendor.id, registration_number]
-            );
-            if (dupe.rows.length > 0) {
-                return res.status(409).json({
-                    error: "This registration number is already associated with another approved vendor account."
-                });
-            }
-        }
-        if (national_id_number) {
-            const dupe = await pool.query(
-                "SELECT id FROM vendors WHERE status = 'approved' AND id != $1 AND LOWER(TRIM(national_id_number)) = LOWER(TRIM($2))",
-                [vendor.id, national_id_number]
-            );
-            if (dupe.rows.length > 0) {
-                return res.status(409).json({
-                    error: "This national ID is already associated with another approved vendor account."
-                });
-            }
-        }
+        const { momo_number, physical_address } = req.body;
 
         const result = await pool.query(
             `UPDATE vendors SET
-                registration_number = COALESCE($1, registration_number),
-                national_id_number = COALESCE($2, national_id_number),
-                momo_number = COALESCE($3, momo_number),
-                physical_address = COALESCE($4, physical_address)
-             WHERE id = $5
-             RETURNING id, business_name, account_type, registration_number, national_id_number,
+                momo_number = COALESCE($1, momo_number),
+                physical_address = COALESCE($2, physical_address)
+             WHERE id = $3
+             RETURNING id, business_name, account_type,
                        phone, physical_address, momo_number, referral_source, status, rejection_reason,
                        submitted_at, reviewed_at`,
-            [registration_number || null, national_id_number || null, momo_number || null,
-                physical_address || null, vendor.id]
+            [momo_number || null, physical_address || null, vendor.id]
         );
 
         res.json(result.rows[0]);
@@ -185,10 +227,12 @@ exports.bulkUpdateVendorProducts = async (req, res) => {
 // currency amounts only, never a rate or percentage, per the "sellers must
 // never see the commission %" rule (Ryan, Sept 2026).
 //
-// The charges figure uses each product's CURRENT commission_rate_applied/
-// fixed_fee_applied rather than a rate locked at order time, because order-
-// time commission locking isn't wired up yet (see PENDING.md) - this is an
-// approximation inherited from that same known limitation, not a new one.
+// The charges figure prefers each order_item's own locked-in
+// commission_rate_applied/fixed_fee_applied (Task #67, migration 072),
+// snapshotted at checkout - falling back to the product's CURRENT snapshot
+// only for orders placed before that migration existed, so old numbers
+// don't change and new ones stay accurate even if a rate or product price
+// changes later.
 exports.getVendorDashboardSummary = async (req, res) => {
     try {
         const vendorRow = await pool.query("SELECT id, business_name, slug FROM vendors WHERE user_id = $1", [req.user.userId]);
@@ -216,8 +260,9 @@ exports.getVendorDashboardSummary = async (req, res) => {
                 `SELECT
                     COALESCE(SUM(oi.price * oi.quantity), 0) AS sale_total,
                     COALESCE(SUM(
-                        CASE WHEN p.commission_rate_applied IS NOT NULL
-                            THEN (oi.price * oi.quantity) * p.commission_rate_applied + COALESCE(p.fixed_fee_applied, 0) * oi.quantity
+                        CASE WHEN COALESCE(oi.commission_rate_applied, p.commission_rate_applied) IS NOT NULL
+                            THEN (oi.price * oi.quantity) * COALESCE(oi.commission_rate_applied, p.commission_rate_applied)
+                                 + COALESCE(oi.fixed_fee_applied, p.fixed_fee_applied, 0) * oi.quantity
                             ELSE 0
                         END
                     ), 0) AS charges_total
@@ -477,7 +522,7 @@ exports.getPublicStorefront = async (req, res) => {
         const { slug } = req.params;
 
         const vendorResult = await pool.query(
-            `SELECT id, business_name, slug, logo_url, banner_url, about
+            `SELECT id, business_name, slug, about, delivery_method
              FROM vendors WHERE slug = $1 AND status = 'approved' LIMIT 1`,
             [slug]
         );
@@ -488,10 +533,15 @@ exports.getPublicStorefront = async (req, res) => {
 
         const [productsResult, followerResult, sellerScore] = await Promise.all([
             pool.query(
-                `SELECT id, name, price, image, stock, public_code
+                `SELECT id, name, price, image, stock, public_code,
+                        EXISTS (
+                            SELECT 1 FROM vendor_promotions vp
+                            WHERE vp.product_id = products.id AND vp.sponsored = true
+                              AND vp.status = 'approved' AND vp.starts_at <= now() AND vp.ends_at >= now()
+                        ) AS is_sponsored
                  FROM products
                  WHERE vendor_id = $1 AND status = 'approved' AND is_active = true AND admin_restricted = false AND deleted_at IS NULL
-                 ORDER BY created_at DESC`,
+                 ORDER BY is_sponsored DESC, created_at DESC`,
                 [vendor.id]
             ),
             pool.query(`SELECT COUNT(*)::int AS n FROM vendor_followers WHERE vendor_id = $1`, [vendor.id]),
@@ -587,7 +637,8 @@ async function loadVendorWalletData(vendorId) {
         pool.query(
             `SELECT o.status AS order_status, oi.handover_status,
                     oi.price, oi.quantity,
-                    p.commission_rate_applied, p.fixed_fee_applied
+                    COALESCE(oi.commission_rate_applied, p.commission_rate_applied) AS commission_rate_applied,
+                    COALESCE(oi.fixed_fee_applied, p.fixed_fee_applied) AS fixed_fee_applied
              FROM order_items oi
              JOIN orders o ON o.id = oi.order_id
              JOIN products p ON p.id = oi.product_id
@@ -1406,8 +1457,11 @@ exports.setVendorPromotionFeatured = async (req, res) => {
     }
 };
 
-// Admin-only flag reserved for a future sponsored-placement mechanic - no
-// placement effect wired to it yet, stored so it's ready when one exists.
+// Admin-only flag (Task #73 wires the actual placement effect): while a
+// promotion is sponsored=true AND active (approved, within its window),
+// getProducts/getPublicStorefront boost it to the top of listings and
+// tag its card "Sponsored" - see isSponsoredAndActive in
+// vendorPromotions.js for the exact predicate those queries mirror.
 exports.setVendorPromotionSponsored = async (req, res) => {
     try {
         const { id } = req.params;
@@ -1574,6 +1628,293 @@ exports.getVendorReports = async (req, res) => {
             orderStatusBreakdown: statusRes.rows.map(r => ({ status: r.status, count: Number(r.n) })),
             payoutSummary: payoutsRes.rows.map(r => ({ status: r.status, count: Number(r.n), total: Number(r.total) }))
         });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// --- Vendor-to-Admin Messaging (Task #71) ---------------------------------
+// A minimal ticket/thread channel so a vendor can reach admin outside the
+// specific structured flows that already exist (return responses,
+// compliance notices, promotion proposals). See PENDING.md for the design
+// notes - one open thread per issue, status is admin-managed triage, and
+// the vendor's existing notification bell (not a second unread system)
+// is what tells them an admin reply landed.
+
+// The vendor's own list of threads, most recently active first.
+exports.getMyVendorMessages = async (req, res) => {
+    try {
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const result = await pool.query(
+            `SELECT vm.id, vm.subject, vm.status, vm.created_at, vm.updated_at,
+                    (SELECT COUNT(*) FROM vendor_message_replies r WHERE r.vendor_message_id = vm.id)::int AS reply_count
+             FROM vendor_messages vm
+             WHERE vm.vendor_id = $1
+             ORDER BY vm.updated_at DESC`,
+            [vendorRow.rows[0].id]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// One of the vendor's own threads, with its full reply history.
+exports.getMyVendorMessageThread = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const threadRes = await pool.query(
+            `SELECT id, subject, status, created_at, updated_at FROM vendor_messages WHERE id = $1 AND vendor_id = $2`,
+            [id, vendorRow.rows[0].id]
+        );
+        if (threadRes.rows.length === 0) {
+            return res.status(404).json({ error: "Message thread not found." });
+        }
+        const repliesRes = await pool.query(
+            `SELECT id, sender_role, body, created_at FROM vendor_message_replies
+             WHERE vendor_message_id = $1 ORDER BY created_at ASC`,
+            [id]
+        );
+        res.json({ thread: threadRes.rows[0], replies: repliesRes.rows });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// A vendor opens a new thread - a subject plus the first message, created
+// together so a thread never exists without at least one reply in it.
+exports.createVendorMessage = async (req, res) => {
+    try {
+        const { subject, body } = req.body;
+        if (!isValidMessageSubject(subject)) {
+            return res.status(400).json({ error: `Subject is required and must be ${MAX_SUBJECT_LENGTH} characters or fewer.` });
+        }
+        if (!isValidMessageBody(body)) {
+            return res.status(400).json({ error: `Message is required and must be ${MAX_BODY_LENGTH} characters or fewer.` });
+        }
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendorId = vendorRow.rows[0].id;
+
+        const threadRes = await pool.query(
+            `INSERT INTO vendor_messages (vendor_id, subject) VALUES ($1, $2) RETURNING *`,
+            [vendorId, subject.trim()]
+        );
+        const thread = threadRes.rows[0];
+        const replyRes = await pool.query(
+            `INSERT INTO vendor_message_replies (vendor_message_id, sender_role, body) VALUES ($1, 'vendor', $2) RETURNING *`,
+            [thread.id, body.trim()]
+        );
+        res.json({ message: "Message sent.", thread, reply: replyRes.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// A vendor replies to one of their own threads. Reopens it automatically
+// if it was resolved (deriveStatusAfterReply) - a vendor following up on
+// a closed thread means it isn't actually closed.
+exports.replyToVendorMessage = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { body } = req.body;
+        if (!isValidMessageBody(body)) {
+            return res.status(400).json({ error: `Message is required and must be ${MAX_BODY_LENGTH} characters or fewer.` });
+        }
+        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const threadRes = await pool.query(
+            `SELECT id, status FROM vendor_messages WHERE id = $1 AND vendor_id = $2`,
+            [id, vendorRow.rows[0].id]
+        );
+        if (threadRes.rows.length === 0) {
+            return res.status(404).json({ error: "Message thread not found." });
+        }
+        const newStatus = deriveStatusAfterReply(threadRes.rows[0].status, "vendor");
+        await pool.query(
+            `UPDATE vendor_messages SET status = $1, updated_at = now() WHERE id = $2`,
+            [newStatus, id]
+        );
+        const replyRes = await pool.query(
+            `INSERT INTO vendor_message_replies (vendor_message_id, sender_role, body) VALUES ($1, 'vendor', $2) RETURNING *`,
+            [id, body.trim()]
+        );
+        res.json({ message: "Reply sent.", reply: replyRes.rows[0], status: newStatus });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Support/admin's merged inbox across every vendor (Task #76 - vendors
+// route to customer_support by default, admin sees the same inbox via
+// requireSupportOrAdmin). Open threads by default; ?view=escalated shows
+// threads a support agent flagged for admin regardless of status,
+// ?view=resolved the resolved ones. Most recently active first (escalated
+// view sorts by escalation time instead, so the newest flag is on top).
+exports.getVendorMessagesAdmin = async (req, res) => {
+    try {
+        const view = isValidMessageAdminView(req.query.view) ? req.query.view : "open";
+        let whereClause = "vm.status = 'open'";
+        let orderClause = "vm.updated_at DESC";
+        if (view === "resolved") {
+            whereClause = "vm.status = 'resolved'";
+        } else if (view === "escalated") {
+            whereClause = "vm.escalated_at IS NOT NULL";
+            orderClause = "vm.escalated_at DESC";
+        }
+        const result = await pool.query(
+            `SELECT vm.id, vm.subject, vm.status, vm.escalated_at, vm.created_at, vm.updated_at,
+                    v.id AS vendor_id, v.business_name AS vendor_business_name,
+                    (SELECT COUNT(*) FROM vendor_message_replies r WHERE r.vendor_message_id = vm.id)::int AS reply_count
+             FROM vendor_messages vm
+             JOIN vendors v ON v.id = vm.vendor_id
+             WHERE ${whereClause}
+             ORDER BY ${orderClause}`
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Any vendor's thread, with its full reply history - admin can view
+// across vendors, unlike getMyVendorMessageThread's own-vendor scoping.
+exports.getVendorMessageThreadAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const threadRes = await pool.query(
+            `SELECT vm.id, vm.subject, vm.status, vm.escalated_at, vm.created_at, vm.updated_at,
+                    v.id AS vendor_id, v.business_name AS vendor_business_name
+             FROM vendor_messages vm
+             JOIN vendors v ON v.id = vm.vendor_id
+             WHERE vm.id = $1`,
+            [id]
+        );
+        if (threadRes.rows.length === 0) {
+            return res.status(404).json({ error: "Message thread not found." });
+        }
+        const repliesRes = await pool.query(
+            `SELECT id, sender_role, body, created_at FROM vendor_message_replies
+             WHERE vendor_message_id = $1 ORDER BY created_at ASC`,
+            [id]
+        );
+        res.json({ thread: threadRes.rows[0], replies: repliesRes.rows });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Admin replies to a vendor's thread. Never changes status on its own
+// (deriveStatusAfterReply) - resolving/reopening is a separate, explicit
+// action below - and pings the vendor's notification bell so they know
+// to check their Messages tab.
+exports.replyToVendorMessageAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { body } = req.body;
+        if (!isValidMessageBody(body)) {
+            return res.status(400).json({ error: `Message is required and must be ${MAX_BODY_LENGTH} characters or fewer.` });
+        }
+        const threadRes = await pool.query(
+            `SELECT id, vendor_id, subject, status FROM vendor_messages WHERE id = $1`,
+            [id]
+        );
+        if (threadRes.rows.length === 0) {
+            return res.status(404).json({ error: "Message thread not found." });
+        }
+        const thread = threadRes.rows[0];
+        const newStatus = deriveStatusAfterReply(thread.status, "admin");
+        await pool.query(
+            `UPDATE vendor_messages SET status = $1, updated_at = now() WHERE id = $2`,
+            [newStatus, id]
+        );
+        const replyRes = await pool.query(
+            `INSERT INTO vendor_message_replies (vendor_message_id, sender_role, sender_user_id, body)
+             VALUES ($1, 'admin', $2, $3) RETURNING *`,
+            [id, req.user.userId, body.trim()]
+        );
+        await createVendorNotification(thread.vendor_id, "admin_message", { subject: thread.subject });
+        res.json({ message: "Reply sent.", reply: replyRes.rows[0], status: newStatus });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.resolveVendorMessageAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            `UPDATE vendor_messages SET status = 'resolved', updated_at = now() WHERE id = $1 RETURNING *`,
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Message thread not found." });
+        }
+        res.json({ message: "Thread marked resolved.", thread: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.reopenVendorMessageAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            `UPDATE vendor_messages SET status = 'open', updated_at = now() WHERE id = $1 RETURNING *`,
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Message thread not found." });
+        }
+        res.json({ message: "Thread reopened.", thread: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Escalation (Task #76) - a support agent (or admin) flags a thread for
+// admin attention. Purely a flag, not a reassignment: the thread stays in
+// the same shared inbox, escalated_at just makes it show up in the
+// Escalated view for whoever is watching. Doesn't touch status - an
+// escalated thread can still be open or resolved.
+exports.escalateVendorMessageAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            `UPDATE vendor_messages SET escalated_at = now() WHERE id = $1 RETURNING *`,
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Message thread not found." });
+        }
+        res.json({ message: "Thread escalated to admin.", thread: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.unescalateVendorMessageAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            `UPDATE vendor_messages SET escalated_at = NULL WHERE id = $1 RETURNING *`,
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Message thread not found." });
+        }
+        res.json({ message: "Thread un-escalated.", thread: result.rows[0] });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

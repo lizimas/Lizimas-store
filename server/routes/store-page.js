@@ -25,7 +25,7 @@ router.get("/store/:slug", async (req, res, next) => {
 
   try {
     const { rows } = await pool.query(
-      `SELECT business_name, slug, logo_url, banner_url, about
+      `SELECT business_name, slug, about
          FROM vendors WHERE slug = $1 AND status = 'approved' LIMIT 1`,
       [slug]
     );
@@ -51,7 +51,6 @@ router.get("/store/:slug", async (req, res, next) => {
       `<meta property="og:title" content="${esc(v.business_name)}">`,
       `<meta property="og:description" content="${esc(desc)}">`,
       `<meta property="og:url" content="${url}">`,
-      v.logo_url || v.banner_url ? `<meta property="og:image" content="${esc(v.banner_url || v.logo_url)}">` : "",
     ].filter(Boolean).join("\n");
 
     let html = fs.readFileSync(HTML_PATH, "utf8");

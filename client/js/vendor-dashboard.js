@@ -49,7 +49,7 @@ function setupVendorTabs() {
             button.classList.add("active");
             document.getElementById(`tab-${button.dataset.tab}`).classList.remove("hidden");
 
-            if (button.dataset.tab === "overview") loadVendorStatus();
+            if (button.dataset.tab === "overview") { loadVendorStatus(); loadVendorKyc(); }
             if (button.dataset.tab === "products") loadVendorProducts();
             if (button.dataset.tab === "add-product" && staffCategoriesLoaded === false) loadVendorCategories();
             if (button.dataset.tab === "orders") loadVendorOrders();
@@ -60,6 +60,8 @@ function setupVendorTabs() {
             if (button.dataset.tab === "promotions") loadVendorPromotionsTab();
             if (button.dataset.tab === "account") loadVendorComplianceNotices();
             if (button.dataset.tab === "reports") loadVendorReports();
+            if (button.dataset.tab === "storefront") loadVendorStorefront();
+            if (button.dataset.tab === "messages") loadVendorMessages();
         });
     });
 }
@@ -97,15 +99,11 @@ async function loadVendorStatus() {
             ${extra}
         `;
 
-        const idLabel = v.account_type === "company" ? "Registration Number" : "National ID Number";
-        const idValue = v.account_type === "company" ? v.registration_number : v.national_id_number;
-
         document.getElementById("vendor-profile-details").innerHTML = `
             <table>
                 <tbody>
                     <tr><td style="font-weight:600; padding:6px 12px 6px 0;">Shop Name</td><td>${v.business_name || "-"}</td></tr>
                     <tr><td style="font-weight:600; padding:6px 12px 6px 0;">Account Type</td><td>${v.account_type === "company" ? "Company" : v.account_type === "individual" ? "Individual" : "-"}</td></tr>
-                    <tr><td style="font-weight:600; padding:6px 12px 6px 0;">${idLabel}</td><td>${idValue || "-"}</td></tr>
                     <tr><td style="font-weight:600; padding:6px 12px 6px 0;">Phone</td><td>${v.phone || "-"}</td></tr>
                     <tr><td style="font-weight:600; padding:6px 12px 6px 0;">Location</td><td>${v.physical_address || "-"}</td></tr>
                     <tr><td style="font-weight:600; padding:6px 12px 6px 0;">MoMo Payout Number</td><td>${v.momo_number || "-"}</td></tr>
@@ -114,38 +112,106 @@ async function loadVendorStatus() {
             </table>
         `;
 
-        const verificationPanel = document.getElementById("vendor-verification-panel");
-        const needsRegNum = v.account_type === "company" && !v.registration_number;
-        const needsNatId = v.account_type === "individual" && !v.national_id_number;
-
-        if (needsRegNum || needsNatId) {
-            verificationPanel.classList.remove("hidden");
-            document.getElementById("vendor-verification-regnum-group").classList.toggle("hidden", !needsRegNum);
-            document.getElementById("vendor-verification-natid-group").classList.toggle("hidden", !needsNatId);
-            document.getElementById("vendor-verification-momo").value = v.momo_number || "";
-        } else {
-            verificationPanel.classList.add("hidden");
-        }
+        document.getElementById("vendor-momo-input").value = v.momo_number || "";
     } catch (error) {
         console.error("Load vendor status error:", error);
     }
 }
 
-async function submitVendorVerification() {
-    const statusEl = document.getElementById("vendor-verification-status");
-    const momo_number = document.getElementById("vendor-verification-momo").value.trim();
+async function saveVendorMomoNumber() {
+    const statusEl = document.getElementById("vendor-momo-status");
+    const momo_number = document.getElementById("vendor-momo-input").value.trim();
 
-    const body = { momo_number: momo_number || null };
+    statusEl.style.color = "#555";
+    statusEl.textContent = "Saving...";
+
+    try {
+        await vendorAuthorizedFetch("/api/vendors/me", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ momo_number: momo_number || null })
+        });
+        statusEl.style.color = "#067647";
+        statusEl.textContent = "Saved.";
+    } catch (error) {
+        console.error("Save vendor momo number error:", error);
+        statusEl.style.color = "#DC2626";
+        statusEl.textContent = "Could not save. Please try again.";
+    }
+}
+
+// --- Vendor KYC & Compliance Profile (Ryan, Sept 2026) ----------------------
+// Identity/business-registration verification - separate from the plain
+// business profile above. See server/utils/vendorKyc.js for the status
+// values and server/controllers/vendorKycController.js for the API.
+
+const VENDOR_KYC_BADGE = {
+    not_started:     { cls: "status-forfeited",  label: "Not started" },
+    submitted:        { cls: "status-new",        label: "Submitted - awaiting review" },
+    under_review:     { cls: "status-processing", label: "Under review" },
+    action_required:  { cls: "status-pending",    label: "Action required" },
+    verified:         { cls: "status-paid",       label: "Verified" },
+    rejected:         { cls: "status-cancelled",  label: "Rejected" },
+    suspended:        { cls: "status-cancelled",  label: "Suspended" }
+};
+
+async function loadVendorKyc() {
+    try {
+        const k = await vendorAuthorizedFetch("/api/vendors/me/kyc");
+
+        const badge = document.getElementById("vendor-kyc-status-badge");
+        const info = VENDOR_KYC_BADGE[k.kyc_status] || VENDOR_KYC_BADGE.not_started;
+        badge.className = "status-badge " + info.cls;
+        badge.textContent = info.label;
+
+        const noteEl = document.getElementById("vendor-kyc-review-note");
+        if (k.review_note && (k.kyc_status === "action_required" || k.kyc_status === "rejected")) {
+            noteEl.textContent = (k.kyc_status === "rejected" ? "Rejected: " : "Action needed: ") + k.review_note;
+            noteEl.classList.remove("hidden");
+        } else {
+            noteEl.classList.add("hidden");
+        }
+
+        const formEl = document.getElementById("vendor-kyc-form");
+        const lockedEl = document.getElementById("vendor-kyc-locked-view");
+
+        if (k.editable) {
+            formEl.classList.remove("hidden");
+            lockedEl.classList.add("hidden");
+            const needsRegNum = k.account_type === "company";
+            const needsNatId = k.account_type === "individual";
+            document.getElementById("vendor-kyc-regnum-group").classList.toggle("hidden", !needsRegNum);
+            document.getElementById("vendor-kyc-natid-group").classList.toggle("hidden", !needsNatId);
+            document.getElementById("vendor-kyc-regnum").value = k.registration_number || "";
+            document.getElementById("vendor-kyc-natid").value = k.national_id_number || "";
+        } else {
+            formEl.classList.add("hidden");
+            lockedEl.classList.remove("hidden");
+            const lockedText = document.getElementById("vendor-kyc-locked-text");
+            if (k.kyc_status === "verified") {
+                lockedText.textContent = "Your identity/business registration is verified. Contact support if anything needs to change.";
+            } else {
+                lockedText.textContent = "Your information is with Lizimas Store for review - we'll let you know once it's checked.";
+            }
+        }
+    } catch (error) {
+        console.error("Load vendor KYC error:", error);
+    }
+}
+
+async function submitVendorKyc() {
+    const statusEl = document.getElementById("vendor-kyc-status-msg");
+    const body = {};
 
     if (vendorAccountType === "company") {
-        const registration_number = document.getElementById("vendor-verification-regnum").value.trim();
+        const registration_number = document.getElementById("vendor-kyc-regnum").value.trim();
         if (!registration_number) {
             statusEl.textContent = "Please enter your URSB registration number.";
             return;
         }
         body.registration_number = registration_number;
     } else if (vendorAccountType === "individual") {
-        const national_id_number = document.getElementById("vendor-verification-natid").value.trim();
+        const national_id_number = document.getElementById("vendor-kyc-natid").value.trim();
         if (!national_id_number) {
             statusEl.textContent = "Please enter your national ID number.";
             return;
@@ -154,21 +220,26 @@ async function submitVendorVerification() {
     }
 
     statusEl.style.color = "#DC2626";
-    statusEl.textContent = "Saving...";
+    statusEl.textContent = "Submitting...";
 
     try {
-        await vendorAuthorizedFetch("/api/vendors/me", {
+        const data = await vendorAuthorizedFetch("/api/vendors/me/kyc", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body)
         });
+        if (data.error) {
+            statusEl.style.color = "#DC2626";
+            statusEl.textContent = data.error;
+            return;
+        }
         statusEl.style.color = "#067647";
-        statusEl.textContent = "Saved.";
-        loadVendorStatus();
+        statusEl.textContent = "Submitted for review.";
+        loadVendorKyc();
     } catch (error) {
-        console.error("Submit vendor verification error:", error);
+        console.error("Submit vendor KYC error:", error);
         statusEl.style.color = "#DC2626";
-        statusEl.textContent = "Could not save. Please try again.";
+        statusEl.textContent = "Could not submit. Please try again.";
     }
 }
 
@@ -334,7 +405,7 @@ function renderVendorProductsTable() {
                         <td data-label="SKU">${p.sku || "—"}</td>
                         <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
                         <td data-label="Stock">${p.stock}</td>
-                        <td data-label="Status">${vendorProductStatusBadge(p)}</td>
+                        <td data-label="Status">${vendorProductStatusBadge(p)}${p.status === "rejected" && p.rejection_reason ? `<div style="font-size:11px; color:#991B1B; margin-top:4px;">${p.rejection_reason}</div>` : ""}</td>
                         <td data-label="Actions">
                             <button onclick="editVendorProduct(${p.id})" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Edit</button>
                             ${p.status === "approved" ? `<button onclick="bulkVendorProductActionSingle(${p.id}, '${p.is_active ? "deactivate" : "activate"}')" style="background:${p.is_active ? "#B45309" : "#16A34A"}; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">${p.is_active ? "Deactivate" : "Activate"}</button>` : ""}
@@ -1736,6 +1807,258 @@ function renderVendorReportsChart(dailySales) {
     });
 }
 
+// --- Storefront branding (Tasks #68/#74/#75) ------------------------------
+// About text and delivery/payment method, shown on the vendor's own public
+// store page (client/store.html). No logo/banner here - Ryan asked for
+// those removed from the storefront (Sept 2026); a plain JSON PATCH is
+// enough now that there's nothing to upload.
+
+async function loadVendorStorefront() {
+    try {
+        const v = await vendorAuthorizedFetch("/api/vendors/me");
+        if (v.error) return;
+
+        const aboutEl = document.getElementById("vendor-storefront-about");
+        aboutEl.value = v.about || "";
+        document.getElementById("vendor-storefront-about-count").textContent = aboutEl.value.length;
+
+        const codRadio = document.getElementById("vendor-delivery-method-cod");
+        const prepayRadio = document.getElementById("vendor-delivery-method-prepay");
+        codRadio.checked = v.delivery_method === "cash_on_delivery";
+        prepayRadio.checked = v.delivery_method === "payment_first";
+
+        const viewLink = document.getElementById("vendor-storefront-view-link");
+        if (v.slug) {
+            viewLink.href = `/store/${encodeURIComponent(v.slug)}`;
+        }
+
+        document.getElementById("vendor-storefront-status").textContent = "";
+    } catch (error) {
+        console.error("Load vendor storefront error:", error);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const aboutEl = document.getElementById("vendor-storefront-about");
+    if (aboutEl) {
+        aboutEl.addEventListener("input", () => {
+            document.getElementById("vendor-storefront-about-count").textContent = aboutEl.value.length;
+        });
+    }
+
+    const saveBtn = document.getElementById("vendor-storefront-save-btn");
+    if (saveBtn) {
+        saveBtn.addEventListener("click", saveVendorStorefront);
+    }
+});
+
+async function saveVendorStorefront() {
+    const statusEl = document.getElementById("vendor-storefront-status");
+    const saveBtn = document.getElementById("vendor-storefront-save-btn");
+    const about = document.getElementById("vendor-storefront-about").value;
+    const codRadio = document.getElementById("vendor-delivery-method-cod");
+    const prepayRadio = document.getElementById("vendor-delivery-method-prepay");
+    const deliveryMethod = codRadio.checked ? "cash_on_delivery" : (prepayRadio.checked ? "payment_first" : "");
+
+    saveBtn.disabled = true;
+    saveBtn.style.opacity = "0.6";
+    statusEl.style.color = "";
+    statusEl.textContent = "Saving...";
+
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/me/storefront", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ about, delivery_method: deliveryMethod })
+        });
+        saveBtn.disabled = false;
+        saveBtn.style.opacity = "1";
+
+        if (data.error) {
+            statusEl.style.color = "#DC2626";
+            statusEl.textContent = data.error;
+            return;
+        }
+
+        statusEl.style.color = "#16A34A";
+        statusEl.textContent = "Saved.";
+        loadVendorStorefront();
+    } catch (error) {
+        console.error("Save vendor storefront error:", error);
+        saveBtn.disabled = false;
+        saveBtn.style.opacity = "1";
+        statusEl.style.color = "#DC2626";
+        statusEl.textContent = "Could not connect to server.";
+    }
+}
+
+// --- Vendor-to-Admin Messaging (Task #71) ---------------------------------
+// A minimal ticket/thread view: a list of the vendor's own threads plus a
+// "New Message" form, and a detail view (conversation + reply box) shown
+// in place of the list when a thread is opened.
+
+let vendorMessagesCache = [];
+let vendorOpenMessageThreadId = null;
+
+function vendorMessageStatusBadge(status) {
+    return status === "resolved"
+        ? `<span class="status-badge status-paid">Resolved</span>`
+        : `<span class="status-badge status-pending">Open</span>`;
+}
+
+async function loadVendorMessages() {
+    const box = document.getElementById("vendor-messages-list");
+    if (!box) return;
+    try {
+        const rows = await vendorAuthorizedFetch("/api/vendors/messages");
+        if (rows.error) {
+            box.innerHTML = `<p>${rows.error}</p>`;
+            return;
+        }
+        vendorMessagesCache = rows;
+        if (rows.length === 0) {
+            box.innerHTML = `<p class="no-data">You haven't sent any messages yet.</p>`;
+            return;
+        }
+        box.innerHTML = `
+            <table style="width:100%;">
+                <thead><tr><th>Subject</th><th>Status</th><th>Replies</th><th>Last Update</th></tr></thead>
+                <tbody>
+                    ${rows.map(m => `
+                        <tr onclick="openVendorMessageThread(${m.id})" style="cursor:pointer;">
+                            <td data-label="Subject">${m.subject}</td>
+                            <td data-label="Status">${vendorMessageStatusBadge(m.status)}</td>
+                            <td data-label="Replies">${m.reply_count}</td>
+                            <td data-label="Last Update">${new Date(m.updated_at).toLocaleString()}</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>`;
+    } catch (error) {
+        console.error("Load vendor messages error:", error);
+        box.innerHTML = "<p>Could not connect to server.</p>";
+    }
+}
+
+async function openVendorMessageThread(id) {
+    vendorOpenMessageThreadId = id;
+    document.getElementById("vendor-messages-list-view").hidden = true;
+    document.getElementById("vendor-messages-thread-view").hidden = false;
+    await loadVendorMessageThread();
+}
+
+function closeVendorMessageThread() {
+    vendorOpenMessageThreadId = null;
+    document.getElementById("vendor-messages-thread-view").hidden = true;
+    document.getElementById("vendor-messages-list-view").hidden = false;
+    loadVendorMessages();
+}
+
+async function loadVendorMessageThread() {
+    if (!vendorOpenMessageThreadId) return;
+    try {
+        const data = await vendorAuthorizedFetch(`/api/vendors/messages/${vendorOpenMessageThreadId}`);
+        if (data.error) return;
+        document.getElementById("vendor-message-thread-subject").textContent = data.thread.subject;
+        document.getElementById("vendor-message-thread-status").innerHTML =
+            `${vendorMessageStatusBadge(data.thread.status)} &middot; opened ${new Date(data.thread.created_at).toLocaleDateString()}`;
+        const repliesBox = document.getElementById("vendor-message-thread-replies");
+        repliesBox.innerHTML = data.replies.map(r => `
+            <div style="padding:8px 10px; border-radius:8px; margin-bottom:8px; max-width:85%; ${r.sender_role === "admin" ? "background:#EEF2FF; margin-right:auto;" : "background:#F3F4F6; margin-left:auto;"}">
+                <div style="font-size:11px; font-weight:600; color:#555; margin-bottom:2px;">${r.sender_role === "admin" ? "Lizimas Store" : "You"}</div>
+                <div>${r.body}</div>
+                <div style="font-size:10px; color:#999; margin-top:2px;">${new Date(r.created_at).toLocaleString()}</div>
+            </div>
+        `).join("");
+    } catch (error) {
+        console.error("Load vendor message thread error:", error);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const sendBtn = document.getElementById("vendor-message-send-btn");
+    if (sendBtn) {
+        sendBtn.addEventListener("click", async () => {
+            const subjectEl = document.getElementById("vendor-message-subject");
+            const bodyEl = document.getElementById("vendor-message-body");
+            const statusEl = document.getElementById("vendor-message-send-status");
+            const subject = subjectEl.value.trim();
+            const body = bodyEl.value.trim();
+            if (!subject || !body) {
+                statusEl.style.color = "#DC2626";
+                statusEl.textContent = "Subject and message are both required.";
+                return;
+            }
+            sendBtn.disabled = true;
+            sendBtn.style.opacity = "0.6";
+            statusEl.style.color = "";
+            statusEl.textContent = "Sending...";
+            try {
+                const data = await vendorAuthorizedFetch("/api/vendors/messages", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ subject, body })
+                });
+                sendBtn.disabled = false;
+                sendBtn.style.opacity = "1";
+                if (data.error) {
+                    statusEl.style.color = "#DC2626";
+                    statusEl.textContent = data.error;
+                    return;
+                }
+                subjectEl.value = "";
+                bodyEl.value = "";
+                statusEl.style.color = "#16A34A";
+                statusEl.textContent = "Sent.";
+                loadVendorMessages();
+            } catch (error) {
+                console.error("Send vendor message error:", error);
+                sendBtn.disabled = false;
+                sendBtn.style.opacity = "1";
+                statusEl.style.color = "#DC2626";
+                statusEl.textContent = "Could not connect to server.";
+            }
+        });
+    }
+
+    const replyBtn = document.getElementById("vendor-message-reply-btn");
+    if (replyBtn) {
+        replyBtn.addEventListener("click", async () => {
+            const bodyEl = document.getElementById("vendor-message-reply-body");
+            const statusEl = document.getElementById("vendor-message-reply-status");
+            const body = bodyEl.value.trim();
+            if (!body || !vendorOpenMessageThreadId) return;
+            replyBtn.disabled = true;
+            replyBtn.style.opacity = "0.6";
+            statusEl.style.color = "";
+            statusEl.textContent = "Sending...";
+            try {
+                const data = await vendorAuthorizedFetch(`/api/vendors/messages/${vendorOpenMessageThreadId}/replies`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ body })
+                });
+                replyBtn.disabled = false;
+                replyBtn.style.opacity = "1";
+                if (data.error) {
+                    statusEl.style.color = "#DC2626";
+                    statusEl.textContent = data.error;
+                    return;
+                }
+                bodyEl.value = "";
+                statusEl.textContent = "";
+                loadVendorMessageThread();
+            } catch (error) {
+                console.error("Send vendor message reply error:", error);
+                replyBtn.disabled = false;
+                replyBtn.style.opacity = "1";
+                statusEl.style.color = "#DC2626";
+                statusEl.textContent = "Could not connect to server.";
+            }
+        });
+    }
+});
+
 // --- Init -----------------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -1745,6 +2068,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     setupVendorTabs();
     loadVendorStatus();
+    loadVendorKyc();
     loadVendorDashboardSummary();
     loadVendorCategories();
     loadVendorPromotions();
