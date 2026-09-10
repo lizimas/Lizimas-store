@@ -1,0 +1,241 @@
+/* Vendor mobile app shell (client/vendor/dashboard.html), matching Jumia's
+   real seller-center IA: a bottom-nav app (Home / Orders / Manage Products
+   / Menu) shown below the ~768px breakpoint, replacing the desktop
+   sidebar-and-tabs shell (.admin-shell) which stays for wider screens.
+   Tokens match the real admin palette (client/css/admin.css): navy
+   #1a1a2e, gold #f4b400, background #f4f5f7 - kept as CSS variables here
+   so the mobile shell and admin.css never have to be kept in sync by hand. */
+
+:root {
+    --vm-navy: #1a1a2e;
+    --vm-gold: #f4b400;
+    --vm-bg: #f4f5f7;
+    --vm-border: #e2e4ea;
+    --vm-muted: #9aa1ae;
+    --vm-subtext: #888;
+    --vm-amber-bg: #fff3d6;
+    --vm-amber-text: #9a6b00;
+    --vm-green-bg: #e6f4ea;
+    --vm-green-text: #1e7e34;
+    --vm-red: #DC2626;
+    --vm-info-bg: #eef1fa;
+    --vm-info-text: #3a4568;
+}
+
+.vendor-mobile-shell {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .admin-shell { display: none; }
+    .vendor-mobile-shell { display: block; }
+}
+
+.vendor-mobile-shell {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    background: var(--vm-bg);
+    padding-bottom: 78px;
+    position: relative;
+}
+
+.vm-screen { display: none; }
+.vm-screen.active { display: block; }
+
+/* --- Headers -------------------------------------------------------- */
+
+.vm-header {
+    background: var(--vm-navy);
+    color: #fff;
+    padding: 22px 18px 26px;
+}
+.vm-header.vm-header-compact { padding: 18px 18px 20px; display: flex; align-items: center; gap: 10px; }
+.vm-header-brand { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.vm-header-brand-badge {
+    width: 28px; height: 28px; background: var(--vm-gold); color: var(--vm-navy);
+    border-radius: 7px; display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 14px; flex-shrink: 0;
+}
+.vm-header-eyebrow { font-size: 13px; font-weight: 600; opacity: .85; }
+.vm-header-title { font-size: 21px; font-weight: 700; line-height: 1.3; }
+.vm-header-compact .vm-header-title { font-size: 19px; }
+.vm-header-subtitle { font-size: 13px; color: #cfd2e0; line-height: 1.5; margin-top: 6px; }
+.vm-back-btn { background: none; border: none; color: #fff; display: flex; cursor: pointer; padding: 2px; flex-shrink: 0; }
+
+/* --- Cards / lists ---------------------------------------------------- */
+
+.vm-card {
+    background: #fff;
+    margin: 0 14px 14px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    padding: 18px 16px;
+}
+.vm-card-title { font-size: 15px; font-weight: 700; color: var(--vm-navy); margin-bottom: 2px; }
+.vm-card-subtitle { font-size: 12px; color: var(--vm-subtext); margin-bottom: 14px; line-height: 1.5; }
+
+.vm-list-row {
+    display: flex; align-items: center; gap: 12px; padding: 14px 4px;
+    border-bottom: 1px solid #f0f1f4; color: var(--vm-navy);
+    background: none; border-left: none; border-right: none; border-top: none;
+    width: 100%; text-align: left; font: inherit; cursor: pointer;
+}
+.vm-list-row:last-child { border-bottom: none; }
+.vm-list-row.vm-muted { color: var(--vm-muted); }
+.vm-list-row-icon { display: flex; flex-shrink: 0; }
+.vm-list-row-label { flex: 1; font-size: 14px; font-weight: 500; }
+.vm-list-row-chevron { display: flex; color: #b6bac4; flex-shrink: 0; }
+.vm-list-row.vm-danger { color: var(--vm-red); }
+.vm-list-row.vm-danger .vm-list-row-label { font-weight: 600; }
+
+.vm-badge-soon {
+    font-size: 9.5px; font-weight: 700; color: var(--vm-amber-text);
+    background: var(--vm-amber-bg); border-radius: 6px; padding: 3px 7px; margin-right: 4px;
+}
+
+.vm-group-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; background: #f7f8fa; margin: 0 -16px;
+}
+.vm-group-header-label {
+    font-size: 12.5px; font-weight: 700; color: var(--vm-navy);
+    letter-spacing: .02em; text-transform: uppercase;
+}
+
+.vm-note {
+    margin: 0 14px 14px; padding: 12px 14px; border-radius: 10px;
+    font-size: 11.5px; line-height: 1.55;
+}
+.vm-note-amber { background: var(--vm-amber-bg); color: var(--vm-amber-text); border: 1px solid #f4e0a3; }
+.vm-note-info { background: var(--vm-info-bg); color: var(--vm-info-text); }
+
+/* --- Bottom nav --------------------------------------------------------- */
+
+.vm-bottom-nav {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 64px;
+    background: #fff; border-top: 1px solid #eee; display: flex; align-items: stretch;
+}
+.vm-nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; color: var(--vm-muted); font-size: 10px; font-weight: 500; background: none; border: none;
+    cursor: pointer; padding: 0; text-align: center; line-height: 1.2;
+}
+.vm-nav-item svg { flex-shrink: 0; }
+.vm-nav-item.active { color: var(--vm-gold); font-weight: 700; }
+
+/* --- Form fields (read-only display + real inputs) ----------------------- */
+
+.vm-field { margin-bottom: 14px; }
+.vm-field:last-child { margin-bottom: 0; }
+.vm-field-label { display: block; font-size: 12px; font-weight: 600; color: #333; margin-bottom: 6px; }
+.vm-field-display {
+    padding: 11px 12px; border: 1px solid var(--vm-border); border-radius: 8px;
+    font-size: 13.5px; color: var(--vm-navy); background: #f9f9fb;
+}
+.vm-field-display.vm-disabled { color: #aaa; }
+.vm-field-input {
+    width: 100%; padding: 11px 12px; border: 1px solid #dfe1e8; border-radius: 8px;
+    font-size: 13.5px; color: var(--vm-navy); font-family: inherit;
+}
+
+.vm-btn-primary {
+    background: var(--vm-gold); color: var(--vm-navy); text-align: center; border-radius: 10px;
+    padding: 14px; font-size: 14.5px; font-weight: 700; border: none; width: 100%; cursor: pointer;
+}
+.vm-btn-primary:disabled { background: #e5e7eb; color: var(--vm-muted); cursor: not-allowed; }
+.vm-btn-row { margin: 0 14px 14px; }
+.vm-btn-help { font-size: 11px; color: #999; text-align: center; margin-top: 8px; }
+
+/* --- Stat tiles (Home KPI state) ---------------------------------------- */
+
+.vm-stat-row { display: flex; gap: 10px; margin-bottom: 10px; }
+.vm-stat-row:last-child { margin-bottom: 0; }
+.vm-stat-tile { background: #fff; border-radius: 12px; padding: 14px; flex: 1; }
+.vm-stat-value { font-size: 20px; font-weight: 700; color: var(--vm-navy); margin-bottom: 4px; }
+.vm-stat-label { font-size: 11px; color: var(--vm-subtext); line-height: 1.3; }
+
+/* --- Status pills / filter pills (Orders) -------------------------------- */
+
+.vm-pill-row { display: flex; gap: 8px; overflow-x: auto; padding: 14px 14px 4px; }
+.vm-pill {
+    flex-shrink: 0; padding: 8px 13px; border-radius: 20px; background: #fff; color: #555;
+    border: 1px solid var(--vm-border); font-size: 12.5px; font-weight: 500; white-space: nowrap;
+    cursor: pointer;
+}
+.vm-pill.active { background: var(--vm-gold); color: var(--vm-navy); border-color: transparent; font-weight: 700; }
+
+.vm-search-field {
+    display: flex; align-items: center; gap: 8px; padding: 12px 14px;
+    border: 1px solid var(--vm-border); border-radius: 10px; background: #fff;
+}
+.vm-search-field input { border: none; outline: none; flex: 1; font-size: 13px; font-family: inherit; }
+.vm-search-field input::placeholder { color: #aaa; }
+
+/* --- Order cards ---------------------------------------------------------- */
+
+.vm-order-card {
+    background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    padding: 14px; margin: 0 14px 10px;
+}
+.vm-order-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.vm-order-no { font-size: 12.5px; font-weight: 700; color: var(--vm-navy); }
+.vm-order-status { font-size: 9.5px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
+.vm-order-product { font-size: 13px; color: var(--vm-navy); font-weight: 600; margin-bottom: 2px; }
+.vm-order-meta { font-size: 11px; color: var(--vm-subtext); margin-bottom: 8px; }
+.vm-order-bottom { display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; color: #555; }
+.vm-order-amount { font-weight: 700; color: var(--vm-navy); }
+.vm-order-actions { display: flex; gap: 8px; margin-top: 10px; }
+.vm-order-action-btn {
+    flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--vm-border); background: #fff;
+    font-size: 11.5px; font-weight: 600; color: var(--vm-navy); cursor: pointer;
+}
+
+/* --- Empty states ----------------------------------------------------- */
+
+.vm-empty-state { padding: 60px 20px; text-align: center; font-size: 13px; color: #bbb; }
+.vm-loading-state { padding: 40px 20px; text-align: center; font-size: 13px; color: #aaa; }
+
+/* --- Product Management (filters + bulk bar + FAB) ------------------------ */
+
+.vm-pm-title { padding: 20px 18px 4px; font-size: 22px; font-weight: 800; color: var(--vm-navy); }
+.vm-pm-status-label { font-size: 11px; font-weight: 700; color: var(--vm-muted); text-transform: uppercase; letter-spacing: .04em; margin: 0 14px 6px; }
+.vm-pm-all-pill {
+    display: inline-flex; margin: 0 14px 14px; padding: 7px 16px; border-radius: 20px; background: #fff;
+    border: 1.5px solid var(--vm-gold); font-size: 12.5px; font-weight: 700; color: var(--vm-amber-text);
+}
+.vm-pm-group-label { font-size: 10.5px; font-weight: 700; color: #b08a2e; text-transform: uppercase; letter-spacing: .04em; margin: 0 14px 6px; }
+.vm-pm-group {
+    display: flex; flex-wrap: wrap; gap: 8px; background: #fdf1d6; border-radius: 14px;
+    padding: 12px; margin: 0 14px 14px;
+}
+.vm-pm-group-pill {
+    padding: 8px 14px; border-radius: 20px; background: #fff; border: 1px solid #e7d9b5;
+    font-size: 12.5px; font-weight: 600; color: var(--vm-navy); white-space: nowrap; cursor: pointer;
+}
+.vm-pm-group-pill.active { border-color: var(--vm-gold); background: var(--vm-gold); color: var(--vm-navy); }
+
+.vm-bulk-bar { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid #eee; }
+.vm-checkbox {
+    width: 19px; height: 19px; border-radius: 5px; border: 1.5px solid #c7cad3; background: #fff;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; padding: 0;
+}
+.vm-checkbox.checked { background: var(--vm-gold); border-color: var(--vm-gold); }
+.vm-bulk-actions { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 12px 16px; }
+.vm-bulk-action { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; background: none; border: none; cursor: pointer; }
+.vm-bulk-action.vm-enabled { color: var(--vm-navy); }
+.vm-bulk-action.vm-disabled-look { color: #8a8f99; cursor: not-allowed; }
+.vm-bulk-divider { width: 1px; height: 16px; background: var(--vm-border); }
+
+.vm-fab-row { position: sticky; bottom: 78px; display: flex; justify-content: center; padding: 10px 0 4px; }
+.vm-fab-cluster {
+    display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 26px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15); padding: 8px;
+}
+.vm-fab {
+    width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: none; cursor: pointer;
+}
+.vm-fab-outline { border: 1px solid var(--vm-border); color: var(--vm-navy); }
+.vm-fab-gold-outline { border: 1.5px solid var(--vm-gold); color: var(--vm-amber-text); }
+.vm-fab-gold { background: var(--vm-gold); border: none; color: var(--vm-navy); }

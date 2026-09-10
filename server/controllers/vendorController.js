@@ -155,6 +155,126 @@ exports.updateMyVendorProfile = async (req, res) => {
     }
 };
 
+// pg's default type parser returns DATE columns as JS Date objects (UTC
+// midnight), which JSON.stringify would otherwise expand into a full
+// "...T00:00:00.000Z" timestamp - this keeps the API's startDate/endDate
+// as plain "YYYY-MM-DD" strings, matching what an <input type="date">
+// sends and expects back.
+function formatDateOnly(value) {
+    if (!value) return null;
+    if (typeof value === "string") return value.slice(0, 10);
+    return value.toISOString().slice(0, 10);
+}
+
+// --- Shop Activation & Holiday Mode (migration 081) -----------------------
+// Two whole-shop visibility switches for the mobile vendor app's Menu >
+// Settings > Seller Settings screen. Both gate every one of the vendor's
+// products out of public listings, search, and their own storefront page
+// (see the WHERE clauses in productController.js and getPublicStorefront
+// above) without touching products.is_active, which stays a per-product
+// decision the vendor keeps full control of underneath either switch.
+
+exports.getVendorShopStatus = async (req, res) => {
+    try {
+        const vendorRow = await pool.query(
+            `SELECT shop_active, holiday_mode_active, holiday_mode_start_date, holiday_mode_end_date
+             FROM vendors WHERE user_id = $1`,
+            [req.user.userId]
+        );
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const row = vendorRow.rows[0];
+        res.json({
+            shopActive: row.shop_active,
+            holidayMode: {
+                active: row.holiday_mode_active,
+                startDate: formatDateOnly(row.holiday_mode_start_date),
+                endDate: formatDateOnly(row.holiday_mode_end_date)
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.updateVendorShopActive = async (req, res) => {
+    try {
+        const { active } = req.body;
+        if (typeof active !== "boolean") {
+            return res.status(400).json({ error: "active must be true or false." });
+        }
+        const result = await pool.query(
+            `UPDATE vendors SET shop_active = $1 WHERE user_id = $2 RETURNING id, shop_active`,
+            [active, req.user.userId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        res.json({ shopActive: result.rows[0].shop_active });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.updateVendorHolidayMode = async (req, res) => {
+    try {
+        const { active } = req.body;
+        if (typeof active !== "boolean") {
+            return res.status(400).json({ error: "active must be true or false." });
+        }
+
+        if (active) {
+            const { startDate, endDate } = req.body;
+            if (!startDate || !endDate) {
+                return res.status(400).json({ error: "startDate and endDate are required to turn Holiday Mode on." });
+            }
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+                return res.status(400).json({ error: "startDate and endDate must be valid dates." });
+            }
+            if (end < start) {
+                return res.status(400).json({ error: "endDate cannot be before startDate." });
+            }
+            const todayStr = new Date().toISOString().slice(0, 10);
+            if (startDate < todayStr) {
+                return res.status(400).json({ error: "startDate cannot be in the past." });
+            }
+
+            const result = await pool.query(
+                `UPDATE vendors SET holiday_mode_active = true, holiday_mode_start_date = $1, holiday_mode_end_date = $2
+                 WHERE user_id = $3
+                 RETURNING id, holiday_mode_active, holiday_mode_start_date, holiday_mode_end_date`,
+                [startDate, endDate, req.user.userId]
+            );
+            if (result.rows.length === 0) {
+                return res.status(404).json({ error: "No vendor profile found for this account." });
+            }
+            return res.json({
+                holidayMode: {
+                    active: result.rows[0].holiday_mode_active,
+                    startDate: formatDateOnly(result.rows[0].holiday_mode_start_date),
+                    endDate: formatDateOnly(result.rows[0].holiday_mode_end_date)
+                }
+            });
+        }
+
+        const result = await pool.query(
+            `UPDATE vendors SET holiday_mode_active = false, holiday_mode_start_date = NULL, holiday_mode_end_date = NULL
+             WHERE user_id = $1
+             RETURNING id`,
+            [req.user.userId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        res.json({ holidayMode: { active: false, startDate: null, endDate: null } });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 // Bulk activate/deactivate/delete across the vendor's own products (Task
 // #60: "bulk actions"). Delete reuses the same soft-delete deleteProduct
 // already does for a single vendor product (straight to Trash, no admin
@@ -522,28 +642,45 @@ exports.getPublicStorefront = async (req, res) => {
         const { slug } = req.params;
 
         const vendorResult = await pool.query(
-            `SELECT id, business_name, slug, about, delivery_method
+            `SELECT id, business_name, slug, about, delivery_method,
+                    shop_active, holiday_mode_active, holiday_mode_start_date, holiday_mode_end_date
              FROM vendors WHERE slug = $1 AND status = 'approved' LIMIT 1`,
             [slug]
         );
         if (vendorResult.rows.length === 0) {
             return res.status(404).json({ error: "Store not found." });
         }
-        const vendor = vendorResult.rows[0];
+        const { shop_active, holiday_mode_active, holiday_mode_start_date, holiday_mode_end_date, ...vendor } = vendorResult.rows[0];
+
+        // Holiday Mode / Shop Activation (migration 081): the storefront
+        // page itself still resolves - a shopper following an old link
+        // should see why the shop is unavailable, not a bare 404 - but its
+        // product list is empty for as long as either switch says so. The
+        // same window check backs productController.js's public listing
+        // and getProductById, so a shopper can never reach a product page
+        // directly during either state either.
+        const today = new Date().toISOString().slice(0, 10);
+        const onHoliday = holiday_mode_active
+            && holiday_mode_start_date && holiday_mode_end_date
+            && today >= holiday_mode_start_date.toISOString().slice(0, 10)
+            && today <= holiday_mode_end_date.toISOString().slice(0, 10);
+        const shopUnavailable = shop_active === false || onHoliday;
 
         const [productsResult, followerResult, sellerScore] = await Promise.all([
-            pool.query(
-                `SELECT id, name, price, image, stock, public_code,
-                        EXISTS (
-                            SELECT 1 FROM vendor_promotions vp
-                            WHERE vp.product_id = products.id AND vp.sponsored = true
-                              AND vp.status = 'approved' AND vp.starts_at <= now() AND vp.ends_at >= now()
-                        ) AS is_sponsored
-                 FROM products
-                 WHERE vendor_id = $1 AND status = 'approved' AND is_active = true AND admin_restricted = false AND deleted_at IS NULL
-                 ORDER BY is_sponsored DESC, created_at DESC`,
-                [vendor.id]
-            ),
+            shopUnavailable
+                ? Promise.resolve({ rows: [] })
+                : pool.query(
+                    `SELECT id, name, price, image, stock, public_code,
+                            EXISTS (
+                                SELECT 1 FROM vendor_promotions vp
+                                WHERE vp.product_id = products.id AND vp.sponsored = true
+                                  AND vp.status = 'approved' AND vp.starts_at <= now() AND vp.ends_at >= now()
+                            ) AS is_sponsored
+                     FROM products
+                     WHERE vendor_id = $1 AND status = 'approved' AND is_active = true AND admin_restricted = false AND deleted_at IS NULL
+                     ORDER BY is_sponsored DESC, created_at DESC`,
+                    [vendor.id]
+                ),
             pool.query(`SELECT COUNT(*)::int AS n FROM vendor_followers WHERE vendor_id = $1`, [vendor.id]),
             computeSellerScore(vendor.id)
         ]);
@@ -552,7 +689,8 @@ exports.getPublicStorefront = async (req, res) => {
             vendor,
             products: productsResult.rows,
             followerCount: followerResult.rows[0].n,
-            sellerScore
+            sellerScore,
+            shopUnavailable
         });
     } catch (error) {
         res.status(500).json({ error: error.message });

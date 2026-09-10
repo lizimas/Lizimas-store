@@ -201,7 +201,14 @@ exports.getProducts = async (req, res) => {
                     ) AS is_sponsored
              FROM products
              LEFT JOIN categories ON products.category_id = categories.id
-             WHERE products.status = 'approved' AND products.is_active = true AND products.admin_restricted = false AND products.deleted_at IS NULL${filter}
+             LEFT JOIN vendors ON vendors.id = products.vendor_id
+             WHERE products.status = 'approved' AND products.is_active = true AND products.admin_restricted = false AND products.deleted_at IS NULL
+               AND (products.vendor_id IS NULL OR (
+                    vendors.shop_active = true
+                    AND (vendors.holiday_mode_active = false
+                         OR CURRENT_DATE < vendors.holiday_mode_start_date
+                         OR CURRENT_DATE > vendors.holiday_mode_end_date)
+               ))${filter}
              ORDER BY is_sponsored DESC, products.id DESC`,
             params
         );
@@ -276,7 +283,13 @@ exports.getProductById = async (req, res) => {
             `SELECT products.*, vendors.business_name AS vendor_business_name, vendors.slug AS vendor_slug
              FROM products
              LEFT JOIN vendors ON vendors.id = products.vendor_id AND vendors.status = 'approved'
-             WHERE products.id = $1 AND products.deleted_at IS NULL AND products.status = 'approved' AND products.is_active = true AND products.admin_restricted = false`,
+             WHERE products.id = $1 AND products.deleted_at IS NULL AND products.status = 'approved' AND products.is_active = true AND products.admin_restricted = false
+               AND (products.vendor_id IS NULL OR (
+                    vendors.shop_active = true
+                    AND (vendors.holiday_mode_active = false
+                         OR CURRENT_DATE < vendors.holiday_mode_start_date
+                         OR CURRENT_DATE > vendors.holiday_mode_end_date)
+               ))`,
             [id]
         );
         if (result.rows.length === 0) {
