@@ -483,6 +483,35 @@ async function sendStaffActivationEmail(email, name) {
     }
 }
 
+async function sendVendorApplicationReceivedEmail(email, name, businessName) {
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: "We've Received Your Vendor Application - Lizimas Store",
+            text: renderCustomerText([
+                `Hi ${name},`,
+                "",
+                `Thanks for applying to sell on Lizimas Store as "${businessName}".`,
+                "Your application is now pending review. We'll email you once a decision has been made.",
+                "",
+                "In the meantime, you can log in to your vendor dashboard to complete your KYC verification (identity or business registration details) - this speeds up review once your application reaches the front of the queue."
+            ]),
+            html: renderCustomerEmail({
+                title: "Application received",
+                bodyHtml: `
+<p style="margin:0 0 12px">Hi ${escHtml(name)},</p>
+<p style="margin:0 0 12px">Thanks for applying to sell on Lizimas Store as <strong>${escHtml(businessName)}</strong>. Your application is now pending review - we'll email you as soon as a decision has been made.</p>
+<p style="margin:0 0 12px">In the meantime, you can log in to your vendor dashboard and complete KYC verification (your identity or business registration details). Doing this now speeds up review once your application reaches the front of the queue.</p>`,
+                ctaUrl: `${BRAND.site}/vendor-login.html`,
+                ctaText: "Go to vendor login"
+            })
+        });
+    } catch (error) {
+        console.error("Vendor application received email error:", error);
+    }
+}
+
 async function sendAccountBlockedEmail(email, name) {
     try {
         await transporter.sendMail({
@@ -818,4 +847,4 @@ async function sendStaffMessageAlert(details) {
     }
 }
 
-module.exports = { sendOrderConfirmationEmail, sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert, sendPerformanceReportEmail, sendStaffMessageAlert, sendDataDeletionAlert };
+module.exports = { sendOrderConfirmationEmail, sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert, sendPerformanceReportEmail, sendStaffMessageAlert, sendDataDeletionAlert, sendVendorApplicationReceivedEmail };

@@ -16,7 +16,8 @@ function uploadProfilePhotoToCloudinary(fileBuffer) {
         stream.end(fileBuffer);
     });
 }
-const { sendStaffInviteEmail, sendAdminLoginAlert, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail } = require("../utils/mailer");
+const { sendStaffInviteEmail, sendAdminLoginAlert, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendVendorApplicationReceivedEmail } = require("../utils/mailer");
+const { isValidEmail } = require("../utils/verificationChannels");
 
 const { issueDeviceCookie } = require("../utils/deviceTrust");
 
@@ -160,6 +161,10 @@ async function registerUser(req, res) {
         return res.status(400).json({ error: "Name, email, and password are required." });
     }
 
+    if (!isValidEmail(email)) {
+        return res.status(400).json({ error: "Please enter a valid email address." });
+    }
+
     try {
         const existingUser = await pool.query(
             "SELECT id FROM users WHERE email = $1",
@@ -251,6 +256,10 @@ async function registerVendor(req, res) {
         });
     }
 
+    if (!isValidEmail(email)) {
+        return res.status(400).json({ error: "Please enter a valid email address." });
+    }
+
     if (account_type !== "individual" && account_type !== "company") {
         return res.status(400).json({
             error: "Please choose whether you're registering as an Individual or a Company."
@@ -324,6 +333,9 @@ async function registerVendor(req, res) {
         const newVendor = vendorResult.rows[0];
 
         await client.query("COMMIT");
+
+        sendVendorApplicationReceivedEmail(newUser.email, newUser.name, business_name)
+            .catch(err => console.error("Vendor application received email failed:", err));
 
         // No token issued here on purpose: the applicant is sent to the
         // vendor login page next, and completes KYC verification
