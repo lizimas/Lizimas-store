@@ -158,6 +158,31 @@ async function sendAdminLoginAlert(details) {
     });
 }
 
+async function sendVendorSignupAbandonedAlert(details) {
+    await transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: process.env.ADMIN_ALERT_EMAIL,
+        subject: "Abandoned vendor signup - Lizimas Store",
+        text: renderCustomerText([
+            "Someone started registering as a vendor but never finished.",
+            "",
+            `Email:     ${details.email}`,
+            `Started:   ${details.startedAt}`,
+            `Verified:  ${details.verified ? "Yes - entered the code, then stopped before submitting the form" : "No - never entered the verification code"}`
+        ]),
+        html: renderInternalEmail({
+            title: "Abandoned vendor signup",
+            introHtml: "Someone started registering as a vendor but never finished.",
+            rows: [
+                ["Email", details.email],
+                ["Started", details.startedAt],
+                ["Verified", details.verified ? "Yes - entered the code, then stopped before submitting the form" : "No - never entered the verification code"]
+            ],
+            noteHtml: "Worth a follow-up (call, WhatsApp, or a nudge email) if this is someone you'd want as a vendor."
+        })
+    });
+}
+
 const { slugify } = require("./slugify");
 
 // Canonical product URL - must match the /product/:slug-:id route.
@@ -847,4 +872,4 @@ async function sendStaffMessageAlert(details) {
     }
 }
 
-module.exports = { sendOrderConfirmationEmail, sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert, sendPerformanceReportEmail, sendStaffMessageAlert, sendDataDeletionAlert, sendVendorApplicationReceivedEmail };
+module.exports = { sendOrderConfirmationEmail, sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert, sendPerformanceReportEmail, sendStaffMessageAlert, sendDataDeletionAlert, sendVendorApplicationReceivedEmail, sendVendorSignupAbandonedAlert };

@@ -266,12 +266,16 @@ async function requestVendorRegistrationCode(req, res) {
         }
         const normalisedEmail = email.trim().toLowerCase();
 
-        const existingUser = await pool.query(
-            "SELECT id FROM users WHERE LOWER(email) = $1",
+        // Scoped to an existing VENDOR account specifically - a customer or
+        // staff account sharing this email is not what "already exists" means
+        // here, and used to wrongly block them from ever starting a vendor
+        // application under their usual email address.
+        const existingVendor = await pool.query(
+            "SELECT users.id FROM users JOIN vendors ON vendors.user_id = users.id WHERE LOWER(users.email) = $1",
             [normalisedEmail]
         );
-        if (existingUser.rows.length > 0) {
-            return res.status(409).json({ error: "An account with this email already exists. Please log in instead." });
+        if (existingVendor.rows.length > 0) {
+            return res.status(409).json({ error: "A vendor account with this email already exists. Please log in instead." });
         }
 
         const existingCode = await pool.query(
@@ -294,7 +298,7 @@ async function requestVendorRegistrationCode(req, res) {
             `INSERT INTO vendor_registration_otp (email, code_hash, expires_at, attempts, last_sent_at, verified_at)
              VALUES ($1, $2, $3, 0, NOW(), NULL)
              ON CONFLICT (email) DO UPDATE
-                SET code_hash = $2, expires_at = $3, attempts = 0, last_sent_at = NOW(), verified_at = NULL`,
+                SET code_hash = $2, expires_at = $3, attempts = 0, last_sent_at = NOW(), verified_at = NULL, alerted_at = NULL`,
             [normalisedEmail, hash, expiresAt]
         );
 
@@ -425,13 +429,19 @@ async function registerVendor(req, res) {
 
     const client = await pool.connect();
     try {
-        const existingUser = await client.query(
-            "SELECT id FROM users WHERE email = $1",
-            [email]
+        // Same scoping as requestVendorRegistrationCode above: only block on
+        // an email that is ALREADY a vendor. A customer or staff account
+        // sharing this email is a different login (this creates its own
+        // users row with role='vendor') and must not block the applicant -
+        // that was the bug Ryan flagged (every existing email, vendor or
+        // not, showed "account already exists, log in").
+        const existingVendor = await client.query(
+            "SELECT users.id FROM users JOIN vendors ON vendors.user_id = users.id WHERE LOWER(users.email) = $1",
+            [normalisedEmail]
         );
 
-        if (existingUser.rows.length > 0) {
-            return res.status(409).json({ error: "An account with this email already exists." });
+        if (existingVendor.rows.length > 0) {
+            return res.status(409).json({ error: "A vendor account with this email already exists." });
         }
 
         // One account per business: block registering under a shop name
@@ -503,6 +513,9 @@ async function registerVendor(req, res) {
 
     } catch (error) {
         try { await client.query("ROLLBACK"); } catch (e2) {}
+        if (error.code === "23505" && String(error.constraint || "").includes("email")) {
+            return res.status(409).json({ error: "This email is already linked to an account. Please use a different email to register as a vendor." });
+        }
         console.error("Vendor register error:", error);
         res.status(500).json({ error: "Something went wrong while creating your vendor account." });
     } finally {

@@ -36,11 +36,28 @@ if (reconcilerEnabled) {
     console.warn("Payment reconciler DISABLED via PAYMENT_RECONCILER_ENABLED=false");
 }
 
+// Abandoned vendor signup alerts. Off by default in any environment that
+// hasn't set ADMIN_ALERT_EMAIL (already required for the other admin alert
+// emails) - sending is a no-op error worth avoiding rather than logging on
+// every tick.
+const vendorSignupAbandonment = require("./jobs/vendorSignupAbandonment");
+const vendorSignupAbandonmentEnabled =
+    String(process.env.VENDOR_SIGNUP_ABANDONMENT_ALERTS_ENABLED || "").toLowerCase() !== "false" &&
+    !!process.env.ADMIN_ALERT_EMAIL;
+
+if (vendorSignupAbandonmentEnabled) {
+    vendorSignupAbandonment.start();
+    console.log("Vendor signup abandonment alerts started");
+} else {
+    console.warn("Vendor signup abandonment alerts DISABLED (set ADMIN_ALERT_EMAIL, or VENDOR_SIGNUP_ABANDONMENT_ALERTS_ENABLED=false was set)");
+}
+
 // Stop the timer before the process goes away, so a deploy cannot kill the
 // dyno mid-tick and leave a claimed payment row unresolved.
 function shutdown(signal) {
     console.log(`${signal} received, shutting down`);
     if (reconcilerEnabled) reconciler.stop();
+    if (vendorSignupAbandonmentEnabled) vendorSignupAbandonment.stop();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 10000).unref();
 }
