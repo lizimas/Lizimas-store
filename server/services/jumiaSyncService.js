@@ -6,10 +6,24 @@
 // the controller stays a thin request/response layer, matching how
 // commissionEngine.js/vendorWallet.js sit underneath their controllers
 // elsewhere in this codebase.
+//
+// Since migration 084 a vendor can have several vendor_jumia_connections
+// rows ("Applications", matching Jumia's own Manage Applications screen -
+// each Web Application or Self Authorization credential set the vendor
+// created there). Product push/pull/import only ever use whichever one
+// is_active=true - everything below that isn't itself an Applications
+// CRUD function resolves that row first and behaves exactly as it did
+// pre-084 (a vendor with exactly one Application, active, is the common
+// case and nothing changes for them).
 
+const jwt = require("jsonwebtoken");
 const pool = require("../config/database");
 const { encryptField, decryptField } = require("../utils/encryption");
 const jumiaClient = require("./jumiaClient");
+
+const JWT_SECRET = process.env.JWT_SECRET;
+const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || "https://lizimasstore.com").replace(/\/+$/, "");
+const JUMIA_OAUTH_CALLBACK_URL = `${PUBLIC_BASE_URL}/api/vendors/jumia/oauth/callback`;
 
 async function getVendorIdForUser(userId) {
     const row = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [userId]);
@@ -24,12 +38,43 @@ async function logSync(vendorId, linkId, action, status, detail) {
     );
 }
 
-// --- Connection lifecycle ---
+// --- Applications (Task: multiple named Jumia Applications per vendor,
+// matching Jumia's own Manage Applications screen - see migration 084) ---
 
+function shapeApplication(r) {
+    return {
+        id: r.id,
+        name: r.name,
+        app_type: r.app_type,
+        client_id: r.client_id,
+        redirect_uri: r.redirect_uri,
+        connection_status: r.connection_status,
+        connected: r.connection_status === "connected",
+        jumia_shop_name: r.jumia_shop_name,
+        last_connected_at: r.last_connected_at,
+        last_error: r.last_error,
+        is_active: r.is_active,
+        created_at: r.created_at
+    };
+}
+
+async function listApplications(vendorId) {
+    const rows = await pool.query(
+        `SELECT id, name, app_type, client_id, redirect_uri, connection_status,
+                jumia_shop_name, last_connected_at, last_error, is_active, created_at
+         FROM vendor_jumia_connections WHERE vendor_id = $1 ORDER BY created_at ASC`,
+        [vendorId]
+    );
+    return rows.rows.map(shapeApplication);
+}
+
+// Status of the ACTIVE Application only, for callers that just need to
+// know whether there's a working connection at all (Product Sync/Import
+// panel gating) without the full Applications list.
 async function getConnectionStatus(vendorId) {
     const row = await pool.query(
         `SELECT connection_status, jumia_shop_name, last_connected_at, last_error, client_id
-         FROM vendor_jumia_connections WHERE vendor_id = $1`,
+         FROM vendor_jumia_connections WHERE vendor_id = $1 AND is_active = true`,
         [vendorId]
     );
     if (row.rows.length === 0) {
@@ -46,36 +91,99 @@ async function getConnectionStatus(vendorId) {
     };
 }
 
-// clientSecret here is really the vendor's Jumia Refresh Token (see
-// jumiaClient.js's header note - corrected September 2026 after Ryan
-// confirmed his real Application screen issues one via "Generate Token",
-// not a client_credentials-style secret). Kept the parameter/column name
-// client_secret(_enc) rather than a schema migration, since nothing has
-// ever connected successfully yet and every layer below treats it as an
-// opaque encrypted credential regardless of what Jumia calls it.
-async function connectVendor(vendorId, clientId, clientSecret) {
-    if (!clientId || !clientSecret) {
+async function getApplicationOwned(vendorId, applicationId) {
+    const row = await pool.query(
+        `SELECT * FROM vendor_jumia_connections WHERE id = $1 AND vendor_id = $2`,
+        [applicationId, vendorId]
+    );
+    if (row.rows.length === 0) {
+        const err = new Error("Application not found.");
+        err.status = 404;
+        throw err;
+    }
+    return row.rows[0];
+}
+
+// client_id/client_secret_enc are NOT NULL (migration 082) - a freshly
+// created, not-yet-connected Application gets empty-string placeholders
+// rather than a schema change to make them nullable.
+async function createApplication(vendorId, { name, appType, redirectUri }) {
+    const cleanName = String(name || "").trim();
+    const cleanType = appType === "web_application" ? "web_application" : "self_authorization";
+    if (!cleanName) {
+        const err = new Error("Application Name is required.");
+        err.status = 400;
+        throw err;
+    }
+    const existingCount = (await pool.query(
+        `SELECT count(*)::int AS n FROM vendor_jumia_connections WHERE vendor_id = $1`, [vendorId]
+    )).rows[0].n;
+    const inserted = await pool.query(
+        `INSERT INTO vendor_jumia_connections (vendor_id, name, app_type, client_id, client_secret_enc, connection_status, redirect_uri, is_active)
+         VALUES ($1, $2, $3, '', '', 'disconnected', $4, $5)
+         RETURNING *`,
+        [
+            vendorId, cleanName, cleanType,
+            cleanType === "web_application" ? JUMIA_OAUTH_CALLBACK_URL : null,
+            existingCount === 0
+        ]
+    );
+    await logSync(vendorId, null, "application_create", "success", `Created Application "${cleanName}" (${cleanType}).`);
+    return shapeApplication(inserted.rows[0]);
+}
+
+async function deleteApplication(vendorId, applicationId) {
+    const app = await getApplicationOwned(vendorId, applicationId);
+    await pool.query(`DELETE FROM vendor_jumia_connections WHERE id = $1`, [applicationId]);
+    await logSync(vendorId, null, "application_delete", "success", `Deleted Application "${app.name}".`);
+}
+
+async function setActiveApplication(vendorId, applicationId) {
+    const app = await getApplicationOwned(vendorId, applicationId);
+    if (app.connection_status !== "connected") {
+        const err = new Error("Connect this Application before making it active.");
+        err.status = 400;
+        throw err;
+    }
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        await client.query(`UPDATE vendor_jumia_connections SET is_active = false WHERE vendor_id = $1`, [vendorId]);
+        await client.query(`UPDATE vendor_jumia_connections SET is_active = true, updated_at = now() WHERE id = $1`, [applicationId]);
+        await client.query("COMMIT");
+    } catch (err) {
+        await client.query("ROLLBACK");
+        throw err;
+    } finally {
+        client.release();
+    }
+    await logSync(vendorId, null, "application_activate", "success", `"${app.name}" is now the active Application for product sync.`);
+    return listApplications(vendorId);
+}
+
+// clientSecret param here is really the vendor's Jumia Refresh Token for a
+// Self Authorization Application (see jumiaClient.js's header note).
+async function connectApplication(vendorId, applicationId, clientId, refreshToken) {
+    const app = await getApplicationOwned(vendorId, applicationId);
+    if (app.app_type !== "self_authorization") {
+        const err = new Error('This Application is a Web Application - use "Sign in with Jumia" instead of pasting a Refresh Token.');
+        err.status = 400;
+        throw err;
+    }
+    if (!clientId || !refreshToken) {
         const err = new Error("Client ID and Refresh Token are both required.");
         err.status = 400;
         throw err;
     }
     let tokenResult;
     try {
-        tokenResult = await jumiaClient.mintAccessToken(clientId, clientSecret);
+        tokenResult = await jumiaClient.mintAccessToken(clientId, refreshToken);
     } catch (err) {
-        // Record the attempt even on failure, so a vendor who mistypes their
-        // token sees why the connection didn't take instead of a silent
-        // no-op, and so the row's status flips to 'error' with a reason.
         await pool.query(
-            `INSERT INTO vendor_jumia_connections (vendor_id, client_id, client_secret_enc, connection_status, last_error, updated_at)
-             VALUES ($1, $2, $3, 'error', $4, now())
-             ON CONFLICT (vendor_id) DO UPDATE SET
-                client_id = EXCLUDED.client_id,
-                client_secret_enc = EXCLUDED.client_secret_enc,
-                connection_status = 'error',
-                last_error = EXCLUDED.last_error,
-                updated_at = now()`,
-            [vendorId, clientId, encryptField(clientSecret), err.message]
+            `UPDATE vendor_jumia_connections
+             SET client_id = $1, client_secret_enc = $2, connection_status = 'error', last_error = $3, updated_at = now()
+             WHERE id = $4`,
+            [clientId, encryptField(refreshToken), err.message, applicationId]
         );
         await logSync(vendorId, null, "connect", "error", err.message);
         const wrapped = new Error(err.message);
@@ -85,49 +193,151 @@ async function connectVendor(vendorId, clientId, clientSecret) {
 
     const expiresAt = new Date(Date.now() + tokenResult.expiresInSeconds * 1000);
     await pool.query(
-        `INSERT INTO vendor_jumia_connections
-            (vendor_id, client_id, client_secret_enc, access_token_enc, refresh_token_enc,
-             token_expires_at, connection_status, jumia_shop_name, last_connected_at, last_error, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, 'connected', $7, now(), NULL, now())
-         ON CONFLICT (vendor_id) DO UPDATE SET
-            client_id = EXCLUDED.client_id,
-            client_secret_enc = EXCLUDED.client_secret_enc,
-            access_token_enc = EXCLUDED.access_token_enc,
-            refresh_token_enc = EXCLUDED.refresh_token_enc,
-            token_expires_at = EXCLUDED.token_expires_at,
-            connection_status = 'connected',
-            jumia_shop_name = EXCLUDED.jumia_shop_name,
-            last_connected_at = now(),
-            last_error = NULL,
-            updated_at = now()`,
+        `UPDATE vendor_jumia_connections
+         SET client_id = $1, client_secret_enc = $2, access_token_enc = $3, refresh_token_enc = $4,
+             token_expires_at = $5, connection_status = 'connected', jumia_shop_name = $6,
+             last_connected_at = now(), last_error = NULL, updated_at = now()
+         WHERE id = $7`,
         [
-            vendorId, clientId, encryptField(clientSecret),
+            clientId, encryptField(refreshToken),
             encryptField(tokenResult.accessToken), encryptField(tokenResult.refreshToken),
-            expiresAt, tokenResult.shopName
+            expiresAt, tokenResult.shopName, applicationId
         ]
     );
-    await logSync(vendorId, null, "connect", "success", tokenResult.shopName ? `Connected to ${tokenResult.shopName}` : "Connected");
-    return getConnectionStatus(vendorId);
+    await logSync(vendorId, null, "connect", "success", tokenResult.shopName ? `Connected "${app.name}" to ${tokenResult.shopName}` : `Connected "${app.name}"`);
+    await activateIfNoneActive(vendorId, applicationId);
+    return listApplications(vendorId);
 }
 
-async function disconnectVendor(vendorId) {
+async function disconnectApplication(vendorId, applicationId) {
+    const app = await getApplicationOwned(vendorId, applicationId);
     await pool.query(
         `UPDATE vendor_jumia_connections
          SET connection_status = 'disconnected', access_token_enc = NULL, refresh_token_enc = NULL,
-             token_expires_at = NULL, last_error = NULL, updated_at = now()
-         WHERE vendor_id = $1`,
-        [vendorId]
+             token_expires_at = NULL, last_error = NULL, is_active = false, updated_at = now()
+         WHERE id = $1`,
+        [applicationId]
     );
-    await logSync(vendorId, null, "disconnect", "success", "Vendor disconnected their Jumia account.");
+    await logSync(vendorId, null, "disconnect", "success", `Disconnected "${app.name}".`);
+    return listApplications(vendorId);
 }
 
-// Internal: loads the connection row and returns a guaranteed-fresh
-// access token, persisting a refreshed token back to the row when one
-// was needed. Throws if there is no usable connection.
+// First-ever successful connection with nothing active yet: make this one
+// active automatically so a vendor's first Application "just works"
+// without an extra step, matching the old single-Application behaviour.
+async function activateIfNoneActive(vendorId, applicationId) {
+    const hasActive = (await pool.query(
+        `SELECT 1 FROM vendor_jumia_connections WHERE vendor_id = $1 AND is_active = true`, [vendorId]
+    )).rows.length > 0;
+    if (!hasActive) {
+        await pool.query(`UPDATE vendor_jumia_connections SET is_active = true, updated_at = now() WHERE id = $1`, [applicationId]);
+    }
+}
+
+// --- Web Application OAuth (Authorization Code Flow) ---
+// UNVERIFIED end to end - see jumiaClient.js's header for exactly what
+// part of this is and isn't confirmed against Jumia's real API.
+
+// Sets/updates a Web Application's Client ID + Client Secret, collected
+// from the vendor just before "Sign in with Jumia" (Jumia's own dialog
+// asks for these at Application-creation time on their side; this UI
+// asks right before the redirect instead, once the vendor has created
+// the matching Application on Jumia and copied its credentials here).
+async function setWebApplicationCredentials(vendorId, applicationId, clientId, clientSecret) {
+    const app = await getApplicationOwned(vendorId, applicationId);
+    if (app.app_type !== "web_application") {
+        const err = new Error("This Application is not a Web Application.");
+        err.status = 400;
+        throw err;
+    }
+    if (!clientId) {
+        const err = new Error("Client ID is required.");
+        err.status = 400;
+        throw err;
+    }
+    await pool.query(
+        `UPDATE vendor_jumia_connections SET client_id = $1, client_secret_enc = $2, updated_at = now() WHERE id = $3`,
+        [clientId, clientSecret ? encryptField(clientSecret) : app.client_secret_enc, applicationId]
+    );
+    return listApplications(vendorId);
+}
+
+async function getAuthorizeUrl(vendorId, applicationId) {
+    const app = await getApplicationOwned(vendorId, applicationId);
+    if (app.app_type !== "web_application") {
+        const err = new Error("This Application is a Self Authorization type - paste its Client ID and Refresh Token instead.");
+        err.status = 400;
+        throw err;
+    }
+    if (!app.client_id) {
+        const err = new Error("Enter this Application's Client ID and Client Secret first, then sign in with Jumia.");
+        err.status = 400;
+        throw err;
+    }
+    const state = jwt.sign({ vendorId, applicationId }, JWT_SECRET, { expiresIn: "15m" });
+    return {
+        authorize_url: jumiaClient.buildAuthorizeUrl(app.client_id, JUMIA_OAUTH_CALLBACK_URL, state),
+        redirect_uri: JUMIA_OAUTH_CALLBACK_URL
+    };
+}
+
+// Handles Jumia's redirect back after the vendor consents. Called from a
+// PUBLIC route (no vendor auth header is available on a top-level browser
+// redirect) - the signed `state` from getAuthorizeUrl() is what identifies
+// which vendor/Application this belongs to instead of req.user.
+async function handleOAuthCallback(code, state) {
+    let decoded;
+    try {
+        decoded = jwt.verify(state, JWT_SECRET);
+    } catch (err) {
+        return { success: false, message: "This Jumia sign-in link expired or is invalid. Please try again." };
+    }
+    const { vendorId, applicationId } = decoded;
+    let app;
+    try {
+        app = await getApplicationOwned(vendorId, applicationId);
+    } catch (err) {
+        return { success: false, message: "That Jumia Application no longer exists." };
+    }
+
+    const clientSecret = decryptField(app.client_secret_enc);
+    let tokenResult;
+    try {
+        tokenResult = await jumiaClient.exchangeAuthorizationCode(app.client_id, clientSecret, JUMIA_OAUTH_CALLBACK_URL, code);
+    } catch (err) {
+        await pool.query(
+            `UPDATE vendor_jumia_connections SET connection_status = 'error', last_error = $1, updated_at = now() WHERE id = $2`,
+            [err.message, applicationId]
+        );
+        await logSync(vendorId, null, "connect", "error", err.message);
+        return { success: false, message: err.message };
+    }
+
+    const expiresAt = new Date(Date.now() + tokenResult.expiresInSeconds * 1000);
+    await pool.query(
+        `UPDATE vendor_jumia_connections
+         SET access_token_enc = $1, refresh_token_enc = $2, token_expires_at = $3,
+             connection_status = 'connected', jumia_shop_name = $4,
+             last_connected_at = now(), last_error = NULL, updated_at = now()
+         WHERE id = $5`,
+        [
+            encryptField(tokenResult.accessToken),
+            tokenResult.refreshToken ? encryptField(tokenResult.refreshToken) : app.refresh_token_enc,
+            expiresAt, tokenResult.shopName, applicationId
+        ]
+    );
+    await logSync(vendorId, null, "connect", "success", tokenResult.shopName ? `Connected "${app.name}" to ${tokenResult.shopName}` : `Connected "${app.name}"`);
+    await activateIfNoneActive(vendorId, applicationId);
+    return { success: true };
+}
+
+// Internal: loads the ACTIVE Application's row and returns a
+// guaranteed-fresh access token, persisting a refreshed token back to it
+// when one was needed. Throws if there is no active, usable connection.
 async function getFreshConnection(vendorId) {
-    const row = await pool.query(`SELECT * FROM vendor_jumia_connections WHERE vendor_id = $1`, [vendorId]);
+    const row = await pool.query(`SELECT * FROM vendor_jumia_connections WHERE vendor_id = $1 AND is_active = true`, [vendorId]);
     if (row.rows.length === 0 || row.rows[0].connection_status === "disconnected") {
-        const err = new Error("Not connected to Jumia yet.");
+        const err = new Error("No active Jumia Application connected - go to Applications and connect or activate one.");
         err.status = 400;
         throw err;
     }
@@ -140,24 +350,39 @@ async function getFreshConnection(vendorId) {
                 `UPDATE vendor_jumia_connections
                  SET access_token_enc = $1, refresh_token_enc = $2, token_expires_at = $3,
                      connection_status = 'connected', last_error = NULL, updated_at = now()
-                 WHERE vendor_id = $4`,
-                [encryptField(fresh.accessToken), encryptField(fresh.refreshToken), expiresAt, vendorId]
+                 WHERE id = $4`,
+                [
+                    encryptField(fresh.accessToken),
+                    fresh.refreshToken ? encryptField(fresh.refreshToken) : connectionRow.refresh_token_enc,
+                    expiresAt, connectionRow.id
+                ]
             );
         }
         return { connectionRow, accessToken: fresh.accessToken };
     } catch (err) {
         await pool.query(
-            `UPDATE vendor_jumia_connections SET connection_status = 'error', last_error = $1, updated_at = now() WHERE vendor_id = $2`,
-            [err.message, vendorId]
+            `UPDATE vendor_jumia_connections SET connection_status = 'error', last_error = $1, updated_at = now() WHERE id = $2`,
+            [err.message, connectionRow.id]
         );
         await logSync(vendorId, null, "token_refresh", "error", err.message);
         throw err;
     }
 }
 
-async function testConnection(vendorId) {
+// Testing always exercises the ACTIVE Application (that's the one
+// getFreshConnection resolves, and the one push/pull/import actually
+// use) - testing a non-active one would tell the vendor nothing about
+// what sync currently uses, so it must be made active first.
+async function testApplicationConnection(vendorId, applicationId) {
+    const app = await getApplicationOwned(vendorId, applicationId);
+    if (!app.is_active) {
+        const err = new Error("Make this Application active first, then test it.");
+        err.status = 400;
+        throw err;
+    }
     await getFreshConnection(vendorId);
-    return getConnectionStatus(vendorId);
+    const refreshed = await getApplicationOwned(vendorId, applicationId);
+    return shapeApplication(refreshed);
 }
 
 // --- Push: Lizimas product -> Jumia ---
@@ -360,9 +585,16 @@ async function listProductLinks(vendorId) {
 module.exports = {
     getVendorIdForUser,
     getConnectionStatus,
-    connectVendor,
-    disconnectVendor,
-    testConnection,
+    listApplications,
+    createApplication,
+    deleteApplication,
+    setActiveApplication,
+    connectApplication,
+    disconnectApplication,
+    setWebApplicationCredentials,
+    getAuthorizeUrl,
+    handleOAuthCallback,
+    testApplicationConnection,
     pushProduct,
     pushProductsBulk,
     listRemoteProducts,

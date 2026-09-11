@@ -202,6 +202,7 @@ router.patch("/security/reports/:id", updateAccountReport);
 router.patch("/orders/:id/status", updateOrderStatus);
 
 router.post("/products/import", csvUpload.single("file"), require("../controllers/adminController").importProducts);
+router.get("/products/export", require("../controllers/adminController").exportProducts);
 
 // Vendor fulfilment: drop-off points, handover inspection, returns collection
 // Vendor KYC review

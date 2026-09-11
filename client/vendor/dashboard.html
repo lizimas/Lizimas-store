@@ -149,68 +149,92 @@
     <div class="vm-screen" id="vm-screen-jumia">
         <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Applications</span></div>
         <div class="vm-card">
-            <div class="vm-card-title">Jumia</div>
-            <div style="font-size:12.5px; color:#444; line-height:1.65; margin-bottom:16px;">
-                Connect your Jumia Vendor Center account to push your Lizimas listings to Jumia, or bring your existing Jumia products into Lizimas. On Jumia, go to Settings &gt; Applications, create an Application, then paste its Client ID and Refresh Token below.
+            <div class="vm-card-title">Jumia Applications</div>
+            <div style="font-size:12.5px; color:#444; line-height:1.65; margin-bottom:14px;">
+                Connect your Jumia Vendor Center account to push your Lizimas listings to Jumia, or bring your existing Jumia products into Lizimas. You can add more than one Application - whichever one is Active is used for syncing.
             </div>
-            <div id="vm-jumia-disconnected-view">
-                <div class="vm-field">
-                    <label class="vm-field-label">Jumia Client ID</label>
-                    <input type="text" id="vm-jumia-client-id" class="vm-field-input" autocomplete="off" spellcheck="false">
-                </div>
-                <div class="vm-field">
-                    <label class="vm-field-label">Jumia Refresh Token</label>
-                    <input type="password" id="vm-jumia-client-secret" class="vm-field-input" autocomplete="off" spellcheck="false">
-                </div>
-            </div>
-            <!-- Manage Applications row - mirrors Jumia's own Settings > Applications
-                 table (Name / Client ID / Actions), just as a single mobile-width row:
-                 the secret itself is never shown back (it's encrypted at rest and this
-                 app never round-trips it to the browser) - the padlock icon is how you
-                 rotate it, matching Jumia's own "secret hidden behind an icon" pattern. -->
-            <div id="vm-jumia-connected-view" hidden>
-                <div style="display:flex; align-items:flex-start; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee;">
-                    <div>
-                        <div style="font-size:13px; font-weight:600; color:var(--vm-navy);">Jumia <span id="vm-jumia-status-text" style="font-size:11px; font-weight:600; color:var(--vm-green-text); margin-left:2px;">&bull; Connected</span></div>
-                        <div id="vm-jumia-shop-name" style="font-size:12px; color:#666; margin-top:2px;"></div>
-                        <div style="font-size:11.5px; color:#999; margin-top:2px;">Client ID: <span id="vm-jumia-client-id-display" style="font-family:monospace;"></span></div>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:12px; flex-shrink:0; margin-left:10px;">
-                        <button type="button" title="Update Refresh Token" onclick="vmShowUpdateJumiaSecret()" style="background:none; border:none; cursor:pointer; padding:4px; color:#B45309; display:flex;">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                        </button>
-                        <button type="button" title="Disconnect" onclick="vmDisconnectJumia()" style="background:none; border:none; cursor:pointer; padding:4px; color:#DC2626; display:flex;">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                        </button>
-                    </div>
-                </div>
-                <button type="button" onclick="vmTestJumiaConnection()" style="background:none; border:none; padding:8px 0 0; color:var(--vm-navy); font-size:12.5px; font-weight:600; cursor:pointer;">Test Connection</button>
-            </div>
-            <!-- Rotate secret: Client ID doesn't change, only a new Secret is pasted. -->
-            <div id="vm-jumia-update-secret-view" hidden style="margin-top:6px; padding-top:12px; border-top:1px solid #eee;">
-                <div class="vm-field">
-                    <label class="vm-field-label">New Jumia Refresh Token</label>
-                    <input type="password" id="vm-jumia-new-secret" class="vm-field-input" autocomplete="off" spellcheck="false">
-                </div>
-            </div>
+            <div id="vm-jumia-applications-list"><div class="vm-loading-state">Loading...</div></div>
         </div>
-        <div class="vm-btn-row" id="vm-jumia-connect-actions">
-            <button class="vm-btn-primary" id="vm-jumia-connect-btn" onclick="vmConnectJumia()">Connect to Jumia</button>
-            <div class="vm-btn-help" id="vm-jumia-help">Paste your Jumia Client ID and Refresh Token above, then connect.</div>
-        </div>
-        <div class="vm-btn-row" id="vm-jumia-update-secret-actions" hidden>
-            <button class="vm-btn-primary" onclick="vmSaveUpdatedJumiaSecret()">Save New Refresh Token</button>
-            <button class="vm-btn-primary" style="background:#fff; border:1.5px solid var(--vm-navy); color:var(--vm-navy);" onclick="vmCancelUpdateJumiaSecret()">Cancel</button>
+        <div class="vm-btn-row" id="vm-jumia-create-actions">
+            <button class="vm-btn-primary" onclick="vmShowScreen('jumia-create')">+ Create Application</button>
         </div>
         <div class="vm-card" id="vm-jumia-sync-card" hidden>
             <div class="vm-card-title">Product Sync</div>
             <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:12px;">
-                Push your Lizimas products to Jumia from the Manage Products screen (select products, then "Push to Jumia"), or import your existing Jumia products here.
+                Export to push your Lizimas products to Jumia, or import your existing Jumia products here.
             </div>
             <div class="vm-btn-row" style="margin:0 0 14px;">
+                <button class="vm-btn-primary" onclick="vmShowScreen('jumia-export')">Export to Jumia</button>
                 <button class="vm-btn-primary" style="background:#fff; border:1.5px solid var(--vm-navy); color:var(--vm-navy);" onclick="vmShowScreen('jumia-import')">Import from Jumia</button>
             </div>
             <div id="vm-jumia-links-list"></div>
+        </div>
+    </div>
+
+    <!-- Create/connect a Jumia Application ------------------------------------ -->
+    <div class="vm-screen" id="vm-screen-jumia-create">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back onclick="vmResetJumiaCreateForm()"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Create Application</span></div>
+        <div class="vm-card" id="vm-jumia-create-step1">
+            <div class="vm-field">
+                <label class="vm-field-label">Application Name</label>
+                <input type="text" id="vm-jumia-new-app-name" class="vm-field-input" placeholder="e.g. Lizimas Sync">
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">Application Type</label>
+                <label style="display:flex; align-items:flex-start; gap:8px; padding:10px; border:1px solid #ddd; border-radius:8px; margin-bottom:8px;">
+                    <input type="radio" name="vm-jumia-new-app-type" value="self_authorization" checked style="margin-top:3px;">
+                    <span style="font-size:12.5px; color:#333;"><b>Self Authorization</b><br><span style="color:#888;">Paste a Client ID + Refresh Token. Confirmed working.</span></span>
+                </label>
+                <label style="display:flex; align-items:flex-start; gap:8px; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                    <input type="radio" name="vm-jumia-new-app-type" value="web_application" style="margin-top:3px;">
+                    <span style="font-size:12.5px; color:#333;"><b>Web Application (OAuth)</b><br><span style="color:#888;">Sign in via Jumia's browser consent screen. Not yet fully tested.</span></span>
+                </label>
+            </div>
+            <div class="vm-btn-help" id="vm-jumia-new-app-error" style="color:#DC2626;"></div>
+        </div>
+        <div class="vm-card" id="vm-jumia-create-step2" hidden>
+            <div id="vm-jumia-create-step2-self">
+                <div class="vm-field">
+                    <label class="vm-field-label">Jumia Client ID</label>
+                    <input type="text" id="vm-jumia-app-client-id" class="vm-field-input" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="vm-field">
+                    <label class="vm-field-label">Jumia Refresh Token</label>
+                    <input type="password" id="vm-jumia-app-refresh-token" class="vm-field-input" autocomplete="off" spellcheck="false">
+                </div>
+            </div>
+            <div id="vm-jumia-create-step2-web">
+                <div class="vm-field">
+                    <label class="vm-field-label">Redirect URI (paste into the Application on Jumia)</label>
+                    <input type="text" id="vm-jumia-app-redirect-uri" class="vm-field-input" readonly style="font-family:monospace; font-size:11.5px;">
+                </div>
+                <div class="vm-field">
+                    <label class="vm-field-label">Client ID</label>
+                    <input type="text" id="vm-jumia-app-web-client-id" class="vm-field-input" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="vm-field">
+                    <label class="vm-field-label">Client Secret</label>
+                    <input type="password" id="vm-jumia-app-web-client-secret" class="vm-field-input" autocomplete="off" spellcheck="false">
+                </div>
+                <div style="font-size:11.5px; color:#B45309; background:#FFFBEB; border:1px solid #FDE68A; border-radius:6px; padding:8px;">Not yet tested end to end - Self Authorization is the confirmed flow.</div>
+            </div>
+            <div class="vm-btn-help" id="vm-jumia-app-setup-error" style="color:#DC2626;"></div>
+        </div>
+        <div class="vm-btn-row">
+            <button class="vm-btn-primary" id="vm-jumia-create-continue-btn" onclick="vmCreateJumiaApplication()">Continue</button>
+        </div>
+    </div>
+
+    <!-- Export to Jumia ------------------------------------------------------- -->
+    <div class="vm-screen" id="vm-screen-jumia-export">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Export to Jumia</span></div>
+        <div class="vm-card">
+            <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:10px;">Select the products to push to Jumia.</div>
+            <div id="vm-jumia-export-list"><div class="vm-loading-state">Loading...</div></div>
+        </div>
+        <div class="vm-btn-row" id="vm-jumia-export-actions" hidden>
+            <button class="vm-btn-primary" onclick="vmExportSelectedToJumia()">Push Selected</button>
+            <div class="vm-btn-help" id="vm-jumia-export-help"></div>
         </div>
     </div>
 
@@ -230,6 +254,7 @@
     </div>
 
     <!-- Add Product ----------------------------------------------------------- -->
+
     <div class="vm-screen" id="vm-screen-add-product">
         <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Add Product</span></div>
         <div class="vm-card">
@@ -717,6 +742,10 @@
                                         <textarea id="product-description" rows="4" placeholder="Features, condition, intended use, and everything included in the box" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;"></textarea>
                                     </div>
                                 </div>
+                                <div style="margin-top:14px;">
+                                    <label style="font-size:13px; font-weight:600; color:#333; display:block; margin-bottom:4px;">Rich Content <span style="font-weight:400; color:#888;">(optional &mdash; add photo/text blocks below the short description above, same as staff listings)</span></label>
+                                    <div id="desc-blocks-editor"></div>
+                                </div>
                             </div>
 
                             <div class="product-form-section">
@@ -1060,65 +1089,112 @@
                     </div>
 
                     <div class="panel" id="vd-jumia-panel">
-                        <h3 style="margin:0 0 4px;">Applications</h3>
-                        <p style="font-size:12.5px; color:#888; margin:-4px 0 12px;">Connect your Jumia Vendor Center account to push Lizimas products to Jumia and import Jumia products into Lizimas.</p>
+                        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:4px;">
+                            <div>
+                                <h3 style="margin:0 0 4px;">Applications</h3>
+                                <p style="font-size:12.5px; color:#888; margin:0;">Connect your Jumia Vendor Center account to push Lizimas products to Jumia and import Jumia products into Lizimas. Add as many Applications as you have on Jumia - one of them is the active one used for syncing.</p>
+                            </div>
+                            <button type="button" onclick="vdShowCreateJumiaApplication()" style="background:#E67E22; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600; font-size:13px; white-space:nowrap;">+ Create Application</button>
+                        </div>
 
-                        <div id="vd-jumia-disconnected-view">
-                            <div style="display:flex; flex-direction:column; gap:10px; max-width:420px;">
-                                <div>
-                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Client ID</label>
-                                    <input type="text" id="vd-jumia-client-id" placeholder="Client ID from Jumia Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                </div>
-                                <div>
-                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Refresh Token</label>
-                                    <input type="password" id="vd-jumia-client-secret" placeholder="Refresh Token from Jumia Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                </div>
-                                <div>
-                                    <button type="button" id="vd-jumia-connect-btn" onclick="vdConnectJumia()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:12px 18px; cursor:pointer; font-weight:600;">Connect to Jumia</button>
-                                </div>
-                                <p id="vd-jumia-help" style="font-size:12.5px; color:#888; margin:0;">Find these under Manage Applications in your Jumia Vendor Center, using a Self Authorization application.</p>
+                        <div id="vd-jumia-applications-table" style="margin-top:14px; overflow-x:auto;"></div>
+
+                        <div id="vd-jumia-create-application-view" hidden style="margin-top:16px; border-top:1px solid #eee; padding-top:16px; max-width:480px; display:none; flex-direction:column; gap:12px;">
+                            <div>
+                                <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Application Name</label>
+                                <input type="text" id="vd-jumia-new-app-name" placeholder="e.g. Lizimas Sync" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:8px;">Application Type</label>
+                                <label style="display:flex; align-items:flex-start; gap:10px; padding:12px; border:1px solid #ddd; border-radius:8px; margin-bottom:8px; cursor:pointer;">
+                                    <input type="radio" name="vd-jumia-new-app-type" value="web_application" style="margin-top:3px;">
+                                    <span>
+                                        <span style="display:block; font-weight:600; font-size:13.5px; color:#1a1a2e;">Web Application (OAuth - Authorization Code Flow)</span>
+                                        <span style="display:block; font-size:12px; color:#888; margin-top:2px;">Sign in to Jumia in a browser popup and approve access - no token to copy/paste. Newer, less tested here than Self Authorization.</span>
+                                    </span>
+                                </label>
+                                <label style="display:flex; align-items:flex-start; gap:10px; padding:12px; border:1px solid #ddd; border-radius:8px; cursor:pointer;">
+                                    <input type="radio" name="vd-jumia-new-app-type" value="self_authorization" checked style="margin-top:3px;">
+                                    <span>
+                                        <span style="display:block; font-weight:600; font-size:13.5px; color:#1a1a2e;">Self Authorization (Integration without User interaction)</span>
+                                        <span style="display:block; font-size:12px; color:#888; margin-top:2px;">Paste the Client ID and Refresh Token from a Self Authorization Application on Jumia. The flow already confirmed working with a real Jumia account.</span>
+                                    </span>
+                                </label>
+                            </div>
+                            <p id="vd-jumia-new-app-error" style="font-size:12.5px; color:#DC2626; margin:0;"></p>
+                            <div style="display:flex; gap:10px;">
+                                <button type="button" onclick="vdCreateJumiaApplication()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Create</button>
+                                <button type="button" onclick="vdHideCreateJumiaApplication()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
                             </div>
                         </div>
 
-                        <div id="vd-jumia-connected-view" hidden>
-                            <div style="display:flex; align-items:flex-start; justify-content:space-between; border:1px solid #eee; border-radius:10px; padding:14px 16px; gap:16px; flex-wrap:wrap;">
+                        <div id="vd-jumia-app-setup-view" hidden style="margin-top:16px; border-top:1px solid #eee; padding-top:16px; max-width:480px; display:none; flex-direction:column; gap:10px;">
+                            <div style="font-size:13.5px; font-weight:600; color:var(--vd-navy);" id="vd-jumia-app-setup-title"></div>
+
+                            <div id="vd-jumia-app-setup-self" style="display:flex; flex-direction:column; gap:10px;">
                                 <div>
-                                    <div style="font-size:14px; font-weight:600; color:var(--vd-navy);">Jumia <span id="vd-jumia-status-text" style="font-weight:600; color:#16A34A;">&bull; Connected</span></div>
-                                    <div id="vd-jumia-shop-name" style="font-size:12.5px; color:#666; margin-top:2px;"></div>
-                                    <div style="font-size:12.5px; color:#999; margin-top:4px;">Client ID: <span id="vd-jumia-client-id-display" style="font-family:monospace;"></span></div>
+                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Client ID</label>
+                                    <input type="text" id="vd-jumia-app-client-id" placeholder="Client ID from Jumia Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                                 </div>
+                                <div>
+                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Refresh Token</label>
+                                    <input type="password" id="vd-jumia-app-refresh-token" placeholder="Refresh Token from Jumia Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                </div>
+                                <p style="font-size:12px; color:#888; margin:0;">Find these under Manage Applications in your Jumia Vendor Center, on this Self Authorization application.</p>
                                 <div style="display:flex; gap:10px;">
-                                    <button type="button" title="Update Refresh Token" onclick="vdShowUpdateJumiaSecret()" style="background:none; border:1px solid #ccc; border-radius:6px; width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                                    </button>
-                                    <button type="button" title="Test Connection" onclick="vdTestJumiaConnection()" style="background:none; border:1px solid #ccc; border-radius:6px; width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                    </button>
-                                    <button type="button" title="Disconnect" onclick="vdDisconnectJumia()" style="background:none; border:1px solid #ccc; border-radius:6px; width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                    </button>
+                                    <button type="button" id="vd-jumia-app-connect-btn" onclick="vdConnectJumiaApp()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Connect</button>
+                                    <button type="button" onclick="vdHideJumiaAppSetup()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
                                 </div>
                             </div>
 
-                            <div id="vd-jumia-update-secret-view" hidden style="margin-top:12px; max-width:420px; flex-direction:column; gap:10px;">
+                            <div id="vd-jumia-app-setup-web" style="display:flex; flex-direction:column; gap:10px;">
                                 <div>
-                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">New Refresh Token</label>
-                                    <input type="password" id="vd-jumia-new-secret" placeholder="Paste the new Refresh Token from Jumia" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Redirect URI <span style="font-weight:400; color:#888;">(paste this into the Application on Jumia)</span></label>
+                                    <div style="display:flex; gap:8px;">
+                                        <input type="text" id="vd-jumia-app-redirect-uri" readonly style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box; font-family:monospace; font-size:12px; background:#f7f7f7;">
+                                        <button type="button" onclick="vdCopyJumiaRedirectUri()" style="padding:10px 14px; border:1px solid #ccc; border-radius:8px; background:#fff; cursor:pointer; white-space:nowrap;">Copy</button>
+                                    </div>
                                 </div>
+                                <div>
+                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Client ID</label>
+                                    <input type="text" id="vd-jumia-app-web-client-id" placeholder="Client ID from Jumia Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                </div>
+                                <div>
+                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Client Secret</label>
+                                    <input type="password" id="vd-jumia-app-web-client-secret" placeholder="Client Secret from Jumia Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                </div>
+                                <p style="font-size:12px; color:#B45309; margin:0; background:#FFFBEB; border:1px solid #FDE68A; border-radius:6px; padding:8px;">This sign-in flow hasn't been tested end-to-end against a real Jumia account yet - Self Authorization above is the flow already confirmed working. Try this one if you'd rather not handle a Refresh Token, and tell us if it doesn't complete.</p>
                                 <div style="display:flex; gap:10px;">
-                                    <button type="button" onclick="vdSaveUpdatedJumiaSecret()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Save New Refresh Token</button>
-                                    <button type="button" onclick="vdCancelUpdateJumiaSecret()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                                    <button type="button" id="vd-jumia-app-signin-btn" onclick="vdSignInWithJumia()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Save &amp; Sign in with Jumia</button>
+                                    <button type="button" onclick="vdHideJumiaAppSetup()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
                                 </div>
                             </div>
+
+                            <p id="vd-jumia-app-setup-error" style="font-size:12.5px; color:#DC2626; margin:0;"></p>
+                        </div>
+                    </div>
+
+                    <div class="panel" id="vd-jumia-export-panel" hidden>
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                            <h3 style="margin:0;">Export to Jumia</h3>
+                            <span id="vd-jumia-export-help" style="font-size:12.5px; color:#666;"></span>
+                        </div>
+                        <div id="vd-jumia-export-list"></div>
+                        <div style="display:flex; gap:10px; margin-top:12px;">
+                            <button type="button" onclick="vdExportSelectedToJumia()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Push Selected</button>
+                            <button type="button" onclick="vdHideJumiaExport()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
                         </div>
                     </div>
 
                     <div class="panel" id="vd-jumia-sync-panel" hidden>
-                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; gap:10px; flex-wrap:wrap;">
                             <h3 style="margin:0;">Product Sync</h3>
-                            <button type="button" onclick="vdShowJumiaImport()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:8px 14px; cursor:pointer; font-size:12.5px; font-weight:600;">Import from Jumia</button>
+                            <div style="display:flex; gap:8px;">
+                                <button type="button" onclick="vdShowJumiaExport()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:8px 14px; cursor:pointer; font-size:12.5px; font-weight:600;">Export to Jumia</button>
+                                <button type="button" onclick="vdShowJumiaImport()" style="background:#fff; color:var(--vd-navy); border:1.5px solid var(--vd-navy); border-radius:8px; padding:8px 14px; cursor:pointer; font-size:12.5px; font-weight:600;">Import from Jumia</button>
+                            </div>
                         </div>
-                        <p style="font-size:12.5px; color:#888; margin:-4px 0 12px;">Push products to Jumia from the Manage Products tab by selecting them and choosing "Push to Jumia".</p>
+                        <p style="font-size:12.5px; color:#888; margin:-4px 0 12px;">Export to Jumia to push products from here, or select them on the Manage Products tab and choose "Push to Jumia" there.</p>
                         <div id="vd-jumia-links-list"></div>
                     </div>
 
@@ -1164,7 +1240,9 @@
     <script src="../js/category-select.js?v=1"></script>
     <script src="../js/seller-panel.js?v=1"></script>
     <script src="../js/photo-crop.js?v=1"></script>
-    <script src="../js/vendor-dashboard.js?v=19"></script>
+    <script src="../js/prepare-picked-file.js?v=10"></script>
+    <script src="../js/description-block-editor.js?v=1"></script>
+    <script src="../js/vendor-dashboard.js?v=20"></script>
 <script src="../js/vendor-mobile.js?v=2"></script>
 </body>
 </html>

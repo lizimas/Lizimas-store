@@ -12,6 +12,27 @@
 // an educated guess (that collection also has "GPM API" and "GOP API"
 // folders that likely hold the real ones - not yet opened) and are the
 // one piece still to confirm before the first real product push/import.
+//
+// UNVERIFIED (Sept 2026, added for multi-Application support): Jumia's
+// Create Application dialog also offers a "Web Application (OAuth -
+// Authorization Code Flow)" type alongside the Self Authorization one
+// this integration has used exclusively so far. The Postman doc Ryan
+// opened is titled "...from Authorization Code / Refresh Token" together,
+// which is why exchangeAuthorizationCode() below reuses the SAME
+// confirmed /token endpoint and host, just with grant_type=
+// authorization_code and the standard OAuth2 fields that heading implies
+// (client_id, client_secret, code, redirect_uri) - this part IS
+// consistent with the confirmed doc. What is NOT confirmed is
+// JUMIA_AUTHORIZE_BASE/JUMIA_AUTHORIZE_PATH below (the browser-facing
+// consent screen a vendor is redirected to first) - Ryan's Postman
+// screenshots only covered the token exchange, never the authorize step,
+// so that URL is a best-effort guess (Jumia's own seller-facing domain,
+// vendorcenter.jumia.com, rather than the vendor-api.jumia.com API host,
+// since an OAuth consent page is normally served from the web app, not
+// the API). This whole Web Application flow needs a real end-to-end test
+// (redirect to Jumia, log in, consent, land back on the callback route)
+// before it can be trusted - Self Authorization remains the flow to use
+// until that happens.
 const axios = require("axios");
 const { encryptField, decryptField } = require("../utils/encryption");
 
@@ -19,6 +40,10 @@ const JUMIA_API_BASE = process.env.JUMIA_API_BASE || "https://vendor-api.jumia.c
 const JUMIA_TOKEN_PATH = "/token";
 const JUMIA_PRODUCTS_PATH = "/catalog/products";
 const JUMIA_CATEGORY_TREE_PATH = "/categories";
+// UNVERIFIED - see header note. Overridable via env once the real value
+// is confirmed, without another code change.
+const JUMIA_AUTHORIZE_BASE = process.env.JUMIA_AUTHORIZE_BASE || "https://vendorcenter.jumia.com";
+const JUMIA_AUTHORIZE_PATH = process.env.JUMIA_AUTHORIZE_PATH || "/oauth/authorize";
 
 const REQUEST_TIMEOUT_MS = 20000;
 
@@ -54,13 +79,20 @@ function jumiaHttp() {
 // caller is given it to persist, but the ORIGINAL pasted token is what
 // gets used again if nothing rotates, so a connection keeps working
 // either way unless Jumia actively invalidates the old one.
-async function mintAccessToken(clientId, refreshToken) {
+async function mintAccessToken(clientId, refreshToken, clientSecret) {
     try {
-        const body = new URLSearchParams({
+        const fields = {
             grant_type: "refresh_token",
             client_id: clientId,
             refresh_token: refreshToken
-        });
+        };
+        // Self Authorization's confirmed Refresh Token grant never sends
+        // this (see file header). Only a Web Application connection passes
+        // a clientSecret here, since a confidential OAuth client's refresh
+        // call conventionally includes it - unconfirmed either way for
+        // Jumia specifically, but harmless to include when present.
+        if (clientSecret) fields.client_secret = clientSecret;
+        const body = new URLSearchParams(fields);
         const response = await axios.post(`${JUMIA_API_BASE}${JUMIA_TOKEN_PATH}`, body.toString(), {
             timeout: REQUEST_TIMEOUT_MS,
             headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }
@@ -80,6 +112,56 @@ async function mintAccessToken(clientId, refreshToken) {
     }
 }
 
+// Builds the URL to send a vendor's browser to for a Web Application's
+// OAuth consent screen. state is an opaque, server-signed token (a JWT
+// from jumiaSyncService) the caller uses to identify which vendor/
+// Application the callback belongs to - Jumia is expected to hand it
+// back unchanged on the redirect per standard OAuth2 "state" handling.
+// UNVERIFIED: see this file's header - the host/path here are a
+// best-effort guess, not confirmed against Jumia's real authorize screen.
+function buildAuthorizeUrl(clientId, redirectUri, state) {
+    const url = new URL(JUMIA_AUTHORIZE_PATH, JUMIA_AUTHORIZE_BASE);
+    url.searchParams.set("response_type", "code");
+    url.searchParams.set("client_id", clientId);
+    url.searchParams.set("redirect_uri", redirectUri);
+    url.searchParams.set("state", state);
+    return url.toString();
+}
+
+// Exchanges a Web Application's OAuth authorization code for tokens, on
+// the SAME confirmed /token endpoint mintAccessToken() uses, with the
+// standard OAuth2 authorization_code fields per the "...Authorization
+// Code / Refresh Token" heading on Jumia's own Postman doc (Ryan opened
+// the Refresh Token branch of that same request - the Authorization Code
+// branch was not opened, so the exact field set is inferred, not read).
+async function exchangeAuthorizationCode(clientId, clientSecret, redirectUri, code) {
+    try {
+        const body = new URLSearchParams({
+            grant_type: "authorization_code",
+            client_id: clientId,
+            client_secret: clientSecret,
+            redirect_uri: redirectUri,
+            code
+        });
+        const response = await axios.post(`${JUMIA_API_BASE}${JUMIA_TOKEN_PATH}`, body.toString(), {
+            timeout: REQUEST_TIMEOUT_MS,
+            headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }
+        });
+        const data = response.data || {};
+        if (!data.access_token) {
+            throw new JumiaApiError("Jumia did not return an access token.", { raw: data });
+        }
+        return {
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token || null,
+            expiresInSeconds: Number(data.expires_in) || 3600,
+            shopName: data.shop_name || data.seller_name || null
+        };
+    } catch (err) {
+        throw normalizeAxiosError(err, "Could not complete sign-in with Jumia.");
+    }
+}
+
 // Given a stored connection row, returns a live access token, minting a
 // new one first if the cached one is missing or about to expire. The
 // vendor's Refresh Token (stored in client_secret_enc - see the schema
@@ -94,6 +176,28 @@ async function ensureFreshAccessToken(connectionRow) {
     if (stillValid && connectionRow.access_token_enc) {
         return { accessToken: decryptField(connectionRow.access_token_enc), refreshed: false };
     }
+
+    // Web Application connections keep the real refresh token in
+    // refresh_token_enc (rotated on each use, per standard OAuth2) and the
+    // real client secret in client_secret_enc - the opposite of Self
+    // Authorization, where client_secret_enc holds the vendor's pasted
+    // Refresh Token and there is no separate secret. See this file's
+    // header for how confirmed each path is.
+    if (connectionRow.app_type === "web_application") {
+        const refreshToken = decryptField(connectionRow.refresh_token_enc);
+        const clientSecret = decryptField(connectionRow.client_secret_enc);
+        if (!refreshToken) {
+            throw new JumiaApiError("This Application has no refresh token yet - sign in with Jumia again from the Applications tab.", { code: "NO_REFRESH_TOKEN" });
+        }
+        const result = await mintAccessToken(connectionRow.client_id, refreshToken, clientSecret);
+        return {
+            accessToken: result.accessToken,
+            refreshed: true,
+            refreshToken: result.refreshToken || refreshToken,
+            expiresInSeconds: result.expiresInSeconds
+        };
+    }
+
     const refreshToken = decryptField(connectionRow.client_secret_enc);
     if (!refreshToken) {
         throw new JumiaApiError("This Jumia connection is missing its Refresh Token - reconnect with the Client ID/Refresh Token.", { code: "NO_REFRESH_TOKEN" });
@@ -235,6 +339,8 @@ function normalizeAxiosError(err, fallbackMessage) {
 module.exports = {
     JumiaApiError,
     mintAccessToken,
+    buildAuthorizeUrl,
+    exchangeAuthorizationCode,
     ensureFreshAccessToken,
     mapLizimasProductToJumiaPayload,
     mapJumiaProductToLizimasFields,

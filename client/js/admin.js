@@ -701,6 +701,70 @@ function collectSpecRows() {
     return specs;
 }
 
+// --- Paste from Excel (Task: staff asked for the same bulk-paste shortcut
+// vendors already have on their product form - splits one pasted line into
+// a label/value pair per row, tries tab first (an Excel column copy/paste),
+// falls back to 2+ spaces or a colon, and as a last resort a curated list
+// of common spec labels for pastes that lost their separator entirely. See
+// vendor-dashboard.js's identical block for the fuller rationale - kept as
+// a parallel copy rather than a shared module since admin.js and
+// vendor-dashboard.js are loaded on separate pages with no shared bundle. ---
+
+const ADMIN_KNOWN_SPEC_LABELS = [
+    "Model Year", "Model Number", "Model", "Os Version", "Operating System", "Os",
+    "Screen Size", "Display Type", "Display", "Refresh Rate", "Resolution",
+    "Internal Storage", "Storage Capacity", "Storage", "Memory", "Ram",
+    "Camera Resolution", "Camera", "Battery Life", "Battery Capacity", "Battery",
+    "Product Type", "Type", "Brand", "Processor", "Chipset", "Graphics",
+    "Color", "Colour", "Sim", "Usb", "Wifi", "Wi-Fi", "Ports", "Port",
+    "Connectivity", "Network", "Weight", "Net Weight", "Item Weight", "Package Weight",
+    "Dimensions", "Size", "Sizes", "Fit", "Material", "Fabric", "Sleeve Length", "Sleeve",
+    "Closure", "Pattern", "Style", "Gender", "Age Group", "Origin", "Country Of Origin",
+    "Warranty", "Power", "Voltage", "Wattage", "Capacity", "Volume", "Quantity",
+    "Flavor", "Flavour", "Ingredients", "Allergen Info", "Care Instructions",
+    "Waterproof", "Water Resistance", "Shelf Life", "Expiry Date"
+].sort((a, b) => b.length - a.length);
+
+function adminMatchKnownSpecLabel(line) {
+    const lower = line.toLowerCase();
+    for (const candidate of ADMIN_KNOWN_SPEC_LABELS) {
+        if (lower.startsWith(candidate.toLowerCase())) {
+            const value = line.slice(candidate.length).trim();
+            if (value) return { label: line.slice(0, candidate.length).trim(), value };
+        }
+    }
+    return null;
+}
+
+function adminParseSpecLine(line) {
+    if (line.includes("\t")) {
+        const [label, ...rest] = line.split("\t");
+        return { label: label.trim(), value: rest.join(" ").trim() };
+    }
+    const spaceSplit = line.match(/^(.+?)\s{2,}(.+)$/);
+    if (spaceSplit) {
+        return { label: spaceSplit[1].trim(), value: spaceSplit[2].trim() };
+    }
+    const colonSplit = line.match(/^([^:]+):\s*(.+)$/);
+    if (colonSplit) {
+        return { label: colonSplit[1].trim(), value: colonSplit[2].trim() };
+    }
+    const knownLabelMatch = adminMatchKnownSpecLabel(line);
+    if (knownLabelMatch) return knownLabelMatch;
+    return { label: line.trim(), value: "" };
+}
+
+function parseAndAddAdminSpecs() {
+    const box = document.getElementById("admin-specs-paste-box");
+    if (!box || !box.value.trim()) return;
+    const lines = box.value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    lines.forEach(line => {
+        const { label, value } = adminParseSpecLine(line);
+        if (label) addSpecRow(label, value);
+    });
+    box.value = "";
+}
+
 async function loadSizeCatalog() {
     try {
         const response = await fetch(`${API_URL}/api/products/catalog/sizes`);
@@ -1058,6 +1122,103 @@ async function renderImagePreviews(fileList) {
     renderPhotoOrderList();
 }
 
+// --- Products: CSV/XLSX import & export (admin only) ---------------------
+// Export downloads the catalogue as a CSV; that same file can be
+// re-uploaded via Import to bulk-update those rows (matched by id or sku)
+// or add new ones. See server/controllers/adminController.js's
+// exportProducts/importProducts for the exact column contract.
+
+function toggleProductImportExportPanel() {
+    const panel = document.getElementById("product-import-export-panel");
+    if (!panel) return;
+    panel.classList.toggle("hidden");
+    if (!panel.classList.contains("hidden")) {
+        document.getElementById("product-import-results").innerHTML = "";
+    }
+}
+
+async function downloadProductsCsv() {
+    try {
+        const status = document.getElementById("product-export-status").value;
+        const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+        const token = getToken();
+        const response = await fetch(`${API_URL}/api/admin/products/export${qs}`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (!response.ok) {
+            const text = await response.text();
+            let message = `HTTP ${response.status}`;
+            try { message = JSON.parse(text).error || message; } catch (e) { /* not JSON */ }
+            throw new Error(message);
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const datestamp = new Date().toISOString().slice(0, 10);
+        a.download = `products-export-${datestamp}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error("Download products CSV error:", error);
+        showToast("Could not export products: " + error.message);
+    }
+}
+
+async function uploadProductsCsv() {
+    const fileInput = document.getElementById("product-import-file");
+    const resultsEl = document.getElementById("product-import-results");
+    const btn = document.getElementById("product-import-btn");
+    const file = fileInput.files[0];
+    if (!file) {
+        resultsEl.innerHTML = '<p style="color:#DC2626;">Choose a .csv, .xlsx, or .xls file first.</p>';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Importing...";
+    resultsEl.innerHTML = '<p style="color:#666;">Uploading and importing - this can take a moment for large files...</p>';
+
+    try {
+        const token = getToken();
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch(`${API_URL}/api/admin/products/import`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${token}` },
+            body: formData
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            resultsEl.innerHTML = `<p style="color:#DC2626;">${pdEsc(data.error || "Import failed.")}</p>`;
+            return;
+        }
+
+        let html = `<p style="color:#16A34A; font-weight:600;">Import complete: ${data.created} created, ${data.updated} updated, ${data.skipped} skipped (${data.totalRows} rows total).</p>`;
+        if (data.errors && data.errors.length) {
+            html += '<div style="margin-top:8px; max-height:220px; overflow-y:auto; border:1px solid #eee; border-radius:6px; padding:8px;">';
+            html += data.errors.map(e =>
+                `<div style="padding:4px 0; border-bottom:1px solid #f2f2f2;"><b>Row ${e.row}</b> (${pdEsc(e.name || "")}): ${pdEsc((e.errors || []).join("; "))}</div>`
+            ).join("");
+            html += "</div>";
+        }
+        resultsEl.innerHTML = html;
+
+        fileInput.value = "";
+        if (typeof loadProducts === "function") loadProducts();
+    } catch (error) {
+        console.error("Upload products CSV error:", error);
+        resultsEl.innerHTML = '<p style="color:#DC2626;">Could not connect to server.</p>';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Upload & Import";
+    }
+}
+
 function openProductForm() {
     document.getElementById("product-form-title").textContent = "Add Product";
     document.getElementById("product-id").value = "";
@@ -1077,6 +1238,8 @@ function openProductForm() {
     document.getElementById("variants-section").classList.add("hidden");
     document.getElementById("variants-list").innerHTML = "";
     document.getElementById("specs-list").innerHTML = "";
+    const adminSpecsPasteBox = document.getElementById("admin-specs-paste-box");
+    if (adminSpecsPasteBox) adminSpecsPasteBox.value = "";
     pdLocalPreviews = [];
     pdAllImages = [];
     const _po = document.getElementById("pd-photo-order"); if (_po) _po.remove();
@@ -1110,6 +1273,8 @@ function editProduct(id) {
     document.getElementById("product-gtin").value = product.gtin || "";
     document.getElementById("product-mpn").value = product.mpn || "";
     document.getElementById("variants-section").classList.remove("hidden");
+    const editAdminSpecsPasteBox = document.getElementById("admin-specs-paste-box");
+    if (editAdminSpecsPasteBox) editAdminSpecsPasteBox.value = "";
     loadVariants(product.id);
     loadProductOptionsIntoForm(product.id);
     LzBlockEditor.mount(document.getElementById("desc-blocks-editor"), product.id, { tokenKey: "adminToken" });

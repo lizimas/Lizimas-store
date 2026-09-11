@@ -9,6 +9,7 @@
     let busy = 0;
 
     let tokenKey = "adminToken";
+    let apiBase = "/api/products";
 
     function token() {
         return localStorage.getItem(tokenKey) || "";
@@ -54,8 +55,8 @@
     async function uploadImage(file) {
         const productId = host.dataset.productId;
         const uploadUrl = productId
-            ? `/api/products/${productId}/description-blocks/image`
-            : "/api/products/description-blocks/image";
+            ? `${apiBase}/${productId}/description-blocks/image`
+            : `${apiBase}/description-blocks/image`;
 
         const prepared = typeof preparePickedFile === "function"
             ? await preparePickedFile(file)
@@ -644,6 +645,7 @@
 
     async function mount(container, productId, opts) {
         if (opts && opts.tokenKey) tokenKey = opts.tokenKey;
+        apiBase = (opts && opts.apiBase) || "/api/products";
         host = container;
         host.dataset.productId = productId || "";
         blocks = [];
@@ -651,7 +653,7 @@
 
         if (productId) {
             try {
-                const res = await fetch(`/api/products/${productId}/description-blocks`);
+                const res = await fetch(`${apiBase}/${productId}/description-blocks`);
                 if (res.ok) {
                     const rows = await res.json();
                     blocks = rows.map((r) => ({
@@ -698,7 +700,7 @@
             }
         }
 
-        const res = await fetch(`/api/products/${id}/description-blocks`, {
+        const res = await fetch(`${apiBase}/${id}/description-blocks`, {
             method: "PUT",
             headers: {
                 "Content-Type": "application/json",

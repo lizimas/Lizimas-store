@@ -60,6 +60,7 @@ function vmShowScreen(name, opts) {
     if (name === "settings") vmLoadSettings();
     if (name === "holiday-mode") vmLoadHolidayMode();
     if (name === "jumia") vmLoadJumia();
+    if (name === "jumia-export") vmLoadJumiaExport();
     if (name === "jumia-import") vmLoadJumiaImport();
     if (name === "add-product") vmLoadAddProduct();
     if (name === "promotions") vmLoadPromotions();
@@ -383,6 +384,30 @@ async function vmLoadSettings() {
     } catch (error) {
         console.error("vmLoadSettings error:", error);
     }
+    vmRefreshJumiaStatusSub();
+}
+
+// Keeps the "Applications" summary row on the Settings screen fresh
+// without waiting for the vendor to actually open Applications - cheap
+// enough to call from vmLoadSettings() every time it loads.
+async function vmRefreshJumiaStatusSub() {
+    const sub = document.getElementById("vm-jumia-status-sub");
+    if (!sub) return;
+    try {
+        const apps = await vendorAuthorizedFetch("/api/vendors/me/jumia/applications");
+        if (apps.error) return;
+        vmJumiaApplications = Array.isArray(apps) ? apps : [];
+        const activeApp = vmJumiaApplications.find(a => a.is_active);
+        if (activeApp && activeApp.connected) {
+            sub.textContent = "Connected";
+        } else if (vmJumiaApplications.length > 0) {
+            sub.textContent = `${vmJumiaApplications.length} Application${vmJumiaApplications.length > 1 ? "s" : ""}`;
+        } else {
+            sub.textContent = "Not connected";
+        }
+    } catch (error) {
+        console.error("vmRefreshJumiaStatusSub error:", error);
+    }
 }
 
 async function vmToggleShopActive() {
@@ -484,135 +509,207 @@ let vmJumiaConnectionCache = { connected: false };
 let vmJumiaRemoteProductsCache = new Map(); // seller_sku -> remote product object, for the import screen
 let vmJumiaImportSelected = new Set();
 
+let vmJumiaApplications = [];
+let vmJumiaSetupAppId = null;
+
 async function vmLoadJumia() {
-    const sub = document.getElementById("vm-jumia-status-sub");
+    const host = document.getElementById("vm-jumia-applications-list");
     try {
-        const status = await vendorAuthorizedFetch("/api/vendors/me/jumia/connection");
-        if (status.error) { console.error("vmLoadJumia error:", status.error); return; }
-        vmJumiaConnectionCache = status;
+        const apps = await vendorAuthorizedFetch("/api/vendors/me/jumia/applications");
+        if (apps.error) { console.error("vmLoadJumia error:", apps.error); return; }
+        vmJumiaApplications = Array.isArray(apps) ? apps : [];
+        vmRenderJumiaApplicationsList(vmJumiaApplications);
 
-        const disconnectedView = document.getElementById("vm-jumia-disconnected-view");
-        const connectedView = document.getElementById("vm-jumia-connected-view");
-        const connectActions = document.getElementById("vm-jumia-connect-actions");
+        const activeApp = vmJumiaApplications.find(a => a.is_active);
+        vmJumiaConnectionCache = activeApp ? { connected: activeApp.connected, client_id: activeApp.client_id } : { connected: false };
         const syncCard = document.getElementById("vm-jumia-sync-card");
-        vmCancelUpdateJumiaSecret();
-
-        if (status.connected) {
-            disconnectedView.hidden = true;
-            connectedView.hidden = false;
-            connectActions.hidden = true;
+        if (activeApp && activeApp.connected) {
             syncCard.hidden = false;
-            document.getElementById("vm-jumia-shop-name").textContent = status.jumia_shop_name || "";
-            document.getElementById("vm-jumia-client-id-display").textContent = status.client_id || "";
-            if (sub) sub.textContent = "Connected";
             vmLoadJumiaLinks();
         } else {
-            disconnectedView.hidden = false;
-            connectedView.hidden = true;
-            connectActions.hidden = false;
             syncCard.hidden = true;
-            if (sub) sub.textContent = status.connection_status === "error" ? "Connection error" : "Not connected";
-            const help = document.getElementById("vm-jumia-help");
-            if (status.last_error && help) { help.textContent = status.last_error; help.style.color = "var(--vm-red)"; }
         }
     } catch (error) {
         console.error("vmLoadJumia error:", error);
+        if (host) host.innerHTML = '<div style="font-size:12.5px; color:#DC2626;">Could not load Applications.</div>';
     }
 }
 
-// Rotating the secret (padlock icon on the connected row) - Client ID
-// stays the same, only a new Secret is submitted. Mirrors Jumia's own
-// Applications table, where the secret is never shown in the list and a
-// dedicated icon is how you deal with it - on our side that means
-// re-entering a new one rather than revealing the stored one, since the
-// vendor's secret is encrypted at rest and this app never sends it back
-// to the browser once saved.
-function vmShowUpdateJumiaSecret() {
-    document.getElementById("vm-jumia-update-secret-view").hidden = false;
-    document.getElementById("vm-jumia-update-secret-actions").hidden = false;
-    const input = document.getElementById("vm-jumia-new-secret");
-    input.value = "";
-    input.focus();
-}
+const VM_JUMIA_TYPE_LABEL = { self_authorization: "Self Authorization", web_application: "Web Application" };
 
-function vmCancelUpdateJumiaSecret() {
-    const view = document.getElementById("vm-jumia-update-secret-view");
-    const actions = document.getElementById("vm-jumia-update-secret-actions");
-    if (view) view.hidden = true;
-    if (actions) actions.hidden = true;
-    const input = document.getElementById("vm-jumia-new-secret");
-    if (input) input.value = "";
-}
-
-async function vmSaveUpdatedJumiaSecret() {
-    const newSecret = document.getElementById("vm-jumia-new-secret").value.trim();
-    if (!newSecret) { alert("Enter the new Refresh Token first."); return; }
-    if (!vmJumiaConnectionCache.client_id) { alert("Missing Client ID - reconnect from scratch instead."); return; }
-    try {
-        const result = await vendorAuthorizedFetch("/api/vendors/me/jumia/connection", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ client_id: vmJumiaConnectionCache.client_id, refresh_token: newSecret })
-        });
-        if (result.error) { alert(result.error); return; }
-        vmLoadJumia();
-    } catch (error) {
-        console.error("vmSaveUpdatedJumiaSecret error:", error);
-        alert("Could not update the secret. Please try again.");
-    }
-}
-
-async function vmConnectJumia() {
-    const clientId = document.getElementById("vm-jumia-client-id").value.trim();
-    const clientSecret = document.getElementById("vm-jumia-client-secret").value.trim();
-    const help = document.getElementById("vm-jumia-help");
-    if (!clientId || !clientSecret) {
-        if (help) { help.textContent = "Enter both the Client ID and Refresh Token."; help.style.color = "var(--vm-red)"; }
+function vmRenderJumiaApplicationsList(apps) {
+    const host = document.getElementById("vm-jumia-applications-list");
+    if (!host) return;
+    if (!apps || apps.length === 0) {
+        host.innerHTML = '<div style="font-size:12.5px; color:#888; padding:8px 0;">No Applications yet. Create one to connect to Jumia.</div>';
         return;
     }
-    const btn = document.getElementById("vm-jumia-connect-btn");
-    if (btn) { btn.disabled = true; btn.textContent = "Connecting..."; }
+    host.innerHTML = apps.map(app => {
+        const [label, color] = VM_JUMIA_STATUS_LABEL[app.connection_status] || [app.connection_status, "#888"];
+        return `<div style="padding:10px 0; border-bottom:1px solid #eee;">
+            <div style="font-size:13px; font-weight:600; color:var(--vm-navy);">${vendorEsc(app.name)} ${app.is_active ? '<span style="font-size:10.5px; font-weight:700; color:#16A34A;">&bull; ACTIVE</span>' : ""}</div>
+            <div style="font-size:11.5px; color:#999; margin-top:2px;">${VM_JUMIA_TYPE_LABEL[app.app_type] || app.app_type} &bull; <span style="color:${color}; font-weight:600;">${label}</span></div>
+            ${app.jumia_shop_name ? `<div style="font-size:11px; color:#666; margin-top:2px;">${vendorEsc(app.jumia_shop_name)}</div>` : ""}
+            <div style="display:flex; gap:14px; margin-top:8px; flex-wrap:wrap;">
+                <button type="button" onclick="vmShowJumiaAppSetup(${app.id})" style="background:none; border:none; padding:0; color:var(--vm-navy); font-size:12px; font-weight:600; cursor:pointer;">${app.connected ? "Reconnect" : "Connect"}</button>
+                ${app.is_active ? `<button type="button" onclick="vmTestJumiaApp(${app.id})" style="background:none; border:none; padding:0; color:#16A34A; font-size:12px; font-weight:600; cursor:pointer;">Test</button>` : ""}
+                ${(app.connected && !app.is_active) ? `<button type="button" onclick="vmMakeJumiaAppActive(${app.id})" style="background:none; border:none; padding:0; color:#B45309; font-size:12px; font-weight:600; cursor:pointer;">Make Active</button>` : ""}
+                <button type="button" onclick="vmDeleteJumiaApp(${app.id})" style="background:none; border:none; padding:0; color:#DC2626; font-size:12px; font-weight:600; cursor:pointer;">Delete</button>
+            </div>
+        </div>`;
+    }).join("");
+}
+
+function vmResetJumiaCreateForm() {
+    vmJumiaSetupAppId = null;
+    const step1 = document.getElementById("vm-jumia-create-step1");
+    const step2 = document.getElementById("vm-jumia-create-step2");
+    if (step1) step1.hidden = false;
+    if (step2) step2.hidden = true;
+    const nameEl = document.getElementById("vm-jumia-new-app-name");
+    if (nameEl) nameEl.value = "";
+    const err1 = document.getElementById("vm-jumia-new-app-error");
+    if (err1) err1.textContent = "";
+    const err2 = document.getElementById("vm-jumia-app-setup-error");
+    if (err2) err2.textContent = "";
+    const selfRadio = document.querySelector('input[name="vm-jumia-new-app-type"][value="self_authorization"]');
+    if (selfRadio) selfRadio.checked = true;
+    const continueBtn = document.getElementById("vm-jumia-create-continue-btn");
+    if (continueBtn) { continueBtn.textContent = "Continue"; continueBtn.onclick = vmCreateJumiaApplication; }
+}
+
+// Step 1 (name + type) submit - creates the Application, then hands off to
+// vmShowJumiaAppSetup for step 2 (credentials). Reconnecting an EXISTING
+// Application skips straight to vmShowJumiaAppSetup instead, bypassing
+// this function entirely.
+async function vmCreateJumiaApplication() {
+    const name = document.getElementById("vm-jumia-new-app-name").value.trim();
+    const typeInput = document.querySelector('input[name="vm-jumia-new-app-type"]:checked');
+    const errorEl = document.getElementById("vm-jumia-new-app-error");
+    if (!name) { errorEl.textContent = "Enter an Application Name."; return; }
+    errorEl.textContent = "";
     try {
-        const result = await vendorAuthorizedFetch("/api/vendors/me/jumia/connection", {
+        const created = await vendorAuthorizedFetch("/api/vendors/me/jumia/applications", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ client_id: clientId, refresh_token: clientSecret })
+            body: JSON.stringify({ name, app_type: typeInput ? typeInput.value : "self_authorization" })
         });
-        if (result.error) {
-            if (help) { help.textContent = result.error; help.style.color = "var(--vm-red)"; }
-            return;
-        }
-        document.getElementById("vm-jumia-client-secret").value = "";
-        vmLoadJumia();
+        if (created.error) { errorEl.textContent = created.error; return; }
+        await vmLoadJumia();
+        vmShowJumiaAppSetup(created.id);
     } catch (error) {
-        console.error("vmConnectJumia error:", error);
-        if (help) { help.textContent = "Could not connect. Please try again."; help.style.color = "var(--vm-red)"; }
-    } finally {
-        if (btn) { btn.disabled = false; btn.textContent = "Connect to Jumia"; }
+        console.error("vmCreateJumiaApplication error:", error);
+        errorEl.textContent = "Could not connect to server.";
     }
 }
 
-async function vmDisconnectJumia() {
-    if (!confirm("Disconnect this Jumia account? Product syncing will stop until you reconnect.")) return;
+function vmShowJumiaAppSetup(applicationId) {
+    const app = vmJumiaApplications.find(a => Number(a.id) === Number(applicationId));
+    if (!app) return;
+    vmJumiaSetupAppId = applicationId;
+    if (!document.getElementById("vm-screen-jumia-create").classList.contains("active")) {
+        vmShowScreen("jumia-create");
+    }
+    document.getElementById("vm-jumia-create-step1").hidden = true;
+    document.getElementById("vm-jumia-create-step2").hidden = false;
+    document.getElementById("vm-jumia-app-setup-error").textContent = "";
+
+    const isWeb = app.app_type === "web_application";
+    document.getElementById("vm-jumia-create-step2-self").style.display = isWeb ? "none" : "block";
+    document.getElementById("vm-jumia-create-step2-web").style.display = isWeb ? "block" : "none";
+
+    const continueBtn = document.getElementById("vm-jumia-create-continue-btn");
+    if (isWeb) {
+        document.getElementById("vm-jumia-app-redirect-uri").value = app.redirect_uri || "";
+        document.getElementById("vm-jumia-app-web-client-id").value = app.client_id || "";
+        document.getElementById("vm-jumia-app-web-client-secret").value = "";
+        continueBtn.textContent = "Save & Sign in with Jumia";
+        continueBtn.onclick = vmSignInWithJumia;
+    } else {
+        document.getElementById("vm-jumia-app-client-id").value = app.client_id || "";
+        document.getElementById("vm-jumia-app-refresh-token").value = "";
+        continueBtn.textContent = "Connect";
+        continueBtn.onclick = vmConnectJumiaApp;
+    }
+}
+
+async function vmConnectJumiaApp() {
+    if (!vmJumiaSetupAppId) return;
+    const clientId = document.getElementById("vm-jumia-app-client-id").value.trim();
+    const refreshToken = document.getElementById("vm-jumia-app-refresh-token").value.trim();
+    const errorEl = document.getElementById("vm-jumia-app-setup-error");
+    if (!clientId || !refreshToken) { errorEl.textContent = "Enter both the Client ID and Refresh Token."; return; }
     try {
-        const result = await vendorAuthorizedFetch("/api/vendors/me/jumia/connection", { method: "DELETE" });
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/jumia/applications/${vmJumiaSetupAppId}/connect`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ client_id: clientId, refresh_token: refreshToken })
+        });
+        if (result.error) { errorEl.textContent = result.error; return; }
+        vmResetJumiaCreateForm();
+        vmShowScreen("jumia", { isBack: true });
+        vmLoadJumia();
+    } catch (error) {
+        console.error("vmConnectJumiaApp error:", error);
+        errorEl.textContent = "Could not connect. Please try again.";
+    }
+}
+
+async function vmSignInWithJumia() {
+    if (!vmJumiaSetupAppId) return;
+    const clientId = document.getElementById("vm-jumia-app-web-client-id").value.trim();
+    const clientSecret = document.getElementById("vm-jumia-app-web-client-secret").value.trim();
+    const errorEl = document.getElementById("vm-jumia-app-setup-error");
+    if (!clientId) { errorEl.textContent = "Enter the Client ID first."; return; }
+    try {
+        const saved = await vendorAuthorizedFetch(`/api/vendors/me/jumia/applications/${vmJumiaSetupAppId}/credentials`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ client_id: clientId, client_secret: clientSecret || undefined })
+        });
+        if (saved.error) { errorEl.textContent = saved.error; return; }
+        const auth = await vendorAuthorizedFetch(`/api/vendors/me/jumia/applications/${vmJumiaSetupAppId}/authorize`);
+        if (auth.error) { errorEl.textContent = auth.error; return; }
+        window.location.href = auth.authorize_url;
+    } catch (error) {
+        console.error("vmSignInWithJumia error:", error);
+        errorEl.textContent = "Could not start Jumia sign-in.";
+    }
+}
+
+async function vmMakeJumiaAppActive(applicationId) {
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/jumia/applications/${applicationId}/activate`, { method: "POST" });
         if (result.error) { alert(result.error); return; }
         vmLoadJumia();
     } catch (error) {
-        console.error("vmDisconnectJumia error:", error);
-        alert("Could not disconnect.");
+        console.error("vmMakeJumiaAppActive error:", error);
+        alert("Could not activate this Application.");
     }
 }
 
-async function vmTestJumiaConnection() {
+async function vmTestJumiaApp(applicationId) {
     try {
-        const result = await vendorAuthorizedFetch("/api/vendors/me/jumia/connection/test", { method: "POST" });
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/jumia/applications/${applicationId}/test`, { method: "POST" });
         if (result.error) { alert(result.error); vmLoadJumia(); return; }
         alert("Connection is working.");
         vmLoadJumia();
     } catch (error) {
-        console.error("vmTestJumiaConnection error:", error);
+        console.error("vmTestJumiaApp error:", error);
         alert("Could not verify the connection.");
+    }
+}
+
+async function vmDeleteJumiaApp(applicationId) {
+    const app = vmJumiaApplications.find(a => Number(a.id) === Number(applicationId));
+    if (!confirm(`Delete "${app ? app.name : "this Application"}"? This cannot be undone.`)) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/jumia/applications/${applicationId}`, { method: "DELETE" });
+        if (result.error) { alert(result.error); return; }
+        vmLoadJumia();
+    } catch (error) {
+        console.error("vmDeleteJumiaApp error:", error);
+        alert("Could not delete this Application.");
     }
 }
 
@@ -743,6 +840,86 @@ async function vmImportSelectedJumiaProducts() {
     } catch (error) {
         console.error("vmImportSelectedJumiaProducts error:", error);
         alert("Could not import products.");
+    }
+}
+
+// --- Export to Jumia (Task #96 counterpart for mobile) ---
+
+let vmJumiaExportCandidates = [];
+let vmJumiaExportSelected = new Set();
+
+async function vmLoadJumiaExport() {
+    const list = document.getElementById("vm-jumia-export-list");
+    list.innerHTML = '<div class="vm-loading-state">Loading...</div>';
+    document.getElementById("vm-jumia-export-actions").hidden = true;
+    try {
+        const [products, links] = await Promise.all([
+            vendorAuthorizedFetch("/api/vendors/products"),
+            vendorAuthorizedFetch("/api/vendors/me/jumia/links")
+        ]);
+        if (products.error) {
+            list.innerHTML = `<div style="font-size:12.5px; color:#DC2626;">${vendorEsc(products.error)}</div>`;
+            return;
+        }
+        const linkedIds = new Set((Array.isArray(links) ? links : []).map(l => Number(l.product_id)));
+        vmJumiaExportCandidates = (Array.isArray(products) ? products : []).filter(p => p.status === "approved" && !p.admin_restricted);
+        vmRenderJumiaExportList(vmJumiaExportCandidates, linkedIds);
+    } catch (error) {
+        console.error("vmLoadJumiaExport error:", error);
+        list.innerHTML = '<div style="font-size:12.5px; color:#DC2626;">Could not load your products.</div>';
+    }
+}
+
+function vmRenderJumiaExportList(products, linkedIds) {
+    const list = document.getElementById("vm-jumia-export-list");
+    vmJumiaExportSelected = new Set();
+    document.getElementById("vm-jumia-export-actions").hidden = false;
+    if (!products || products.length === 0) {
+        list.innerHTML = '<div style="font-size:12.5px; color:#888; padding:8px 0;">No approved products to export yet.</div>';
+        return;
+    }
+    list.innerHTML = products.map(p => {
+        const linked = linkedIds.has(Number(p.id));
+        return `<label style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid #eee;">
+            <input type="checkbox" onchange="vmToggleJumiaExportSelect(${p.id}, this.checked)">
+            <div style="flex:1;">
+                <div style="font-size:13px; font-weight:600; color:var(--vm-navy);">${vendorEsc(p.name)}</div>
+                <div style="font-size:11.5px; color:#999;">${linked ? "Already linked - pushing again re-syncs it" : (p.sku || `LZM-${p.id}`)}</div>
+            </div>
+        </label>`;
+    }).join("");
+}
+
+function vmToggleJumiaExportSelect(productId, checked) {
+    if (checked) vmJumiaExportSelected.add(productId);
+    else vmJumiaExportSelected.delete(productId);
+    const help = document.getElementById("vm-jumia-export-help");
+    if (help) help.textContent = vmJumiaExportSelected.size > 0 ? `${vmJumiaExportSelected.size} selected` : "";
+}
+
+async function vmExportSelectedToJumia() {
+    if (vmJumiaExportSelected.size === 0) { alert("Select at least one product first."); return; }
+    const ids = Array.from(vmJumiaExportSelected);
+    if (!confirm(`Push ${ids.length} product(s) to Jumia?`)) return;
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/jumia/products/push-bulk", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productIds: ids })
+        });
+        if (result.error) { alert(result.error); return; }
+        const successCount = (result.successful || []).length;
+        const failedCount = (result.failed || []).length;
+        let message = `${successCount} product(s) pushed to Jumia.`;
+        if (failedCount > 0) {
+            message += `\n${failedCount} failed:\n` + result.failed.map(f => `- ${f.reason}`).join("\n");
+        }
+        alert(message);
+        vmShowScreen("jumia", { isBack: true });
+        vmLoadJumia();
+    } catch (error) {
+        console.error("vmExportSelectedToJumia error:", error);
+        alert("Could not push products to Jumia.");
     }
 }
 
@@ -1279,5 +1456,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const endEl = document.getElementById("vm-holiday-end");
     if (startEl) startEl.addEventListener("change", vmUpdateHolidaySaveState);
     if (endEl) endEl.addEventListener("change", vmUpdateHolidaySaveState);
+
+    // Jumia's OAuth redirect (jumiaController.js's jumiaOAuthCallback) lands
+    // back on this same dashboard URL with a jumia_oauth query param - jump
+    // straight to Applications so the result is visible on mobile too.
+    if (new URLSearchParams(window.location.search).has("jumia_oauth")) {
+        vmShowScreen("jumia");
+        vdCheckJumiaOAuthReturn();
+        return;
+    }
+
     vmShowScreen("home");
 });

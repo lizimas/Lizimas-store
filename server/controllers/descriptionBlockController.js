@@ -1,5 +1,6 @@
 const pool = require("../config/database");
 const { uploadBuffer } = require("../utils/cloudinaryUpload");
+const { canEditProduct } = require("./productController");
 
 // Public: ordered blocks for one product. Empty array is a valid answer —
 // the storefront falls back to products.description when nothing is here.
@@ -103,15 +104,20 @@ const saveDescriptionBlocks = async (req, res) => {
         }
     }
 
+    // This endpoint is shared by the admin/staff route (requireStaffOrAdmin,
+    // no per-product check needed - staff can edit any listing) and the
+    // vendor route (requireAuth+requireVendor only) - canEditProduct is what
+    // stops one vendor from overwriting another vendor's description blocks
+    // by guessing a product id, exactly like updateProduct() above enforces
+    // for the rest of a product's fields.
+    const permission = await canEditProduct(req.user, productId);
+    if (!permission.allowed) {
+        return res.status(permission.status).json({ message: permission.error });
+    }
+
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
-
-        const owned = await client.query("SELECT id FROM products WHERE id = $1", [productId]);
-        if (owned.rowCount === 0) {
-            await client.query("ROLLBACK");
-            return res.status(404).json({ message: "Product not found" });
-        }
 
         await client.query(
             "DELETE FROM product_description_blocks WHERE product_id = $1",

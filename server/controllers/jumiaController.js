@@ -5,6 +5,15 @@
 // attaches it) and then defers to jumiaSyncService.js for everything
 // else. See jumiaClient.js's header for what part of this feature is
 // still unverified against Jumia's real API.
+//
+// Since migration 084, "connection" in the old single-Application sense
+// has been replaced by "Applications" - a vendor can add several named
+// Jumia credential sets (Web Application or Self Authorization, matching
+// Jumia's own Create Application dialog). handleOAuthCallback is the one
+// exception to the requireVendorId pattern above: it is reached by a
+// public GET from Jumia's own redirect, with no vendor auth header
+// available, so it identifies the vendor from the signed `state` param
+// instead (see jumiaSyncService.getAuthorizeUrl/handleOAuthCallback).
 
 const jumiaSync = require("../services/jumiaSyncService");
 const { JumiaApiError } = require("../services/jumiaClient");
@@ -25,17 +34,52 @@ function handleError(res, error, fallbackMessage) {
     res.status(status).json({ error: error.message || fallbackMessage });
 }
 
-exports.getJumiaConnection = async (req, res) => {
+// --- Applications CRUD ---
+
+exports.listJumiaApplications = async (req, res) => {
     try {
         const vendorId = await requireVendorId(req, res);
         if (!vendorId) return;
-        res.json(await jumiaSync.getConnectionStatus(vendorId));
+        res.json(await jumiaSync.listApplications(vendorId));
     } catch (error) {
-        handleError(res, error, "Could not load Jumia connection status.");
+        handleError(res, error, "Could not load your Jumia Applications.");
     }
 };
 
-exports.connectJumia = async (req, res) => {
+exports.createJumiaApplication = async (req, res) => {
+    try {
+        const vendorId = await requireVendorId(req, res);
+        if (!vendorId) return;
+        const { name, app_type } = req.body;
+        const created = await jumiaSync.createApplication(vendorId, { name, appType: app_type });
+        res.json(created);
+    } catch (error) {
+        handleError(res, error, "Could not create the Application.");
+    }
+};
+
+exports.deleteJumiaApplication = async (req, res) => {
+    try {
+        const vendorId = await requireVendorId(req, res);
+        if (!vendorId) return;
+        await jumiaSync.deleteApplication(vendorId, Number(req.params.id));
+        res.json({ success: true });
+    } catch (error) {
+        handleError(res, error, "Could not delete the Application.");
+    }
+};
+
+exports.activateJumiaApplication = async (req, res) => {
+    try {
+        const vendorId = await requireVendorId(req, res);
+        if (!vendorId) return;
+        res.json(await jumiaSync.setActiveApplication(vendorId, Number(req.params.id)));
+    } catch (error) {
+        handleError(res, error, "Could not activate this Application.");
+    }
+};
+
+exports.connectJumiaApplication = async (req, res) => {
     try {
         const vendorId = await requireVendorId(req, res);
         if (!vendorId) return;
@@ -44,33 +88,81 @@ exports.connectJumia = async (req, res) => {
         // header note) - accepting the old client_secret key too in case
         // any not-yet-updated client code is still sending that name.
         const { client_id, refresh_token, client_secret } = req.body;
-        const status = await jumiaSync.connectVendor(vendorId, client_id, refresh_token || client_secret);
-        res.json(status);
+        const result = await jumiaSync.connectApplication(vendorId, Number(req.params.id), client_id, refresh_token || client_secret);
+        res.json(result);
     } catch (error) {
-        handleError(res, error, "Could not connect to Jumia.");
+        handleError(res, error, "Could not connect this Application to Jumia.");
     }
 };
 
-exports.disconnectJumia = async (req, res) => {
+exports.disconnectJumiaApplication = async (req, res) => {
     try {
         const vendorId = await requireVendorId(req, res);
         if (!vendorId) return;
-        await jumiaSync.disconnectVendor(vendorId);
-        res.json({ success: true });
+        res.json(await jumiaSync.disconnectApplication(vendorId, Number(req.params.id)));
     } catch (error) {
-        handleError(res, error, "Could not disconnect from Jumia.");
+        handleError(res, error, "Could not disconnect this Application.");
     }
 };
 
-exports.testJumiaConnection = async (req, res) => {
+exports.testJumiaApplication = async (req, res) => {
     try {
         const vendorId = await requireVendorId(req, res);
         if (!vendorId) return;
-        res.json(await jumiaSync.testConnection(vendorId));
+        res.json(await jumiaSync.testApplicationConnection(vendorId, Number(req.params.id)));
     } catch (error) {
-        handleError(res, error, "Could not verify the Jumia connection.");
+        handleError(res, error, "Could not verify this Application's connection.");
     }
 };
+
+exports.setJumiaApplicationCredentials = async (req, res) => {
+    try {
+        const vendorId = await requireVendorId(req, res);
+        if (!vendorId) return;
+        const { client_id, client_secret } = req.body;
+        res.json(await jumiaSync.setWebApplicationCredentials(vendorId, Number(req.params.id), client_id, client_secret));
+    } catch (error) {
+        handleError(res, error, "Could not save this Application's credentials.");
+    }
+};
+
+exports.getJumiaAuthorizeUrl = async (req, res) => {
+    try {
+        const vendorId = await requireVendorId(req, res);
+        if (!vendorId) return;
+        res.json(await jumiaSync.getAuthorizeUrl(vendorId, Number(req.params.id)));
+    } catch (error) {
+        handleError(res, error, "Could not start Jumia sign-in.");
+    }
+};
+
+// Public route - Jumia redirects the vendor's browser here directly, so
+// there is no Authorization header to read req.user from. Ends in a
+// redirect back to the vendor dashboard's Applications tab either way, so
+// the vendor lands somewhere sensible even if this tab was opened fresh
+// by Jumia's redirect rather than carried over from the dashboard.
+exports.jumiaOAuthCallback = async (req, res) => {
+    const { code, state, error: jumiaError } = req.query;
+    if (jumiaError) {
+        return res.redirect(`/vendor/dashboard.html?jumia_oauth=error&message=${encodeURIComponent(String(jumiaError))}#account`);
+    }
+    if (!code || !state) {
+        return res.redirect(`/vendor/dashboard.html?jumia_oauth=error&message=${encodeURIComponent("Missing code or state from Jumia.")}#account`);
+    }
+    try {
+        const result = await jumiaSync.handleOAuthCallback(code, state);
+        if (!result.success) {
+            return res.redirect(`/vendor/dashboard.html?jumia_oauth=error&message=${encodeURIComponent(result.message || "Could not connect to Jumia.")}#account`);
+        }
+        return res.redirect(`/vendor/dashboard.html?jumia_oauth=success#account`);
+    } catch (error) {
+        console.error("jumiaOAuthCallback error:", error);
+        return res.redirect(`/vendor/dashboard.html?jumia_oauth=error&message=${encodeURIComponent("Something went wrong completing Jumia sign-in.")}#account`);
+    }
+};
+
+// --- Product sync (unchanged - always operates on the vendor's ACTIVE
+// Application, resolved inside jumiaSyncService) ---
 
 exports.getJumiaLinks = async (req, res) => {
     try {

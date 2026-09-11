@@ -27,6 +27,7 @@ const { SIZE_RANK } = require("../utils/deliveryPricing");
 function safePackageSize(value) {
     return SIZE_RANK[value] ? value : "Small";
 }
+exports.safePackageSize = safePackageSize;
 
 // Sellers must never see or derive Lizimas' commission rate from their own
 // dashboard (Ryan, Sept 2026) - vendor_desired_payout (their own input) and
@@ -224,6 +225,7 @@ exports.getProducts = async (req, res) => {
 
 // Get the logged-in staff member's own products, with pending deletion request status
 // Capability check rather than a role test, so new roles need no handler changes.
+exports.canEditProduct = canEditProduct;
 async function canEditProduct(user, productId) {
     if (user.role === "admin") return { allowed: true };
     const row = (await pool.query(

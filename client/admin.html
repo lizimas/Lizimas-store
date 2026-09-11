@@ -245,7 +245,34 @@
 
                     <div class="product-summary-grid" id="product-summary-grid"></div>
 
-                    <button class="add-btn" onclick="openProductForm()">+ Add Product</button>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+                        <button class="add-btn" onclick="openProductForm()">+ Add Product</button>
+                        <button class="add-btn" style="background:#fff; color:#1a1a2e; border:1.5px solid #1a1a2e;" onclick="toggleProductImportExportPanel()">Import / Export</button>
+                    </div>
+
+                    <div id="product-import-export-panel" class="hidden panel" style="margin-bottom:16px;">
+                        <h3 style="margin:0 0 4px;">Export Products</h3>
+                        <p style="font-size:12.5px; color:#888; margin:0 0 10px;">Download the catalogue as a CSV file. Re-uploading it below (via the Import section) updates these same products by id or sku.</p>
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:20px;">
+                            <label style="font-size:13px; color:#333;">Status:
+                                <select id="product-export-status" style="margin-left:6px; padding:6px 8px; border:1px solid #ccc; border-radius:6px;">
+                                    <option value="">All</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="rejected">Rejected</option>
+                                </select>
+                            </label>
+                            <button type="button" onclick="downloadProductsCsv()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:9px 16px; cursor:pointer; font-weight:600; font-size:13px;">Download CSV</button>
+                        </div>
+
+                        <h3 style="margin:0 0 4px; border-top:1px solid #eee; padding-top:16px;">Import Products</h3>
+                        <p style="font-size:12.5px; color:#888; margin:0 0 10px;">Upload a .csv, .xlsx, or .xls file. Rows with an <code>id</code> or a matching <code>sku</code> update that product; all other rows create a new one. A <code>category</code> name that doesn't exist yet is created automatically.</p>
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <input type="file" id="product-import-file" accept=".csv,.xlsx,.xls" style="font-size:13px;">
+                            <button type="button" onclick="uploadProductsCsv()" id="product-import-btn" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:9px 16px; cursor:pointer; font-weight:600; font-size:13px;">Upload &amp; Import</button>
+                        </div>
+                        <div id="product-import-results" style="margin-top:14px; font-size:12.5px;"></div>
+                    </div>
 
                     <div id="product-form-container" class="hidden panel">
                         <h3 id="product-form-title">Add Product</h3>
@@ -317,8 +344,16 @@
 
                             <div class="product-form-section">
                                 <h4>Specifications</h4>
+                                <p style="font-size:12px; color:#666; margin-top:-6px;">Optional key/value facts shown on the product page (e.g. Material: Cotton, Battery Life: 10 hours).</p>
                                 <div id="specs-list" style="display:flex; flex-direction:column; gap:6px;"></div>
                                 <button type="button" onclick="addSpecRow()" style="margin-top:8px; padding:8px 12px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer;">+ Add Specification</button>
+
+                                <div style="margin-top:14px; border-top:1px dashed #ddd; padding-top:12px;">
+                                    <label style="font-size:12.5px; font-weight:600; color:#333; display:block; margin-bottom:4px;">Paste from Excel</label>
+                                    <p style="font-size:11.5px; color:#888; margin:0 0 6px;">Select your Label and Value columns in Excel, copy, and paste them below &mdash; one row per line.</p>
+                                    <textarea id="admin-specs-paste-box" rows="3" placeholder="Material&#9;Cotton&#10;Battery Life&#9;10 hours&#10;Weight&#9;250g" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid #ccc; border-radius:6px; font-family:monospace; font-size:12px;"></textarea>
+                                    <button type="button" onclick="parseAndAddAdminSpecs()" style="margin-top:6px; padding:7px 12px; border-radius:6px; border:1px solid #1a1a2e; background:#1a1a2e; color:#fff; cursor:pointer; font-size:12.5px;">Parse &amp; Add Rows</button>
+                                </div>
                             </div>
 
                             <div class="product-form-section">

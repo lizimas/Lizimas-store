@@ -3,6 +3,7 @@ const { sendOrderStatusSms } = require("../utils/sms");
 const { sendOrderStatusEmail } = require("../utils/mailer");
 const XLSX = require("xlsx");
 const { parse } = require("csv-parse/sync");
+const { safePackageSize } = require("./productController");
 
 // Base URL for links that leave the app (emails, receipts). Hardcoding the
 // production domain makes locally generated links unusable, since they resolve
@@ -225,6 +226,23 @@ exports.updateOrderStatus = async (req, res) => {
     }
 };
 
+// Bulk product import from CSV/XLSX. Admin-only (this whole router is gated
+// by requireAuth+requireAdmin above) - so, unlike the staff-facing product
+// forms, every field here is directly writable including status: there is
+// no "goes back to pending" safety net to preserve because product_staff
+// can't reach this endpoint at all.
+//
+// Row matching: an `id` column (if present and non-empty) always wins as
+// the target row for an UPDATE. Failing that, a non-empty `sku` that
+// matches an existing product also updates it - this lets a re-import of a
+// previously exported file (see exportProducts below) work without anyone
+// having to look up database ids by hand. Otherwise the row is a CREATE.
+//
+// Kept transactional (BEGIN/COMMIT/ROLLBACK) exactly as this function
+// already was before this pass: a genuinely unexpected failure (a DB error
+// mid-loop) rolls back everything so a half-applied import can't corrupt
+// the catalogue, while ordinary per-row validation problems are collected
+// into results.errors and the row is skipped without aborting the batch.
 exports.importProducts = async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ error: "No file uploaded (field name must be \"file\")." });
@@ -252,6 +270,12 @@ exports.importProducts = async (req, res) => {
         return res.status(400).json({ error: "File contains no rows." });
     }
 
+    if (rows.length > 5000) {
+        return res.status(400).json({ error: `File has ${rows.length} rows - please split it into batches of 5000 or fewer.` });
+    }
+
+    const VALID_STATUSES = ["pending", "approved", "rejected"];
+
     const results = { created: 0, updated: 0, skipped: 0, errors: [] };
     const categoryCache = new Map();
     const client = await pool.connect();
@@ -269,6 +293,24 @@ exports.importProducts = async (req, res) => {
             const description = String(row.description || "").trim();
             const categoryName = String(row.category || "").trim();
             const existingId = row.id ? Number(row.id) : null;
+            const sku = row.sku !== undefined ? String(row.sku).trim() : "";
+
+            const packageSizeRaw = row.package_size !== undefined ? String(row.package_size).trim() : "";
+            const brand = row.brand !== undefined ? String(row.brand).trim() : "";
+            const gtin = row.gtin !== undefined ? String(row.gtin).trim() : "";
+            const mpn = row.mpn !== undefined ? String(row.mpn).trim() : "";
+            const material = row.material !== undefined ? String(row.material).trim() : "";
+            const color = row.color !== undefined ? String(row.color).trim() : "";
+            const sleeve = row.sleeve !== undefined ? String(row.sleeve).trim() : "";
+            const style = row.style !== undefined ? String(row.style).trim() : "";
+            const length = row.length !== undefined ? String(row.length).trim() : "";
+            const fit = row.fit !== undefined ? String(row.fit).trim() : "";
+            const pattern = row.pattern !== undefined ? String(row.pattern).trim() : "";
+            const careInstructions = row.care_instructions !== undefined ? String(row.care_instructions).trim() : "";
+            const occasion = row.occasion !== undefined ? String(row.occasion).trim() : "";
+            const warrantyMonthsRaw = row.warranty_months !== undefined ? String(row.warranty_months).trim() : "";
+            const statusRaw = row.status !== undefined ? String(row.status).trim().toLowerCase() : "";
+            const imageRaw = row.image !== undefined ? String(row.image).trim() : "";
 
             const rowErrors = [];
             if (!name) rowErrors.push("name is required");
@@ -276,6 +318,21 @@ exports.importProducts = async (req, res) => {
                 rowErrors.push("price must be a non-negative number");
             }
             if (isNaN(stock) || stock < 0) rowErrors.push("stock must be a non-negative number");
+
+            let warrantyMonths = null;
+            if (warrantyMonthsRaw) {
+                warrantyMonths = Number(warrantyMonthsRaw);
+                if (isNaN(warrantyMonths) || warrantyMonths < 0) {
+                    rowErrors.push("warranty_months must be a non-negative number");
+                    warrantyMonths = null;
+                }
+            }
+
+            if (statusRaw && !VALID_STATUSES.includes(statusRaw)) {
+                rowErrors.push(`status must be one of ${VALID_STATUSES.join(", ")} (or left blank)`);
+            }
+
+            const packageSize = packageSizeRaw ? safePackageSize(packageSizeRaw) : null;
 
             if (rowErrors.length) {
                 results.skipped++;
@@ -306,26 +363,71 @@ exports.importProducts = async (req, res) => {
                 }
             }
 
-            if (existingId) {
+            // Resolve which existing row (if any) this line targets: an
+            // explicit id wins, otherwise fall back to a sku match so a
+            // re-imported export file updates by sku alone.
+            let targetId = existingId;
+            if (!targetId && sku) {
+                const bySku = await client.query(
+                    "SELECT id FROM products WHERE sku = $1 AND deleted_at IS NULL",
+                    [sku]
+                );
+                if (bySku.rows.length) targetId = bySku.rows[0].id;
+            }
+
+            if (targetId) {
+                const setClauses = [
+                    "name = $1", "description = $2", "price = $3", "stock = $4", "category_id = $5",
+                    "sku = $6", "brand = $7", "gtin = $8", "mpn = $9", "material = $10", "color = $11",
+                    "sleeve = $12", "style = $13", "length = $14", "fit = $15", "pattern = $16",
+                    "care_instructions = $17", "occasion = $18", "warranty_months = $19"
+                ];
+                const params = [
+                    name, description, price, stock, categoryId,
+                    sku || null, brand || null, gtin || null, mpn || null, material || null, color || null,
+                    sleeve || null, style || null, length || null, fit || null, pattern || null,
+                    careInstructions || null, occasion || null, warrantyMonths
+                ];
+
+                if (packageSize) {
+                    params.push(packageSize);
+                    setClauses.push(`package_size = $${params.length}`);
+                }
+                if (statusRaw) {
+                    params.push(statusRaw);
+                    setClauses.push(`status = $${params.length}`);
+                }
+                if (imageRaw) {
+                    params.push(imageRaw);
+                    setClauses.push(`image = $${params.length}`);
+                }
+
+                params.push(targetId);
                 const updateResult = await client.query(
-                    `UPDATE products
-                     SET name = $1, description = $2, price = $3, stock = $4, category_id = $5
-                     WHERE id = $6
-                     RETURNING id`,
-                    [name, description, price, stock, categoryId, existingId]
+                    `UPDATE products SET ${setClauses.join(", ")} WHERE id = $${params.length} AND deleted_at IS NULL RETURNING id`,
+                    params
                 );
 
                 if (updateResult.rows.length) {
                     results.updated++;
                 } else {
                     results.skipped++;
-                    results.errors.push({ row: rowNum, name, errors: [`No product with id ${existingId} found`] });
+                    results.errors.push({ row: rowNum, name, errors: [`No product with id ${targetId} found`] });
                 }
             } else {
                 await client.query(
-                    `INSERT INTO products (name, description, price, stock, category_id)
-                     VALUES ($1, $2, $3, $4, $5)`,
-                    [name, description, price, stock, categoryId]
+                    `INSERT INTO products (
+                        name, description, price, stock, category_id, created_by, status,
+                        sku, brand, gtin, mpn, material, color, sleeve, style, length, fit, pattern,
+                        care_instructions, occasion, warranty_months, package_size, image
+                     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
+                    [
+                        name, description, price, stock, categoryId, req.user.userId, statusRaw || "approved",
+                        sku || null, brand || null, gtin || null, mpn || null, material || null, color || null,
+                        sleeve || null, style || null, length || null, fit || null, pattern || null,
+                        careInstructions || null, occasion || null, warrantyMonths, packageSize || "Small",
+                        imageRaw || null
+                    ]
                 );
                 results.created++;
             }
@@ -345,6 +447,73 @@ exports.importProducts = async (req, res) => {
         totalRows: rows.length,
         ...results
     });
+};
+
+// One CSV field, quoted and escaped per RFC 4180 (double quotes doubled,
+// wrapped in quotes whenever the value contains a quote, comma, or newline
+// so a comma or line break inside a description can't corrupt the column
+// layout downstream).
+function csvField(value) {
+    if (value === null || value === undefined) return "";
+    const s = String(value);
+    if (/[",\n\r]/.test(s)) {
+        return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+}
+
+const EXPORT_COLUMNS = [
+    "id", "sku", "name", "category", "description", "price", "stock", "package_size",
+    "brand", "gtin", "mpn", "material", "color", "sleeve", "style", "length", "fit", "pattern",
+    "care_instructions", "occasion", "warranty_months", "status", "image", "created_at"
+];
+
+// GET /api/admin/products/export - the read side of the round-trip above:
+// every column here is one importProducts understands, including `id` and
+// `sku` (either can be re-uploaded to update these same rows) and `image`
+// (already-hosted URLs pass straight through import unchanged). Optional
+// ?status=pending|approved|rejected filters to one status; otherwise every
+// non-deleted product is included.
+exports.exportProducts = async (req, res) => {
+    try {
+        const statusFilter = String(req.query.status || "").trim().toLowerCase();
+        const validStatuses = ["pending", "approved", "rejected"];
+        const params = [];
+        let whereClause = "WHERE p.deleted_at IS NULL";
+        if (statusFilter) {
+            if (!validStatuses.includes(statusFilter)) {
+                return res.status(400).json({ error: `status must be one of ${validStatuses.join(", ")}` });
+            }
+            params.push(statusFilter);
+            whereClause += ` AND p.status = $${params.length}`;
+        }
+
+        const result = await pool.query(
+            `SELECT p.id, p.sku, p.name, c.name AS category, p.description, p.price, p.stock,
+                    p.package_size, p.brand, p.gtin, p.mpn, p.material, p.color, p.sleeve, p.style,
+                    p.length, p.fit, p.pattern, p.care_instructions, p.occasion, p.warranty_months,
+                    p.status, p.image, p.created_at
+             FROM products p
+             LEFT JOIN categories c ON c.id = p.category_id
+             ${whereClause}
+             ORDER BY p.id ASC`,
+            params
+        );
+
+        const lines = [EXPORT_COLUMNS.join(",")];
+        for (const row of result.rows) {
+            lines.push(EXPORT_COLUMNS.map(col => csvField(row[col])).join(","));
+        }
+        const csv = lines.join("\r\n") + "\r\n";
+
+        const datestamp = new Date().toISOString().slice(0, 10);
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="products-export-${datestamp}.csv"`);
+        res.send(csv);
+    } catch (error) {
+        console.error("Export products error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
 };
 
 exports.getVisitorStats = async (req, res) => {

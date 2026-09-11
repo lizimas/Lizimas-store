@@ -45,7 +45,10 @@ const {
 const { previewPricing } = require("../controllers/commissionController");
 const { getVendorReviews, respondToReview } = require("../controllers/reviewController");
 const {
-    getJumiaConnection, connectJumia, disconnectJumia, testJumiaConnection,
+    listJumiaApplications, createJumiaApplication, deleteJumiaApplication,
+    activateJumiaApplication, connectJumiaApplication, disconnectJumiaApplication,
+    testJumiaApplication, setJumiaApplicationCredentials, getJumiaAuthorizeUrl,
+    jumiaOAuthCallback,
     getJumiaLinks, pushProductToJumia, pushProductsToJumiaBulk,
     getJumiaRemoteProducts, importJumiaProducts
 } = require("../controllers/jumiaController");
@@ -75,6 +78,14 @@ router.get("/store/:slug", getPublicStorefront);
 router.post("/:id/follow", requireAuth, followVendor);
 router.delete("/:id/follow", requireAuth, unfollowVendor);
 router.get("/:id/follow-status", requireAuth, getFollowStatus);
+
+// Public: Jumia redirects a vendor's browser straight here after OAuth
+// consent (Web Application Applications only) - no auth header is
+// available on a top-level browser redirect, so this must sit before the
+// requireAuth/requireVendor gate below. See jumiaSyncService.js's
+// handleOAuthCallback for how the vendor/Application is identified
+// instead (the signed `state` param).
+router.get("/jumia/oauth/callback", jumiaOAuthCallback);
 
 // Everything below is the vendor's own portal.
 router.use(requireAuth, requireVendor);
@@ -119,6 +130,9 @@ router.patch("/products/:id/variants/stock", updateVariantStock);
 router.get("/products/:id/description-blocks", getDescriptionBlocks);
 router.put("/products/:id/description-blocks", saveDescriptionBlocks);
 router.post("/products/:id/description-blocks/image", upload.single("image"), uploadBlockImage);
+// Staging upload for the vendor Add Product form, where no product id
+// exists yet - mirrors products.js's equivalent no-id route.
+router.post("/products/description-blocks/image", upload.single("image"), uploadBlockImage);
 
 router.get("/dropoff-points", listActiveDropoffPoints);
 router.post("/order-items/:orderItemId/handover", vendorMarkHandedOver);
@@ -164,10 +178,15 @@ router.post("/pricing/preview", previewPricing);
 // connect/disconnect a vendor's Jumia Vendor Center Application, push
 // Lizimas listings out to Jumia, and pull existing Jumia listings in.
 // See jumiaClient.js for what is/isn't verified against Jumia's real API.
-router.get("/me/jumia/connection", getJumiaConnection);
-router.post("/me/jumia/connection", connectJumia);
-router.delete("/me/jumia/connection", disconnectJumia);
-router.post("/me/jumia/connection/test", testJumiaConnection);
+router.get("/me/jumia/applications", listJumiaApplications);
+router.post("/me/jumia/applications", createJumiaApplication);
+router.delete("/me/jumia/applications/:id", deleteJumiaApplication);
+router.post("/me/jumia/applications/:id/activate", activateJumiaApplication);
+router.post("/me/jumia/applications/:id/connect", connectJumiaApplication);
+router.post("/me/jumia/applications/:id/disconnect", disconnectJumiaApplication);
+router.post("/me/jumia/applications/:id/test", testJumiaApplication);
+router.post("/me/jumia/applications/:id/credentials", setJumiaApplicationCredentials);
+router.get("/me/jumia/applications/:id/authorize", getJumiaAuthorizeUrl);
 router.get("/me/jumia/links", getJumiaLinks);
 router.post("/me/jumia/products/:id/push", pushProductToJumia);
 router.post("/me/jumia/products/push-bulk", pushProductsToJumiaBulk);
