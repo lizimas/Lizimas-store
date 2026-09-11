@@ -677,6 +677,42 @@ function collectVendorSpecRows() {
 // adjacent columns produces tab-separated text, so that's tried first;
 // falls back to 2+ spaces (a plain-text table) or a colon (someone typing
 // "Material: Cotton" by hand) so the paste box is forgiving either way.
+//
+// Last resort: some sources (copying straight out of a rendered spec table,
+// rather than an actual spreadsheet) lose the separator entirely - "Os" and
+// "iOS" arrive glued together as "OsiOS" with nothing between them. There's
+// no way to split that back apart in general (the boundary information is
+// gone), so this only recovers it for a curated list of common spec labels:
+// if the line starts with one of them, that's treated as the label and
+// whatever follows is the value. It never overrides a real tab/space/colon
+// match above, so it can't make a well-formed paste worse - it only helps
+// the no-separator case, and only for labels on the list.
+const VENDOR_KNOWN_SPEC_LABELS = [
+    "Model Year", "Model Number", "Model", "Os Version", "Operating System", "Os",
+    "Screen Size", "Display Type", "Display", "Refresh Rate", "Resolution",
+    "Internal Storage", "Storage Capacity", "Storage", "Memory", "Ram",
+    "Camera Resolution", "Camera", "Battery Life", "Battery Capacity", "Battery",
+    "Product Type", "Type", "Brand", "Processor", "Chipset", "Graphics",
+    "Color", "Colour", "Sim", "Usb", "Wifi", "Wi-Fi", "Ports", "Port",
+    "Connectivity", "Network", "Weight", "Net Weight", "Item Weight", "Package Weight",
+    "Dimensions", "Size", "Sizes", "Fit", "Material", "Fabric", "Sleeve Length", "Sleeve",
+    "Closure", "Pattern", "Style", "Gender", "Age Group", "Origin", "Country Of Origin",
+    "Warranty", "Power", "Voltage", "Wattage", "Capacity", "Volume", "Quantity",
+    "Flavor", "Flavour", "Ingredients", "Allergen Info", "Care Instructions",
+    "Waterproof", "Water Resistance", "Shelf Life", "Expiry Date"
+].sort((a, b) => b.length - a.length);
+
+function vendorMatchKnownSpecLabel(line) {
+    const lower = line.toLowerCase();
+    for (const candidate of VENDOR_KNOWN_SPEC_LABELS) {
+        if (lower.startsWith(candidate.toLowerCase())) {
+            const value = line.slice(candidate.length).trim();
+            if (value) return { label: line.slice(0, candidate.length).trim(), value };
+        }
+    }
+    return null;
+}
+
 function vendorParseSpecLine(line) {
     if (line.includes("\t")) {
         const [label, ...rest] = line.split("\t");
@@ -690,6 +726,8 @@ function vendorParseSpecLine(line) {
     if (colonSplit) {
         return { label: colonSplit[1].trim(), value: colonSplit[2].trim() };
     }
+    const knownLabelMatch = vendorMatchKnownSpecLabel(line);
+    if (knownLabelMatch) return knownLabelMatch;
     return { label: line.trim(), value: "" };
 }
 
@@ -2585,6 +2623,47 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
+// --- Profile photo (shared account-level upload, wired up via photo-crop.js) ---
+// The Account tab's photo circle (#profile-photo-img/#profile-photo-placeholder)
+// is updated directly by photo-crop.js's own upload/remove logic. This just
+// keeps the sidebar's small avatar in sync with it, on load and after a change.
+
+function setVdSidebarProfileIcon(photoUrl) {
+    const icon = document.getElementById("vd-sidebar-profile-icon");
+    if (!icon) return;
+    if (photoUrl) {
+        icon.innerHTML = `<img src="${vendorEsc(photoUrl)}" alt="" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">`;
+    } else {
+        icon.innerHTML = "&#127978;";
+    }
+}
+
+async function loadVendorProfilePhoto() {
+    try {
+        const data = await vendorAuthorizedFetch("/api/auth/profile");
+        const photoUrl = data.user && data.user.profile_photo_url;
+        setVdSidebarProfileIcon(photoUrl);
+        const img = document.getElementById("profile-photo-img");
+        const placeholder = document.getElementById("profile-photo-placeholder");
+        if (img && placeholder) {
+            if (photoUrl) {
+                img.src = photoUrl;
+                img.classList.remove("hidden");
+                placeholder.classList.add("hidden");
+            } else {
+                img.classList.add("hidden");
+                placeholder.classList.remove("hidden");
+            }
+        }
+    } catch (error) {
+        console.error("Load vendor profile photo error:", error);
+    }
+}
+
+window.addEventListener("profilePhotoChanged", (e) => {
+    setVdSidebarProfileIcon(e.detail && e.detail.url);
+});
+
 // --- Init -----------------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -2599,5 +2678,6 @@ document.addEventListener("DOMContentLoaded", () => {
     loadVendorPremiumDashboard();
     loadVendorCategories();
     loadVendorPromotions();
+    loadVendorProfilePhoto();
     refreshVendorNotifBadge();
 });

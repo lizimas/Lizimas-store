@@ -325,7 +325,7 @@
 
                 <div class="vd-sidebar-profile">
                     <div class="vd-sidebar-profile-top" onclick="toggleVdProfileMenu()" style="cursor:pointer;">
-                        <span class="vd-sidebar-profile-icon">&#127978;</span>
+                        <span class="vd-sidebar-profile-icon" id="vd-sidebar-profile-icon">&#127978;</span>
                         <div style="min-width:0; flex:1;">
                             <div class="vd-sidebar-profile-name" id="vd-sidebar-profile-name">Loading...</div>
                             <span class="vd-sidebar-profile-badge" id="vd-sidebar-profile-badge"></span>
@@ -952,6 +952,22 @@
                 <section id="tab-account" class="tab-content hidden">
                     <h2 class="admin-page-title">Account</h2>
                     <div class="panel">
+                        <h3 style="margin:0 0 10px;">Profile Photo</h3>
+                        <p style="font-size:12.5px; color:#888; margin:-4px 0 12px;">Shown next to your store name in the sidebar. Customers don't see this - it's for you and your staff.</p>
+                        <div style="display:flex; align-items:center; gap:16px;">
+                            <div class="profile-photo-circle" id="profile-photo-circle" onclick="triggerPhotoUpload()">
+                                <span id="profile-photo-placeholder" style="font-size:32px; color:#bbb;">+</span>
+                                <img id="profile-photo-img" src="" alt="Profile photo" class="hidden">
+                            </div>
+                            <input type="file" id="profile-photo-file-input" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="handlePhotoFileSelected(event)">
+                            <div class="profile-photo-actions">
+                                <button type="button" onclick="triggerPhotoUpload()">Change Photo</button>
+                                <button type="button" class="remove-link" onclick="removeProfilePhotoAction()">Remove</button>
+                            </div>
+                        </div>
+                        <p id="profile-save-status" style="font-size:13px; color:#666; margin-top:8px;"></p>
+                    </div>
+                    <div class="panel">
                         <h3 style="margin:0 0 10px;">Notices</h3>
                         <div id="vendor-compliance-notices">Loading...</div>
                     </div>
@@ -966,10 +982,22 @@
 
     </div>
 
+    <div class="crop-modal-overlay" id="crop-modal-overlay">
+        <div class="crop-viewport" id="crop-viewport">
+            <img id="crop-image" src="" alt="Crop preview">
+        </div>
+        <p class="crop-modal-hint">Drag to reposition &bull; Pinch or scroll to zoom</p>
+        <div class="crop-modal-actions">
+            <button class="crop-cancel" onclick="closeCropModal()">Cancel</button>
+            <button class="crop-confirm" onclick="confirmCrop()">Use This Photo</button>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
     <script src="../js/category-select.js?v=1"></script>
     <script src="../js/seller-panel.js?v=1"></script>
-    <script src="../js/vendor-dashboard.js?v=17"></script>
+    <script src="../js/photo-crop.js?v=1"></script>
+    <script src="../js/vendor-dashboard.js?v=18"></script>
 <script src="../js/vendor-mobile.js?v=1"></script>
 </body>
 </html>

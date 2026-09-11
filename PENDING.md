@@ -1388,3 +1388,55 @@ Fixed by removing `display:flex` from each element's inline style and adding a s
 `:not([hidden])` rule to `client/css/vendor-desktop.css` that supplies `display:flex` only
 once the attribute is cleared. No markup structure changed; `node --check`, HTML tag
 balance, and all 204 existing tests still pass.
+
+## Vendor profile photo upload; specifications parser handles glued label/value pastes (September 2026)
+
+Two follow-ups from the batch above, both scoped to keep the spec boxes' structure and
+storefront rendering exactly as they are - only how data gets *into* them changed.
+
+**Vendor profile photo.** The vendor account already had nowhere to set one, even though
+the `users` table and `/api/auth/profile/photo` endpoints (upload with crop, and remove)
+have existed since the admin/staff profile panel was built - vendors are `users` rows
+too, so no backend work was needed. Added the same photo-circle + crop-modal UI
+(`client/js/photo-crop.js`, already shared by `admin.html` and the staff pages) to the
+vendor dashboard's Account tab, and extended `photo-crop.js`'s `getAuthToken()` to also
+recognize `getVendorToken()` (one added line - staff and admin token helpers were already
+supported the same way). On a successful upload or removal, `photo-crop.js` now dispatches
+a `profilePhotoChanged` window event carrying the new URL (or `null`) so pages with an
+extra photo display elsewhere - here, the sidebar's small avatar - can stay in sync
+without the shared module needing to know about vendor-specific DOM. `vendor-dashboard.js`
+listens for that event and also fetches `/api/auth/profile` once on load
+(`loadVendorProfilePhoto()`) to show the vendor's existing photo (if any) in both the
+Account tab and the sidebar profile card, replacing the static store-icon glyph.
+
+**Specifications paste: labels and values with no separator at all.** The paste-from-Excel
+parser added earlier this batch handled tab-separated, 2+-space, and `label: value`
+pastes, but a vendor copying straight out of a rendered two-column spec table (rather than
+an actual spreadsheet) can get the label and value glued together with nothing between
+them at all - "Os" + "iOS" arrives as "OsiOS". That's not generally recoverable (the
+boundary information is gone), so `vendorParseSpecLine`/`vmParseSpecLine` now fall back,
+only when no tab/space/colon match, to a curated list of ~60 common spec labels
+(`VENDOR_KNOWN_SPEC_LABELS` / `VM_KNOWN_SPEC_LABELS`, duplicated between the desktop and
+mobile files like the rest of this parser): if a line starts with one of them, that's
+taken as the label and everything after it as the value. This is a real limitation, not a
+full fix - a label outside the list still falls through to the old whole-line behavior -
+but it recovers cleanly on the table the vendor sent as an example (Os, Brand, Color,
+Processor, Model Year, Os Version, Screen Size, Display Type, Refresh Rate, Internal
+Storage all split correctly) and never changes how an already well-formed paste (tab,
+space, or colon separated) is handled, since it only runs after those checks fail.
+
+**What shipped**: `client/js/photo-crop.js`, `client/vendor/dashboard.html`,
+`client/js/vendor-dashboard.js`, `client/js/vendor-mobile.js`. No database migration -
+the `users.profile_photo_url` column and its endpoints already existed. All 204 existing
+tests still pass; `node --check` clean on every edited JS file; HTML tag balance,
+duplicate-id, and `getElementById` cross-reference checks all clean; the specs-parser
+fallback was verified directly against the exact lines from the vendor's example
+(`Os iOS`, `Brand Apple`, `Color Silver`, `Processor Apple`, `Model Year 2025`, `Os
+Version 26.0`, `Screen Size 6.3 inches`, `Display Type OLED`, `Refresh Rate 120 Hz`,
+`Internal Storage 256 GB`) - all ten parse correctly.
+
+**Not covered by automated tests** - needs a live browser pass once deployed: the actual
+photo upload/crop/remove round trip against a real backend and Cloudinary (the crop
+canvas, the resulting image quality, and the sidebar avatar updating live); and the
+known-spec-label fallback against a wider variety of real vendor pastes, since the label
+list is necessarily incomplete.

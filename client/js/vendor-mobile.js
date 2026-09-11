@@ -531,7 +531,38 @@ function vmCollectSpecRows() {
 // Same paste-from-Excel parsing as the desktop Add Product form
 // (client/js/vendor-dashboard.js's vendorParseSpecLine) - tab-separated
 // first (how Excel copies two adjacent columns), then 2+ spaces or a
-// colon as forgiving fallbacks.
+// colon as forgiving fallbacks. Last resort - a curated list of common spec
+// labels for sources that lose the separator entirely (e.g. copying out of
+// a rendered spec table gives "OsiOS" with nothing between "Os" and "iOS").
+// Mirrors vendorMatchKnownSpecLabel/VENDOR_KNOWN_SPEC_LABELS in
+// vendor-dashboard.js - kept duplicated since desktop and mobile are
+// separate files, same as the rest of this parser.
+const VM_KNOWN_SPEC_LABELS = [
+    "Model Year", "Model Number", "Model", "Os Version", "Operating System", "Os",
+    "Screen Size", "Display Type", "Display", "Refresh Rate", "Resolution",
+    "Internal Storage", "Storage Capacity", "Storage", "Memory", "Ram",
+    "Camera Resolution", "Camera", "Battery Life", "Battery Capacity", "Battery",
+    "Product Type", "Type", "Brand", "Processor", "Chipset", "Graphics",
+    "Color", "Colour", "Sim", "Usb", "Wifi", "Wi-Fi", "Ports", "Port",
+    "Connectivity", "Network", "Weight", "Net Weight", "Item Weight", "Package Weight",
+    "Dimensions", "Size", "Sizes", "Fit", "Material", "Fabric", "Sleeve Length", "Sleeve",
+    "Closure", "Pattern", "Style", "Gender", "Age Group", "Origin", "Country Of Origin",
+    "Warranty", "Power", "Voltage", "Wattage", "Capacity", "Volume", "Quantity",
+    "Flavor", "Flavour", "Ingredients", "Allergen Info", "Care Instructions",
+    "Waterproof", "Water Resistance", "Shelf Life", "Expiry Date"
+].sort((a, b) => b.length - a.length);
+
+function vmMatchKnownSpecLabel(line) {
+    const lower = line.toLowerCase();
+    for (const candidate of VM_KNOWN_SPEC_LABELS) {
+        if (lower.startsWith(candidate.toLowerCase())) {
+            const value = line.slice(candidate.length).trim();
+            if (value) return { label: line.slice(0, candidate.length).trim(), value };
+        }
+    }
+    return null;
+}
+
 function vmParseSpecLine(line) {
     if (line.includes("\t")) {
         const [label, ...rest] = line.split("\t");
@@ -545,6 +576,8 @@ function vmParseSpecLine(line) {
     if (colonSplit) {
         return { label: colonSplit[1].trim(), value: colonSplit[2].trim() };
     }
+    const knownLabelMatch = vmMatchKnownSpecLabel(line);
+    if (knownLabelMatch) return knownLabelMatch;
     return { label: line.trim(), value: "" };
 }
 

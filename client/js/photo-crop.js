@@ -5,6 +5,7 @@
 function getAuthToken() {
     if (typeof getStaffToken === "function") return getStaffToken();
     if (typeof getToken === "function") return getToken();
+    if (typeof getVendorToken === "function") return getVendorToken();
     return null;
 }
 
@@ -181,6 +182,7 @@ async function uploadCroppedPhoto(blob) {
 
         closeCropModal();
         if (statusEl) statusEl.textContent = "Photo updated!";
+        window.dispatchEvent(new CustomEvent("profilePhotoChanged", { detail: { url: data.profile_photo_url } }));
 
     } catch (error) {
         console.error("Upload photo error:", error);
@@ -200,6 +202,7 @@ async function removeProfilePhotoAction() {
 
         document.getElementById("profile-photo-img").classList.add("hidden");
         document.getElementById("profile-photo-placeholder").classList.remove("hidden");
+        window.dispatchEvent(new CustomEvent("profilePhotoChanged", { detail: { url: null } }));
 
     } catch (error) {
         console.error("Remove photo error:", error);
