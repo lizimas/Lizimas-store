@@ -257,61 +257,93 @@
                         <span class="sidebar-icon">&#9635;</span> Dashboard
                     </button>
 
-                    <div class="vd-group-label">Products</div>
-                    <button class="tab-btn" data-tab="products">
-                        <span class="sidebar-icon">&#128230;</span> My Products
-                    </button>
-                    <button class="tab-btn" data-tab="add-product">
-                        <span class="sidebar-icon">&#10133;</span> Add Product
-                    </button>
+                    <div class="vd-nav-group" data-group="products">
+                        <button class="vd-nav-parent" onclick="toggleVdNavGroup('products')">
+                            <span class="sidebar-icon">&#128230;</span>
+                            <span class="vd-nav-label">Products</span>
+                            <span class="vd-nav-chevron">&#8250;</span>
+                        </button>
+                        <div class="vd-nav-children">
+                            <button class="tab-btn vd-sub-item" data-tab="products">My Products</button>
+                            <button class="tab-btn vd-sub-item" data-tab="add-product">Add Product</button>
+                        </div>
+                    </div>
+
+                    <div class="vd-nav-group" data-group="orders">
+                        <button class="vd-nav-parent" onclick="toggleVdNavGroup('orders')">
+                            <span class="sidebar-icon">&#128179;</span>
+                            <span class="vd-nav-label">Orders</span>
+                            <span class="vd-nav-badge" id="vd-sidebar-orders-badge" hidden>0</span>
+                            <span class="vd-nav-chevron">&#8250;</span>
+                        </button>
+                        <div class="vd-nav-children">
+                            <button class="tab-btn vd-sub-item" data-tab="orders">All Orders</button>
+                            <button class="tab-btn vd-sub-item" data-tab="returns">Returns</button>
+                            <button class="tab-btn vd-sub-item" data-tab="refunds">Returns &amp; Refunds</button>
+                        </div>
+                    </div>
+
                     <button class="tab-btn" data-tab="inventory">
                         <span class="sidebar-icon">&#128200;</span> Inventory
                     </button>
 
-                    <div class="vd-group-label">Orders</div>
-                    <button class="tab-btn" data-tab="orders">
-                        <span class="sidebar-icon">&#128230;</span> Orders
-                    </button>
-                    <button class="tab-btn" data-tab="returns">
-                        <span class="sidebar-icon">&#8634;</span> Returns
-                    </button>
-                    <button class="tab-btn" data-tab="refunds">
-                        <span class="sidebar-icon">&#128181;</span> Returns &amp; Refunds
-                    </button>
-
-                    <div class="vd-group-label">Storefront</div>
                     <button class="tab-btn" data-tab="storefront">
                         <span class="sidebar-icon">&#127978;</span> Storefront
                     </button>
 
-                    <div class="vd-group-label">Marketing</div>
-                    <button class="tab-btn" data-tab="promotions">
-                        <span class="sidebar-icon">&#127991;</span> Promotions
-                    </button>
+                    <div class="vd-nav-group" data-group="marketing">
+                        <button class="vd-nav-parent" onclick="toggleVdNavGroup('marketing')">
+                            <span class="sidebar-icon">&#127991;</span>
+                            <span class="vd-nav-label">Marketing</span>
+                            <span class="vd-nav-chevron">&#8250;</span>
+                        </button>
+                        <div class="vd-nav-children">
+                            <button class="tab-btn vd-sub-item" data-tab="promotions">Promotions</button>
+                        </div>
+                    </div>
 
-                    <div class="vd-group-label">Analytics</div>
-                    <button class="tab-btn" data-tab="reports">
-                        <span class="sidebar-icon">&#128202;</span> Reports
-                    </button>
-                    <button class="tab-btn" data-tab="reviews">
-                        <span class="sidebar-icon">&#11088;</span> Reviews
-                    </button>
+                    <div class="vd-nav-group" data-group="analytics">
+                        <button class="vd-nav-parent" onclick="toggleVdNavGroup('analytics')">
+                            <span class="sidebar-icon">&#128202;</span>
+                            <span class="vd-nav-label">Analytics</span>
+                            <span class="vd-nav-chevron">&#8250;</span>
+                        </button>
+                        <div class="vd-nav-children">
+                            <button class="tab-btn vd-sub-item" data-tab="reports">Reports</button>
+                            <button class="tab-btn vd-sub-item" data-tab="reviews">Reviews</button>
+                        </div>
+                    </div>
 
-                    <div class="vd-group-label">Payments</div>
-                    <button class="tab-btn" data-tab="wallet">
-                        <span class="sidebar-icon">&#128176;</span> Wallet
-                    </button>
+                    <div class="vd-nav-group" data-group="payments">
+                        <button class="vd-nav-parent" onclick="toggleVdNavGroup('payments')">
+                            <span class="sidebar-icon">&#128176;</span>
+                            <span class="vd-nav-label">Payments</span>
+                            <span class="vd-nav-chevron">&#8250;</span>
+                        </button>
+                        <div class="vd-nav-children">
+                            <button class="tab-btn vd-sub-item" data-tab="wallet">Wallet</button>
+                        </div>
+                    </div>
 
-                    <div class="vd-group-label">Support</div>
                     <button class="tab-btn" data-tab="messages">
-                        <span class="sidebar-icon">&#128172;</span> Messages
+                        <span class="sidebar-icon">&#128172;</span> Support
                     </button>
 
-                    <div class="vd-group-label">Settings</div>
                     <button class="tab-btn" data-tab="account">
-                        <span class="sidebar-icon">&#9881;</span> Account
+                        <span class="sidebar-icon">&#9881;</span> Settings
                     </button>
                 </nav>
+
+                <div class="vd-sidebar-profile">
+                    <div class="vd-sidebar-profile-top">
+                        <span class="vd-sidebar-profile-icon">&#127978;</span>
+                        <div style="min-width:0;">
+                            <div class="vd-sidebar-profile-name" id="vd-sidebar-profile-name">Loading...</div>
+                            <span class="vd-sidebar-profile-badge" id="vd-sidebar-profile-badge"></span>
+                        </div>
+                    </div>
+                    <a href="#" id="vd-sidebar-view-storefront" target="_blank" class="vd-sidebar-profile-link">View Storefront &rarr;</a>
+                </div>
             </aside>
 
             <main class="admin-main">
@@ -364,8 +396,9 @@
                             <div class="vd-stat-value" id="vd-stat-total-products">-</div>
                         </div>
                         <div class="vd-stat-card">
-                            <div class="vd-stat-label">Seller Score</div>
+                            <div class="vd-stat-label">Store Rating</div>
                             <div class="vd-stat-value" id="vd-stat-store-rating">-</div>
+                            <div class="vd-stat-stars" id="vd-stat-rating-stars"></div>
                         </div>
                     </div>
 
@@ -396,13 +429,41 @@
                         </div>
 
                         <div>
+                            <button class="vd-primary-cta" onclick="document.querySelector('.tab-btn[data-tab=\'add-product\']').click();">+ Add New Product</button>
+
                             <div class="vd-card">
-                                <h3 class="vd-card-title"><span>Quick Actions</span></h3>
-                                <button class="vd-quick-action" onclick="document.querySelector('.tab-btn[data-tab=\'add-product\']').click();">+ Add New Product</button>
-                                <button class="vd-quick-action" onclick="document.querySelector('.tab-btn[data-tab=\'products\']').click();">Manage Products</button>
-                                <button class="vd-quick-action" onclick="document.querySelector('.tab-btn[data-tab=\'orders\']').click();">View Orders</button>
-                                <button class="vd-quick-action" onclick="document.querySelector('.tab-btn[data-tab=\'inventory\']').click();">Update Inventory</button>
-                                <button class="vd-quick-action" onclick="document.querySelector('.tab-btn[data-tab=\'account\']').click();">Store Settings</button>
+                                <button class="vd-quick-row" onclick="document.querySelector('.tab-btn[data-tab=\'products\']').click();">
+                                    <span class="vd-quick-icon" style="background:#EAF2FF; color:#1D4ED8;">&#127978;</span>
+                                    <span class="vd-quick-text">
+                                        <span class="vd-quick-title">Manage Products</span>
+                                        <span class="vd-quick-sub">Add, edit or remove products</span>
+                                    </span>
+                                    <span class="vd-quick-chevron">&#8250;</span>
+                                </button>
+                                <button class="vd-quick-row" onclick="document.querySelector('.tab-btn[data-tab=\'orders\']').click();">
+                                    <span class="vd-quick-icon" style="background:#EAFBF1; color:#16A34A;">&#128179;</span>
+                                    <span class="vd-quick-text">
+                                        <span class="vd-quick-title">View Orders</span>
+                                        <span class="vd-quick-sub">Track and manage your orders</span>
+                                    </span>
+                                    <span class="vd-quick-chevron">&#8250;</span>
+                                </button>
+                                <button class="vd-quick-row" onclick="document.querySelector('.tab-btn[data-tab=\'inventory\']').click();">
+                                    <span class="vd-quick-icon" style="background:#FFF3E0; color:#B45309;">&#128200;</span>
+                                    <span class="vd-quick-text">
+                                        <span class="vd-quick-title">Update Inventory</span>
+                                        <span class="vd-quick-sub">Keep your stock levels current</span>
+                                    </span>
+                                    <span class="vd-quick-chevron">&#8250;</span>
+                                </button>
+                                <button class="vd-quick-row" onclick="document.querySelector('.tab-btn[data-tab=\'account\']').click();">
+                                    <span class="vd-quick-icon" style="background:#F3EEFF; color:#7C3AED;">&#9881;</span>
+                                    <span class="vd-quick-text">
+                                        <span class="vd-quick-title">Store Settings</span>
+                                        <span class="vd-quick-sub">Update your store information</span>
+                                    </span>
+                                    <span class="vd-quick-chevron">&#8250;</span>
+                                </button>
                             </div>
 
                             <div class="vd-card">

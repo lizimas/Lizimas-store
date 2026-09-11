@@ -49,6 +49,9 @@ function setupVendorTabs() {
             button.classList.add("active");
             document.getElementById(`tab-${button.dataset.tab}`).classList.remove("hidden");
 
+            const parentGroup = button.closest(".vd-nav-group");
+            if (parentGroup) parentGroup.classList.add("vd-nav-open");
+
             if (button.dataset.tab === "overview") { loadVendorStatus(); loadVendorKyc(); loadVendorPremiumDashboard(); }
             if (button.dataset.tab === "products") loadVendorProducts();
             if (button.dataset.tab === "inventory") loadVendorInventory();
@@ -65,6 +68,16 @@ function setupVendorTabs() {
             if (button.dataset.tab === "messages") loadVendorMessages();
         });
     });
+}
+
+// Sidebar accordion groups (Products/Orders/Marketing/Analytics/Payments) -
+// collapsed by default, matching the reference layout's chevron affordance;
+// opens automatically when one of its own tabs becomes active (see the
+// click handler above).
+function toggleVdNavGroup(key) {
+    const group = document.querySelector(`.vd-nav-group[data-group="${key}"]`);
+    if (!group) return;
+    group.classList.toggle("vd-nav-open");
 }
 
 // --- Overview ---------------------------------------------------------
@@ -95,6 +108,23 @@ async function loadVendorStatus() {
 
         const banner = document.getElementById("vendor-status-banner");
         const s = vendorStatusLabel(v.status);
+
+        const sidebarProfileName = document.getElementById("vd-sidebar-profile-name");
+        const sidebarProfileBadge = document.getElementById("vd-sidebar-profile-badge");
+        const sidebarStorefrontLink = document.getElementById("vd-sidebar-view-storefront");
+        if (sidebarProfileName) sidebarProfileName.textContent = v.business_name || "Your Store";
+        if (sidebarProfileBadge) {
+            sidebarProfileBadge.textContent = v.status === "approved" ? "Verified Vendor" : s.text;
+            sidebarProfileBadge.style.background = s.bg;
+            sidebarProfileBadge.style.color = s.color;
+        }
+        if (sidebarStorefrontLink) {
+            if (v.slug) {
+                sidebarStorefrontLink.href = `/store/${encodeURIComponent(v.slug)}`;
+            } else {
+                sidebarStorefrontLink.style.display = "none";
+            }
+        }
 
         let extra = "";
         if (v.status === "pending") {
@@ -1355,13 +1385,50 @@ async function loadVendorDashboardStats() {
         const ordersToday = document.getElementById("vd-stat-orders-today");
         const pendingHandover = document.getElementById("vd-stat-pending-handover");
         const totalProducts = document.getElementById("vd-stat-total-products");
-        const sellerScoreEl = document.getElementById("vd-stat-store-rating");
         if (ordersToday) ordersToday.textContent = data.orders.today;
         if (pendingHandover) pendingHandover.textContent = data.orders.pendingHandover;
         if (totalProducts) totalProducts.textContent = data.products.total;
-        if (sellerScoreEl) sellerScoreEl.textContent = (data.sellerScore && !data.sellerScore.isNew) ? `${data.sellerScore.score}%` : "New";
+
+        const sidebarOrdersBadge = document.getElementById("vd-sidebar-orders-badge");
+        if (sidebarOrdersBadge) {
+            const needsAttention = (data.orders.pendingHandover || 0) + (data.orders.awaitingDelivery || 0);
+            if (needsAttention > 0) {
+                sidebarOrdersBadge.textContent = needsAttention > 99 ? "99+" : String(needsAttention);
+                sidebarOrdersBadge.hidden = false;
+            } else {
+                sidebarOrdersBadge.hidden = true;
+            }
+        }
     } catch (error) {
         console.error("Load vendor dashboard stats error:", error);
+    }
+}
+
+// Store Rating stat card - a real average across the vendor's own product
+// reviews (same /api/vendors/reviews rows the Reviews tab lists), not a
+// stand-in metric. Shown as a number, a row of filled/empty stars, and the
+// review count, matching the reference screenshot.
+async function loadVendorDashboardRating() {
+    const valueEl = document.getElementById("vd-stat-store-rating");
+    const starsEl = document.getElementById("vd-stat-rating-stars");
+    if (!valueEl && !starsEl) return;
+    try {
+        const rows = await vendorAuthorizedFetch("/api/vendors/reviews");
+        if (!Array.isArray(rows) || rows.length === 0) {
+            if (valueEl) valueEl.textContent = "-";
+            if (starsEl) starsEl.textContent = "No reviews yet";
+            return;
+        }
+        const total = rows.reduce((sum, r) => sum + Number(r.rating || 0), 0);
+        const average = total / rows.length;
+        if (valueEl) valueEl.textContent = average.toFixed(1);
+        if (starsEl) {
+            const filled = Math.round(average);
+            const stars = "\u2605".repeat(Math.max(0, Math.min(5, filled))) + "\u2606".repeat(Math.max(0, 5 - filled));
+            starsEl.textContent = `${stars} (${rows.length} review${rows.length === 1 ? "" : "s"})`;
+        }
+    } catch (error) {
+        console.error("Load vendor dashboard rating error:", error);
     }
 }
 
@@ -1442,6 +1509,7 @@ async function loadVendorDashboardNotifPreview() {
 
 function loadVendorPremiumDashboard() {
     loadVendorDashboardStats();
+    loadVendorDashboardRating();
     loadVendorDashboardOrdersAndProducts();
     loadVendorDashboardNotifPreview();
 }
