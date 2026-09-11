@@ -149,6 +149,12 @@
         blocks.forEach((b) => {
             if (b.type === "image") {
                 frag.appendChild(imageEl(b));
+                if (b.body && String(b.body).trim()) {
+                    const cap = document.createElement("div");
+                    cap.className = "pdb-caption";
+                    cap.textContent = pdbDecode(b.body);
+                    frag.appendChild(cap);
+                }
             } else if (b.type === "heading") {
                 const h = document.createElement("h3");
                 h.className = "pdb-heading";

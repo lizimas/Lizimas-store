@@ -122,6 +122,7 @@ const {
     deleteFlashSale
 } = require("../controllers/flashSaleController");
 const csvUpload = require("../middleware/csvUpload");
+const jumiaAdmin = require("../controllers/jumiaAdminController");
 const { getSecurityLogins, unlockAccount, getAccountReports, updateAccountReport } = require("../controllers/adminController");
 
 // Vendor messages (Task #71/#76) - reachable by customer_support as well
@@ -134,6 +135,10 @@ router.patch("/vendor-messages/:id/resolve", requireAuth, requireSupportOrAdmin,
 router.patch("/vendor-messages/:id/reopen", requireAuth, requireSupportOrAdmin, reopenVendorMessageAdmin);
 router.patch("/vendor-messages/:id/escalate", requireAuth, requireSupportOrAdmin, escalateVendorMessageAdmin);
 router.patch("/vendor-messages/:id/unescalate", requireAuth, requireSupportOrAdmin, unescalateVendorMessageAdmin);
+
+// Public - Jumia redirects here directly, no admin auth header on a
+// top-level browser redirect (see jumiaAdminController.js).
+router.get("/jumia/oauth/callback", jumiaAdmin.adminJumiaOAuthCallback);
 
 router.use(requireAuth, requireAdmin);
 
@@ -203,6 +208,24 @@ router.patch("/orders/:id/status", updateOrderStatus);
 
 router.post("/products/import", csvUpload.single("file"), require("../controllers/adminController").importProducts);
 router.get("/products/export", require("../controllers/adminController").exportProducts);
+
+// Store-level Jumia integration (migration 085) - same Applications
+// concept vendors have, scoped to Lizimas's own products so Ryan can push
+// the store's own catalogue to Jumia independently of any vendor.
+router.get("/jumia/applications", jumiaAdmin.listAdminJumiaApplications);
+router.post("/jumia/applications", jumiaAdmin.createAdminJumiaApplication);
+router.delete("/jumia/applications/:id", jumiaAdmin.deleteAdminJumiaApplication);
+router.post("/jumia/applications/:id/activate", jumiaAdmin.activateAdminJumiaApplication);
+router.post("/jumia/applications/:id/connect", jumiaAdmin.connectAdminJumiaApplication);
+router.post("/jumia/applications/:id/disconnect", jumiaAdmin.disconnectAdminJumiaApplication);
+router.post("/jumia/applications/:id/test", jumiaAdmin.testAdminJumiaApplication);
+router.post("/jumia/applications/:id/credentials", jumiaAdmin.setAdminJumiaApplicationCredentials);
+router.get("/jumia/applications/:id/authorize", jumiaAdmin.getAdminJumiaAuthorizeUrl);
+router.get("/jumia/links", jumiaAdmin.getAdminJumiaLinks);
+router.post("/jumia/products/:id/push", jumiaAdmin.pushAdminProductToJumia);
+router.post("/jumia/products/push-bulk", jumiaAdmin.pushAdminProductsToJumiaBulk);
+router.get("/jumia/remote-products", jumiaAdmin.getAdminJumiaRemoteProducts);
+router.post("/jumia/import", jumiaAdmin.importAdminJumiaProducts);
 
 // Vendor fulfilment: drop-off points, handover inspection, returns collection
 // Vendor KYC review

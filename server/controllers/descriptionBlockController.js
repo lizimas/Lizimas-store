@@ -72,6 +72,10 @@ const saveDescriptionBlocks = async (req, res) => {
         }
         if (b.type === "text") b.body = sanitizeBlockHtml(b.body || "");
         if (b.type === "heading") b.body = stripTags(b.body || "").trim();
+        // Image blocks reuse the same "body" column for an optional caption
+        // shown under the photo on the storefront (unlike alt_text, which
+        // never renders) - plain text only, same treatment as a heading.
+        if (b.type === "image") b.body = stripTags(b.body || "").trim() || null;
 
         if (b.type === "grid") {
             // Mirrors the DB's pdb_grid_needs_items check constraint, so a
@@ -100,6 +104,12 @@ const saveDescriptionBlocks = async (req, res) => {
             return res.status(400).json({
                 message: `Block ${i}: alt text is ${String(b.alt_text).length} characters, limit is 255. ` +
                          `Alt text should briefly describe the image, not repeat the product description.`
+            });
+        }
+
+        if (b.type === "image" && b.body && String(b.body).length > 300) {
+            return res.status(400).json({
+                message: `Block ${i}: caption is ${String(b.body).length} characters, limit is 300.`
             });
         }
     }

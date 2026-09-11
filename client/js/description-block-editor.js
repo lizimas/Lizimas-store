@@ -453,6 +453,17 @@
                 renderAltCount();
                 row.appendChild(altCount);
 
+                // Caption: unlike alt text, this DOES show on the storefront,
+                // as small text under the photo (reuses the "body" column -
+                // image blocks have no other use for it). Optional.
+                const caption = document.createElement("input");
+                caption.type = "text";
+                caption.maxLength = 300;
+                caption.placeholder = "Caption shown under the photo (optional)";
+                caption.value = b.body || "";
+                caption.addEventListener("input", (e) => { blocks[i].body = e.target.value; });
+                row.appendChild(caption);
+
                 const dim = document.createElement("div");
                 dim.className = "lzbe-dim";
                 dim.textContent = `${b.image_width} × ${b.image_height}`;

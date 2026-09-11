@@ -205,6 +205,17 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
     overflow: hidden;
     border-radius: 6px;
 }
+
+/* Small caption text under a standalone Image block - optional, shown to
+   shoppers (unlike alt text). Deliberately small/gray, unlike the bolder
+   .pdb-grid-caption used for multi-column grid images. */
+.pd-desc-blocks .pdb-caption {
+    font-size: 12px;
+    line-height: 1.5;
+    color: #888;
+    text-align: center;
+    margin: -6px 0 14px;
+}
 .pd-desc-blocks .pdb-img img {
     display: block;
     width: 100%;

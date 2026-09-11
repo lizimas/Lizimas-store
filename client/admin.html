@@ -248,6 +248,7 @@
                     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
                         <button class="add-btn" onclick="openProductForm()">+ Add Product</button>
                         <button class="add-btn" style="background:#fff; color:#1a1a2e; border:1.5px solid #1a1a2e;" onclick="toggleProductImportExportPanel()">Import / Export</button>
+                        <button class="add-btn" style="background:#fff; color:#1a1a2e; border:1.5px solid #1a1a2e;" onclick="toggleAdminJumiaPanel()">Jumia</button>
                     </div>
 
                     <div id="product-import-export-panel" class="hidden panel" style="margin-bottom:16px;">
@@ -272,6 +273,128 @@
                             <button type="button" onclick="uploadProductsCsv()" id="product-import-btn" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:9px 16px; cursor:pointer; font-weight:600; font-size:13px;">Upload &amp; Import</button>
                         </div>
                         <div id="product-import-results" style="margin-top:14px; font-size:12.5px;"></div>
+                    </div>
+
+                    <div class="hidden panel" id="admin-jumia-panel" style="margin-bottom:16px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:4px;">
+                            <div>
+                                <h3 style="margin:0 0 4px;">Jumia Applications</h3>
+                                <p style="font-size:12.5px; color:#888; margin:0;">Connect Lizimas's own Jumia Vendor Center account here to push Lizimas-owned products (not vendor products) to Jumia and import Jumia products into Lizimas. Add as many Applications as needed - one of them is the active one used for syncing.</p>
+                            </div>
+                            <button type="button" onclick="ajShowCreateJumiaApplication()" style="background:#E67E22; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600; font-size:13px; white-space:nowrap;">+ Create Application</button>
+                        </div>
+
+                        <div id="aj-jumia-applications-table" style="margin-top:14px; overflow-x:auto;"></div>
+
+                        <div id="aj-jumia-create-application-view" class="hidden" style="margin-top:16px; border-top:1px solid #eee; padding-top:16px; max-width:480px; display:none; flex-direction:column; gap:12px;">
+                            <div>
+                                <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Application Name</label>
+                                <input type="text" id="aj-jumia-new-app-name" placeholder="e.g. Lizimas Store Sync" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:8px;">Application Type</label>
+                                <label style="display:flex; align-items:flex-start; gap:10px; padding:12px; border:1px solid #ddd; border-radius:8px; margin-bottom:8px; cursor:pointer;">
+                                    <input type="radio" name="aj-jumia-new-app-type" value="web_application" style="margin-top:3px;">
+                                    <span>
+                                        <span style="display:block; font-weight:600; font-size:13.5px; color:#1a1a2e;">Web Application (OAuth - Authorization Code Flow)</span>
+                                        <span style="display:block; font-size:12px; color:#888; margin-top:2px;">Sign in to Jumia in a browser popup and approve access - no token to copy/paste. Newer, less tested here than Self Authorization.</span>
+                                    </span>
+                                </label>
+                                <label style="display:flex; align-items:flex-start; gap:10px; padding:12px; border:1px solid #ddd; border-radius:8px; cursor:pointer;">
+                                    <input type="radio" name="aj-jumia-new-app-type" value="self_authorization" checked style="margin-top:3px;">
+                                    <span>
+                                        <span style="display:block; font-weight:600; font-size:13.5px; color:#1a1a2e;">Self Authorization (Integration without User interaction)</span>
+                                        <span style="display:block; font-size:12px; color:#888; margin-top:2px;">Paste the Client ID and Refresh Token from a Self Authorization Application on Jumia. The flow already confirmed working with a real Jumia account.</span>
+                                    </span>
+                                </label>
+                            </div>
+                            <p id="aj-jumia-new-app-error" style="font-size:12.5px; color:#DC2626; margin:0;"></p>
+                            <div style="display:flex; gap:10px;">
+                                <button type="button" onclick="ajCreateJumiaApplication()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Create</button>
+                                <button type="button" onclick="ajHideCreateJumiaApplication()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                            </div>
+                        </div>
+
+                        <div id="aj-jumia-app-setup-view" class="hidden" style="margin-top:16px; border-top:1px solid #eee; padding-top:16px; max-width:480px; display:none; flex-direction:column; gap:10px;">
+                            <div style="font-size:13.5px; font-weight:600; color:#1a1a2e;" id="aj-jumia-app-setup-title"></div>
+
+                            <div id="aj-jumia-app-setup-self" style="display:flex; flex-direction:column; gap:10px;">
+                                <div>
+                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Client ID</label>
+                                    <input type="text" id="aj-jumia-app-client-id" placeholder="Client ID from Jumia Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                </div>
+                                <div>
+                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Refresh Token</label>
+                                    <input type="password" id="aj-jumia-app-refresh-token" placeholder="Refresh Token from Jumia Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                </div>
+                                <p style="font-size:12px; color:#888; margin:0;">Find these under Manage Applications in your Jumia Vendor Center, on this Self Authorization application.</p>
+                                <div style="display:flex; gap:10px;">
+                                    <button type="button" id="aj-jumia-app-connect-btn" onclick="ajConnectJumiaApp()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Connect</button>
+                                    <button type="button" onclick="ajHideJumiaAppSetup()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                                </div>
+                            </div>
+
+                            <div id="aj-jumia-app-setup-web" style="display:flex; flex-direction:column; gap:10px;">
+                                <div>
+                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Redirect URI <span style="font-weight:400; color:#888;">(paste this into the Application on Jumia)</span></label>
+                                    <div style="display:flex; gap:8px;">
+                                        <input type="text" id="aj-jumia-app-redirect-uri" readonly style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box; font-family:monospace; font-size:12px; background:#f7f7f7;">
+                                        <button type="button" onclick="ajCopyJumiaRedirectUri()" style="padding:10px 14px; border:1px solid #ccc; border-radius:8px; background:#fff; cursor:pointer; white-space:nowrap;">Copy</button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Client ID</label>
+                                    <input type="text" id="aj-jumia-app-web-client-id" placeholder="Client ID from Jumia Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                </div>
+                                <div>
+                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Client Secret</label>
+                                    <input type="password" id="aj-jumia-app-web-client-secret" placeholder="Client Secret from Jumia Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                </div>
+                                <p style="font-size:12px; color:#B45309; margin:0; background:#FFFBEB; border:1px solid #FDE68A; border-radius:6px; padding:8px;">This sign-in flow hasn't been tested end-to-end against a real Jumia account yet - Self Authorization above is the flow already confirmed working. Try this one if you'd rather not handle a Refresh Token, and tell us if it doesn't complete.</p>
+                                <div style="display:flex; gap:10px;">
+                                    <button type="button" id="aj-jumia-app-signin-btn" onclick="ajSignInWithJumia()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Save &amp; Sign in with Jumia</button>
+                                    <button type="button" onclick="ajHideJumiaAppSetup()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                                </div>
+                            </div>
+
+                            <p id="aj-jumia-app-setup-error" style="font-size:12.5px; color:#DC2626; margin:0;"></p>
+                        </div>
+                    </div>
+
+                    <div class="hidden panel" id="aj-jumia-export-panel" style="margin-bottom:16px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                            <h3 style="margin:0;">Export to Jumia</h3>
+                            <span id="aj-jumia-export-help" style="font-size:12.5px; color:#666;"></span>
+                        </div>
+                        <p style="font-size:12.5px; color:#888; margin:-4px 0 12px;">Only Lizimas's own products (not vendor products) can be pushed to Jumia this way.</p>
+                        <div id="aj-jumia-export-list"></div>
+                        <div style="display:flex; gap:10px; margin-top:12px;">
+                            <button type="button" onclick="ajExportSelectedToJumia()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Push Selected</button>
+                            <button type="button" onclick="ajHideJumiaExport()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                        </div>
+                    </div>
+
+                    <div class="hidden panel" id="aj-jumia-sync-panel" style="margin-bottom:16px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; gap:10px; flex-wrap:wrap;">
+                            <h3 style="margin:0;">Product Sync</h3>
+                            <div style="display:flex; gap:8px;">
+                                <button type="button" onclick="ajShowJumiaExport()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:8px 14px; cursor:pointer; font-size:12.5px; font-weight:600;">Export to Jumia</button>
+                                <button type="button" onclick="ajShowJumiaImport()" style="background:#fff; color:#1a1a2e; border:1.5px solid #1a1a2e; border-radius:8px; padding:8px 14px; cursor:pointer; font-size:12.5px; font-weight:600;">Import from Jumia</button>
+                            </div>
+                        </div>
+                        <div id="aj-jumia-links-list"></div>
+                    </div>
+
+                    <div class="hidden panel" id="aj-jumia-import-panel" style="margin-bottom:16px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                            <h3 style="margin:0;">Import from Jumia</h3>
+                            <span id="aj-jumia-import-help" style="font-size:12.5px; color:#666;"></span>
+                        </div>
+                        <div id="aj-jumia-import-list"></div>
+                        <div style="display:flex; gap:10px; margin-top:12px;">
+                            <button type="button" onclick="ajImportSelectedJumiaProducts()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Import Selected</button>
+                            <button type="button" onclick="ajHideJumiaImport()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                        </div>
                     </div>
 
                     <div id="product-form-container" class="hidden panel">
