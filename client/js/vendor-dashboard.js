@@ -635,6 +635,11 @@ function resetVendorProductForm() {
     document.getElementById("product-mpn").value = "";
     document.getElementById("product-images").value = "";
     document.getElementById("product-authenticity-confirm").checked = false;
+    vdPickedFiles = [];
+    vdLocalPreviews = [];
+    vdAllImages = [];
+    const _vdPo = document.getElementById("vd-photo-order"); if (_vdPo) _vdPo.remove();
+    const _vdPreview = document.getElementById("product-image-preview"); if (_vdPreview) _vdPreview.innerHTML = "";
     document.getElementById("product-submit-btn").textContent = "Submit for Approval";
     document.getElementById("product-form-status").textContent = "";
     const specsList = document.getElementById("specs-list");
@@ -647,6 +652,253 @@ function resetVendorProductForm() {
         LzBlockEditor.mount(blockHost, null, { tokenKey: "vendorToken", apiBase: "/api/vendors/products" });
     }
 }
+// --- Photo upload with drag/drop + explicit ordering (Ryan: vendor's photo
+// picker was a bare <input multiple> with no way to choose which photo
+// comes first - staff's form already has a drag-drop zone plus a numbered
+// list with up/down reorder, so this ports that same UI and logic here.
+// No color-swatch-to-photo linking exists on the vendor form (that's an
+// admin-only feature), so this is a trimmed copy of admin.js's
+// pdAllImages/renderPhotoOrderList machinery without that piece. ---
+
+let vdLocalPreviews = [];
+let vdAllImages = [];
+let vdPickedFiles = [];
+
+function setupVendorImageDropzone() {
+    const dropzone = document.getElementById("product-image-dropzone");
+    const fileInput = document.getElementById("product-images");
+    if (!dropzone || !fileInput || dropzone.dataset.wired) return;
+
+    dropzone.dataset.wired = "true";
+
+    dropzone.addEventListener("click", () => fileInput.click());
+
+    dropzone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropzone.classList.add("dragover");
+    });
+
+    dropzone.addEventListener("dragleave", () => {
+        dropzone.classList.remove("dragover");
+    });
+
+    dropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+        if (e.dataTransfer.files.length > 0) {
+            fileInput.files = e.dataTransfer.files;
+            renderVendorImagePreviews(fileInput.files);
+        }
+    });
+
+    fileInput.addEventListener("change", () => {
+        renderVendorImagePreviews(fileInput.files);
+    });
+}
+
+async function renderVendorImagePreviews(fileList) {
+    const preview = document.getElementById("product-image-preview");
+    if (!preview) return;
+    preview.innerHTML = "";
+    vdPickedFiles = [];
+
+    const submitBtn = document.getElementById("product-submit-btn");
+    const files = Array.from(fileList);
+    if (files.length === 0) {
+        vdLocalPreviews = [];
+        vdAllImages = vdAllImages.filter(im => im.key.startsWith("id:"));
+        renderVendorPhotoOrderList();
+        return;
+    }
+
+    // Block submit while reads are in flight, or a partial set can upload.
+    if (submitBtn) submitBtn.disabled = true;
+    const status = document.createElement("div");
+    status.style.cssText = "font-size:12px; color:#666; width:100%;";
+    status.textContent = "Preparing " + files.length + " photo(s)...";
+    preview.appendChild(status);
+
+    const failures = [];
+    for (let i = 0; i < files.length; i++) {
+        status.textContent = "Preparing photo " + (i + 1) + " of " + files.length + "...";
+        const res = await preparePickedFile(files[i]);
+        if (res.ok) vdPickedFiles.push(res.file);
+        else failures.push(res);
+    }
+
+    if (submitBtn) submitBtn.disabled = false;
+    preview.innerHTML = "";
+
+    if (failures.length > 0) {
+        const warn = document.createElement("div");
+        warn.style.cssText = "color:#c0392b; font-size:12px; width:100%; margin-bottom:6px;";
+        warn.textContent = failures.length + " photo(s) could not be read and were skipped: "
+            + failures.map(f => f.name + " (" + f.reason + ")").join(", ")
+            + ". Re-select them, or pick from Files rather than a cloud gallery.";
+        preview.appendChild(warn);
+    }
+
+    vdLocalPreviews = vdPickedFiles.map(f => URL.createObjectURL(f));
+    vdAllImages = vdAllImages.filter(im => im.key.startsWith("id:"))
+        .concat(vdPickedFiles.map((f, i) => ({ key: "new:" + i, url: vdLocalPreviews[i] })));
+
+    renderVendorPhotoOrderList();
+}
+
+function vdIsNew(key) { return key.startsWith("new:"); }
+
+function vdRebuildAllImages() {
+    const stored = vdAllImages.filter(im => im.key.startsWith("id:"));
+    vdAllImages = stored.concat(
+        vdPickedFiles.map((f, i) => ({ key: "new:" + i, url: vdLocalPreviews[i] }))
+    );
+}
+
+function renderVendorPhotoOrderList() {
+    const preview = document.getElementById("product-image-preview");
+    if (!preview) return;
+    let block = document.getElementById("vd-photo-order");
+    const all = vdAllImages;
+    if (all.length === 0) { if (block) block.remove(); return; }
+    if (!block) {
+        block = document.createElement("div");
+        block.id = "vd-photo-order";
+        block.style.cssText = "width:100%; margin-bottom:10px;";
+        preview.parentNode.insertBefore(block, preview);
+    }
+
+    const storedCount = all.filter(im => im.key.startsWith("id:")).length;
+
+    block.innerHTML =
+        '<div style="font-size:12px;font-weight:700;color:#444;margin-bottom:8px;">Photos (first photo is the main one shown on the storefront)</div>' +
+        all.map((im, i) => {
+            const isNew = vdIsNew(im.key);
+            const prev = all[i - 1];
+            const next = all[i + 1];
+            const canUp = prev && vdIsNew(prev.key) === isNew;
+            const canDown = next && vdIsNew(next.key) === isNew;
+            return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+                '<span style="min-width:16px;font-size:12px;color:#666;">' + (i + 1) + '</span>' +
+                '<div style="position:relative;flex:0 0 auto;">' +
+                    '<img src="' + im.url + '" style="width:46px;height:46px;object-fit:cover;border-radius:4px;display:block;">' +
+                    '<button type="button" onclick="removeVendorPhoto(\'' + im.key + '\')" title="Remove photo" ' +
+                        'style="position:absolute;top:-7px;right:-7px;width:21px;height:21px;padding:0;line-height:19px;text-align:center;' +
+                        'background:#fff;color:#c0392b;border:1px solid #e0b4ae;border-radius:50%;font-size:12px;cursor:pointer;">&#10005;</button>' +
+                '</div>' +
+                '<button type="button" onclick="moveVendorPhotoOrder(' + i + ',-1)" ' + (canUp ? '' : 'disabled') + ' style="padding:6px 12px;">&uarr;</button>' +
+                '<button type="button" onclick="moveVendorPhotoOrder(' + i + ',1)" ' + (canDown ? '' : 'disabled') + ' style="padding:6px 12px;">&darr;</button>' +
+                (isNew ? '<span style="font-size:10px;font-weight:700;color:#ff6a00;letter-spacing:.5px;">NEW</span>' : '') +
+            '</div>';
+        }).join("") +
+        (storedCount > 1
+            ? '<button type="button" onclick="saveVendorPhotoOrder()" style="margin-top:4px;padding:6px 14px;background:var(--vd-navy,#1a1a2e);color:#fff;border:none;border-radius:4px;">Save order</button>'
+            : '') +
+        '<span id="vd-photo-order-status" style="margin-left:8px;font-size:12px;color:#666;"></span>';
+}
+
+function removeVendorPhoto(key) {
+    if (key.startsWith("id:")) return deleteVendorStoredPhoto(key);
+    return removeVendorNewPhoto(key);
+}
+
+// Unsaved upload: nothing has reached the server, so this is purely local.
+function removeVendorNewPhoto(key) {
+    const i = Number(key.slice(4));
+    if (!Number.isInteger(i) || i < 0 || i >= vdPickedFiles.length) return;
+    try { URL.revokeObjectURL(vdLocalPreviews[i]); } catch (e) {}
+    vdPickedFiles.splice(i, 1);
+    vdLocalPreviews.splice(i, 1);
+    vdRebuildAllImages();
+    renderVendorPhotoOrderList();
+}
+
+let vdDeleteInFlight = false;
+
+async function deleteVendorStoredPhoto(key) {
+    if (vdDeleteInFlight) return;
+    const imageId = key.split(":")[1];
+    if (!imageId) return;
+    if (!confirm("Remove this photo from the product?")) return;
+
+    vdDeleteInFlight = true;
+    document.querySelectorAll("#vd-photo-order button").forEach(b => b.disabled = true);
+    const status = document.getElementById("vd-photo-order-status");
+    if (status) status.textContent = "Removing...";
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/products/images/" + imageId, { method: "DELETE" });
+        if (data && data.error) {
+            if (status) status.textContent = "Failed: " + data.error;
+            return;
+        }
+        vdAllImages = vdAllImages.filter(im => im.key !== key);
+        renderVendorPhotoOrderList();
+        const s2 = document.getElementById("vd-photo-order-status");
+        if (s2) s2.textContent = "Removed";
+    } catch (e) {
+        if (status) status.textContent = "Failed: " + e.message;
+    } finally {
+        vdDeleteInFlight = false;
+        renderVendorPhotoOrderList();
+    }
+}
+
+function moveVendorPhotoOrder(index, delta) {
+    const target = index + delta;
+    if (target < 0 || target >= vdAllImages.length) return;
+    const a = vdAllImages[index];
+    const b = vdAllImages[target];
+    // Saved and unsaved photos do not interleave: unsaved always sort last.
+    if (vdIsNew(a.key) !== vdIsNew(b.key)) return;
+
+    if (vdIsNew(a.key)) {
+        const i = Number(a.key.slice(4));
+        const j = Number(b.key.slice(4));
+        const tf = vdPickedFiles[i]; vdPickedFiles[i] = vdPickedFiles[j]; vdPickedFiles[j] = tf;
+        const tp = vdLocalPreviews[i]; vdLocalPreviews[i] = vdLocalPreviews[j]; vdLocalPreviews[j] = tp;
+        vdRebuildAllImages();
+    } else {
+        vdAllImages[index] = b;
+        vdAllImages[target] = a;
+    }
+
+    renderVendorPhotoOrderList();
+}
+
+async function saveVendorPhotoOrder() {
+    const productId = document.getElementById("product-id").value;
+    const status = document.getElementById("vd-photo-order-status");
+    if (!productId) { if (status) status.textContent = "Save the product first."; return; }
+    const imageIds = vdAllImages
+        .filter(im => im.key.startsWith("id:"))
+        .map(im => Number(im.key.slice(3)));
+    if (status) status.textContent = "Saving...";
+    try {
+        const res = await vendorAuthorizedFetch("/api/vendors/products/" + productId + "/images/order", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageIds: imageIds })
+        });
+        if (status) status.textContent = (res && res.success) ? "Order saved." : ("Failed: " + ((res && res.error) || "Unexpected response."));
+    } catch (e) {
+        if (status) status.textContent = "Failed: " + e.message;
+    }
+}
+
+async function loadVendorProductImagesIntoForm(productId) {
+    try {
+        const response = await fetch(`${API_URL}/api/products/${productId}/images`);
+        const images = await response.json();
+        vdPickedFiles = [];
+        vdLocalPreviews = [];
+        vdAllImages = (Array.isArray(images) ? images : []).map(im => ({ key: "id:" + im.id, url: im.image_path }));
+        renderVendorPhotoOrderList();
+    } catch (error) {
+        console.error("Load vendor product images error:", error);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", setupVendorImageDropzone);
+
 
 // --- Specifications (Task: same key-value spec structure staff/admin use,
 // so vendor listings render specs consistently with staff-added ones on the
@@ -1144,6 +1396,7 @@ async function editVendorProduct(id) {
     scheduleVendorPricingPreview();
     loadVendorVariantOptions(product.id);
     loadVendorProductSpecs(product.id);
+    loadVendorProductImagesIntoForm(product.id);
     const blockHost = document.getElementById("desc-blocks-editor");
     if (blockHost && window.LzBlockEditor) {
         LzBlockEditor.mount(blockHost, product.id, { tokenKey: "vendorToken", apiBase: "/api/vendors/products" });
@@ -1183,7 +1436,6 @@ async function submitVendorProductForm() {
     const brand = document.getElementById("product-brand").value.trim();
     const gtin = document.getElementById("product-gtin").value.trim();
     const mpn = document.getElementById("product-mpn").value.trim();
-    const imageFiles = document.getElementById("product-images").files;
     const statusEl = document.getElementById("product-form-status");
     const submitBtn = document.getElementById("product-submit-btn");
 
@@ -1212,7 +1464,9 @@ async function submitVendorProductForm() {
     formData.append("brand", brand);
     formData.append("gtin", gtin);
     formData.append("mpn", mpn);
-    for (const file of imageFiles) {
+    // Ordered by vdPickedFiles (drag/drop + reorder UI), not the raw file
+    // input, so whichever photo the vendor put first actually uploads first.
+    for (const file of vdPickedFiles) {
         formData.append("images", file);
     }
 

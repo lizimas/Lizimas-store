@@ -803,7 +803,11 @@
                                 <div class="field-row">
                                     <div>
                                         <label style="font-size:13px; font-weight:600; color:#333;">Photos <span style="font-weight:400; color:#888;">(at least 3 recommended — clear, well lit, no watermarks)</span></label>
-                                        <input type="file" id="product-images" accept="image/*" multiple style="padding:6px 0;">
+                                        <div class="drag-drop-zone" id="product-image-dropzone">
+                                            Drag &amp; drop images here, or click to browse
+                                        </div>
+                                        <input type="file" id="product-images" accept="image/*" multiple class="hidden">
+                                        <div class="drag-drop-preview-grid" id="product-image-preview"></div>
                                     </div>
                                 </div>
                             </div>
