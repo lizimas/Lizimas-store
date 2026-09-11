@@ -1492,3 +1492,11 @@ Not yet confirmed: the product endpoints (`/catalog/products` etc.) are still an
 Ryan connected his real Jumia Vendor Center account (Client ID 9e9c54e7-d813-4c58-ad2a-b2c5496e21b7) successfully after the /token path + form-urlencoded body fix above - the vendor UI shows "Connected" with his shop name. This confirms the entire auth layer (host, path, credential model, request/response shapes) end to end against production, not just against a mock.
 
 Still unverified: everything past auth - pushing a Lizimas product to Jumia and importing a Jumia product into Lizimas, which hit /catalog/products (a guess, not confirmed like the token endpoint was). That's the next real test.
+
+## Fix: approved vendors after migration 062 never got a storefront slug (September 2026)
+
+Why: Ryan reported a product from an approved vendor ("Talent Gadgets") showed no seller/vendor information on the storefront. Traced it to `approveVendor()` in `server/controllers/vendorController.js`: migration 062 (vendors.slug for the public storefront) backfilled a slug for every vendor that existed *at the time it ran*, but nothing generates one for a vendor approved since - `approveVendor()` only ever set `status = 'approved'`. `client/js/product-detail.js`'s `loadSellerPanel()` gates entirely on `product.vendor_slug` being truthy, so any such vendor's products silently never show a "Sold by" panel, even though the vendor is fully approved and everything else about them (business name, KYC, shop_active) is fine - a subtle gap since nothing errors, the panel just never appears.
+
+What shipped: `approveVendor()` now generates a unique slug (reusing the shared `server/utils/slugify.js` helper plus the same numeric-suffix-on-collision logic migration 062 used) whenever the vendor doesn't already have one, at approval time. `migrations/083_backfill_vendor_slugs.sql` is the one-time catch-up for every vendor - Talent Gadgets included - already approved without one.
+
+Verified: `node --check` clean; full test suite 204/204. Not covered by automated tests: needs the migration run against production, then a live check that Talent Gadgets' storefront page now shows their seller panel.

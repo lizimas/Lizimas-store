@@ -1,4 +1,5 @@
 const pool = require("../config/database");
+const { slugify } = require("../utils/slugify");
 const { computeSellerScore } = require("../utils/sellerScore");
 const { deriveVendorOrderStage, STAGE_LABELS, isValidStage, canAdvanceStage } = require("../utils/vendorOrderStage");
 const { logActivity } = require("../utils/activityLog");
@@ -658,6 +659,32 @@ exports.getPendingVendors = async (req, res) => {
     }
 };
 
+// Generates a unique storefront slug (lizimasstore.com/store/:slug) for a
+// vendor that doesn't have one yet. Migration 062 backfilled every vendor
+// that existed at the time it ran, but nothing generated one for a vendor
+// approved AFTER that migration - so a product's "Sold by" panel on the
+// storefront (client/js/product-detail.js's loadSellerPanel, which only
+// fires when product.vendor_slug is truthy) silently never appeared for
+// any vendor approved since then, even though the vendor was fully
+// approved. Mirrors the migration's own base-slug/uniqueness-suffix logic,
+// reusing the shared slugify() helper instead of duplicating it.
+async function ensureVendorSlug(vendorId, businessName) {
+    const base = slugify(businessName) === "product" ? `vendor-${vendorId}` : slugify(businessName);
+    let candidate = base;
+    let suffix = 2;
+    while (true) {
+        const existing = await pool.query(
+            `SELECT id FROM vendors WHERE slug = $1 AND id <> $2`,
+            [candidate, vendorId]
+        );
+        if (existing.rows.length === 0) break;
+        candidate = `${base}-${suffix}`;
+        suffix += 1;
+    }
+    await pool.query(`UPDATE vendors SET slug = $1 WHERE id = $2`, [candidate, vendorId]);
+    return candidate;
+}
+
 exports.approveVendor = async (req, res) => {
     try {
         const { id } = req.params;
@@ -669,8 +696,12 @@ exports.approveVendor = async (req, res) => {
         if (result.rows.length === 0) {
             return res.status(409).json({ error: "Vendor is not awaiting review." });
         }
-        logActivity(req.user.userId, "vendor_approved", "vendor", id, result.rows[0].business_name);
-        res.json({ message: "Vendor approved.", vendor: result.rows[0] });
+        let vendor = result.rows[0];
+        if (!vendor.slug) {
+            vendor = { ...vendor, slug: await ensureVendorSlug(vendor.id, vendor.business_name) };
+        }
+        logActivity(req.user.userId, "vendor_approved", "vendor", id, vendor.business_name);
+        res.json({ message: "Vendor approved.", vendor });
     } catch (error) {
         // One account per business, enforced at the DB level (migration 054):
         // approving this vendor would create a second APPROVED account
