@@ -361,24 +361,33 @@ exports.saveProductOptions = async (req, res) => {
         }
 
         const { sizes, colors, specs } = req.body;
+        const touchesVariants = Array.isArray(sizes) || Array.isArray(colors);
 
         await client.query("BEGIN");
 
-        const priorVariants = (await client.query(
+        // This endpoint is shared by two independent forms: staff's product
+        // form submits sizes/colors/specs together every time, but the vendor
+        // dashboard splits them into separate screens (Variants panel for
+        // sizes/colors, Add Product's Specifications section for specs) that
+        // call this same endpoint one field at a time. Only clear + rewrite
+        // whichever of sizes/colors/specs was actually included in this
+        // request - a specs-only call must never wipe out sizes/colors set by
+        // a separate call, and vice versa.
+        const priorVariants = touchesVariants ? (await client.query(
             `SELECT v.id, pc.name AS color_name, ps.name AS size_name
              FROM product_variants v
              LEFT JOIN product_colors pc ON pc.id = v.color_id
              LEFT JOIN product_sizes ps ON ps.id = v.size_id
              WHERE v.product_id = $1`,
             [id]
-        )).rows;
+        )).rows : [];
 
         const sizeIdByName = new Map();
         const colorIdByName = new Map();
 
-        await client.query(`DELETE FROM product_sizes WHERE product_id = $1`, [id]);
-        await client.query(`DELETE FROM product_colors WHERE product_id = $1`, [id]);
-        await client.query(`DELETE FROM product_specifications WHERE product_id = $1`, [id]);
+        if (Array.isArray(sizes)) await client.query(`DELETE FROM product_sizes WHERE product_id = $1`, [id]);
+        if (Array.isArray(colors)) await client.query(`DELETE FROM product_colors WHERE product_id = $1`, [id]);
+        if (Array.isArray(specs)) await client.query(`DELETE FROM product_specifications WHERE product_id = $1`, [id]);
 
         if (Array.isArray(sizes)) {
             for (let i = 0; i < sizes.length; i++) {
@@ -474,20 +483,22 @@ exports.saveProductOptions = async (req, res) => {
 
         let variantsRelinked = 0;
         let variantsOrphaned = 0;
-        for (const v of priorVariants) {
-            const nc = v.color_name ? colorIdByName.get(String(v.color_name).trim().toLowerCase()) : undefined;
-            const ns = v.size_name ? sizeIdByName.get(String(v.size_name).trim().toLowerCase()) : undefined;
-            if (nc === undefined && ns === undefined) {
-                if (v.color_name || v.size_name) variantsOrphaned++;
-                continue;
+        if (touchesVariants) {
+            for (const v of priorVariants) {
+                const nc = v.color_name ? colorIdByName.get(String(v.color_name).trim().toLowerCase()) : undefined;
+                const ns = v.size_name ? sizeIdByName.get(String(v.size_name).trim().toLowerCase()) : undefined;
+                if (nc === undefined && ns === undefined) {
+                    if (v.color_name || v.size_name) variantsOrphaned++;
+                    continue;
+                }
+                await client.query(
+                    `UPDATE product_variants
+                     SET color_id = COALESCE($1, color_id), size_id = COALESCE($2, size_id)
+                     WHERE id = $3`,
+                    [nc === undefined ? null : nc, ns === undefined ? null : ns, v.id]
+                );
+                variantsRelinked++;
             }
-            await client.query(
-                `UPDATE product_variants
-                 SET color_id = COALESCE($1, color_id), size_id = COALESCE($2, size_id)
-                 WHERE id = $3`,
-                [nc === undefined ? null : nc, ns === undefined ? null : ns, v.id]
-            );
-            variantsRelinked++;
         }
 
         await client.query("COMMIT");

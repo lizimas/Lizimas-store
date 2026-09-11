@@ -1166,8 +1166,11 @@ async function forgotPassword(req, res) {
 
         const genericMessage = "If an account with that email exists, a password reset link has been sent.";
 
+        // Self-service reset covers customer and vendor accounts. Staff/admin
+        // are intentionally excluded (see forcePasswordReset below) - they get
+        // reset links only from an admin action, never by requesting one here.
         const result = await pool.query(
-            "SELECT id, name, email FROM users WHERE email = $1 AND role = 'customer'",
+            "SELECT id, name, email FROM users WHERE email = $1 AND role IN ('customer', 'vendor')",
             [email]
         );
 

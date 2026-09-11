@@ -2300,37 +2300,76 @@ async function createStaffAccount() {
     }
 }
 
+let pendingProductsCache = [];
+let pendingProductsFilter = "all"; // all | staff | vendor
+
 async function loadPendingProducts() {
     try {
-        const products = await authorizedFetch("/api/admin/products/pending");
-        const container = document.getElementById("pending-products-list");
-
-        if (!products || products.length === 0) {
-            container.innerHTML = `<p class="no-data">No products awaiting approval.</p>`;
-            return;
-        }
-
-        container.innerHTML = `
-            <table>
-                <thead><tr><th>Product</th><th>Submitted By</th><th>Price</th><th>Actions</th></tr></thead>
-                <tbody>
-                    ${products.map(p => `
-                        <tr>
-                            <td data-label="Product">${p.name}</td>
-                            <td data-label="Submitted By">${p.submitted_by_name || "Unknown"}</td>
-                            <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
-                            <td data-label="Actions">
-                                <button onclick="approvePendingProduct(${p.id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Approve</button>
-                                <button onclick="rejectPendingProduct(${p.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Reject</button>
-                            </td>
-                        </tr>
-                    `).join("")}
-                </tbody>
-            </table>
-        `;
+        pendingProductsCache = await authorizedFetch("/api/admin/products/pending") || [];
+        renderPendingProductsFilter();
+        renderPendingProductsList();
     } catch (error) {
         console.error("Load pending products error:", error);
     }
+}
+
+function renderPendingProductsFilter() {
+    const el = document.getElementById("pending-products-filter");
+    if (!el) return;
+    const vendorCount = pendingProductsCache.filter(p => p.vendor_id).length;
+    const staffCount = pendingProductsCache.length - vendorCount;
+    const tabs = [
+        ["all", `All (${pendingProductsCache.length})`],
+        ["vendor", `Vendor (${vendorCount})`],
+        ["staff", `Staff (${staffCount})`]
+    ];
+    el.innerHTML = tabs.map(([key, label]) => {
+        const active = pendingProductsFilter === key;
+        return `<button onclick="setPendingProductsFilter('${key}')" style="padding:6px 14px; border-radius:6px; border:1px solid ${active ? "#1a1a2e" : "#ccc"}; background:${active ? "#1a1a2e" : "#fff"}; color:${active ? "#fff" : "#333"}; font-size:12.5px; font-weight:600; cursor:pointer;">${label}</button>`;
+    }).join("");
+}
+
+function setPendingProductsFilter(key) {
+    pendingProductsFilter = key;
+    renderPendingProductsFilter();
+    renderPendingProductsList();
+}
+
+function renderPendingProductsList() {
+    const container = document.getElementById("pending-products-list");
+    const products = pendingProductsFilter === "all"
+        ? pendingProductsCache
+        : pendingProductsFilter === "vendor"
+            ? pendingProductsCache.filter(p => p.vendor_id)
+            : pendingProductsCache.filter(p => !p.vendor_id);
+
+    if (!products || products.length === 0) {
+        container.innerHTML = `<p class="no-data">No products awaiting approval${pendingProductsFilter !== "all" ? " in this view" : ""}.</p>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <table>
+            <thead><tr><th>Product</th><th>Submitted By</th><th>Price</th><th>Actions</th></tr></thead>
+            <tbody>
+                ${products.map(p => `
+                    <tr>
+                        <td data-label="Product">${p.name}</td>
+                        <td data-label="Submitted By">
+                            ${p.vendor_id
+                                ? `<span style="display:inline-block; background:#EEF2FF; color:#3730A3; border-radius:4px; padding:1px 7px; font-size:11px; font-weight:700; margin-right:6px;">VENDOR</span>${p.vendor_business_name || p.submitted_by_name || "Unknown"}`
+                                : (p.submitted_by_name || "Unknown")}
+                        </td>
+                        <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
+                        <td data-label="Actions">
+                            <button onclick="approvePendingProduct(${p.id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Approve</button>
+                            <button onclick="rejectPendingProduct(${p.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Reject</button>
+                        </td>
+                    </tr>
+                `).join("")}
+            </tbody>
+        </table>
+    `;
 }
 
 async function approvePendingProduct(id) {

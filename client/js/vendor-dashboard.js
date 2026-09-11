@@ -456,7 +456,56 @@ function resetVendorProductForm() {
     document.getElementById("product-authenticity-confirm").checked = false;
     document.getElementById("product-submit-btn").textContent = "Submit for Approval";
     document.getElementById("product-form-status").textContent = "";
+    const specsList = document.getElementById("specs-list");
+    if (specsList) specsList.innerHTML = "";
     hideVendorVariantsPanel();
+}
+
+// --- Specifications (Task: same key-value spec structure staff/admin use,
+// so vendor listings render specs consistently with staff-added ones on the
+// storefront) - specs are saved via the shared saveProductOptions endpoint
+// but ONLY that field: this call omits sizes/colors entirely so it never
+// touches the vendor's separate Variants panel, and vice versa (see the
+// productController.js comment on saveProductOptions). ------------------
+
+let vendorSpecRowCounter = 0;
+
+function addVendorSpecRow(label, value) {
+    const list = document.getElementById("specs-list");
+    if (!list) return;
+    const rowId = `vendor-spec-row-${vendorSpecRowCounter++}`;
+    const row = document.createElement("div");
+    row.id = rowId;
+    row.style.cssText = "display:flex; gap:6px;";
+    row.innerHTML = `
+        <input type="text" class="spec-label-input" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Label (e.g. Material)" value="${label || ''}" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:6px;">
+        <input type="text" class="spec-value-input" placeholder="Value (e.g. Polyester)" value="${value || ''}" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:6px;">
+        <button type="button" onclick="document.getElementById('${rowId}').remove()" style="padding:8px 12px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer;">&times;</button>
+    `;
+    list.appendChild(row);
+}
+
+function collectVendorSpecRows() {
+    const rows = document.querySelectorAll("#specs-list > div");
+    const specs = [];
+    rows.forEach(row => {
+        const label = row.querySelector(".spec-label-input").value.trim();
+        const value = row.querySelector(".spec-value-input").value.trim();
+        if (label) specs.push({ label, value });
+    });
+    return specs;
+}
+
+async function loadVendorProductSpecs(productId) {
+    const list = document.getElementById("specs-list");
+    if (list) list.innerHTML = "";
+    vendorSpecRowCounter = 0;
+    try {
+        const data = await vendorAuthorizedFetch(`/api/products/${productId}/options`);
+        (data.specs || []).forEach(sp => addVendorSpecRow(sp.label, sp.value));
+    } catch (error) {
+        console.error("Load vendor product specs error:", error);
+    }
 }
 
 
@@ -743,6 +792,7 @@ async function editVendorProduct(id) {
     document.getElementById("product-form-status").textContent = "Editing an approved product returns it to pending review.";
     scheduleVendorPricingPreview();
     loadVendorVariantOptions(product.id);
+    loadVendorProductSpecs(product.id);
 }
 
 async function deleteVendorProduct(id) {
@@ -832,6 +882,21 @@ async function submitVendorProductForm() {
         }
 
         statusEl.textContent = data.message || "Saved.";
+
+        const savedProductId = data.product ? data.product.id : id;
+        const specsPayload = collectVendorSpecRows();
+        if (savedProductId && specsPayload.length > 0) {
+            try {
+                await vendorAuthorizedFetch(`/api/vendors/products/${savedProductId}/options`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ specs: specsPayload })
+                });
+            } catch (optionsError) {
+                console.error("Save vendor product specs error:", optionsError);
+            }
+        }
+
         resetVendorProductForm();
         document.querySelector('.tab-btn[data-tab="products"]').click();
 

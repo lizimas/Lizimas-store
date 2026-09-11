@@ -19,8 +19,20 @@ const VM_ICON = {
 
 // --- Navigation ------------------------------------------------------------
 
-const VM_NAV_SCREENS = ["home", "orders", "products", "menu"]; // bottom-nav-level screens
-let vmNavStack = ["menu"]; // back-target for a sub-screen reached from Menu
+const VM_NAV_SCREENS = ["home", "products", "orders", "account"]; // bottom-nav-level screens
+let vmNavStack = ["account"]; // back-target for a sub-screen reached from Account
+
+// Which bottom-nav tab should stay highlighted while a nested (non-nav)
+// screen is open, keyed by where that screen is actually reached from -
+// add-product from the Manage Products FAB, everything else from Account.
+const VM_NAV_FALLBACK = {
+    "add-product": "products",
+    "promotions": "account",
+    "wallet": "account",
+    "settings": "account",
+    "holiday-mode": "account",
+    "commissions-fees": "account"
+};
 
 function vmShowScreen(name, opts) {
     opts = opts || {};
@@ -29,7 +41,7 @@ function vmShowScreen(name, opts) {
     if (target) target.classList.add("active");
 
     document.querySelectorAll(".vm-nav-item").forEach(el => el.classList.remove("active"));
-    const navKey = VM_NAV_SCREENS.includes(name) ? name : "menu";
+    const navKey = VM_NAV_SCREENS.includes(name) ? name : (VM_NAV_FALLBACK[name] || "account");
     const navBtn = document.querySelector(`.vm-nav-item[data-vm-nav="${navKey}"]`);
     if (navBtn) navBtn.classList.add("active");
 
@@ -42,18 +54,17 @@ function vmShowScreen(name, opts) {
     if (name === "home") vmLoadHome();
     if (name === "orders") vmLoadOrders();
     if (name === "products") vmLoadProducts();
-    if (name === "menu") vmLoadMenu();
+    if (name === "account") vmLoadProfile();
     if (name === "settings") vmLoadSettings();
     if (name === "holiday-mode") vmLoadHolidayMode();
     if (name === "add-product") vmLoadAddProduct();
     if (name === "promotions") vmLoadPromotions();
     if (name === "wallet") vmLoadWallet();
-    if (name === "profile") vmLoadProfile();
 }
 
 function vmGoBack() {
     vmNavStack.pop();
-    const prev = vmNavStack[vmNavStack.length - 1] || "menu";
+    const prev = vmNavStack[vmNavStack.length - 1] || "account";
     vmShowScreen(prev, { isBack: true });
 }
 
@@ -348,23 +359,6 @@ function vmExportProductsCsv() {
     URL.revokeObjectURL(url);
 }
 
-// --- Menu ------------------------------------------------------------------
-
-async function vmLoadMenu() {
-    const el = document.getElementById("vm-menu-account");
-    try {
-        const v = await vendorAuthorizedFetch("/api/vendors/me");
-        el.innerHTML = `
-            <span style="width:44px; height:44px; border-radius:50%; background:var(--vm-navy); color:var(--vm-gold); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:17px; flex-shrink:0;">${(v.business_name || "L").charAt(0).toUpperCase()}</span>
-            <div style="flex:1; min-width:0;">
-                <div style="font-size:14.5px; font-weight:700; color:var(--vm-navy); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${v.business_name || "Lizimas Store"}</div>
-                <div style="font-size:12px; color:#888;">${vmStatusCopy(v.status).text}</div>
-            </div>`;
-    } catch (error) {
-        console.error("vmLoadMenu error:", error);
-    }
-}
-
 // --- Settings, Shop Activation & Holiday Mode -------------------------------
 
 let vmShopStatusCache = { shopActive: true, holidayMode: { active: false } };
@@ -496,6 +490,40 @@ async function vmLoadAddProduct() {
     const select = document.getElementById("vm-product-category");
     if (select && staffCategories) select.innerHTML = buildGroupedCategoryOptions(staffCategories);
     document.getElementById("vm-product-form-status").textContent = "";
+    const specsList = document.getElementById("vm-specs-list");
+    if (specsList) specsList.innerHTML = "";
+    vmSpecRowCounter = 0;
+}
+
+// Same key/value structure as desktop's Specifications section (and
+// staff/admin's) - kept as its own vm-prefixed id/function pair since this
+// screen shares the page with the desktop admin-shell's own #specs-list.
+let vmSpecRowCounter = 0;
+
+function vmAddSpecRow(label, value) {
+    const list = document.getElementById("vm-specs-list");
+    if (!list) return;
+    const rowId = `vm-spec-row-${vmSpecRowCounter++}`;
+    const row = document.createElement("div");
+    row.id = rowId;
+    row.style.cssText = "display:flex; gap:6px;";
+    row.innerHTML = `
+        <input type="text" class="vm-field-input vm-spec-label-input" placeholder="Label (e.g. Material)" value="${label || ''}" style="flex:1;">
+        <input type="text" class="vm-field-input vm-spec-value-input" placeholder="Value (e.g. Polyester)" value="${value || ''}" style="flex:1;">
+        <button type="button" onclick="document.getElementById('${rowId}').remove()" style="padding:0 12px; border-radius:8px; border:1px solid #dfe1e8; background:#fff; cursor:pointer;">&times;</button>
+    `;
+    list.appendChild(row);
+}
+
+function vmCollectSpecRows() {
+    const rows = document.querySelectorAll("#vm-specs-list > div");
+    const specs = [];
+    rows.forEach(row => {
+        const label = row.querySelector(".vm-spec-label-input").value.trim();
+        const value = row.querySelector(".vm-spec-value-input").value.trim();
+        if (label) specs.push({ label, value });
+    });
+    return specs;
 }
 
 function vmSchedulePricingPreview() {
@@ -587,10 +615,24 @@ async function vmSubmitProduct() {
             return;
         }
 
+        const specsPayload = vmCollectSpecRows();
+        if (data.product && data.product.id && specsPayload.length > 0) {
+            try {
+                await vendorAuthorizedFetch(`/api/vendors/products/${data.product.id}/options`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ specs: specsPayload })
+                });
+            } catch (optionsError) {
+                console.error("vmSubmitProduct specs error:", optionsError);
+            }
+        }
+
         // Reset the quick-add form for next time.
         ["vm-product-name", "vm-product-description", "vm-product-payout", "vm-product-stock"].forEach(id => document.getElementById(id).value = "");
         document.getElementById("vm-product-images").value = "";
         document.getElementById("vm-product-authenticity-confirm").checked = false;
+        document.getElementById("vm-specs-list").innerHTML = "";
         vmHidePricingPreview();
 
         vmShowScreen("products");
@@ -818,11 +860,45 @@ function vmRenderProfile(v, notices) {
 
     const noticesCard = `<div class="vm-card"><div class="vm-card-title">Notices</div>${notices.length === 0 ? '<div style="font-size:12.5px; color:#888;">No notices on your account.</div>' : notices.map(vmNoticeCard).join("")}</div>`;
 
-    const logoutRow = `<div class="vm-card" style="padding:4px 16px;"><button class="vm-list-row vm-danger" onclick="vendorLogout()">
+    const moreCard = `<div class="vm-card" style="padding:4px 16px;">
+        <button class="vm-list-row" onclick="vmShowScreen('promotions')">
+            <span class="vm-list-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 13v-2Z"/><path d="M11.6 16.8 13 21h-3l-1.4-4.8"/></svg></span>
+            <span class="vm-list-row-label">Promotions</span>
+            <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
+        </button>
+        <button class="vm-list-row" onclick="vmShowScreen('wallet')">
+            <span class="vm-list-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg></span>
+            <span class="vm-list-row-label">Account Statements</span>
+            <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
+        </button>
+        <button class="vm-list-row" onclick="vmShowScreen('settings')">
+            <span class="vm-list-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></span>
+            <span class="vm-list-row-label">Settings</span>
+            <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
+        </button>
+        <div class="vm-list-row vm-muted" style="cursor:default;">
+            <span class="vm-list-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></span>
+            <span class="vm-list-row-label">Stock Recommendation</span>
+            <span class="vm-badge-soon">Coming soon</span>
+        </div>
+        <div class="vm-list-row vm-muted" style="cursor:default;">
+            <span class="vm-list-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h3l4 4V6L7 10H4a1 1 0 0 0-1 1Z"/><path d="M16 8a4 4 0 0 1 0 8"/><path d="M19 5a8 8 0 0 1 0 14"/></svg></span>
+            <span class="vm-list-row-label">Advertise your Products</span>
+            <span class="vm-badge-soon">Coming soon</span>
+        </div>
+        <button class="vm-list-row" onclick="alert('Give us your feedback needs a bigger screen for now \u2014 switch to desktop.')">
+            <span class="vm-list-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg></span>
+            <span class="vm-list-row-label">Give us your feedback!</span>
+            <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
+        </button>
+    </div>
+    <div class="vm-note vm-note-amber">"Stock Recommendation" and "Advertise your Products" mirror Jumia's marketplace tools and aren't built in Lizimas yet.</div>`;
+
+    const logoutRow = `<div class="vm-card" style="padding:4px 16px; margin-top:14px;"><button class="vm-list-row vm-danger" onclick="vendorLogout()">
         <span class="vm-list-row-label">Logout</span>
     </button></div>`;
 
-    return statusCard + detailsCard + momoCard + noticesCard + logoutRow;
+    return statusCard + detailsCard + momoCard + moreCard + noticesCard + logoutRow;
 }
 
 async function vmSaveMomoNumber() {
