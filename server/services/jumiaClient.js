@@ -2,47 +2,21 @@
 // between Lizimas and Jumia: push a Lizimas listing out to a vendor's
 // Jumia store, and pull an existing Jumia listing into Lizimas).
 //
-// *** ENDPOINT PATHS BELOW ARE THE ONE UNVERIFIED PIECE OF THIS FEATURE ***
-// Jumia's Vendor Center (vendorcenter.jumia.com) is their newer
-// OAuth2-based platform - its "Applications" screen (Settings > Seller
-// Settings > Applications) is exactly where a vendor generates the
-// Client ID/Secret this module authenticates with. Its full API
-// reference (vendorcenter.jumia.com/api-docs/) requires a logged-in
-// Jumia session to view, and Jumia's API hosts are not reachable from
-// this dev environment's network at all (confirmed: every
-// *.sellercenter.jumia.com / *.vendorcenter.jumia.com host either
-// doesn't resolve or is blocked by the outbound proxy here) - so the
-// exact token/product endpoint paths and field names below are this
-// module's best-effort placeholder against the standard OAuth2 +
-// REST/JSON shape Jumia's own doc titles describe, NOT something that
-// has been tested against a real Application. Everything above this
-// layer (DB schema, encryption, routes, sync bookkeeping, the vendor
-// UI) does not depend on these specifics and is solid; this file is the
-// one piece that needs a real Jumia Application connected (or the
-// actual api-docs content pasted in) to confirm/correct before the
-// first live push or import is trusted.
-//
-// Once real access is available, the only things that should need to
-// change are the constants and the two field-mapping functions below -
-// everything else (token refresh, retry/error normalization, the
-// push/pull orchestration in jumiaSyncService.js) is written to be
-// independent of those specifics.
-
+// The auth flow (host, /token path, form-urlencoded body, response
+// shape) is now CONFIRMED against Jumia's own official Postman
+// documentation (postman.com/jumiagandalf/jumia-vendor-api -
+// "Vendor API Collection" > Authentication > "Obtain an Access Token
+// from Authorization Code / Refresh Token", author Pedro Ferreira),
+// which Ryan opened directly since every Jumia host is unreachable from
+// both dev environments here. The product/category paths below remain
+// an educated guess (that collection also has "GPM API" and "GOP API"
+// folders that likely hold the real ones - not yet opened) and are the
+// one piece still to confirm before the first real product push/import.
 const axios = require("axios");
 const { encryptField, decryptField } = require("../utils/encryption");
 
-// Corrected September 2026, after Ryan's first live connection attempt
-// returned an HTTP 301 whose body was Jumia's own Vendor Center *frontend*
-// app shell (<title>Jumia | Vendor Center</title>) - proof the request was
-// landing on vendorcenter.jumia.com's web app, not an API host. Cross-checked
-// against a third-party open-source Jumia Vendor Center MCP integration
-// (github.com/damurka/jumia-vendor-mcp) whose README documents a working
-// setup against the real API: base host vendor-api.jumia.com, with product
-// endpoints under /catalog/products, /catalog/stock, and orders under
-// /orders, /orders/items - all still unverified against Ryan's own account,
-// but a much stronger starting point than the previous guess.
 const JUMIA_API_BASE = process.env.JUMIA_API_BASE || "https://vendor-api.jumia.com";
-const JUMIA_TOKEN_PATH = "/oauth/token";
+const JUMIA_TOKEN_PATH = "/token";
 const JUMIA_PRODUCTS_PATH = "/catalog/products";
 const JUMIA_CATEGORY_TREE_PATH = "/categories";
 
@@ -67,23 +41,29 @@ function jumiaHttp() {
 }
 
 // Mints a short-lived access token from a vendor's Jumia Application
-// Client ID + Refresh Token. Corrected September 2026: Ryan confirmed his
-// real Jumia "Self Authorization" Application shows a "Generate Token"
-// action that issues a Refresh Token, not a Client Secret for a
-// client_credentials grant - matching the third-party integration
-// referenced above. There is no separate "exchange" step: the vendor's
-// pasted Refresh Token IS the long-lived credential, used as-is on every
-// call (grant_type: refresh_token). Uncertain whether Jumia rotates the
-// refresh token on each use - if data.refresh_token comes back, the
+// Client ID + Refresh Token, per the "Case 2 (Refresh Token)" branch of
+// Jumia's own /token endpoint: form-urlencoded body (NOT JSON - the
+// endpoint's Content-Type is application/x-www-form-urlencoded), with
+// client_id, grant_type=refresh_token, and refresh_token - client_secret
+// is only required for Case 1 (the 3-legged Authorization Code flow,
+// which this app does not use). Response is { access_token, expires_in,
+// refresh_token, refresh_expires_in, token_type }. There is no separate
+// "exchange" step: the vendor's pasted Refresh Token IS the long-lived
+// credential, used as-is on every call. Uncertain whether Jumia rotates
+// the refresh token on each use - if data.refresh_token comes back, the
 // caller is given it to persist, but the ORIGINAL pasted token is what
 // gets used again if nothing rotates, so a connection keeps working
 // either way unless Jumia actively invalidates the old one.
 async function mintAccessToken(clientId, refreshToken) {
     try {
-        const response = await jumiaHttp().post(JUMIA_TOKEN_PATH, {
+        const body = new URLSearchParams({
             grant_type: "refresh_token",
             client_id: clientId,
             refresh_token: refreshToken
+        });
+        const response = await axios.post(`${JUMIA_API_BASE}${JUMIA_TOKEN_PATH}`, body.toString(), {
+            timeout: REQUEST_TIMEOUT_MS,
+            headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }
         });
         const data = response.data || {};
         if (!data.access_token) {
