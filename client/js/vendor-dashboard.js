@@ -2721,13 +2721,13 @@ function vdCancelUpdateJumiaSecret() {
 
 async function vdSaveUpdatedJumiaSecret() {
     const newSecret = document.getElementById("vd-jumia-new-secret").value.trim();
-    if (!newSecret) { alert("Enter the new Client Secret first."); return; }
+    if (!newSecret) { alert("Enter the new Refresh Token first."); return; }
     if (!vmJumiaConnectionCache.client_id) { alert("Missing Client ID - reconnect from scratch instead."); return; }
     try {
         const result = await vendorAuthorizedFetch("/api/vendors/me/jumia/connection", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ client_id: vmJumiaConnectionCache.client_id, client_secret: newSecret })
+            body: JSON.stringify({ client_id: vmJumiaConnectionCache.client_id, refresh_token: newSecret })
         });
         if (result.error) { alert(result.error); return; }
         vdLoadJumia();
@@ -2742,7 +2742,7 @@ async function vdConnectJumia() {
     const clientSecret = document.getElementById("vd-jumia-client-secret").value.trim();
     const help = document.getElementById("vd-jumia-help");
     if (!clientId || !clientSecret) {
-        if (help) { help.textContent = "Enter both the Client ID and Client Secret."; help.style.color = "#DC2626"; }
+        if (help) { help.textContent = "Enter both the Client ID and Refresh Token."; help.style.color = "#DC2626"; }
         return;
     }
     const btn = document.getElementById("vd-jumia-connect-btn");
@@ -2751,7 +2751,7 @@ async function vdConnectJumia() {
         const result = await vendorAuthorizedFetch("/api/vendors/me/jumia/connection", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ client_id: clientId, client_secret: clientSecret })
+            body: JSON.stringify({ client_id: clientId, refresh_token: clientSecret })
         });
         if (result.error) {
             if (help) { help.textContent = result.error; help.style.color = "#DC2626"; }

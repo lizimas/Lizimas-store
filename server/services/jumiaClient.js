@@ -66,19 +66,24 @@ function jumiaHttp() {
     });
 }
 
-// Exchanges a vendor's Jumia Application Client ID/Secret for an
-// access/refresh token pair. Modelled as an OAuth2 client_credentials
-// grant (the common shape for a first-party seller API like this one,
-// and the simplest to support without a public browser-redirect
-// callback route) - if Jumia's Applications actually require the
-// 3-legged authorization-code flow instead, this is the function that
-// changes; nothing else needs to know the difference.
-async function exchangeCredentialsForToken(clientId, clientSecret) {
+// Mints a short-lived access token from a vendor's Jumia Application
+// Client ID + Refresh Token. Corrected September 2026: Ryan confirmed his
+// real Jumia "Self Authorization" Application shows a "Generate Token"
+// action that issues a Refresh Token, not a Client Secret for a
+// client_credentials grant - matching the third-party integration
+// referenced above. There is no separate "exchange" step: the vendor's
+// pasted Refresh Token IS the long-lived credential, used as-is on every
+// call (grant_type: refresh_token). Uncertain whether Jumia rotates the
+// refresh token on each use - if data.refresh_token comes back, the
+// caller is given it to persist, but the ORIGINAL pasted token is what
+// gets used again if nothing rotates, so a connection keeps working
+// either way unless Jumia actively invalidates the old one.
+async function mintAccessToken(clientId, refreshToken) {
     try {
         const response = await jumiaHttp().post(JUMIA_TOKEN_PATH, {
-            grant_type: "client_credentials",
+            grant_type: "refresh_token",
             client_id: clientId,
-            client_secret: clientSecret
+            refresh_token: refreshToken
         });
         const data = response.data || {};
         if (!data.access_token) {
@@ -86,54 +91,34 @@ async function exchangeCredentialsForToken(clientId, clientSecret) {
         }
         return {
             accessToken: data.access_token,
-            refreshToken: data.refresh_token || null,
+            refreshToken: data.refresh_token || refreshToken,
             expiresInSeconds: Number(data.expires_in) || 3600,
             shopName: data.shop_name || data.seller_name || null
         };
     } catch (err) {
-        throw normalizeAxiosError(err, "Could not connect to Jumia with the Client ID/Secret provided.");
+        throw normalizeAxiosError(err, "Could not connect to Jumia with the Client ID/Refresh Token provided.");
     }
 }
 
-async function refreshAccessToken(refreshToken, clientId, clientSecret) {
-    try {
-        const response = await jumiaHttp().post(JUMIA_TOKEN_PATH, {
-            grant_type: "refresh_token",
-            refresh_token: refreshToken,
-            client_id: clientId,
-            client_secret: clientSecret
-        });
-        const data = response.data || {};
-        if (!data.access_token) {
-            throw new JumiaApiError("Jumia did not return a refreshed access token.", { raw: data });
-        }
-        return {
-            accessToken: data.access_token,
-            refreshToken: data.refresh_token || refreshToken,
-            expiresInSeconds: Number(data.expires_in) || 3600
-        };
-    } catch (err) {
-        throw normalizeAxiosError(err, "Could not refresh the Jumia connection - it may need to be reconnected.");
-    }
-}
-
-// Given a stored connection row (with encrypted token fields), returns a
-// live access token, transparently refreshing it first if it is expired
-// or about to expire. Does NOT persist the refreshed token itself - the
-// caller (jumiaSyncService) owns writing the connection row back so this
-// module stays free of DB access.
+// Given a stored connection row, returns a live access token, minting a
+// new one first if the cached one is missing or about to expire. The
+// vendor's Refresh Token (stored in client_secret_enc - see the schema
+// note in jumiaSyncService.js for why the column keeps its original
+// name) is the durable credential re-used on every mint; there is no
+// separate rotating secret to track. Does NOT persist the minted token
+// itself - the caller (jumiaSyncService) owns writing the connection row
+// back so this module stays free of DB access.
 async function ensureFreshAccessToken(connectionRow) {
     const expiresAt = connectionRow.token_expires_at ? new Date(connectionRow.token_expires_at) : null;
     const stillValid = expiresAt && expiresAt.getTime() - Date.now() > 60000; // >1min left
     if (stillValid && connectionRow.access_token_enc) {
         return { accessToken: decryptField(connectionRow.access_token_enc), refreshed: false };
     }
-    const refreshToken = decryptField(connectionRow.refresh_token_enc);
+    const refreshToken = decryptField(connectionRow.client_secret_enc);
     if (!refreshToken) {
-        throw new JumiaApiError("This Jumia connection has expired and has no refresh token - reconnect with the Client ID/Secret.", { code: "NO_REFRESH_TOKEN" });
+        throw new JumiaApiError("This Jumia connection is missing its Refresh Token - reconnect with the Client ID/Refresh Token.", { code: "NO_REFRESH_TOKEN" });
     }
-    const clientSecret = decryptField(connectionRow.client_secret_enc);
-    const result = await refreshAccessToken(refreshToken, connectionRow.client_id, clientSecret);
+    const result = await mintAccessToken(connectionRow.client_id, refreshToken);
     return {
         accessToken: result.accessToken,
         refreshed: true,
@@ -269,8 +254,7 @@ function normalizeAxiosError(err, fallbackMessage) {
 
 module.exports = {
     JumiaApiError,
-    exchangeCredentialsForToken,
-    refreshAccessToken,
+    mintAccessToken,
     ensureFreshAccessToken,
     mapLizimasProductToJumiaPayload,
     mapJumiaProductToLizimasFields,

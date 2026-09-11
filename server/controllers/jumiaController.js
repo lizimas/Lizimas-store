@@ -39,8 +39,12 @@ exports.connectJumia = async (req, res) => {
     try {
         const vendorId = await requireVendorId(req, res);
         if (!vendorId) return;
-        const { client_id, client_secret } = req.body;
-        const status = await jumiaSync.connectVendor(vendorId, client_id, client_secret);
+        // refresh_token: what Jumia calls the credential from "Generate
+        // Token" on a Self Authorization Application (see jumiaClient.js's
+        // header note) - accepting the old client_secret key too in case
+        // any not-yet-updated client code is still sending that name.
+        const { client_id, refresh_token, client_secret } = req.body;
+        const status = await jumiaSync.connectVendor(vendorId, client_id, refresh_token || client_secret);
         res.json(status);
     } catch (error) {
         handleError(res, error, "Could not connect to Jumia.");

@@ -46,18 +46,25 @@ async function getConnectionStatus(vendorId) {
     };
 }
 
+// clientSecret here is really the vendor's Jumia Refresh Token (see
+// jumiaClient.js's header note - corrected September 2026 after Ryan
+// confirmed his real Application screen issues one via "Generate Token",
+// not a client_credentials-style secret). Kept the parameter/column name
+// client_secret(_enc) rather than a schema migration, since nothing has
+// ever connected successfully yet and every layer below treats it as an
+// opaque encrypted credential regardless of what Jumia calls it.
 async function connectVendor(vendorId, clientId, clientSecret) {
     if (!clientId || !clientSecret) {
-        const err = new Error("Client ID and Client Secret are both required.");
+        const err = new Error("Client ID and Refresh Token are both required.");
         err.status = 400;
         throw err;
     }
     let tokenResult;
     try {
-        tokenResult = await jumiaClient.exchangeCredentialsForToken(clientId, clientSecret);
+        tokenResult = await jumiaClient.mintAccessToken(clientId, clientSecret);
     } catch (err) {
         // Record the attempt even on failure, so a vendor who mistypes their
-        // secret sees why the connection didn't take instead of a silent
+        // token sees why the connection didn't take instead of a silent
         // no-op, and so the row's status flips to 'error' with a reason.
         await pool.query(
             `INSERT INTO vendor_jumia_connections (vendor_id, client_id, client_secret_enc, connection_status, last_error, updated_at)
