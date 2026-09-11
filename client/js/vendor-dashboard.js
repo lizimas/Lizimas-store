@@ -80,6 +80,17 @@ function toggleVdNavGroup(key) {
     group.classList.toggle("vd-nav-open");
 }
 
+// The bottom vendor profile card's Settings/Profile/Logout/feedback menu -
+// same expand-in-place pattern as the sidebar's accordion groups, but not
+// itself a .vd-nav-group (it lives below the tab list, not among the tabs).
+function toggleVdProfileMenu() {
+    const menu = document.getElementById("vd-sidebar-profile-menu");
+    const chevron = document.getElementById("vd-sidebar-profile-chevron");
+    if (!menu) return;
+    menu.classList.toggle("vd-nav-open");
+    if (chevron) chevron.classList.toggle("vd-nav-open");
+}
+
 // --- Overview ---------------------------------------------------------
 
 function vendorStatusLabel(status) {
@@ -373,10 +384,44 @@ function toggleAllVendorProductsSelect(checked, visibleIds) {
     renderVendorProductsTable();
 }
 
-async function bulkVendorProductAction(action) {
+// Bulk action flow: confirm -> run -> results breakdown, matching the
+// Jumia Vendor Center pattern Ryan referenced (a confirmation step before
+// the action runs, then a successful/failed/skipped count with reasons
+// and a downloadable error report) rather than a bare browser confirm().
+let vendorBulkPendingAction = null;
+let vendorLastBulkResults = null;
+
+const VD_BULK_ACTION_VERB = { activate: "activate", deactivate: "deactivate", delete: "delete" };
+const VD_BULK_ACTION_WARNING = {
+    activate: "Activated products become visible on the storefront immediately (subject to admin approval).",
+    deactivate: "Deactivated products are pulled off the storefront but are not deleted - you can reactivate them later.",
+    delete: "Deleted products are removed from your active catalogue. Products with existing orders are archived, not permanently erased."
+};
+
+function bulkVendorProductAction(action) {
     if (vendorProductsSelected.size === 0) return;
-    const verb = { activate: "activate", deactivate: "deactivate", delete: "delete" }[action];
-    if (!confirm(`${verb.charAt(0).toUpperCase()}${verb.slice(1)} ${vendorProductsSelected.size} product(s)?`)) return;
+    vendorBulkPendingAction = action;
+    const verb = VD_BULK_ACTION_VERB[action];
+    const count = vendorProductsSelected.size;
+    document.getElementById("vd-bulk-confirm-text").innerHTML =
+        `You selected <strong>${count}</strong> product${count === 1 ? "" : "s"}.<br>Action: <strong>${verb.charAt(0).toUpperCase()}${verb.slice(1)}</strong><br><br>${VD_BULK_ACTION_WARNING[action] || ""}`;
+    const confirmBtn = document.getElementById("vd-bulk-confirm-btn");
+    confirmBtn.textContent = action === "delete" ? "Delete Products" : `${verb.charAt(0).toUpperCase()}${verb.slice(1)}`;
+    confirmBtn.style.background = action === "delete" ? "#DC2626" : "#1a1a2e";
+    document.getElementById("vd-bulk-confirm-overlay").hidden = false;
+}
+
+function closeVdBulkConfirm() {
+    document.getElementById("vd-bulk-confirm-overlay").hidden = true;
+    vendorBulkPendingAction = null;
+}
+
+async function confirmVdBulkAction() {
+    const action = vendorBulkPendingAction;
+    if (!action) return;
+    const confirmBtn = document.getElementById("vd-bulk-confirm-btn");
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = "Working...";
 
     try {
         const data = await vendorAuthorizedFetch("/api/vendors/products/bulk", {
@@ -384,17 +429,89 @@ async function bulkVendorProductAction(action) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ productIds: Array.from(vendorProductsSelected), action })
         });
+        closeVdBulkConfirm();
+        confirmBtn.disabled = false;
+
         if (data.error) {
             alert(data.error);
             return;
         }
+
+        vendorLastBulkResults = { action, ...data };
+        renderVdBulkResults(data, action);
         vendorProductsSelected.clear();
         updateVendorProductsBulkBar();
         loadVendorProducts();
     } catch (error) {
         console.error("Bulk product action error:", error);
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = "Confirm";
         alert("Could not connect to server.");
     }
+}
+
+function renderVdBulkResults(data, action) {
+    const summary = data.summary || {
+        total: (data.successful || []).length + (data.failed || []).length + (data.skipped || []).length,
+        successCount: (data.successful || []).length,
+        failedCount: (data.failed || []).length,
+        skippedCount: (data.skipped || []).length
+    };
+
+    document.getElementById("vd-bulk-results-summary").innerHTML = `
+        <div><div style="font-size:20px; font-weight:700; color:#166534;">${summary.successCount}</div><div style="color:#666;">Successful</div></div>
+        <div><div style="font-size:20px; font-weight:700; color:#DC2626;">${summary.failedCount}</div><div style="color:#666;">Failed</div></div>
+        <div><div style="font-size:20px; font-weight:700; color:#B45309;">${summary.skippedCount}</div><div style="color:#666;">Skipped</div></div>
+        <div><div style="font-size:20px; font-weight:700; color:#1a1a2e;">${summary.total}</div><div style="color:#666;">Total</div></div>
+    `;
+
+    const sections = [];
+    if ((data.failed || []).length > 0) {
+        sections.push(`
+            <div style="margin-bottom:14px;">
+                <div style="font-weight:700; font-size:12.5px; color:#DC2626; margin-bottom:6px;">Failed</div>
+                ${data.failed.map(f => `<div style="font-size:12.5px; padding:5px 0; border-bottom:1px solid #f3f3f3;">${vendorEsc(f.name || `Product #${f.id}`)} - <span style="color:#666;">${vendorEsc(f.reason)}</span></div>`).join("")}
+            </div>
+        `);
+    }
+    if ((data.skipped || []).length > 0) {
+        sections.push(`
+            <div>
+                <div style="font-weight:700; font-size:12.5px; color:#B45309; margin-bottom:6px;">Skipped</div>
+                ${data.skipped.map(s => `<div style="font-size:12.5px; padding:5px 0; border-bottom:1px solid #f3f3f3;">${vendorEsc(s.name || `Product #${s.id}`)} - <span style="color:#666;">${vendorEsc(s.reason)}</span></div>`).join("")}
+            </div>
+        `);
+    }
+    document.getElementById("vd-bulk-results-detail").innerHTML = sections.join("") ||
+        `<p style="font-size:13px; color:#666;">All selected products were ${action}d successfully.</p>`;
+
+    const downloadBtn = document.getElementById("vd-bulk-download-report-btn");
+    downloadBtn.hidden = (data.failed || []).length === 0 && (data.skipped || []).length === 0;
+
+    document.getElementById("vd-bulk-results-overlay").hidden = false;
+}
+
+function closeVdBulkResults() {
+    document.getElementById("vd-bulk-results-overlay").hidden = true;
+}
+
+function downloadVdBulkErrorReport() {
+    if (!vendorLastBulkResults) return;
+    const rows = [["Product ID", "Product Name", "Outcome", "Reason"]];
+    (vendorLastBulkResults.successful || []).forEach(r => rows.push([r.id, r.name || "", "Successful", ""]));
+    (vendorLastBulkResults.failed || []).forEach(r => rows.push([r.id, r.name || "", "Failed", r.reason || ""]));
+    (vendorLastBulkResults.skipped || []).forEach(r => rows.push([r.id, r.name || "", "Skipped", r.reason || ""]));
+
+    const csv = rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bulk-${vendorLastBulkResults.action}-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 async function loadVendorProducts() {
@@ -516,6 +633,8 @@ function resetVendorProductForm() {
     document.getElementById("product-form-status").textContent = "";
     const specsList = document.getElementById("specs-list");
     if (specsList) specsList.innerHTML = "";
+    const specsPasteBox = document.getElementById("vendor-specs-paste-box");
+    if (specsPasteBox) specsPasteBox.value = "";
     hideVendorVariantsPanel();
 }
 
@@ -552,6 +671,37 @@ function collectVendorSpecRows() {
         if (label) specs.push({ label, value });
     });
     return specs;
+}
+
+// Splits one pasted line into a label/value pair. Excel copy/paste of two
+// adjacent columns produces tab-separated text, so that's tried first;
+// falls back to 2+ spaces (a plain-text table) or a colon (someone typing
+// "Material: Cotton" by hand) so the paste box is forgiving either way.
+function vendorParseSpecLine(line) {
+    if (line.includes("\t")) {
+        const [label, ...rest] = line.split("\t");
+        return { label: label.trim(), value: rest.join(" ").trim() };
+    }
+    const spaceSplit = line.match(/^(.+?)\s{2,}(.+)$/);
+    if (spaceSplit) {
+        return { label: spaceSplit[1].trim(), value: spaceSplit[2].trim() };
+    }
+    const colonSplit = line.match(/^([^:]+):\s*(.+)$/);
+    if (colonSplit) {
+        return { label: colonSplit[1].trim(), value: colonSplit[2].trim() };
+    }
+    return { label: line.trim(), value: "" };
+}
+
+function parseAndAddVendorSpecs() {
+    const box = document.getElementById("vendor-specs-paste-box");
+    if (!box || !box.value.trim()) return;
+    const lines = box.value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    lines.forEach(line => {
+        const { label, value } = vendorParseSpecLine(line);
+        if (label) addVendorSpecRow(label, value);
+    });
+    box.value = "";
 }
 
 async function loadVendorProductSpecs(productId) {

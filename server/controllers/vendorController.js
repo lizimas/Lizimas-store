@@ -284,6 +284,11 @@ exports.updateVendorHolidayMode = async (req, res) => {
 // approval status - it never needs re-review.
 const BULK_PRODUCT_ACTIONS = ["activate", "deactivate", "delete"];
 
+// Cap mirrors Jumia's own Vendor Center bulk-action limit (Ryan referenced
+// their "up to 100 products per operation" behaviour, Sept 2026) - keeps a
+// single request's classification loop and UPDATE bounded.
+const BULK_PRODUCT_MAX_IDS = 100;
+
 exports.bulkUpdateVendorProducts = async (req, res) => {
     try {
         const { productIds, action } = req.body;
@@ -295,9 +300,12 @@ exports.bulkUpdateVendorProducts = async (req, res) => {
             return res.status(400).json({ error: `action must be one of: ${BULK_PRODUCT_ACTIONS.join(", ")}.` });
         }
 
-        const ids = productIds.map(Number).filter(n => Number.isInteger(n) && n > 0);
+        const ids = [...new Set(productIds.map(Number).filter(n => Number.isInteger(n) && n > 0))];
         if (ids.length === 0) {
             return res.status(400).json({ error: "No valid product ids given." });
+        }
+        if (ids.length > BULK_PRODUCT_MAX_IDS) {
+            return res.status(400).json({ error: `You can select at most ${BULK_PRODUCT_MAX_IDS} products per bulk action.` });
         }
 
         const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
@@ -306,26 +314,93 @@ exports.bulkUpdateVendorProducts = async (req, res) => {
         }
         const vendorId = vendorRow.rows[0].id;
 
-        const result = action === "delete"
-            ? await pool.query(
-                `UPDATE products SET deleted_at = now()
-                 WHERE id = ANY($1::int[]) AND vendor_id = $2 AND deleted_at IS NULL
-                 RETURNING id`,
-                [ids, vendorId]
-            )
-            : await pool.query(
-                `UPDATE products SET is_active = $1
-                 WHERE id = ANY($2::int[]) AND vendor_id = $3 AND deleted_at IS NULL
-                 RETURNING id`,
-                [action === "activate", ids, vendorId]
-            );
+        // One lookup covering every requested id (including already-deleted
+        // ones, so those are reported as "already deleted" rather than a
+        // bare "not found") - classification below happens in JS so the
+        // vendor sees exactly why each product was or wasn't changed,
+        // matching the successful/failed/skipped breakdown Jumia's Vendor
+        // Center shows after a bulk action.
+        const rowsResult = await pool.query(
+            `SELECT id, name, status, is_active, admin_restricted, deleted_at
+             FROM products WHERE id = ANY($1::int[]) AND vendor_id = $2`,
+            [ids, vendorId]
+        );
+        const byId = new Map(rowsResult.rows.map(r => [r.id, r]));
+
+        const successful = [];
+        const failed = [];
+        const skipped = [];
+        const toChange = [];
+
+        for (const id of ids) {
+            const row = byId.get(id);
+            if (!row) {
+                failed.push({ id, name: null, reason: "Not found - it may belong to another vendor." });
+                continue;
+            }
+            if (row.deleted_at) {
+                if (action === "delete") {
+                    skipped.push({ id, name: row.name, reason: "Already deleted." });
+                } else {
+                    failed.push({ id, name: row.name, reason: "This product has been deleted." });
+                }
+                continue;
+            }
+            if (action === "activate") {
+                if (row.admin_restricted) {
+                    failed.push({ id, name: row.name, reason: "Restricted by admin." });
+                } else if (row.status === "rejected") {
+                    failed.push({ id, name: row.name, reason: "Rejected - fix and resubmit before activating." });
+                } else if (row.status === "pending") {
+                    failed.push({ id, name: row.name, reason: "Pending approval - not live until admin approves it." });
+                } else if (row.is_active) {
+                    skipped.push({ id, name: row.name, reason: "Already active." });
+                } else {
+                    toChange.push(id);
+                    successful.push({ id, name: row.name });
+                }
+            } else if (action === "deactivate") {
+                if (!row.is_active) {
+                    skipped.push({ id, name: row.name, reason: "Already inactive." });
+                } else {
+                    toChange.push(id);
+                    successful.push({ id, name: row.name });
+                }
+            } else {
+                toChange.push(id);
+                successful.push({ id, name: row.name });
+            }
+        }
+
+        if (toChange.length > 0) {
+            if (action === "delete") {
+                await pool.query(
+                    `UPDATE products SET deleted_at = now() WHERE id = ANY($1::int[]) AND vendor_id = $2`,
+                    [toChange, vendorId]
+                );
+            } else {
+                await pool.query(
+                    `UPDATE products SET is_active = $1 WHERE id = ANY($2::int[]) AND vendor_id = $3`,
+                    [action === "activate", toChange, vendorId]
+                );
+            }
+        }
 
         logActivity(req.user.userId, `bulk_${action}_products`, "product", null,
-            `${result.rows.length} product(s): ${action}`);
+            `${successful.length} succeeded, ${failed.length} failed, ${skipped.length} skipped (${action})`);
 
         res.json({
-            message: `${result.rows.length} product(s) ${action}d.`,
-            updatedIds: result.rows.map(r => r.id)
+            message: `${successful.length} product(s) ${action}d.`,
+            updatedIds: toChange,
+            successful,
+            failed,
+            skipped,
+            summary: {
+                total: ids.length,
+                successCount: successful.length,
+                failedCount: failed.length,
+                skippedCount: skipped.length
+            }
         });
     } catch (error) {
         res.status(500).json({ error: error.message });

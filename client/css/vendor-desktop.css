@@ -574,3 +574,11 @@
     color: var(--vd-muted);
     flex-shrink: 0;
 }
+
+.vendor-desktop-shell #vd-sidebar-profile-menu.vd-nav-open {
+    display: flex;
+}
+
+.vendor-desktop-shell #vd-sidebar-profile-chevron.vd-nav-open {
+    transform: rotate(90deg);
+}

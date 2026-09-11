@@ -492,6 +492,8 @@ async function vmLoadAddProduct() {
     document.getElementById("vm-product-form-status").textContent = "";
     const specsList = document.getElementById("vm-specs-list");
     if (specsList) specsList.innerHTML = "";
+    const specsPasteBox = document.getElementById("vm-specs-paste-box");
+    if (specsPasteBox) specsPasteBox.value = "";
     vmSpecRowCounter = 0;
 }
 
@@ -524,6 +526,37 @@ function vmCollectSpecRows() {
         if (label) specs.push({ label, value });
     });
     return specs;
+}
+
+// Same paste-from-Excel parsing as the desktop Add Product form
+// (client/js/vendor-dashboard.js's vendorParseSpecLine) - tab-separated
+// first (how Excel copies two adjacent columns), then 2+ spaces or a
+// colon as forgiving fallbacks.
+function vmParseSpecLine(line) {
+    if (line.includes("\t")) {
+        const [label, ...rest] = line.split("\t");
+        return { label: label.trim(), value: rest.join(" ").trim() };
+    }
+    const spaceSplit = line.match(/^(.+?)\s{2,}(.+)$/);
+    if (spaceSplit) {
+        return { label: spaceSplit[1].trim(), value: spaceSplit[2].trim() };
+    }
+    const colonSplit = line.match(/^([^:]+):\s*(.+)$/);
+    if (colonSplit) {
+        return { label: colonSplit[1].trim(), value: colonSplit[2].trim() };
+    }
+    return { label: line.trim(), value: "" };
+}
+
+function vmParseAndAddSpecs() {
+    const box = document.getElementById("vm-specs-paste-box");
+    if (!box || !box.value.trim()) return;
+    const lines = box.value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    lines.forEach(line => {
+        const { label, value } = vmParseSpecLine(line);
+        if (label) vmAddSpecRow(label, value);
+    });
+    box.value = "";
 }
 
 function vmSchedulePricingPreview() {
@@ -633,6 +666,8 @@ async function vmSubmitProduct() {
         document.getElementById("vm-product-images").value = "";
         document.getElementById("vm-product-authenticity-confirm").checked = false;
         document.getElementById("vm-specs-list").innerHTML = "";
+        const vmSpecsPasteBoxAfterSubmit = document.getElementById("vm-specs-paste-box");
+        if (vmSpecsPasteBoxAfterSubmit) vmSpecsPasteBoxAfterSubmit.value = "";
         vmHidePricingPreview();
 
         vmShowScreen("products");

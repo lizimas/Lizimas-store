@@ -1262,3 +1262,110 @@ viewport; and the desktop redesign generally - the sidebar groups, topbar
 search, dashboard-home widgets (especially the two independent Chart.js
 instances on Overview vs Reports), and the new Inventory tab, all on a real
 vendor account with real orders/products/notifications data.
+
+## Premium vendor dashboard: reference-match fixes (September 2026)
+
+The premium desktop redesign committed just before this (sidebar groups, topbar,
+dashboard home, Inventory tab) didn't actually match the reference mockup the
+vendor-side redesign was based on, once compared side by side against it again.
+Four gaps were fixed, all confined to `client/vendor/dashboard.html`,
+`client/css/vendor-desktop.css`, and `client/js/vendor-dashboard.js` - nothing
+in the sidebar's underlying `.tab-btn`/`data-tab` switching mechanism changed.
+
+- **Sidebar grouping**: the plain, non-clickable text section labels (Products,
+  Orders, Marketing, etc.) were replaced with a real expand/collapse accordion -
+  `.vd-nav-group` / `.vd-nav-parent` / `.vd-nav-children` / `.vd-nav-chevron`,
+  toggled by a new `toggleVdNavGroup(key)` that flips a `.vd-nav-open` class on
+  the group wrapper (CSS shows `.vd-nav-children` only inside an open group).
+  The existing tab-click handler was extended to auto-expand a group when one
+  of its own children becomes the active tab.
+- **Bottom-left vendor mini-profile card**: added `.vd-sidebar-profile` at the
+  foot of the sidebar (icon, store name, verification badge, "View Storefront"
+  link) - the reference mockup's persistent account summary, which the first
+  pass had dropped entirely.
+- **Quick Actions panel**: restyled to match the reference's standalone
+  primary-CTA-plus-icon-row layout (`.vd-primary-cta`, `.vd-quick-row`,
+  `.vd-quick-icon`, `.vd-quick-title`/`.vd-quick-sub`) instead of a plain
+  stacked button list.
+- **Store Rating stat card**: was showing a fabricated percentage; now computes
+  a real average client-side from the raw rows `/api/vendors/reviews` already
+  returns, rendered as stars via `.vd-stat-stars`. Sellers still never see the
+  commission percentage anywhere on this page.
+
+No new backend endpoints or database changes. All 204 existing tests still
+pass; `node --check` clean; HTML tag balance and id cross-reference verified.
+
+## Vendor panel reorganized to match Jumia Vendor Center; bulk-action confirmation + results report; specifications paste-from-Excel (September 2026)
+
+Requested after the vendor sent real screenshots of the live Jumia Vendor
+Center (vendorcenter.jumia.com) alongside a long architectural proposal for a
+future "Product Center 2.0". Rather than build that whole proposal blindly,
+the scope for this pass was narrowed to four concrete pieces the vendor asked
+for directly: a confirmation-and-results flow for bulk product actions,
+reorganizing the sidebar to mirror the real Jumia navigation, leaving the
+existing Lizimas product-upload form exactly as it is, and letting a vendor
+paste specification rows copied straight out of an Excel sheet. The rest of
+the proposal (approval state machine, staff permission roles, product
+quality/duplicate-detection scoring, a dedicated variants matrix UI, full
+audit trail, schema changes) was not built and is not yet scheduled - it
+stays a reference document for now, not a roadmap commitment.
+
+- **Bulk actions: confirmation + results report.**
+  `bulkUpdateVendorProducts` in `server/controllers/vendorController.js` was
+  rewritten from a single blind `UPDATE ... RETURNING id` into a real
+  classifier: every selected id is checked against the vendor's own rows
+  (ownership, `status`, `is_active`, `admin_restricted`, `deleted_at`) and
+  sorted into `successful` / `failed` / `skipped` with a plain-language reason
+  for each (Restricted by admin, Pending approval, Rejected - fix and resubmit,
+  Already active/inactive/deleted, Not found - belongs to another vendor),
+  capped at 100 ids per call. Only the ids that can actually change get
+  written. On the client, `bulkVendorProductAction()` now opens a confirmation
+  modal (`#vd-bulk-confirm-overlay`) naming the action and count before
+  anything happens, then a results modal (`#vd-bulk-results-overlay`) breaking
+  down what succeeded, failed, and was skipped, with a "Download error report"
+  button that builds a CSV client-side from the failed/skipped rows - no new
+  endpoint for the download.
+- **Sidebar reorganized to mirror the real Jumia Vendor Center screenshots**:
+  flat top-level items for Dashboard, Stock Recommendation, Promotions,
+  Account Statements, Storefront, and Support, plus three expandable groups -
+  Orders (All Orders / Returns / Returns & Refunds), Products (Manage
+  Products / Add Products), and Analytics (Reports / Reviews). The old
+  top-level Settings button was removed; Settings, Profile, "Give us your
+  feedback!" and Logout now live in a dropdown off the bottom profile card
+  (`#vd-sidebar-profile-menu`, toggled by a new `toggleVdProfileMenu()`,
+  separate from the sidebar accordion since it isn't one of the tab items).
+  Jumia features Lizimas has no equivalent for - multi-shop switching,
+  Fulfillment by Jumia, Sponsored Products/Advertise - were deliberately not
+  cloned as hollow placeholders. Orders was kept as an expandable group
+  (unlike Jumia's flat Orders item) so Returns/Refunds still have somewhere
+  to live; that's a conscious deviation from the screenshots, not an oversight.
+  The Add Product form itself was intentionally left untouched - it keeps
+  Lizimas' own sectioned Basic Info / Pricing / Images / Specifications layout
+  rather than adopting Jumia's two-card wizard, per the vendor's explicit
+  instruction.
+- **Specifications: paste from Excel.** Both the desktop Specifications
+  section and the mobile Add Product screen got a paste box
+  (`#vendor-specs-paste-box` / `#vm-specs-paste-box`) that parses pasted rows
+  into label/value spec entries - tab-separated first (how Excel copies
+  adjacent columns), falling back to runs of 2+ spaces, then a `label: value`
+  colon pattern, and finally treating a whole line as a label with an empty
+  value if nothing else matches. Implemented separately for desktop
+  (`vendorParseSpecLine` / `parseAndAddVendorSpecs`) and mobile
+  (`vmParseSpecLine` / `vmParseAndAddSpecs`) since the two Add Product flows
+  are independent JS files; both add rows through the same functions the
+  manual "+ Add Specification" button already used.
+
+**What shipped**: `server/controllers/vendorController.js`,
+`client/vendor/dashboard.html`, `client/css/vendor-desktop.css`,
+`client/js/vendor-dashboard.js`, `client/js/vendor-mobile.js`. No database
+migration. All 204 existing tests still pass; `node --check` clean on all
+three edited/rewritten JS files; HTML tag balance, duplicate-id, and
+`getElementById` cross-reference checks all clean.
+
+**Not covered by automated tests** - needs a live browser pass: the bulk
+action modals against a real mix of restricted/pending/rejected/deleted
+products (including the downloaded CSV's contents); the rebuilt sidebar's
+accordion auto-expand and the new profile dropdown on an actual vendor
+account; and the Excel-paste parser against real copy/paste output from
+Excel, Google Sheets, and Numbers, which can differ in whitespace and how
+multi-word values are separated.
