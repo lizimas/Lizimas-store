@@ -1486,3 +1486,9 @@ Ryan found and opened Jumia's own official public Postman workspace (postman.com
 What changed: `JUMIA_TOKEN_PATH` corrected to `/token`. `mintAccessToken()` in `jumiaClient.js` now POSTs `application/x-www-form-urlencoded` (via `URLSearchParams`, a one-off `axios.post` call rather than the shared JSON `jumiaHttp()` client used elsewhere) instead of a JSON body - this was silently wrong before (Jumia's Kong gateway would have rejected a JSON body at the right path too, not just the wrong path). The response field mapping was already correct and unchanged.
 
 Not yet confirmed: the product endpoints (`/catalog/products` etc.) are still an unverified guess from a third-party source - the same Postman collection has "GPM API" and "GOP API" folders that almost certainly hold the real ones, not yet opened. Auth should now work; product push/import is the next thing to verify once a real connection succeeds.
+
+## Jumia integration: first successful live connection (September 2026)
+
+Ryan connected his real Jumia Vendor Center account (Client ID 9e9c54e7-d813-4c58-ad2a-b2c5496e21b7) successfully after the /token path + form-urlencoded body fix above - the vendor UI shows "Connected" with his shop name. This confirms the entire auth layer (host, path, credential model, request/response shapes) end to end against production, not just against a mock.
+
+Still unverified: everything past auth - pushing a Lizimas product to Jumia and importing a Jumia product into Lizimas, which hit /catalog/products (a guess, not confirmed like the token endpoint was). That's the next real test.
