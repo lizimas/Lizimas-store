@@ -5,6 +5,7 @@
 <meta charset="UTF-8">
 <title>Lizimas Store — Vendor Dashboard</title>
 <link rel="stylesheet" href="../css/admin.css?v=22">
+<link rel="stylesheet" href="../css/vendor-desktop.css?v=1">
 <link rel="stylesheet" href="../css/vendor-mobile.css?v=1">
 </head>
 <body>
@@ -244,34 +245,30 @@
 
 </div>
 
-        <div class="admin-shell">
+        <div class="admin-shell vendor-desktop-shell">
 
             <aside class="admin-sidebar">
-                <div class="sidebar-brand" style="position:relative; display:flex; align-items:center; justify-content:space-between;">
+                <div class="sidebar-brand">
                     <span style="display:flex; align-items:center; gap:8px;"><span class="sidebar-brand-icon">L</span><span>Vendor Portal</span></span>
-                    <button id="vendor-notif-bell" onclick="toggleVendorNotifPanel()" style="position:relative; background:none; border:none; cursor:pointer; font-size:18px; color:inherit; padding:4px;">
-                        &#128276;
-                        <span id="vendor-notif-badge" hidden style="position:absolute; top:-2px; right:-2px; background:#DC2626; color:#fff; border-radius:10px; font-size:10px; padding:1px 5px; font-weight:700;">0</span>
-                    </button>
-                    <div id="vendor-notif-panel" hidden style="position:absolute; top:100%; right:0; width:320px; max-height:400px; overflow-y:auto; background:#fff; color:#1a1a2e; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.2); z-index:100; padding:10px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                            <strong style="font-size:13px;">Notifications</strong>
-                            <button onclick="markAllVendorNotifsRead()" style="background:none; border:none; color:#1a1a2e; font-size:12px; text-decoration:underline; cursor:pointer;">Mark all read</button>
-                        </div>
-                        <div id="vendor-notif-list" style="font-size:13px;">Loading...</div>
-                    </div>
                 </div>
 
                 <nav class="sidebar-nav">
                     <button class="tab-btn active" data-tab="overview">
-                        <span class="sidebar-icon">&#9635;</span> Overview
+                        <span class="sidebar-icon">&#9635;</span> Dashboard
                     </button>
+
+                    <div class="vd-group-label">Products</div>
                     <button class="tab-btn" data-tab="products">
                         <span class="sidebar-icon">&#128230;</span> My Products
                     </button>
                     <button class="tab-btn" data-tab="add-product">
                         <span class="sidebar-icon">&#10133;</span> Add Product
                     </button>
+                    <button class="tab-btn" data-tab="inventory">
+                        <span class="sidebar-icon">&#128200;</span> Inventory
+                    </button>
+
+                    <div class="vd-group-label">Orders</div>
                     <button class="tab-btn" data-tab="orders">
                         <span class="sidebar-icon">&#128230;</span> Orders
                     </button>
@@ -281,24 +278,36 @@
                     <button class="tab-btn" data-tab="refunds">
                         <span class="sidebar-icon">&#128181;</span> Returns &amp; Refunds
                     </button>
-                    <button class="tab-btn" data-tab="wallet">
-                        <span class="sidebar-icon">&#128176;</span> Wallet
+
+                    <div class="vd-group-label">Storefront</div>
+                    <button class="tab-btn" data-tab="storefront">
+                        <span class="sidebar-icon">&#127978;</span> Storefront
+                    </button>
+
+                    <div class="vd-group-label">Marketing</div>
+                    <button class="tab-btn" data-tab="promotions">
+                        <span class="sidebar-icon">&#127991;</span> Promotions
+                    </button>
+
+                    <div class="vd-group-label">Analytics</div>
+                    <button class="tab-btn" data-tab="reports">
+                        <span class="sidebar-icon">&#128202;</span> Reports
                     </button>
                     <button class="tab-btn" data-tab="reviews">
                         <span class="sidebar-icon">&#11088;</span> Reviews
                     </button>
-                    <button class="tab-btn" data-tab="promotions">
-                        <span class="sidebar-icon">&#127991;</span> Promotions
+
+                    <div class="vd-group-label">Payments</div>
+                    <button class="tab-btn" data-tab="wallet">
+                        <span class="sidebar-icon">&#128176;</span> Wallet
                     </button>
-                    <button class="tab-btn" data-tab="reports">
-                        <span class="sidebar-icon">&#128202;</span> Reports
-                    </button>
-                    <button class="tab-btn" data-tab="storefront">
-                        <span class="sidebar-icon">&#127978;</span> Storefront
-                    </button>
+
+                    <div class="vd-group-label">Support</div>
                     <button class="tab-btn" data-tab="messages">
                         <span class="sidebar-icon">&#128172;</span> Messages
                     </button>
+
+                    <div class="vd-group-label">Settings</div>
                     <button class="tab-btn" data-tab="account">
                         <span class="sidebar-icon">&#9881;</span> Account
                     </button>
@@ -307,8 +316,109 @@
 
             <main class="admin-main">
 
+                <div class="vd-topbar">
+                    <div class="vd-search">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" id="vd-product-search-input" placeholder="Search your products..." onkeydown="if(event.key==='Enter') vdSearchProducts()">
+                    </div>
+                    <div class="vd-topbar-right">
+                        <button id="vendor-notif-bell" class="vd-bell-btn" onclick="toggleVendorNotifPanel()">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                            <span id="vendor-notif-badge" hidden class="vd-bell-badge">0</span>
+                        </button>
+                        <div id="vendor-notif-panel" hidden style="position:absolute; top:56px; right:28px; width:320px; max-height:400px; overflow-y:auto; background:#fff; color:#1a1a2e; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.18); z-index:100; padding:10px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                <strong style="font-size:13px;">Notifications</strong>
+                                <button onclick="markAllVendorNotifsRead()" style="background:none; border:none; color:#1a1a2e; font-size:12px; text-decoration:underline; cursor:pointer;">Mark all read</button>
+                            </div>
+                            <div id="vendor-notif-list" style="font-size:13px;">Loading...</div>
+                        </div>
+                        <div class="vd-avatar-chip" id="vd-avatar-chip">
+                            <span class="vd-avatar-badge" id="vd-avatar-initial">L</span>
+                            <div>
+                                <div class="vd-avatar-name" id="vd-avatar-name">Loading...</div>
+                                <div class="vd-avatar-role">Vendor</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <section id="tab-overview" class="tab-content">
-                    <h2 class="admin-page-title">Overview</h2>
+
+                    <div class="vd-welcome-banner">
+                        <h2 id="vd-welcome-heading">Welcome back!</h2>
+                        <p>Here's how your store is doing today.</p>
+                    </div>
+
+                    <div class="vd-stat-grid">
+                        <div class="vd-stat-card">
+                            <div class="vd-stat-label">Today's Orders</div>
+                            <div class="vd-stat-value" id="vd-stat-orders-today">-</div>
+                        </div>
+                        <div class="vd-stat-card">
+                            <div class="vd-stat-label">Pending Handover</div>
+                            <div class="vd-stat-value" id="vd-stat-pending-handover">-</div>
+                        </div>
+                        <div class="vd-stat-card">
+                            <div class="vd-stat-label">Total Products</div>
+                            <div class="vd-stat-value" id="vd-stat-total-products">-</div>
+                        </div>
+                        <div class="vd-stat-card">
+                            <div class="vd-stat-label">Seller Score</div>
+                            <div class="vd-stat-value" id="vd-stat-store-rating">-</div>
+                        </div>
+                    </div>
+
+                    <div class="vd-content-grid">
+                        <div>
+                            <div class="vd-card">
+                                <h3 class="vd-card-title">
+                                    <span>Sales Overview</span>
+                                    <a href="#" onclick="document.querySelector('.tab-btn[data-tab=\'reports\']').click(); return false;">View Reports</a>
+                                </h3>
+                                <canvas id="vd-sales-overview-chart" height="90"></canvas>
+                            </div>
+
+                            <div class="vd-card">
+                                <h3 class="vd-card-title">
+                                    <span>Recent Orders</span>
+                                    <a href="#" onclick="document.querySelector('.tab-btn[data-tab=\'orders\']').click(); return false;">View All</a>
+                                </h3>
+                                <div id="vd-recent-orders-list">Loading...</div>
+                            </div>
+
+                            <div class="vd-card">
+                                <h3 class="vd-card-title">
+                                    <span>Top Performing Products</span>
+                                </h3>
+                                <div id="vd-top-products-list">Loading...</div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="vd-card">
+                                <h3 class="vd-card-title"><span>Quick Actions</span></h3>
+                                <button class="vd-quick-action" onclick="document.querySelector('.tab-btn[data-tab=\'add-product\']').click();">+ Add New Product</button>
+                                <button class="vd-quick-action" onclick="document.querySelector('.tab-btn[data-tab=\'products\']').click();">Manage Products</button>
+                                <button class="vd-quick-action" onclick="document.querySelector('.tab-btn[data-tab=\'orders\']').click();">View Orders</button>
+                                <button class="vd-quick-action" onclick="document.querySelector('.tab-btn[data-tab=\'inventory\']').click();">Update Inventory</button>
+                                <button class="vd-quick-action" onclick="document.querySelector('.tab-btn[data-tab=\'account\']').click();">Store Settings</button>
+                            </div>
+
+                            <div class="vd-card">
+                                <h3 class="vd-card-title"><span>Recent Notifications</span></h3>
+                                <div id="vd-dashboard-notif-list">Loading...</div>
+                            </div>
+
+                            <div class="vd-help-card">
+                                <div style="font-weight:700; color:var(--vd-navy); font-size:13.5px;">Need Help?</div>
+                                <p style="font-size:12.5px; color:var(--vd-subtext); margin:4px 0 0;">Our support team is here for you.</p>
+                                <a href="#" onclick="document.querySelector('.tab-btn[data-tab=\'messages\']').click(); return false;">Contact Support</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2 class="admin-page-title" style="margin-top:8px;">Application &amp; Business Profile</h2>
                     <p class="admin-page-subtitle">Your vendor application and business profile.</p>
 
                     <div class="panel" id="vendor-status-panel">
@@ -529,6 +639,39 @@
                         <button onclick="saveVendorProductOptions()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; margin-right:8px;">Save Colours/Sizes</button>
                         <p id="vendor-variant-options-status" style="font-size:13px; color:#666; margin-top:8px;"></p>
                         <div id="vendor-variant-stock-area" style="margin-top:16px;"></div>
+                    </div>
+                </section>
+
+                <section id="tab-inventory" class="tab-content hidden">
+                    <h2 class="admin-page-title">Inventory</h2>
+                    <p class="admin-page-subtitle">Keep an eye on stock levels across your catalogue. Low stock is 5 units or fewer; out of stock is 0.</p>
+
+                    <div class="vd-stat-grid" style="margin-bottom:18px;">
+                        <div class="vd-stat-card">
+                            <div class="vd-stat-label">Total Products</div>
+                            <div class="vd-stat-value" id="vd-inv-total">-</div>
+                        </div>
+                        <div class="vd-stat-card">
+                            <div class="vd-stat-label">In Stock</div>
+                            <div class="vd-stat-value" id="vd-inv-in-stock">-</div>
+                        </div>
+                        <div class="vd-stat-card">
+                            <div class="vd-stat-label">Low Stock</div>
+                            <div class="vd-stat-value" id="vd-inv-low-stock">-</div>
+                        </div>
+                        <div class="vd-stat-card">
+                            <div class="vd-stat-label">Out of Stock</div>
+                            <div class="vd-stat-value" id="vd-inv-out-stock">-</div>
+                        </div>
+                    </div>
+
+                    <div id="vendor-inventory-filters" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+                        <button class="vd-inv-filter-btn active" data-inv-filter="low" onclick="setVendorInventoryFilter('low')" style="padding:6px 12px; border-radius:999px; border:1px solid #1a1a2e; background:#1a1a2e; color:#fff; font-size:12px; cursor:pointer;">Low &amp; Out of Stock</button>
+                        <button class="vd-inv-filter-btn" data-inv-filter="all" onclick="setVendorInventoryFilter('all')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">All Products</button>
+                    </div>
+
+                    <div class="panel">
+                        <div id="vendor-inventory-list">Loading...</div>
                     </div>
                 </section>
 

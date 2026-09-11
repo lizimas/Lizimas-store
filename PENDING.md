@@ -1146,3 +1146,119 @@ Follow-up to the mobile vendor app section above - built the 4 mobile screens th
 **What shipped**: 4 new screen controllers in `client/js/vendor-mobile.js` (858 lines total); 4 new `<div class="vm-screen">` blocks in `client/vendor/dashboard.html`; the Manage Products "+" FAB and the Menu's Promotions/Account Statements/Profile rows rewired to `vmShowScreen(...)`. All 204 existing tests still pass (frontend-only change); `node --check` clean on the JS; HTML div/button/select/textarea/label tags verified balanced; every `getElementById` call in the new JS cross-checked against the new HTML's `id` attributes (the only 3 not found statically - `vm-momo-input`, `vm-momo-status`, `vm-request-payout-btn` - are created by the JS's own `innerHTML` rendering, not missing markup).
 
 **Not covered by automated tests**: same caveat as the mobile app section above - needs a live browser pass narrowed below ~768px: add a product from mobile and confirm the pricing preview and the resulting listing match what desktop would produce, propose a promotion and see it land in the admin approval queue, request a payout and confirm it behaves like the desktop Wallet tab's request, and edit the MoMo number from Profile and confirm it's the same field desktop's Account tab reads.
+
+## Vendor dashboard: forgot password, unified product form, admin approval visibility, premium desktop redesign (September 2026)
+
+Batch of 6 fixes/features requested together from a reference screenshot of a
+green "premium SaaS" vendor dashboard, with the explicit instruction to keep
+Lizimas' own navy/gold palette rather than adopt the screenshot's colors, and
+to scope the redesign to the vendor dashboard only (desktop + the existing
+mobile app), never touching the shared `admin.css` classes as they render on
+`client/admin.html` or `client/staff/*.html`.
+
+**1. Vendor self-service password reset.** `authController.js`'s
+`forgotPassword()` query widened from `role = 'customer'` to
+`role IN ('customer', 'vendor')` (staff/admin are untouched - `forcePasswordReset`
+remains their only route). New `client/vendor-forgot-password.html` mirrors
+`vendor-login.html`'s card style and reuses the existing
+`js/forgot-password.js` unchanged. `vendor-login.html` gained the "Forgot
+password?" link and the site-wide `js/password-toggle.js` eye-icon script,
+which existed already but was simply missing from this one page.
+
+**2. Vendor Add Product form restructured to match staff/admin's sectioned
+layout**, on both desktop and mobile: Basic Information / Pricing & Inventory
+/ Images / Specifications. Specifications is a genuinely new field (desktop:
+`#specs-list`, mobile: `#vm-specs-list`), posted to the existing shared
+`/api/vendors/products/:id/options` endpoint (`productController.js`'s
+`saveProductOptions`, the same handler staff's `/api/products/:id/options`
+uses). That handler previously always ran `DELETE FROM product_sizes` /
+`product_colors` / `product_specifications` on every call regardless of which
+fields were present in the request body - safe for staff (always submits all
+three together) but a real data-loss bug for vendor, which now makes two
+independent calls to this endpoint (the existing Variants panel sending only
+`{sizes, colors}`, and the new Specifications section sending only `{specs}`).
+Fixed with per-field `Array.isArray()` guards so each call only deletes/relinks
+the variant type it actually touches. Also caught in passing: mobile's
+Package Size field was a free-text input that the backend's `safePackageSize()`
+silently coerces to "Small" for anything not exactly matching one of 4 values
+- changed to a `<select>` with the same 4 options desktop uses.
+
+**3. Admin product approvals now show which vendor submitted what.** The
+backend/data model already supported this fully; the gap was purely in the
+UI. `admin.html`'s Pending Product Approvals panel gained an All/Vendor/Staff
+filter with live counts, and each row shows a "VENDOR" badge plus
+`vendor_business_name` when `p.vendor_id` is set (`admin.js`'s
+`loadPendingProducts()` split into `loadPendingProducts` / render-filter /
+render-list, caching into `pendingProductsCache`).
+
+**4. Mobile vendor app bottom nav reordered** to Home / Manage Products /
+Orders / Account (previously Home / Manage Products / Orders / Menu), with
+the old Menu screen removed entirely and its rows (Promotions, Account
+Statements, Settings, feedback, and the two "coming soon" rows) folded into
+the Profile screen (now the "Account" screen) below the MoMo card.
+`vendor-mobile.js`'s nav-highlight logic gained a `VM_NAV_FALLBACK` map so
+back-navigation and active-tab highlighting stay correct for every screen
+reachable only through Account (Promotions, Wallet, Settings, Holiday Mode,
+Commissions & Fees all fall back to highlighting "account"; Add Product falls
+back to "products").
+
+**5. Premium desktop vendor dashboard redesign**, scoped entirely under a new
+`.vendor-desktop-shell` class added to the existing `.admin-shell` wrapper in
+`client/vendor/dashboard.html`, styled by a new `client/css/vendor-desktop.css`
+(same navy/gold custom-property palette as `vendor-mobile.css`). This overrides
+the shared `admin.css` classes (`.admin-sidebar`, `.tab-btn`, `.panel`, etc.)
+only on this one page - staff and admin pages reuse the same class names via
+`admin.css` but never carry the shell wrapper, so nothing changes for them.
+The existing `.tab-btn`/`.tab-content`/`data-tab` click-switching mechanism
+(`setupVendorTabs()`) was kept as-is; only the sidebar markup around it changed.
+
+- **Sidebar**: grouped with non-clickable section labels (Products, Orders,
+  Storefront, Marketing, Analytics, Payments, Support, Settings) instead of
+  the old flat 13-button list, plus one new "Inventory" entry.
+- **Top bar**: product search box, notification bell (moved out of the old
+  sidebar-brand corner), and a real avatar chip - all new markup, no
+  functional change to the existing notification panel itself.
+- **Dashboard home** (top of the Overview tab, existing panels below
+  unchanged): welcome banner, 4 stat cards (Today's Orders, Pending Handover,
+  Total Products, Seller Score), a Sales Overview chart, Recent Orders,
+  Top Performing Products, Quick Actions, Recent Notifications, and a Help
+  card. All of it reuses data already fetched for other tabs rather than any
+  new endpoint: `/api/vendors/dashboard-summary` (stat cards),
+  `/api/vendors/reports` (chart + top products - same data as the Reports
+  tab, rendered into a second, independent Chart.js instance so the two tabs
+  don't fight over one canvas), `/api/vendors/orders` (5 most recent, sorted
+  client-side), and `/api/vendors/notifications` (top 4). Sellers still never
+  see the commission percentage - the earnings panel below is untouched and
+  the new stat cards show only counts and the seller score percentage, never
+  a commission rate.
+- **New Inventory tab**: built entirely client-side from the same
+  `vendorProductsCache` the Products tab already populates (fetches fresh via
+  `/api/vendors/products` only if that cache is empty) - low stock is defined
+  as 1-5 units, out of stock as 0. No new backend endpoint.
+- **Topbar search** (`vdSearchProducts()`) filters the existing Products tab
+  by name/SKU client-side and switches to it; no new endpoint.
+- Welcome banner and avatar chip are populated from the same `/api/vendors/me`
+  fetch `loadVendorStatus()` already made for the Overview tab's status panel.
+
+**What shipped**: `authController.js`, `productController.js`, `admin.html`,
+`admin.js` (items 1/2/3); `vendor-mobile.js`, `client/vendor/dashboard.html`
+(mobile screens, item 4); `client/css/vendor-desktop.css` (new file),
+`client/vendor/dashboard.html` (sidebar/topbar/dashboard-home/inventory
+markup), `client/js/vendor-dashboard.js` (item 5). No new database migration
+for any of this. All 204 existing tests still pass; `node --check` clean on
+every edited JS file; HTML div/button/select/textarea/label/input tag balance
+verified; every `getElementById` call in the new/edited JS cross-checked
+against the HTML's `id` attributes (the only ones not found statically are
+pre-existing JS-generated dynamic ids, unrelated to this batch).
+
+**Not covered by automated tests** - needs a live browser pass: the vendor
+forgot-password flow end to end (email arrives, link works, password
+actually changes); saving a product's Specifications from both the new
+desktop section and mobile without clobbering Colours/Sizes saved from the
+Variants panel, and vice versa; the admin approval queue's Vendor/Staff
+filter and badge against a real mix of vendor- and staff-submitted pending
+products; the mobile bottom nav and Account screen on an actual small
+viewport; and the desktop redesign generally - the sidebar groups, topbar
+search, dashboard-home widgets (especially the two independent Chart.js
+instances on Overview vs Reports), and the new Inventory tab, all on a real
+vendor account with real orders/products/notifications data.

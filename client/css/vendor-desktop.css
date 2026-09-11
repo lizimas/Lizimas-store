@@ -1,0 +1,368 @@
+/*
+ * client/css/vendor-desktop.css
+ * Lizimas Store - premium desktop skin for the vendor dashboard.
+ *
+ * Scoped entirely under .vendor-desktop-shell (added to the existing
+ * .admin-shell wrapper in client/vendor/dashboard.html) so it can safely
+ * override the shared admin.css classes (.admin-sidebar, .tab-btn, .panel,
+ * etc.) without touching how those same classes render on the staff and
+ * admin panels, which reuse admin.css but never carry this wrapper class.
+ * Same navy/gold palette as vendor-mobile.css, so the desktop and mobile
+ * vendor experiences read as one brand.
+ */
+
+.vendor-desktop-shell {
+    --vd-navy: #1a1a2e;
+    --vd-gold: #f4b400;
+    --vd-bg: #f4f5f7;
+    --vd-border: #e2e4ea;
+    --vd-muted: #9aa1ae;
+    --vd-subtext: #6b7280;
+    --vd-amber-bg: #fff3d6;
+    --vd-amber-text: #9a6b00;
+    --vd-green-bg: #e6f4ea;
+    --vd-green-text: #1e7e34;
+    --vd-red: #DC2626;
+    --vd-info-bg: #eef1fa;
+    --vd-info-text: #3a4568;
+
+    background: var(--vd-bg) !important;
+}
+
+/* --- Sidebar --------------------------------------------------------- */
+
+.vendor-desktop-shell .admin-sidebar {
+    background: var(--vd-navy) !important;
+    border-right: none !important;
+    padding: 0 !important;
+    display: flex;
+    flex-direction: column;
+}
+
+.vendor-desktop-shell .sidebar-brand {
+    padding: 20px 18px !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    font-weight: 700;
+}
+
+.vendor-desktop-shell .sidebar-brand-icon {
+    background: var(--vd-gold) !important;
+    color: var(--vd-navy) !important;
+}
+
+.vendor-desktop-shell .sidebar-nav {
+    padding: 14px 10px 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.vendor-desktop-shell .vd-group-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.38);
+    padding: 16px 12px 6px;
+}
+
+.vendor-desktop-shell .vd-group-label:first-child {
+    padding-top: 4px;
+}
+
+.vendor-desktop-shell .tab-btn {
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    background: transparent !important;
+    color: rgba(255,255,255,0.72) !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 10px 12px !important;
+    margin-bottom: 2px;
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.vendor-desktop-shell .tab-btn:hover {
+    background: rgba(255,255,255,0.06) !important;
+    color: #fff !important;
+}
+
+.vendor-desktop-shell .tab-btn.active {
+    background: var(--vd-gold) !important;
+    color: var(--vd-navy) !important;
+    font-weight: 700;
+}
+
+.vendor-desktop-shell .tab-btn .sidebar-icon {
+    font-size: 15px;
+    width: 18px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.vendor-desktop-shell .vd-sub-item {
+    padding-left: 30px !important;
+    font-size: 13px;
+}
+
+/* --- Top bar ----------------------------------------------------------- */
+
+.vendor-desktop-shell .vd-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: #fff;
+    border-bottom: 1px solid var(--vd-border);
+    padding: 14px 28px;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+
+.vendor-desktop-shell .vd-search {
+    flex: 1;
+    max-width: 420px;
+    position: relative;
+}
+
+.vendor-desktop-shell .vd-search input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 14px 10px 38px;
+    border: 1px solid var(--vd-border);
+    border-radius: 10px;
+    font-size: 13.5px;
+    background: var(--vd-bg);
+    color: var(--vd-navy);
+}
+
+.vendor-desktop-shell .vd-search svg {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--vd-muted);
+    pointer-events: none;
+}
+
+.vendor-desktop-shell .vd-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-shrink: 0;
+}
+
+.vendor-desktop-shell .vd-bell-btn {
+    position: relative;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--vd-navy);
+    padding: 6px;
+    display: flex;
+}
+
+.vendor-desktop-shell .vd-bell-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: var(--vd-red);
+    color: #fff;
+    border-radius: 10px;
+    font-size: 10px;
+    padding: 1px 5px;
+    font-weight: 700;
+}
+
+.vendor-desktop-shell .vd-avatar-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--vd-bg);
+    border: 1px solid var(--vd-border);
+    border-radius: 999px;
+    padding: 6px 14px 6px 6px;
+}
+
+.vendor-desktop-shell .vd-avatar-badge {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--vd-navy);
+    color: var(--vd-gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.vendor-desktop-shell .vd-avatar-name {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--vd-navy);
+    line-height: 1.3;
+}
+
+.vendor-desktop-shell .vd-avatar-role {
+    font-size: 10.5px;
+    color: var(--vd-muted);
+    line-height: 1.3;
+}
+
+.vendor-desktop-shell .admin-main {
+    padding: 24px 28px !important;
+}
+
+/* --- Dashboard home ------------------------------------------------------ */
+
+.vendor-desktop-shell .vd-welcome-banner {
+    background: linear-gradient(135deg, var(--vd-navy), #232345);
+    border-radius: 16px;
+    padding: 26px 28px;
+    color: #fff;
+    margin-bottom: 20px;
+}
+
+.vendor-desktop-shell .vd-welcome-banner h2 {
+    margin: 0 0 4px;
+    font-size: 21px;
+}
+
+.vendor-desktop-shell .vd-welcome-banner p {
+    margin: 0;
+    color: rgba(255,255,255,0.72);
+    font-size: 13.5px;
+}
+
+.vendor-desktop-shell .vd-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+.vendor-desktop-shell .vd-stat-card {
+    background: #fff;
+    border: 1px solid var(--vd-border);
+    border-radius: 14px;
+    padding: 18px;
+}
+
+.vendor-desktop-shell .vd-stat-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+}
+
+.vendor-desktop-shell .vd-stat-label {
+    font-size: 12.5px;
+    color: var(--vd-subtext);
+    margin-bottom: 4px;
+}
+
+.vendor-desktop-shell .vd-stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--vd-navy);
+}
+
+.vendor-desktop-shell .vd-content-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+@media (max-width: 980px) {
+    .vendor-desktop-shell .vd-content-grid { grid-template-columns: 1fr; }
+}
+
+.vendor-desktop-shell .vd-card {
+    background: #fff;
+    border: 1px solid var(--vd-border);
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 18px;
+}
+
+.vendor-desktop-shell .vd-card-title {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--vd-navy);
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.vendor-desktop-shell .vd-card-title a {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--vd-gold);
+    text-decoration: none;
+}
+
+.vendor-desktop-shell .vd-quick-action {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    background: var(--vd-bg);
+    border: 1px solid var(--vd-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--vd-navy);
+    cursor: pointer;
+}
+
+.vendor-desktop-shell .vd-quick-action:hover {
+    background: #eef0f4;
+}
+
+.vendor-desktop-shell .vd-notif-row {
+    display: flex;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid #f0f1f4;
+    font-size: 12.5px;
+}
+
+.vendor-desktop-shell .vd-notif-row:last-child {
+    border-bottom: none;
+}
+
+.vendor-desktop-shell .vd-help-card {
+    background: var(--vd-bg);
+    border: 1px dashed var(--vd-border);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+}
+
+.vendor-desktop-shell .vd-help-card a {
+    display: inline-block;
+    margin-top: 10px;
+    background: var(--vd-navy);
+    color: #fff;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-decoration: none;
+}

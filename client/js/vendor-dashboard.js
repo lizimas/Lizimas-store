@@ -49,8 +49,9 @@ function setupVendorTabs() {
             button.classList.add("active");
             document.getElementById(`tab-${button.dataset.tab}`).classList.remove("hidden");
 
-            if (button.dataset.tab === "overview") { loadVendorStatus(); loadVendorKyc(); }
+            if (button.dataset.tab === "overview") { loadVendorStatus(); loadVendorKyc(); loadVendorPremiumDashboard(); }
             if (button.dataset.tab === "products") loadVendorProducts();
+            if (button.dataset.tab === "inventory") loadVendorInventory();
             if (button.dataset.tab === "add-product" && staffCategoriesLoaded === false) loadVendorCategories();
             if (button.dataset.tab === "orders") loadVendorOrders();
             if (button.dataset.tab === "returns") loadVendorReturns();
@@ -84,6 +85,14 @@ async function loadVendorStatus() {
     try {
         const v = await vendorAuthorizedFetch("/api/vendors/me");
         vendorAccountType = v.account_type;
+
+        const welcomeHeading = document.getElementById("vd-welcome-heading");
+        if (welcomeHeading) welcomeHeading.textContent = v.business_name ? `Welcome back, ${v.business_name}!` : "Welcome back!";
+        const avatarName = document.getElementById("vd-avatar-name");
+        const avatarInitial = document.getElementById("vd-avatar-initial");
+        if (avatarName) avatarName.textContent = v.business_name || "Vendor";
+        if (avatarInitial) avatarInitial.textContent = (v.business_name || "V").trim().charAt(0).toUpperCase();
+
         const banner = document.getElementById("vendor-status-banner");
         const s = vendorStatusLabel(v.status);
 
@@ -295,6 +304,7 @@ function vendorProductStatusBadge(p) {
 let vendorProductsCache = [];
 let vendorProductsFilter = "all";
 let vendorProductsSelected = new Set();
+let vendorProductsSearchTerm = "";
 
 function renderVendorProductFilters() {
     const container = document.getElementById("vendor-products-filters");
@@ -379,9 +389,16 @@ function renderVendorProductsTable() {
         return;
     }
 
-    const rows = vendorProductsFilter === "all"
+    let rows = vendorProductsFilter === "all"
         ? vendorProductsCache
         : vendorProductsCache.filter(p => vendorProductFilterKey(p) === vendorProductsFilter);
+
+    if (vendorProductsSearchTerm) {
+        rows = rows.filter(p =>
+            (p.name || "").toLowerCase().includes(vendorProductsSearchTerm) ||
+            (p.sku || "").toLowerCase().includes(vendorProductsSearchTerm)
+        );
+    }
 
     if (rows.length === 0) {
         container.innerHTML = `<p class="no-data">No products in this view.</p>`;
@@ -437,6 +454,17 @@ async function bulkVendorProductActionSingle(id, action) {
         console.error("Product action error:", error);
         alert("Could not connect to server.");
     }
+}
+
+// Topbar search box (premium desktop dashboard) - filters the Products tab
+// by name/SKU rather than hitting a separate endpoint, since the full
+// product list is already fetched for that tab.
+function vdSearchProducts() {
+    const input = document.getElementById("vd-product-search-input");
+    vendorProductsSearchTerm = input ? input.value.trim().toLowerCase() : "";
+    const productsBtn = document.querySelector('.tab-btn[data-tab="products"]');
+    if (productsBtn) productsBtn.click();
+    else renderVendorProductsTable();
 }
 
 function resetVendorProductForm() {
@@ -1201,6 +1229,221 @@ async function loadVendorPromotions() {
     }
 
     box.innerHTML = html;
+}
+
+
+// --- Inventory (premium desktop dashboard) --------------------------------
+// Client-side view over the vendor's own product list - no new backend
+// endpoint needed, since /api/vendors/products already returns stock and
+// active/status for every product.
+
+let vendorInventoryFilter = "low";
+
+function setVendorInventoryFilter(key) {
+    vendorInventoryFilter = key;
+    document.querySelectorAll("#vendor-inventory-filters .vd-inv-filter-btn").forEach(btn => {
+        const active = btn.dataset.invFilter === key;
+        btn.classList.toggle("active", active);
+        btn.style.background = active ? "#1a1a2e" : "#fff";
+        btn.style.color = active ? "#fff" : "#333";
+        btn.style.borderColor = active ? "#1a1a2e" : "#ddd";
+    });
+    renderVendorInventoryList();
+}
+
+async function loadVendorInventory() {
+    try {
+        if (!vendorProductsCache || vendorProductsCache.length === 0) {
+            vendorProductsCache = await vendorAuthorizedFetch("/api/vendors/products");
+        }
+        renderVendorInventoryList();
+    } catch (error) {
+        console.error("Load vendor inventory error:", error);
+    }
+}
+
+function renderVendorInventoryList() {
+    const totalEl = document.getElementById("vd-inv-total");
+    const inStockEl = document.getElementById("vd-inv-in-stock");
+    const lowStockEl = document.getElementById("vd-inv-low-stock");
+    const outStockEl = document.getElementById("vd-inv-out-stock");
+    const listEl = document.getElementById("vendor-inventory-list");
+    if (!listEl) return;
+
+    const products = vendorProductsCache || [];
+    const lowStock = products.filter(p => Number(p.stock) > 0 && Number(p.stock) <= 5);
+    const outOfStock = products.filter(p => Number(p.stock) <= 0);
+    const inStock = products.filter(p => Number(p.stock) > 5);
+
+    if (totalEl) totalEl.textContent = products.length;
+    if (inStockEl) inStockEl.textContent = inStock.length;
+    if (lowStockEl) lowStockEl.textContent = lowStock.length;
+    if (outStockEl) outStockEl.textContent = outOfStock.length;
+
+    const rows = vendorInventoryFilter === "all" ? products : [...outOfStock, ...lowStock];
+
+    if (rows.length === 0) {
+        listEl.innerHTML = vendorInventoryFilter === "all"
+            ? `<p class="no-data">You haven't listed any products yet.</p>`
+            : `<p class="no-data">Nothing low or out of stock right now.</p>`;
+        return;
+    }
+
+    listEl.innerHTML = `
+        <table>
+            <thead><tr><th>Product</th><th>SKU</th><th>Stock</th><th>Status</th></tr></thead>
+            <tbody>
+                ${rows.map(p => {
+                    const stock = Number(p.stock);
+                    const stockColor = stock <= 0 ? "#DC2626" : stock <= 5 ? "#B45309" : "#166534";
+                    const stockLabel = stock <= 0 ? "Out of stock" : stock <= 5 ? "Low stock" : "In stock";
+                    return `
+                        <tr>
+                            <td data-label="Product">${vendorEsc(p.name)}</td>
+                            <td data-label="SKU">${p.sku ? vendorEsc(p.sku) : "—"}</td>
+                            <td data-label="Stock"><span style="font-weight:700; color:${stockColor};">${p.stock}</span></td>
+                            <td data-label="Status"><span style="color:${stockColor};">${stockLabel}</span></td>
+                        </tr>`;
+                }).join("")}
+            </tbody>
+        </table>
+    `;
+}
+
+
+// --- Premium Dashboard Home (Sales Overview / Recent Orders / Top Products /
+// Quick Actions / Notifications) -------------------------------------------
+// Reuses the same data already fetched for the Reports tab (/api/vendors/reports),
+// Orders tab (/api/vendors/orders) and the notification panel
+// (/api/vendors/notifications) rather than adding new endpoints.
+
+let vendorDashboardChart = null;
+
+function renderVendorDashboardChart(dailySales) {
+    const canvas = document.getElementById("vd-sales-overview-chart");
+    if (!canvas || typeof Chart === "undefined") return;
+    const labels = dailySales.map(d => d.day);
+    const datasets = [
+        { label: "Sales (UGX)", data: dailySales.map(d => d.sales), borderColor: "#1a1a2e", backgroundColor: "rgba(26,26,46,0.08)", tension: 0.3, fill: true, yAxisID: "y" },
+        { label: "Orders", data: dailySales.map(d => d.orders), borderColor: "#f4b400", backgroundColor: "rgba(244,180,0,0.12)", tension: 0.3, fill: true, yAxisID: "y1" }
+    ];
+    if (vendorDashboardChart) {
+        vendorDashboardChart.data.labels = labels;
+        vendorDashboardChart.data.datasets = datasets;
+        vendorDashboardChart.update();
+        return;
+    }
+    vendorDashboardChart = new Chart(canvas.getContext("2d"), {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: "index", intersect: false },
+            scales: {
+                y: { beginAtZero: true, position: "left" },
+                y1: { beginAtZero: true, position: "right", grid: { drawOnChartArea: false } }
+            }
+        }
+    });
+}
+
+async function loadVendorDashboardStats() {
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/dashboard-summary");
+        if (data.error) return;
+        const ordersToday = document.getElementById("vd-stat-orders-today");
+        const pendingHandover = document.getElementById("vd-stat-pending-handover");
+        const totalProducts = document.getElementById("vd-stat-total-products");
+        const sellerScoreEl = document.getElementById("vd-stat-store-rating");
+        if (ordersToday) ordersToday.textContent = data.orders.today;
+        if (pendingHandover) pendingHandover.textContent = data.orders.pendingHandover;
+        if (totalProducts) totalProducts.textContent = data.products.total;
+        if (sellerScoreEl) sellerScoreEl.textContent = (data.sellerScore && !data.sellerScore.isNew) ? `${data.sellerScore.score}%` : "New";
+    } catch (error) {
+        console.error("Load vendor dashboard stats error:", error);
+    }
+}
+
+async function loadVendorDashboardOrdersAndProducts() {
+    const ordersBox = document.getElementById("vd-recent-orders-list");
+    const topProductsBox = document.getElementById("vd-top-products-list");
+
+    try {
+        const orders = await vendorAuthorizedFetch("/api/vendors/orders");
+        if (ordersBox && Array.isArray(orders)) {
+            const recent = [...orders]
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                .slice(0, 5);
+            ordersBox.innerHTML = recent.length === 0
+                ? `<p class="no-data">No orders yet.</p>`
+                : `<table>
+                    <thead><tr><th>Product</th><th>Qty</th><th>Status</th></tr></thead>
+                    <tbody>
+                        ${recent.map(o => `
+                            <tr>
+                                <td data-label="Product">${vendorEsc(o.product_name)}</td>
+                                <td data-label="Qty">${o.quantity}</td>
+                                <td data-label="Status"><span class="status-badge ${VENDOR_STAGE_BADGE_CLASS[o.stage] || "status-pending"}">${vendorEsc(o.stageLabel)}</span></td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>`;
+        }
+    } catch (error) {
+        console.error("Load recent orders error:", error);
+    }
+
+    try {
+        const reportsData = await vendorAuthorizedFetch("/api/vendors/reports");
+        if (reportsData.error) return;
+        renderVendorDashboardChart(reportsData.dailySales);
+        if (topProductsBox) {
+            topProductsBox.innerHTML = reportsData.topProducts.length === 0
+                ? `<p class="no-data">No sales in the last 30 days.</p>`
+                : reportsData.topProducts.slice(0, 5).map(p => `
+                    <div class="vd-notif-row" style="justify-content:space-between;">
+                        <span>${vendorEsc(p.name)}</span>
+                        <span style="color:#6b7280;">${p.unitsSold} sold &middot; ${vendorFmtUgx(p.revenue)}</span>
+                    </div>
+                `).join("");
+        }
+    } catch (error) {
+        console.error("Load dashboard reports error:", error);
+    }
+}
+
+async function loadVendorDashboardNotifPreview() {
+    const box = document.getElementById("vd-dashboard-notif-list");
+    if (!box) return;
+    try {
+        const rows = await vendorAuthorizedFetch("/api/vendors/notifications");
+        if (rows.error) {
+            box.innerHTML = `<p class="no-data">${vendorEsc(rows.error)}</p>`;
+            return;
+        }
+        if (rows.length === 0) {
+            box.innerHTML = `<p class="no-data">No notifications yet.</p>`;
+            return;
+        }
+        box.innerHTML = rows.slice(0, 4).map(n => `
+            <div class="vd-notif-row" style="cursor:pointer; ${n.read_at ? "opacity:0.55;" : ""}" onclick="openVendorNotification(${n.id}, '${n.link_tab || ""}')">
+                <div>
+                    <div style="font-weight:600;">${vendorEsc(n.title)}</div>
+                    <div style="color:#6b7280;">${vendorEsc(n.message)}</div>
+                </div>
+            </div>
+        `).join("");
+    } catch (error) {
+        console.error("Load dashboard notif preview error:", error);
+        box.innerHTML = `<p class="no-data">Could not connect to server.</p>`;
+    }
+}
+
+function loadVendorPremiumDashboard() {
+    loadVendorDashboardStats();
+    loadVendorDashboardOrdersAndProducts();
+    loadVendorDashboardNotifPreview();
 }
 
 // --- Dashboard summary (Store Snapshot / Earnings / Seller Score) --------
@@ -2135,6 +2378,7 @@ document.addEventListener("DOMContentLoaded", () => {
     loadVendorStatus();
     loadVendorKyc();
     loadVendorDashboardSummary();
+    loadVendorPremiumDashboard();
     loadVendorCategories();
     loadVendorPromotions();
     refreshVendorNotifBadge();
