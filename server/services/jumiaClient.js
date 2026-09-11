@@ -31,9 +31,19 @@
 const axios = require("axios");
 const { encryptField, decryptField } = require("../utils/encryption");
 
-const JUMIA_API_BASE = process.env.JUMIA_API_BASE || "https://vendorcenter.jumia.com/api";
+// Corrected September 2026, after Ryan's first live connection attempt
+// returned an HTTP 301 whose body was Jumia's own Vendor Center *frontend*
+// app shell (<title>Jumia | Vendor Center</title>) - proof the request was
+// landing on vendorcenter.jumia.com's web app, not an API host. Cross-checked
+// against a third-party open-source Jumia Vendor Center MCP integration
+// (github.com/damurka/jumia-vendor-mcp) whose README documents a working
+// setup against the real API: base host vendor-api.jumia.com, with product
+// endpoints under /catalog/products, /catalog/stock, and orders under
+// /orders, /orders/items - all still unverified against Ryan's own account,
+// but a much stronger starting point than the previous guess.
+const JUMIA_API_BASE = process.env.JUMIA_API_BASE || "https://vendor-api.jumia.com";
 const JUMIA_TOKEN_PATH = "/oauth/token";
-const JUMIA_PRODUCTS_PATH = "/products";
+const JUMIA_PRODUCTS_PATH = "/catalog/products";
 const JUMIA_CATEGORY_TREE_PATH = "/categories";
 
 const REQUEST_TIMEOUT_MS = 20000;
@@ -184,18 +194,25 @@ function mapJumiaProductToLizimasFields(jumiaProduct) {
 }
 
 // Creates or updates one product on Jumia. jumiaProductId present ->
-// update (PATCH); absent -> create (POST). Returns Jumia's product id
-// for a create, so the caller can store it on the link row.
+// update (PATCH); absent -> create (POST). Per the same third-party
+// integration referenced above, Jumia's catalog API is feed-based: both
+// create and update POST/PATCH to the SAME /catalog/products path (no id
+// in the URL) with the seller_sku identifying the product in the payload,
+// rather than a REST-style /products/{id} - unverified against a real
+// response, but consistent with the "async feed" pattern that source
+// describes (a create/update is accepted and processed, not applied
+// synchronously - a real response may need polling a feed-status endpoint
+// this module does not yet implement). Returns Jumia's product id for a
+// create, so the caller can store it on the link row.
 async function upsertJumiaProduct(accessToken, payload, jumiaProductId) {
     try {
         const http = authedHttp(accessToken);
-        if (jumiaProductId) {
-            const response = await http.patch(`${JUMIA_PRODUCTS_PATH}/${encodeURIComponent(jumiaProductId)}`, payload);
-            return { jumiaProductId, raw: response.data };
-        }
-        const response = await http.post(JUMIA_PRODUCTS_PATH, payload);
+        const body = jumiaProductId ? { ...payload, jumia_product_id: jumiaProductId } : payload;
+        const response = jumiaProductId
+            ? await http.patch(JUMIA_PRODUCTS_PATH, body)
+            : await http.post(JUMIA_PRODUCTS_PATH, body);
         const data = response.data || {};
-        const newId = data.product_id || data.id || null;
+        const newId = jumiaProductId || data.product_id || data.id || null;
         return { jumiaProductId: newId, raw: data };
     } catch (err) {
         throw normalizeAxiosError(err, `Jumia rejected the product "${payload.name || payload.seller_sku}".`);
