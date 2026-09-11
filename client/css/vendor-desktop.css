@@ -592,6 +592,12 @@
     display: flex;
 }
 
+/* Jumia update-secret sub-form: same hidden/display:flex conflict class -
+   display is driven purely by the `hidden` attribute. */
+.vendor-desktop-shell #vd-jumia-update-secret-view:not([hidden]) {
+    display: flex;
+}
+
 .vendor-desktop-shell #vd-sidebar-profile-chevron.vd-nav-open {
     transform: rotate(90deg);
 }

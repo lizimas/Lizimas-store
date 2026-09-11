@@ -655,6 +655,7 @@
                         <button onclick="bulkVendorProductAction('activate')" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Activate</button>
                         <button onclick="bulkVendorProductAction('deactivate')" style="background:#B45309; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Deactivate</button>
                         <button onclick="bulkVendorProductAction('delete')" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Delete</button>
+                        <button onclick="vmPushSelectedToJumia()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Push to Jumia</button>
                     </div>
                     <div class="panel">
                         <div id="vendor-products-list">Loading...</div>
@@ -1057,6 +1058,82 @@
                         </div>
                         <p id="profile-save-status" style="font-size:13px; color:#666; margin-top:8px;"></p>
                     </div>
+
+                    <div class="panel" id="vd-jumia-panel">
+                        <h3 style="margin:0 0 4px;">Applications</h3>
+                        <p style="font-size:12.5px; color:#888; margin:-4px 0 12px;">Connect your Jumia Vendor Center account to push Lizimas products to Jumia and import Jumia products into Lizimas.</p>
+
+                        <div id="vd-jumia-disconnected-view">
+                            <div style="display:flex; flex-direction:column; gap:10px; max-width:420px;">
+                                <div>
+                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Client ID</label>
+                                    <input type="text" id="vd-jumia-client-id" placeholder="Client ID from Jumia Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                </div>
+                                <div>
+                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Client Secret</label>
+                                    <input type="password" id="vd-jumia-client-secret" placeholder="Client Secret from Jumia Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                </div>
+                                <div>
+                                    <button type="button" id="vd-jumia-connect-btn" onclick="vdConnectJumia()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:12px 18px; cursor:pointer; font-weight:600;">Connect to Jumia</button>
+                                </div>
+                                <p id="vd-jumia-help" style="font-size:12.5px; color:#888; margin:0;">Find these under Manage Applications in your Jumia Vendor Center, using a Self Authorization application.</p>
+                            </div>
+                        </div>
+
+                        <div id="vd-jumia-connected-view" hidden>
+                            <div style="display:flex; align-items:flex-start; justify-content:space-between; border:1px solid #eee; border-radius:10px; padding:14px 16px; gap:16px; flex-wrap:wrap;">
+                                <div>
+                                    <div style="font-size:14px; font-weight:600; color:var(--vd-navy);">Jumia <span id="vd-jumia-status-text" style="font-weight:600; color:#16A34A;">&bull; Connected</span></div>
+                                    <div id="vd-jumia-shop-name" style="font-size:12.5px; color:#666; margin-top:2px;"></div>
+                                    <div style="font-size:12.5px; color:#999; margin-top:4px;">Client ID: <span id="vd-jumia-client-id-display" style="font-family:monospace;"></span></div>
+                                </div>
+                                <div style="display:flex; gap:10px;">
+                                    <button type="button" title="Update Secret" onclick="vdShowUpdateJumiaSecret()" style="background:none; border:1px solid #ccc; border-radius:6px; width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                                    </button>
+                                    <button type="button" title="Test Connection" onclick="vdTestJumiaConnection()" style="background:none; border:1px solid #ccc; border-radius:6px; width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    </button>
+                                    <button type="button" title="Disconnect" onclick="vdDisconnectJumia()" style="background:none; border:1px solid #ccc; border-radius:6px; width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div id="vd-jumia-update-secret-view" hidden style="margin-top:12px; max-width:420px; flex-direction:column; gap:10px;">
+                                <div>
+                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">New Client Secret</label>
+                                    <input type="password" id="vd-jumia-new-secret" placeholder="Paste the new Client Secret from Jumia" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                </div>
+                                <div style="display:flex; gap:10px;">
+                                    <button type="button" onclick="vdSaveUpdatedJumiaSecret()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Save New Secret</button>
+                                    <button type="button" onclick="vdCancelUpdateJumiaSecret()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel" id="vd-jumia-sync-panel" hidden>
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                            <h3 style="margin:0;">Product Sync</h3>
+                            <button type="button" onclick="vdShowJumiaImport()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:8px 14px; cursor:pointer; font-size:12.5px; font-weight:600;">Import from Jumia</button>
+                        </div>
+                        <p style="font-size:12.5px; color:#888; margin:-4px 0 12px;">Push products to Jumia from the Manage Products tab by selecting them and choosing "Push to Jumia".</p>
+                        <div id="vd-jumia-links-list"></div>
+                    </div>
+
+                    <div class="panel" id="vd-jumia-import-panel" hidden>
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                            <h3 style="margin:0;">Import from Jumia</h3>
+                            <span id="vd-jumia-import-help" style="font-size:12.5px; color:#666;"></span>
+                        </div>
+                        <div id="vd-jumia-import-list"></div>
+                        <div style="display:flex; gap:10px; margin-top:12px;">
+                            <button type="button" onclick="vdImportSelectedJumiaProducts()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Import Selected</button>
+                            <button type="button" onclick="vdHideJumiaImport()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                        </div>
+                    </div>
+
                     <div class="panel">
                         <h3 style="margin:0 0 10px;">Notices</h3>
                         <div id="vendor-compliance-notices">Loading...</div>
@@ -1087,7 +1164,7 @@
     <script src="../js/category-select.js?v=1"></script>
     <script src="../js/seller-panel.js?v=1"></script>
     <script src="../js/photo-crop.js?v=1"></script>
-    <script src="../js/vendor-dashboard.js?v=18"></script>
+    <script src="../js/vendor-dashboard.js?v=19"></script>
 <script src="../js/vendor-mobile.js?v=2"></script>
 </body>
 </html>

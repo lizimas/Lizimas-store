@@ -225,7 +225,29 @@ function normalizeAxiosError(err, fallbackMessage) {
     const status = err.response ? err.response.status : null;
     const raw = err.response ? err.response.data : null;
     const jumiaMessage = raw && (raw.error_description || raw.message || raw.error);
-    return new JumiaApiError(jumiaMessage || fallbackMessage, { status, raw });
+
+    // The endpoint paths/response shape in this file are unverified against
+    // a real Jumia Application (see the header comment) - so the FIRST live
+    // attempt is likely to fail in a way normalizeAxiosError can't turn into
+    // a friendly message (wrong path -> HTML 404, wrong host, timeout, a
+    // JSON error shape this code doesn't recognize yet). Rather than hide
+    // that behind the generic fallbackMessage, append whatever diagnostic
+    // detail is available directly to the message shown in the vendor UI,
+    // so the exact failure is visible without needing server log access -
+    // essential for correcting the endpoint/field-name guesses afterwards.
+    let message = jumiaMessage || fallbackMessage;
+    if (!jumiaMessage) {
+        if (status) {
+            const bodySnippet = raw ? (typeof raw === "string" ? raw : JSON.stringify(raw)).slice(0, 300) : "";
+            message += ` (Jumia responded with HTTP ${status}${bodySnippet ? ": " + bodySnippet : ""})`;
+        } else if (err.code) {
+            message += ` (${err.code}${err.message ? ": " + err.message : ""})`;
+        } else if (err.message) {
+            message += ` (${err.message})`;
+        }
+    }
+    console.error("[jumiaClient] request failed:", { status, code: err.code || null, raw, originalMessage: err.message });
+    return new JumiaApiError(message, { status, raw });
 }
 
 module.exports = {
