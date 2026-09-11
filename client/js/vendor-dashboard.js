@@ -751,6 +751,101 @@ function parseAndAddVendorSpecs() {
     });
     box.value = "";
 }
+// --- Direct paste into the spec boxes themselves (Ryan: typing a single
+// spec should keep working exactly as before, but pasting a multi-line
+// block straight into a Label or Value box - not just via the separate
+// "Paste from Excel" staging box above - should fan out across rows,
+// spreadsheet-style, adding new rows as needed). Mirrors admin.js's
+// adminDistributeSpecPaste - kept as its own copy, same reason as the
+// rest of this parser (separate pages, no shared bundle). ---
+
+function vendorDistributeSpecPaste(startRowIndex, startCol, text) {
+    const rawLines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (rawLines.length === 0) return;
+
+    function ensureRow(idx) {
+        let rows = document.querySelectorAll("#specs-list > div");
+        while (rows.length <= idx) {
+            addVendorSpecRow();
+            rows = document.querySelectorAll("#specs-list > div");
+        }
+        return rows[idx];
+    }
+
+    function setCell(idx, col, val) {
+        const row = ensureRow(idx);
+        const input = row.querySelector(col === "label" ? ".spec-label-input" : ".spec-value-input");
+        if (input) input.value = val;
+    }
+
+    // Every line has a tab - a normal two-column Excel copy. One full
+    // label+value pair per line, regardless of which box was pasted into.
+    if (rawLines.every(l => l.includes("\t"))) {
+        rawLines.forEach((line, i) => {
+            const [label, ...rest] = line.split("\t");
+            setCell(startRowIndex + i, "label", label.trim());
+            setCell(startRowIndex + i, "value", rest.join(" ").trim());
+        });
+        return;
+    }
+
+    // Every line independently parses via a colon or 2+ spaces - one pair
+    // per line, same rule the "Paste from Excel" box above already uses.
+    if (rawLines.every(l => /:|  +/.test(l))) {
+        rawLines.forEach((line, i) => {
+            const { label, value } = vendorParseSpecLine(line);
+            setCell(startRowIndex + i, "label", label);
+            setCell(startRowIndex + i, "value", value);
+        });
+        return;
+    }
+
+    // Flat list with no reliable per-line separator - e.g. a spec table
+    // copied from a web page where each cell lands on its own line rather
+    // than tab-joined with its neighbour. Pair consecutive lines alternately
+    // as label/value, starting at whichever column was actually pasted into.
+    let row = startRowIndex;
+    let col = startCol;
+    rawLines.forEach((line) => {
+        setCell(row, col, line);
+        if (col === "label") {
+            col = "value";
+        } else {
+            col = "label";
+            row += 1;
+        }
+    });
+}
+
+function setupVendorSpecsPasteHandler() {
+    const list = document.getElementById("specs-list");
+    if (!list || list.dataset.pasteHandlerAttached) return;
+    list.dataset.pasteHandlerAttached = "1";
+    list.addEventListener("paste", (e) => {
+        const target = e.target;
+        if (!target || !target.classList) return;
+        let col = null;
+        if (target.classList.contains("spec-label-input")) col = "label";
+        else if (target.classList.contains("spec-value-input")) col = "value";
+        if (!col) return;
+
+        const text = (e.clipboardData || window.clipboardData).getData("text");
+        if (!text) return;
+        // A single value with no tab and no newline is a normal single-box
+        // paste - let the browser handle it so typing or pasting one spec
+        // at a time keeps working exactly as before.
+        if (!/\t/.test(text) && !/\r?\n/.test(text.trim())) return;
+
+        e.preventDefault();
+        const rows = Array.from(document.querySelectorAll("#specs-list > div"));
+        const row = target.closest("#specs-list > div");
+        const rowIndex = Math.max(0, rows.indexOf(row));
+        vendorDistributeSpecPaste(rowIndex, col, text);
+    });
+}
+
+document.addEventListener("DOMContentLoaded", setupVendorSpecsPasteHandler);
+
 
 async function loadVendorProductSpecs(productId) {
     const list = document.getElementById("specs-list");
