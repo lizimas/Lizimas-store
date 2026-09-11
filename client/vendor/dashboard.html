@@ -44,6 +44,8 @@
                 <button class="vm-bulk-action vm-enabled" onclick="vmBulkAction('deactivate')">Deactivate</button>
                 <span class="vm-bulk-divider"></span>
                 <button class="vm-bulk-action vm-enabled" style="color:#DC2626;" onclick="vmBulkAction('delete')">Delete</button>
+                <span class="vm-bulk-divider"></span>
+                <button class="vm-bulk-action vm-enabled" onclick="vmPushSelectedToJumia()">Push to Jumia</button>
             </div>
         </div>
         <div id="vm-products-list" style="margin:0 14px 90px;"></div>
@@ -73,7 +75,11 @@
                 <button id="vm-shop-active-toggle" class="vm-checkbox" onclick="vmToggleShopActive()"></button>
             </div>
             <div class="vm-list-row vm-muted" style="cursor:default;"><span class="vm-list-row-label">Users</span><span class="vm-badge-soon">Coming soon</span></div>
-            <div class="vm-list-row vm-muted" style="cursor:default;"><span class="vm-list-row-label">Applications</span><span class="vm-badge-soon">Coming soon</span></div>
+            <button class="vm-list-row" onclick="vmShowScreen('jumia')">
+                <span class="vm-list-row-label">Applications</span>
+                <span id="vm-jumia-status-sub" style="font-size:12px; color:#888; margin-right:6px;">Not connected</span>
+                <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
+            </button>
             <div class="vm-list-row vm-muted" style="cursor:default;"><span class="vm-list-row-label">Manage Pickers</span><span class="vm-badge-soon">Coming soon</span></div>
         </div>
         <div class="vm-card" style="padding:4px 16px;">
@@ -136,6 +142,64 @@
         </div>
         <div class="vm-btn-row" id="vm-holiday-off-actions" hidden>
             <button class="vm-btn-primary" style="background:#fff; border:1.5px solid #DC2626; color:#DC2626;" onclick="vmTurnOffHolidayMode()">Turn Off Holiday Mode</button>
+        </div>
+    </div>
+
+    <!-- Applications: Jumia product linking ------------------------------- -->
+    <div class="vm-screen" id="vm-screen-jumia">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Applications</span></div>
+        <div class="vm-card">
+            <div class="vm-card-title">Jumia</div>
+            <div style="font-size:12.5px; color:#444; line-height:1.65; margin-bottom:16px;">
+                Connect your Jumia Vendor Center account to push your Lizimas listings to Jumia, or bring your existing Jumia products into Lizimas. On Jumia, go to Settings &gt; Applications, create an Application, then paste its Client ID and Client Secret below.
+            </div>
+            <div id="vm-jumia-disconnected-view">
+                <div class="vm-field">
+                    <label class="vm-field-label">Jumia Client ID</label>
+                    <input type="text" id="vm-jumia-client-id" class="vm-field-input" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="vm-field">
+                    <label class="vm-field-label">Jumia Client Secret</label>
+                    <input type="password" id="vm-jumia-client-secret" class="vm-field-input" autocomplete="off" spellcheck="false">
+                </div>
+            </div>
+            <div id="vm-jumia-connected-view" hidden>
+                <div style="font-size:13px; color:#555;">Status: <strong id="vm-jumia-status-text" style="color:var(--vm-green-text);">Connected</strong></div>
+                <div id="vm-jumia-shop-name" style="font-size:13px; font-weight:600; color:var(--vm-navy); margin-top:4px;"></div>
+            </div>
+        </div>
+        <div class="vm-btn-row" id="vm-jumia-connect-actions">
+            <button class="vm-btn-primary" id="vm-jumia-connect-btn" onclick="vmConnectJumia()">Connect to Jumia</button>
+            <div class="vm-btn-help" id="vm-jumia-help">Paste your Jumia Client ID and Secret above, then connect.</div>
+        </div>
+        <div class="vm-btn-row" id="vm-jumia-connected-actions" hidden>
+            <button class="vm-btn-primary" onclick="vmTestJumiaConnection()">Test Connection</button>
+            <button class="vm-btn-primary" style="background:#fff; border:1.5px solid #DC2626; color:#DC2626;" onclick="vmDisconnectJumia()">Disconnect</button>
+        </div>
+        <div class="vm-card" id="vm-jumia-sync-card" hidden>
+            <div class="vm-card-title">Product Sync</div>
+            <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:12px;">
+                Push your Lizimas products to Jumia from the Manage Products screen (select products, then "Push to Jumia"), or import your existing Jumia products here.
+            </div>
+            <div class="vm-btn-row" style="margin:0 0 14px;">
+                <button class="vm-btn-primary" style="background:#fff; border:1.5px solid var(--vm-navy); color:var(--vm-navy);" onclick="vmShowScreen('jumia-import')">Import from Jumia</button>
+            </div>
+            <div id="vm-jumia-links-list"></div>
+        </div>
+    </div>
+
+    <!-- Import products from Jumia ----------------------------------------- -->
+    <div class="vm-screen" id="vm-screen-jumia-import">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Import from Jumia</span></div>
+        <div class="vm-card">
+            <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:10px;">
+                Select the Jumia products you want to bring into Lizimas. Imported products come in as pending, the same as any new listing, until approved.
+            </div>
+            <div id="vm-jumia-import-list"><div class="vm-loading-state">Loading...</div></div>
+        </div>
+        <div class="vm-btn-row" id="vm-jumia-import-actions" hidden>
+            <button class="vm-btn-primary" onclick="vmImportSelectedJumiaProducts()">Import Selected</button>
+            <div class="vm-btn-help" id="vm-jumia-import-help"></div>
         </div>
     </div>
 
@@ -998,6 +1062,6 @@
     <script src="../js/seller-panel.js?v=1"></script>
     <script src="../js/photo-crop.js?v=1"></script>
     <script src="../js/vendor-dashboard.js?v=18"></script>
-<script src="../js/vendor-mobile.js?v=1"></script>
+<script src="../js/vendor-mobile.js?v=2"></script>
 </body>
 </html>

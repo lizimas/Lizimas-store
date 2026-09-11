@@ -44,6 +44,11 @@ const {
 
 const { previewPricing } = require("../controllers/commissionController");
 const { getVendorReviews, respondToReview } = require("../controllers/reviewController");
+const {
+    getJumiaConnection, connectJumia, disconnectJumia, testJumiaConnection,
+    getJumiaLinks, pushProductToJumia, pushProductsToJumiaBulk,
+    getJumiaRemoteProducts, importJumiaProducts
+} = require("../controllers/jumiaController");
 
 const { requireAuth, requireVendor } = require("../middleware/authMiddleware");
 const { otpLimiter } = require("../middleware/rateLimiter");
@@ -154,5 +159,19 @@ router.post("/messages/:id/replies", replyToVendorMessage);
 // Lizimas' cut, and the customer-facing price - before the vendor submits
 // anything.
 router.post("/pricing/preview", previewPricing);
+
+// Jumia product linking (Settings > Applications on the vendor side):
+// connect/disconnect a vendor's Jumia Vendor Center Application, push
+// Lizimas listings out to Jumia, and pull existing Jumia listings in.
+// See jumiaClient.js for what is/isn't verified against Jumia's real API.
+router.get("/me/jumia/connection", getJumiaConnection);
+router.post("/me/jumia/connection", connectJumia);
+router.delete("/me/jumia/connection", disconnectJumia);
+router.post("/me/jumia/connection/test", testJumiaConnection);
+router.get("/me/jumia/links", getJumiaLinks);
+router.post("/me/jumia/products/:id/push", pushProductToJumia);
+router.post("/me/jumia/products/push-bulk", pushProductsToJumiaBulk);
+router.get("/me/jumia/remote-products", getJumiaRemoteProducts);
+router.post("/me/jumia/import", importJumiaProducts);
 
 module.exports = router;
