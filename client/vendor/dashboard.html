@@ -560,7 +560,7 @@
                     <h2 class="admin-page-title">My Products</h2>
                     <p class="admin-page-subtitle">Products you've listed. New listings need admin approval before they go live. Deactivating a product pulls it off the storefront without deleting it or losing its approval.</p>
                     <div id="vendor-products-filters" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;"></div>
-                    <div id="vendor-products-bulk-bar" hidden style="display:flex; align-items:center; gap:10px; background:#F0F4FF; border:1px solid #C7D2FE; border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:13px;">
+                    <div id="vendor-products-bulk-bar" hidden style="align-items:center; gap:10px; background:#F0F4FF; border:1px solid #C7D2FE; border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:13px;">
                         <span id="vendor-products-selected-count">0 selected</span>
                         <button onclick="bulkVendorProductAction('activate')" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Activate</button>
                         <button onclick="bulkVendorProductAction('deactivate')" style="background:#B45309; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Deactivate</button>
@@ -570,7 +570,7 @@
                         <div id="vendor-products-list">Loading...</div>
                     </div>
 
-                    <div id="vd-bulk-confirm-overlay" hidden style="position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; display:flex; align-items:center; justify-content:center;">
+                    <div id="vd-bulk-confirm-overlay" hidden style="position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center;">
                         <div style="background:#fff; border-radius:14px; padding:24px; width:420px; max-width:92vw;">
                             <h3 style="margin:0 0 10px; font-size:16px; color:#1a1a2e;">Confirm bulk action</h3>
                             <p id="vd-bulk-confirm-text" style="font-size:13.5px; color:#444; margin:0 0 18px; line-height:1.5;"></p>
@@ -581,7 +581,7 @@
                         </div>
                     </div>
 
-                    <div id="vd-bulk-results-overlay" hidden style="position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; display:flex; align-items:center; justify-content:center;">
+                    <div id="vd-bulk-results-overlay" hidden style="position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center;">
                         <div style="background:#fff; border-radius:14px; padding:24px; width:520px; max-width:94vw; max-height:80vh; overflow-y:auto;">
                             <h3 style="margin:0 0 14px; font-size:16px; color:#1a1a2e;">Bulk action completed</h3>
                             <div id="vd-bulk-results-summary" style="display:flex; gap:16px; margin-bottom:16px; font-size:13px;"></div>

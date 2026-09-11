@@ -579,6 +579,19 @@
     display: flex;
 }
 
+/* Bulk-action overlays: display is driven purely by the `hidden` attribute
+   (no inline display:flex, which would otherwise beat the UA [hidden] rule
+   and leave the modal visible even while hidden) - centering only kicks in
+   once JS clears `hidden`. */
+.vendor-desktop-shell #vd-bulk-confirm-overlay:not([hidden]),
+.vendor-desktop-shell #vd-bulk-results-overlay:not([hidden]) {
+    display: flex;
+}
+
+.vendor-desktop-shell #vendor-products-bulk-bar:not([hidden]) {
+    display: flex;
+}
+
 .vendor-desktop-shell #vd-sidebar-profile-chevron.vd-nav-open {
     transform: rotate(90deg);
 }

@@ -1369,3 +1369,22 @@ accordion auto-expand and the new profile dropdown on an actual vendor
 account; and the Excel-paste parser against real copy/paste output from
 Excel, Google Sheets, and Numbers, which can differ in whitespace and how
 multi-word values are separated.
+
+## Fix: bulk-action overlays and the products bulk bar were ignoring `hidden` (September 2026)
+
+Caught while building an interactive preview of the batch above and actually clicking
+through it for the first time, rather than only running the static syntax/tag-balance
+checks used to verify the earlier commit. Three elements in `client/vendor/dashboard.html`
+combined the `hidden` attribute with an inline `style="display:flex"` - `#vd-bulk-confirm-overlay`,
+`#vd-bulk-results-overlay`, and the pre-existing `#vendor-products-bulk-bar`. An inline
+style always beats the browser's default `[hidden]{display:none}` rule, so all three would
+have rendered permanently visible (the two modals as an unmissable full-screen overlay,
+the bulk bar as a permanent "0 selected" strip) regardless of the `hidden` attribute's
+state - a real regression for the two new modals and a pre-existing bug for the bulk bar,
+neither of which the tag-balance/duplicate-id/id-cross-reference checks used earlier could
+have caught, since it's a runtime rendering behaviour, not a syntax issue.
+
+Fixed by removing `display:flex` from each element's inline style and adding a scoped
+`:not([hidden])` rule to `client/css/vendor-desktop.css` that supplies `display:flex` only
+once the attribute is cleared. No markup structure changed; `node --check`, HTML tag
+balance, and all 204 existing tests still pass.
