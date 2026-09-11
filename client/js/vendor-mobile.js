@@ -494,23 +494,22 @@ async function vmLoadJumia() {
         const disconnectedView = document.getElementById("vm-jumia-disconnected-view");
         const connectedView = document.getElementById("vm-jumia-connected-view");
         const connectActions = document.getElementById("vm-jumia-connect-actions");
-        const connectedActions = document.getElementById("vm-jumia-connected-actions");
         const syncCard = document.getElementById("vm-jumia-sync-card");
+        vmCancelUpdateJumiaSecret();
 
         if (status.connected) {
             disconnectedView.hidden = true;
             connectedView.hidden = false;
             connectActions.hidden = true;
-            connectedActions.hidden = false;
             syncCard.hidden = false;
             document.getElementById("vm-jumia-shop-name").textContent = status.jumia_shop_name || "";
+            document.getElementById("vm-jumia-client-id-display").textContent = status.client_id || "";
             if (sub) sub.textContent = "Connected";
             vmLoadJumiaLinks();
         } else {
             disconnectedView.hidden = false;
             connectedView.hidden = true;
             connectActions.hidden = false;
-            connectedActions.hidden = true;
             syncCard.hidden = true;
             if (sub) sub.textContent = status.connection_status === "error" ? "Connection error" : "Not connected";
             const help = document.getElementById("vm-jumia-help");
@@ -518,6 +517,48 @@ async function vmLoadJumia() {
         }
     } catch (error) {
         console.error("vmLoadJumia error:", error);
+    }
+}
+
+// Rotating the secret (padlock icon on the connected row) - Client ID
+// stays the same, only a new Secret is submitted. Mirrors Jumia's own
+// Applications table, where the secret is never shown in the list and a
+// dedicated icon is how you deal with it - on our side that means
+// re-entering a new one rather than revealing the stored one, since the
+// vendor's secret is encrypted at rest and this app never sends it back
+// to the browser once saved.
+function vmShowUpdateJumiaSecret() {
+    document.getElementById("vm-jumia-update-secret-view").hidden = false;
+    document.getElementById("vm-jumia-update-secret-actions").hidden = false;
+    const input = document.getElementById("vm-jumia-new-secret");
+    input.value = "";
+    input.focus();
+}
+
+function vmCancelUpdateJumiaSecret() {
+    const view = document.getElementById("vm-jumia-update-secret-view");
+    const actions = document.getElementById("vm-jumia-update-secret-actions");
+    if (view) view.hidden = true;
+    if (actions) actions.hidden = true;
+    const input = document.getElementById("vm-jumia-new-secret");
+    if (input) input.value = "";
+}
+
+async function vmSaveUpdatedJumiaSecret() {
+    const newSecret = document.getElementById("vm-jumia-new-secret").value.trim();
+    if (!newSecret) { alert("Enter the new Client Secret first."); return; }
+    if (!vmJumiaConnectionCache.client_id) { alert("Missing Client ID - reconnect from scratch instead."); return; }
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/jumia/connection", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ client_id: vmJumiaConnectionCache.client_id, client_secret: newSecret })
+        });
+        if (result.error) { alert(result.error); return; }
+        vmLoadJumia();
+    } catch (error) {
+        console.error("vmSaveUpdatedJumiaSecret error:", error);
+        alert("Could not update the secret. Please try again.");
     }
 }
 

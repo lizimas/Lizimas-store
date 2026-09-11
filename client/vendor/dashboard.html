@@ -163,18 +163,44 @@
                     <input type="password" id="vm-jumia-client-secret" class="vm-field-input" autocomplete="off" spellcheck="false">
                 </div>
             </div>
+            <!-- Manage Applications row - mirrors Jumia's own Settings > Applications
+                 table (Name / Client ID / Actions), just as a single mobile-width row:
+                 the secret itself is never shown back (it's encrypted at rest and this
+                 app never round-trips it to the browser) - the padlock icon is how you
+                 rotate it, matching Jumia's own "secret hidden behind an icon" pattern. -->
             <div id="vm-jumia-connected-view" hidden>
-                <div style="font-size:13px; color:#555;">Status: <strong id="vm-jumia-status-text" style="color:var(--vm-green-text);">Connected</strong></div>
-                <div id="vm-jumia-shop-name" style="font-size:13px; font-weight:600; color:var(--vm-navy); margin-top:4px;"></div>
+                <div style="display:flex; align-items:flex-start; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee;">
+                    <div>
+                        <div style="font-size:13px; font-weight:600; color:var(--vm-navy);">Jumia <span id="vm-jumia-status-text" style="font-size:11px; font-weight:600; color:var(--vm-green-text); margin-left:2px;">&bull; Connected</span></div>
+                        <div id="vm-jumia-shop-name" style="font-size:12px; color:#666; margin-top:2px;"></div>
+                        <div style="font-size:11.5px; color:#999; margin-top:2px;">Client ID: <span id="vm-jumia-client-id-display" style="font-family:monospace;"></span></div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:12px; flex-shrink:0; margin-left:10px;">
+                        <button type="button" title="Update Secret" onclick="vmShowUpdateJumiaSecret()" style="background:none; border:none; cursor:pointer; padding:4px; color:#B45309; display:flex;">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        </button>
+                        <button type="button" title="Disconnect" onclick="vmDisconnectJumia()" style="background:none; border:none; cursor:pointer; padding:4px; color:#DC2626; display:flex;">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <button type="button" onclick="vmTestJumiaConnection()" style="background:none; border:none; padding:8px 0 0; color:var(--vm-navy); font-size:12.5px; font-weight:600; cursor:pointer;">Test Connection</button>
+            </div>
+            <!-- Rotate secret: Client ID doesn't change, only a new Secret is pasted. -->
+            <div id="vm-jumia-update-secret-view" hidden style="margin-top:6px; padding-top:12px; border-top:1px solid #eee;">
+                <div class="vm-field">
+                    <label class="vm-field-label">New Jumia Client Secret</label>
+                    <input type="password" id="vm-jumia-new-secret" class="vm-field-input" autocomplete="off" spellcheck="false">
+                </div>
             </div>
         </div>
         <div class="vm-btn-row" id="vm-jumia-connect-actions">
             <button class="vm-btn-primary" id="vm-jumia-connect-btn" onclick="vmConnectJumia()">Connect to Jumia</button>
             <div class="vm-btn-help" id="vm-jumia-help">Paste your Jumia Client ID and Secret above, then connect.</div>
         </div>
-        <div class="vm-btn-row" id="vm-jumia-connected-actions" hidden>
-            <button class="vm-btn-primary" onclick="vmTestJumiaConnection()">Test Connection</button>
-            <button class="vm-btn-primary" style="background:#fff; border:1.5px solid #DC2626; color:#DC2626;" onclick="vmDisconnectJumia()">Disconnect</button>
+        <div class="vm-btn-row" id="vm-jumia-update-secret-actions" hidden>
+            <button class="vm-btn-primary" onclick="vmSaveUpdatedJumiaSecret()">Save New Secret</button>
+            <button class="vm-btn-primary" style="background:#fff; border:1.5px solid var(--vm-navy); color:var(--vm-navy);" onclick="vmCancelUpdateJumiaSecret()">Cancel</button>
         </div>
         <div class="vm-card" id="vm-jumia-sync-card" hidden>
             <div class="vm-card-title">Product Sync</div>
