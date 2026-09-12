@@ -523,7 +523,9 @@
                                     <span>Sales Overview</span>
                                     <a href="#" onclick="document.querySelector('.tab-btn[data-tab=\'reports\']').click(); return false;">View Reports</a>
                                 </h3>
-                                <canvas id="vd-sales-overview-chart" height="90"></canvas>
+                                <div class="vd-chart-container">
+                                    <canvas id="vd-sales-overview-chart"></canvas>
+                                </div>
                             </div>
 
                             <div class="vd-card">
@@ -997,7 +999,9 @@
                     <p class="admin-page-subtitle">Sales, orders and payouts over the last 30 days.</p>
                     <div class="panel">
                         <h3 style="margin:0 0 10px;">Daily Sales</h3>
-                        <canvas id="vendor-reports-chart" height="90"></canvas>
+                        <div class="vd-chart-container">
+                            <canvas id="vendor-reports-chart"></canvas>
+                        </div>
                     </div>
                     <div class="panel">
                         <h3 style="margin:0 0 10px;">Top Products</h3>

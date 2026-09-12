@@ -297,6 +297,22 @@
     margin-bottom: 18px;
 }
 
+/* Chart.js with maintainAspectRatio:false needs a positioned, height-bounded
+   parent - without one the canvas has no determinate height to fill (its own
+   container only shrink-wraps around it) and can render as a huge, empty
+   chart with the axis stuck at "1.0" (Ryan caught this live on both the
+   Overview and Reports tabs, Sept 2026). Used by both vd-sales-overview-chart
+   and vendor-reports-chart. */
+.vendor-desktop-shell .vd-chart-container {
+    position: relative;
+    height: 260px;
+}
+
+.vendor-desktop-shell .vd-chart-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
 .vendor-desktop-shell .vd-card-title {
     font-size: 14.5px;
     font-weight: 700;
