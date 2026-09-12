@@ -11,4 +11,11 @@ BEGIN;
 
 ALTER TABLE vendor_registration_otp ADD COLUMN IF NOT EXISTS alerted_at TIMESTAMPTZ;
 
+INSERT INTO public.schema_migrations (filename, note)
+VALUES (
+    '086_vendor_registration_abandonment_alert.sql',
+    'Adds alerted_at to vendor_registration_otp so the vendor-signup-abandonment sweep job (server/jobs/vendorSignupAbandonment.js) alerts Ryan and the applicant at most once per abandoned attempt.'
+)
+ON CONFLICT (filename) DO NOTHING;
+
 COMMIT;
