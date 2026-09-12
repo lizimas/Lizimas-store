@@ -1,7 +1,7 @@
 'use strict';
 
 const pool = require('../config/database');
-const { sendVendorSignupAbandonedAlert } = require('../utils/mailer');
+const { sendVendorSignupAbandonedAlert, sendVendorSignupReminderEmail } = require('../utils/mailer');
 
 /**
  * Vendor registration is a multi-step wizard (verify email -> fill in
@@ -13,9 +13,13 @@ const { sendVendorSignupAbandonedAlert } = require('../utils/mailer');
  *
  * So: any row that's been sitting there longer than ABANDONED_AFTER_MS,
  * with nothing sent for it yet, is by definition someone who started and
- * never finished. Alert Ryan once per attempt (alerted_at marks it done;
- * requesting a fresh code resets alerted_at so a second abandoned attempt
- * later still gets its own alert - see authController.js).
+ * never finished. Each such row gets two emails, once: an alert to Ryan
+ * (so he can follow up), and a reminder to the applicant themselves - it's
+ * common for this to be a dropped connection rather than a change of mind,
+ * so the reminder says as much and points them back to the registration
+ * page. alerted_at marks a row as done; requesting a fresh code resets it
+ * so a second abandoned attempt later still gets its own round of emails
+ * - see authController.js.
  *
  * Runs on the same web dyno as the reconciler, on a much slower tick - this
  * is a same-day follow-up nudge, not something that needs second-level
@@ -45,11 +49,17 @@ async function claimAbandonedBatch(client) {
 }
 
 async function alertOne(client, row) {
+    // Ryan's alert isn't wrapped here on purpose: if it throws (a transient
+    // email-send error), the whole row is left unalerted and retried next
+    // tick, same as before. The applicant's reminder below catches its own
+    // errors internally (sendVendorSignupReminderEmail), so a hiccup there
+    // doesn't also block Ryan's alert from ever being recorded as sent.
     await sendVendorSignupAbandonedAlert({
         email: row.email,
         startedAt: new Date(row.created_at).toLocaleString('en-GB', { timeZone: 'Africa/Kampala' }),
         verified: !!row.verified_at
     });
+    await sendVendorSignupReminderEmail(row.email);
     await client.query(
         'UPDATE vendor_registration_otp SET alerted_at = NOW() WHERE email = $1',
         [row.email]

@@ -537,6 +537,37 @@ async function sendVendorApplicationReceivedEmail(email, name, businessName) {
     }
 }
 
+async function sendVendorSignupReminderEmail(email) {
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: "Finish setting up your Lizimas Store vendor account",
+            text: renderCustomerText([
+                "Hi,",
+                "",
+                "We noticed you started registering to sell on Lizimas Store but didn't finish - this sometimes happens if your internet connection drops partway through.",
+                "",
+                "If you'd still like to sell with us, please go back and complete your registration. You'll need to verify your email again since the earlier verification code has expired.",
+                "",
+                "If you didn't mean to start this, you can safely ignore this email."
+            ]),
+            html: renderCustomerEmail({
+                title: "Pick up where you left off",
+                bodyHtml: `
+<p style="margin:0 0 12px">Hi,</p>
+<p style="margin:0 0 12px">We noticed you started registering to sell on Lizimas Store but didn't finish - this sometimes happens if your internet connection drops partway through.</p>
+<p style="margin:0 0 12px">If you'd still like to sell with us, please go back and complete your registration. You'll need to verify your email again since the earlier verification code has expired.</p>
+<p style="margin:0;color:#777;font-size:13px">If you didn't mean to start this, you can safely ignore this email.</p>`,
+                ctaUrl: `${BRAND.site}/vendor-register.html`,
+                ctaText: "Complete your registration"
+            })
+        });
+    } catch (error) {
+        console.error("Vendor signup reminder email error:", error);
+    }
+}
+
 async function sendAccountBlockedEmail(email, name) {
     try {
         await transporter.sendMail({
@@ -872,4 +903,4 @@ async function sendStaffMessageAlert(details) {
     }
 }
 
-module.exports = { sendOrderConfirmationEmail, sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert, sendPerformanceReportEmail, sendStaffMessageAlert, sendDataDeletionAlert, sendVendorApplicationReceivedEmail, sendVendorSignupAbandonedAlert };
+module.exports = { sendOrderConfirmationEmail, sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert, sendPerformanceReportEmail, sendStaffMessageAlert, sendDataDeletionAlert, sendVendorApplicationReceivedEmail, sendVendorSignupAbandonedAlert, sendVendorSignupReminderEmail };
