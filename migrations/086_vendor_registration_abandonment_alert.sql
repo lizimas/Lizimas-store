@@ -6,4 +6,9 @@
 -- Reset to NULL whenever a fresh code is requested for that email
 -- (authController.js), so a second abandoned attempt later is still
 -- eligible for its own alert.
+
+BEGIN;
+
 ALTER TABLE vendor_registration_otp ADD COLUMN IF NOT EXISTS alerted_at TIMESTAMPTZ;
+
+COMMIT;
