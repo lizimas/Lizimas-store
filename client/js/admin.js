@@ -8094,6 +8094,7 @@ async function openVendorKycReviewModal(vendorId) {
                     <tr><td style="font-weight:600; padding:4px 12px 4px 0;">Account Type</td><td>${detail.account_type === "company" ? "Company" : "Individual"}</td></tr>
                 </tbody>
             </table>
+            ${detail.account_type === "company" ? renderUrsbSection(detail, vendorId) : ""}
             ${transitionButtons.length > 0 ? `
                 <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Move to:</label>
                 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
@@ -8130,13 +8131,85 @@ async function reviewVendorKyc(vendorId, newStatus) {
         });
         const data = await res.json();
         if (data.error) {
-            alert(data.error);
+            alert(data.message || data.error);
             return;
         }
         closeGenericModal();
         loadVendorKycAdmin();
     } catch (error) {
         console.error("Review vendor KYC error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+// URSB verification panel - shown in the KYC modal only for company
+// vendors. The admin opens URSB's eRegistry in a new tab, searches the
+// registration number manually, then records the outcome here. Required
+// before kyc_status can be set to 'verified' for a company vendor.
+function renderUrsbSection(detail, vendorId) {
+    const regNum = detail.registration_number || "-";
+    const isVerified = detail.ursb_verified === true;
+    const isChecked = detail.ursb_verified !== null && detail.ursb_verified !== undefined;
+
+    let statusLine = "Not yet checked";
+    let statusColor = "#6b7280";
+    if (isChecked) {
+        statusLine = isVerified ? "Verified ✓" : "Not verified ✗";
+        statusColor = isVerified ? "#059669" : "#dc2626";
+    }
+
+    const whenLine = detail.ursb_verified_at
+        ? ` — ${new Date(detail.ursb_verified_at).toLocaleString()}`
+        : "";
+
+    const evidenceLine = detail.ursb_evidence_url
+        ? `<br><a href="${detail.ursb_evidence_url}" target="_blank" rel="noopener" style="font-size:12px; color:#16264f;">View evidence</a>`
+        : "";
+
+    return `
+        <div style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:12px; margin-bottom:14px;">
+            <h3 style="font-size:14px; margin:0 0 8px 0;">URSB Verification</h3>
+            <div style="font-size:13px; margin-bottom:6px;">
+                Registration Number: <strong>${regNum}</strong>
+            </div>
+            <div style="font-size:13px; margin-bottom:10px;">
+                Status: <strong style="color:${statusColor};">${statusLine}${whenLine}</strong>
+                ${evidenceLine}
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                <a href="https://eregistry.ursb.go.ug" target="_blank" rel="noopener" style="display:inline-block; background:#16264f; color:#fff; text-decoration:none; border-radius:6px; padding:6px 12px; font-size:12px;">Open URSB eRegistry</a>
+            </div>
+            <label style="font-size:12px; font-weight:600; display:block; margin-bottom:4px;">Evidence URL (optional)</label>
+            <input type="text" id="ursb-evidence-input" placeholder="Link to URSB search result" value="${detail.ursb_evidence_url || ""}" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box; margin-bottom:10px; font-size:12px;">
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button onclick="saveVendorUrsbCheck(${vendorId}, true)" style="background:#059669; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;">Mark URSB-verified</button>
+                <button onclick="saveVendorUrsbCheck(${vendorId}, false)" style="background:#dc2626; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;">Mark NOT verified</button>
+            </div>
+            ${isChecked && !isVerified ? `<p style="font-size:12px; color:#b91c1c; margin-top:8px;">This vendor cannot be marked Verified until URSB confirms the registration number.</p>` : ""}
+        </div>
+    `;
+}
+
+async function saveVendorUrsbCheck(vendorId, ursbVerified) {
+    const evidenceEl = document.getElementById("ursb-evidence-input");
+    const evidence = evidenceEl ? evidenceEl.value.trim() : "";
+
+    try {
+        const token = getToken();
+        const res = await fetch(`${API_URL}/api/admin/vendors/${vendorId}/kyc/ursb`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ ursb_verified: ursbVerified, ursb_evidence_url: evidence || null })
+        });
+        const data = await res.json();
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        closeGenericModal();
+        loadVendorKycAdmin();
+    } catch (error) {
+        console.error("Save URSB check error:", error);
         alert("Something went wrong.");
     }
 }

@@ -1044,9 +1044,14 @@ exports.getVendorPayoutRequests = async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT vp.id, vp.vendor_id, vp.amount, vp.method, vp.momo_number, vp.status,
-                    vp.requested_at, v.business_name, v.phone
+                    vp.requested_at, v.business_name, v.phone, v.payout_frozen,
+                    COALESCE(k.kyc_status, 'not_started') AS kyc_status,
+                    (COALESCE(k.kyc_status, 'not_started') = 'verified'
+                     AND v.payout_frozen = false
+                     AND v.status != 'suspended') AS payout_eligible
              FROM vendor_payouts vp
              JOIN vendors v ON v.id = vp.vendor_id
+             LEFT JOIN vendor_kyc k ON k.vendor_id = v.id
              WHERE vp.status = 'requested'
              ORDER BY vp.requested_at ASC`
         );
@@ -1057,10 +1062,50 @@ exports.getVendorPayoutRequests = async (req, res) => {
 };
 
 // Admin confirms the MoMo transfer was actually sent.
+// Blocked if the vendor's KYC is not verified, payouts are frozen,
+// or the vendor is suspended.
 exports.markVendorPayoutPaid = async (req, res) => {
     try {
         const { id } = req.params;
         const { reference, notes } = req.body;
+
+        const guard = await pool.query(
+            `SELECT vp.status AS payout_status, v.payout_frozen,
+                    v.status AS vendor_status,
+                    COALESCE(k.kyc_status, 'not_started') AS kyc_status
+             FROM vendor_payouts vp
+             JOIN vendors v ON v.id = vp.vendor_id
+             LEFT JOIN vendor_kyc k ON k.vendor_id = v.id
+             WHERE vp.id = $1`,
+            [id]
+        );
+        if (guard.rows.length === 0) {
+            return res.status(404).json({ error: "Payout request not found." });
+        }
+        const g = guard.rows[0];
+
+        if (g.payout_status !== "requested") {
+            return res.status(409).json({ error: "Payout request is not awaiting payment." });
+        }
+        if (g.kyc_status !== "verified") {
+            return res.status(409).json({
+                error: "kyc_not_verified",
+                message: `Cannot approve payout: KYC status is "${g.kyc_status}". Must be "verified".`
+            });
+        }
+        if (g.payout_frozen) {
+            return res.status(409).json({
+                error: "payouts_frozen",
+                message: "Cannot approve payout: this vendor's payouts are frozen."
+            });
+        }
+        if (g.vendor_status === "suspended") {
+            return res.status(409).json({
+                error: "vendor_suspended",
+                message: "Cannot approve payout: this vendor is suspended."
+            });
+        }
+
         const result = await pool.query(
             `UPDATE vendor_payouts
              SET status = 'paid', paid_at = now(), paid_by = $1, reference = $2, notes = $3

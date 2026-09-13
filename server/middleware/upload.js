@@ -92,6 +92,39 @@ const chatAttachment = multer({
     limits: { fileSize: CHAT_ATTACHMENT_MAX_BYTES }
 });
 
+
+// Vendor KYC document upload (national ID photo or business registration
+// proof). Images or PDF - a registration certificate is often scanned as a
+// PDF, unlike every other upload instance above, which is image-only.
+// Kept separate so this allowlist (and its private-Cloudinary-delivery
+// destination, unlike every other instance here) never leaks into product,
+// promo, or chat uploads.
+const KYC_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
+
+const kycDocumentFilter = (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const mime = (file.mimetype || "").toLowerCase();
+
+    const imageOk = /\.(jpe?g|png|webp)$/.test(ext)
+        || /^image\/(jpeg|jpg|png|webp)$/.test(mime);
+    const pdfOk = /\.pdf$/.test(ext) || mime === "application/pdf";
+
+    if (imageOk || pdfOk) {
+        cb(null, true);
+    } else {
+        const err = new Error(
+            "Upload a .jpg, .png, .webp image, or a .pdf file.");
+        err.code = "INVALID_FILE_TYPE";
+        cb(err);
+    }
+};
+
+const kycDocument = multer({
+    storage,
+    fileFilter: kycDocumentFilter,
+    limits: { fileSize: KYC_DOCUMENT_MAX_BYTES }
+});
+
 module.exports = upload;
 // Attached rather than exported as an object so every existing
 // `require("../middleware/upload")` call site keeps working unchanged.
@@ -100,3 +133,6 @@ module.exports.PROMO_MEDIA_MAX_BYTES = PROMO_MEDIA_MAX_BYTES;
 
 module.exports.chatAttachment = chatAttachment;
 module.exports.CHAT_ATTACHMENT_MAX_BYTES = CHAT_ATTACHMENT_MAX_BYTES;
+
+module.exports.kycDocument = kycDocument;
+module.exports.KYC_DOCUMENT_MAX_BYTES = KYC_DOCUMENT_MAX_BYTES;

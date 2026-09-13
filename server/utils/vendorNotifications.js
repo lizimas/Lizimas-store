@@ -6,7 +6,8 @@
 
 const NOTIFICATION_TYPES = [
     "new_order", "low_stock", "product_approved", "product_rejected",
-    "compliance_action", "payout_update", "refund_decision", "admin_message"
+    "compliance_action", "payout_update", "refund_decision", "admin_message",
+    "kyc_status_change"
 ];
 
 // Matches the `stock < 10` threshold getVendorDashboardSummary already
@@ -73,6 +74,24 @@ function buildNotification(type, context = {}) {
                 message: context.subject ? `Reply on: ${context.subject}` : "You have a new reply on your message.",
                 linkTab: "messages"
             };
+        case "kyc_status_change": {
+            const labels = {
+                submitted: "submitted",
+                under_review: "under review",
+                action_required: "needs more information",
+                verified: "verified",
+                rejected: "rejected",
+                suspended: "suspended"
+            };
+            const statusLabel = labels[context.status] || context.status;
+            return {
+                title: `KYC status: ${statusLabel}`,
+                message: context.note
+                    ? `Your KYC submission: ${statusLabel}. Note: ${context.note}`
+                    : `Your KYC submission: ${statusLabel}.`,
+                linkTab: "kyc"
+            };
+        }
         default:
             return null;
     }

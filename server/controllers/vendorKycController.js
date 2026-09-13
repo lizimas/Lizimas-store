@@ -18,6 +18,8 @@ const pool = require("../config/database");
 const { encryptField, decryptField, hashForLookup } = require("../utils/encryption");
 const { isValidAdminKycTransition, canVendorEditKyc } = require("../utils/vendorKyc");
 const { logActivity } = require("../utils/activityLog");
+const { uploadPrivateDocument, privateDocumentViewUrl, destroyPrivateDocument } = require("../utils/cloudinaryUpload");
+const { createVendorNotification } = require("./vendorController");
 
 // --- Vendor-self ------------------------------------------------------------
 
@@ -42,6 +44,12 @@ exports.getMyKyc = async (req, res) => {
             [vendor.id]
         );
 
+        const docRows = await pool.query(
+            `SELECT document_type, original_filename, uploaded_at
+             FROM vendor_kyc_documents WHERE vendor_id = $1`,
+            [vendor.id]
+        );
+
         if (kycRow.rows.length === 0) {
             return res.json({
                 kyc_status: "not_started",
@@ -52,7 +60,8 @@ exports.getMyKyc = async (req, res) => {
                 registration_number: null,
                 review_note: null,
                 reviewed_at: null,
-                editable: true
+                editable: true,
+                documents: docRows.rows
             });
         }
 
@@ -66,7 +75,8 @@ exports.getMyKyc = async (req, res) => {
             registration_number: decryptField(kyc.registration_number_enc),
             review_note: kyc.review_note,
             reviewed_at: kyc.reviewed_at,
-            editable: canVendorEditKyc(kyc.kyc_status)
+            editable: canVendorEditKyc(kyc.kyc_status),
+            documents: docRows.rows
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -107,6 +117,19 @@ exports.updateMyKyc = async (req, res) => {
         }
         if (vendor.account_type === "individual" && !national_id_number) {
             return res.status(400).json({ error: "National ID number is required." });
+        }
+
+        const requiredDocType = vendor.account_type === "company" ? "business_registration" : "national_id";
+        const docCheck = await pool.query(
+            "SELECT 1 FROM vendor_kyc_documents WHERE vendor_id = $1 AND document_type = $2",
+            [vendor.id, requiredDocType]
+        );
+        if (docCheck.rows.length === 0) {
+            return res.status(400).json({
+                error: vendor.account_type === "company"
+                    ? "Upload your business registration document before submitting."
+                    : "Upload a photo of your national ID before submitting."
+            });
         }
 
         const natIdHash = hashForLookup(national_id_number);
@@ -168,6 +191,112 @@ exports.updateMyKyc = async (req, res) => {
     }
 };
 
+// Vendor uploads (or replaces) the document backing their KYC submission.
+// document_type must match what their account_type actually requires -
+// an individual can't upload a "business_registration" document and vice
+// versa. Only allowed while KYC itself is still editable (same rule as
+// updateMyKyc), so a verified/in-review vendor can't swap their evidence
+// out from under an in-flight or completed review. Stored privately in
+// Cloudinary (see server/utils/cloudinaryUpload.js) - never publicly
+// reachable like every other upload in this codebase.
+exports.uploadMyKycDocument = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No file uploaded." });
+        }
+
+        const vendorRow = await pool.query(
+            "SELECT id, account_type FROM vendors WHERE user_id = $1",
+            [req.user.userId]
+        );
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendor = vendorRow.rows[0];
+
+        const existing = await pool.query(
+            "SELECT kyc_status FROM vendor_kyc WHERE vendor_id = $1",
+            [vendor.id]
+        );
+        const currentStatus = existing.rows.length > 0 ? existing.rows[0].kyc_status : "not_started";
+        if (!canVendorEditKyc(currentStatus)) {
+            return res.status(409).json({
+                error: `Documents can't be changed while your KYC is ${currentStatus.replace(/_/g, " ")}. Contact support if something needs correcting.`
+            });
+        }
+
+        const documentType = req.body.document_type;
+        const expectedType = vendor.account_type === "company" ? "business_registration" : "national_id";
+        if (documentType !== expectedType) {
+            return res.status(400).json({ error: `Expected a ${expectedType.replace("_", " ")} document for this account type.` });
+        }
+
+        const priorRow = await pool.query(
+            "SELECT cloudinary_public_id, resource_type FROM vendor_kyc_documents WHERE vendor_id = $1 AND document_type = $2",
+            [vendor.id, documentType]
+        );
+
+        const uploaded = await uploadPrivateDocument(req.file.buffer, req.file.originalname);
+
+        await pool.query(
+            `INSERT INTO vendor_kyc_documents (vendor_id, document_type, cloudinary_public_id, resource_type, format, original_filename, bytes)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT (vendor_id, document_type) DO UPDATE SET
+                cloudinary_public_id = $3,
+                resource_type = $4,
+                format = $5,
+                original_filename = $6,
+                bytes = $7,
+                uploaded_at = now()`,
+            [vendor.id, documentType, uploaded.public_id, uploaded.resource_type, uploaded.format, req.file.originalname, uploaded.bytes]
+        );
+
+        // Best-effort cleanup of the replaced asset - never let a Cloudinary
+        // hiccup here block the new document from being saved (already is).
+        if (priorRow.rows.length > 0) {
+            destroyPrivateDocument(priorRow.rows[0].cloudinary_public_id, priorRow.rows[0].resource_type)
+                .catch((err) => console.error("Failed to clean up replaced KYC document:", err.message));
+        }
+
+        res.json({ message: "Document uploaded.", document_type: documentType });
+    } catch (error) {
+        if (error.code === "INVALID_FILE_TYPE") {
+            return res.status(400).json({ error: error.message });
+        }
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Vendor requests a fresh signed URL to view their own already-uploaded
+// document. The URL expires in ~5 minutes - callers must fetch a new one
+// on every view rather than storing it anywhere.
+exports.getMyKycDocumentUrl = async (req, res) => {
+    try {
+        const { document_type } = req.query;
+        const vendorRow = await pool.query(
+            "SELECT id FROM vendors WHERE user_id = $1",
+            [req.user.userId]
+        );
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+
+        const docRow = await pool.query(
+            "SELECT cloudinary_public_id, resource_type, format FROM vendor_kyc_documents WHERE vendor_id = $1 AND document_type = $2",
+            [vendorRow.rows[0].id, document_type]
+        );
+        if (docRow.rows.length === 0) {
+            return res.status(404).json({ error: "No document on file." });
+        }
+
+        const doc = docRow.rows[0];
+        const url = privateDocumentViewUrl(doc.cloudinary_public_id, doc.resource_type, doc.format);
+        res.json({ url });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 // --- Admin -------------------------------------------------------------
 
 // List every vendor with their KYC status (optionally filtered by
@@ -224,7 +353,8 @@ exports.getVendorKycAdminDetail = async (req, res) => {
 
         const kycRow = await pool.query(
             `SELECT kyc_status, identity_verified, business_verified, national_id_number_enc,
-                    registration_number_enc, review_note, reviewed_by, reviewed_at, created_at, updated_at
+                    registration_number_enc, review_note, reviewed_by, reviewed_at, created_at, updated_at,
+                    ursb_verified, ursb_verified_at, ursb_verified_by, ursb_evidence_url
              FROM vendor_kyc WHERE vendor_id = $1`,
             [id]
         );
@@ -234,6 +364,11 @@ exports.getVendorKycAdminDetail = async (req, res) => {
              LEFT JOIN users u ON u.id = a.changed_by
              WHERE a.vendor_id = $1
              ORDER BY a.created_at DESC`,
+            [id]
+        );
+        const docRows = await pool.query(
+            `SELECT document_type, original_filename, uploaded_at
+             FROM vendor_kyc_documents WHERE vendor_id = $1`,
             [id]
         );
 
@@ -254,6 +389,11 @@ exports.getVendorKycAdminDetail = async (req, res) => {
             registration_number: kyc ? decryptField(kyc.registration_number_enc) : null,
             review_note: kyc ? kyc.review_note : null,
             reviewed_at: kyc ? kyc.reviewed_at : null,
+            ursb_verified: kyc ? kyc.ursb_verified : null,
+            ursb_verified_at: kyc ? kyc.ursb_verified_at : null,
+            ursb_verified_by: kyc ? kyc.ursb_verified_by : null,
+            ursb_evidence_url: kyc ? kyc.ursb_evidence_url : null,
+            documents: docRows.rows,
             audit_log: auditRows.rows
         });
     } catch (error) {
@@ -286,6 +426,22 @@ exports.reviewVendorKycAdmin = async (req, res) => {
             return res.status(400).json({ error: `Can't move KYC status from ${currentStatus} to ${kyc_status}.` });
         }
 
+        // Company vendors must have URSB verification recorded before they
+        // can be marked verified (see migration 091).
+        if (kyc_status === "verified" && vendor.account_type === "company") {
+            const ursbRow = await pool.query(
+                "SELECT ursb_verified FROM vendor_kyc WHERE vendor_id = $1",
+                [id]
+            );
+            const ursb = ursbRow.rows[0] ? ursbRow.rows[0].ursb_verified : null;
+            if (ursb !== true) {
+                return res.status(409).json({
+                    error: "ursb_not_verified",
+                    message: "Cannot mark this company vendor as verified: URSB registration check has not been confirmed. Use the URSB verification panel first."
+                });
+            }
+        }
+
         const identityVerified = kyc_status === "verified" && vendor.account_type === "individual";
         const businessVerified = kyc_status === "verified" && vendor.account_type === "company";
 
@@ -308,6 +464,11 @@ exports.reviewVendorKycAdmin = async (req, res) => {
             [id, currentStatus, kyc_status, req.user.userId, note || null]
         );
 
+        await createVendorNotification(id, "kyc_status_change", {
+            status: kyc_status,
+            note: note || null
+        });
+
         logActivity(req.user.userId, "vendor_kyc_review", "vendor", id, `KYC ${currentStatus} -> ${kyc_status}`);
 
         res.json({ message: "KYC status updated.", kyc_status });
@@ -315,6 +476,86 @@ exports.reviewVendorKycAdmin = async (req, res) => {
         if (error.code === "23505") {
             return res.status(409).json({ error: "Can't mark verified: this ID/registration number is already verified on another vendor account." });
         }
+        res.status(500).json({ error: error.message });
+    }
+};
+// Admin views a vendor's uploaded KYC document via a freshly-minted signed
+// URL - never a stored/static link, and this is the only path (besides the
+// vendor's own getMyKycDocumentUrl) that can ever reach the document's
+// content. getPublicStorefront never joins this table.
+exports.getVendorKycDocumentAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { document_type } = req.query;
+
+        const docRow = await pool.query(
+            "SELECT cloudinary_public_id, resource_type, format FROM vendor_kyc_documents WHERE vendor_id = $1 AND document_type = $2",
+            [id, document_type]
+        );
+        if (docRow.rows.length === 0) {
+            return res.status(404).json({ error: "No document on file." });
+        }
+
+        const doc = docRow.rows[0];
+        const url = privateDocumentViewUrl(doc.cloudinary_public_id, doc.resource_type, doc.format);
+        res.json({ url });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Record the outcome of a manual URSB eRegistry lookup for a company
+// vendor. Required before kyc_status can become 'verified' when the
+// vendor's account_type is 'company'. Individual vendors are unaffected.
+exports.updateVendorUrsbVerification = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { ursb_verified, ursb_evidence_url } = req.body;
+
+        if (typeof ursb_verified !== "boolean") {
+            return res.status(400).json({ error: "ursb_verified must be true or false." });
+        }
+
+        const vendorRow = await pool.query("SELECT id, account_type FROM vendors WHERE id = $1", [id]);
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "Vendor not found." });
+        }
+        const vendor = vendorRow.rows[0];
+        if (vendor.account_type !== "company") {
+            return res.status(400).json({ error: "URSB verification only applies to company vendors." });
+        }
+
+        const existing = await pool.query("SELECT vendor_id FROM vendor_kyc WHERE vendor_id = $1", [id]);
+        if (existing.rows.length === 0) {
+            return res.status(409).json({ error: "This vendor hasn't submitted any KYC information yet." });
+        }
+
+        await pool.query(
+            `UPDATE vendor_kyc SET
+                ursb_verified = $1,
+                ursb_verified_at = now(),
+                ursb_verified_by = $2,
+                ursb_evidence_url = $3,
+                updated_at = now()
+             WHERE vendor_id = $4`,
+            [ursb_verified, req.user.userId, ursb_evidence_url || null, id]
+        );
+
+        await pool.query(
+            `INSERT INTO vendor_kyc_audit_log (vendor_id, from_status, to_status, changed_by, note)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [id,
+             (await pool.query("SELECT kyc_status FROM vendor_kyc WHERE vendor_id = $1", [id])).rows[0].kyc_status,
+             (await pool.query("SELECT kyc_status FROM vendor_kyc WHERE vendor_id = $1", [id])).rows[0].kyc_status,
+             req.user.userId,
+             `URSB check: ${ursb_verified ? "verified" : "NOT verified"}${ursb_evidence_url ? " - " + ursb_evidence_url : ""}`]
+        );
+
+        logActivity(req.user.userId, "vendor_kyc_ursb_check", "vendor", id,
+            `URSB check recorded: ${ursb_verified ? "verified" : "not verified"}`);
+
+        res.json({ message: "URSB verification recorded.", ursb_verified });
+    } catch (error) {
         res.status(500).json({ error: error.message });
     }
 };

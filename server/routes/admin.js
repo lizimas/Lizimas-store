@@ -102,7 +102,8 @@ const {
     unescalateVendorMessageAdmin
 } = require("../controllers/vendorController");
 const {
-    listVendorKycAdmin, getVendorKycAdminDetail, reviewVendorKycAdmin
+    listVendorKycAdmin, getVendorKycAdminDetail, reviewVendorKycAdmin,
+    updateVendorUrsbVerification
 } = require("../controllers/vendorKycController");
 
 const {
@@ -242,6 +243,7 @@ router.patch("/vendors/:id/reject", rejectVendor);
 router.get("/vendors/kyc", listVendorKycAdmin);
 router.get("/vendors/:id/kyc", getVendorKycAdminDetail);
 router.patch("/vendors/:id/kyc/review", reviewVendorKycAdmin);
+router.patch("/vendors/:id/kyc/ursb", updateVendorUrsbVerification);
 
 // Vendor Wallet & Payouts (Task #61).
 router.get("/vendor-payouts", getVendorPayoutRequests);

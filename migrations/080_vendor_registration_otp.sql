@@ -21,3 +21,7 @@ CREATE TABLE IF NOT EXISTS vendor_registration_otp (
 );
 
 CREATE INDEX IF NOT EXISTS idx_vendor_registration_otp_email ON vendor_registration_otp (email);
+
+INSERT INTO schema_migrations (filename, note)
+VALUES ('080_vendor_registration_otp.sql', 'Retroactive ledger insert.')
+ON CONFLICT (filename) DO NOTHING;
