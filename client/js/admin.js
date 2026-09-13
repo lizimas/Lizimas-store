@@ -6600,6 +6600,34 @@ async function forfeitReturnItem(orderItemId) {
 // server/utils/vendorWallet.js. This panel only ever handles requests
 // already sitting in vendor_payouts (status = 'requested').
 
+function payoutStatusBadge(p) {
+    if (p.payout_eligible) {
+        return '<span style="background:#dcfce7; color:#166534; padding:3px 8px; border-radius:999px; font-size:11px; font-weight:600;">✓ Eligible</span>';
+    }
+    if (p.payout_frozen) {
+        return '<span style="background:#fef3c7; color:#92400e; padding:3px 8px; border-radius:999px; font-size:11px; font-weight:600;">⚠ Payouts frozen</span>';
+    }
+    const kyc = p.kyc_status || "not_started";
+    const kycLabels = {
+        not_started: "KYC not started",
+        submitted: "KYC submitted",
+        under_review: "KYC under review",
+        action_required: "KYC needs action",
+        rejected: "KYC rejected",
+        suspended: "KYC suspended",
+        verified: "KYC verified"
+    };
+    const label = kycLabels[kyc] || `KYC ${kyc}`;
+    return `<span style="background:#fee2e2; color:#991b1b; padding:3px 8px; border-radius:999px; font-size:11px; font-weight:600;">⚠ ${label}</span>`;
+}
+
+function payoutIneligibleReason(p) {
+    if (p.payout_eligible) return "";
+    if (p.payout_frozen) return "Cannot pay: this vendor's payouts are frozen.";
+    const kyc = p.kyc_status || "not_started";
+    return `Cannot pay: KYC status is "${kyc}". Must be "verified".`;
+}
+
 async function loadPendingVendorPayouts() {
     try {
         const payouts = await authorizedFetch("/api/admin/vendor-payouts");
@@ -6612,21 +6640,29 @@ async function loadPendingVendorPayouts() {
 
         container.innerHTML = `
             <table>
-                <thead><tr><th>Vendor</th><th>Amount</th><th>MoMo Number</th><th>Requested</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Vendor</th><th>Amount</th><th>MoMo Number</th><th>Requested</th><th>Status</th><th>Actions</th></tr></thead>
                 <tbody>
-                    ${payouts.map(p => `
+                    ${payouts.map(p => {
+                        const disabled = !p.payout_eligible;
+                        const reason = payoutIneligibleReason(p);
+                        const disabledAttrs = disabled
+                            ? `disabled style="background:#9ca3af; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:not-allowed; margin-right:6px; opacity:0.6;" title="${reason}"`
+                            : `style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;"`;
+                        return `
                         <tr>
                             <td data-label="Vendor">${p.business_name}<br><span style="color:#888; font-size:12px;">${p.phone || ""}</span></td>
                             <td data-label="Amount">${fmtUgx(p.amount)}</td>
                             <td data-label="MoMo Number">${p.momo_number || "-"}</td>
                             <td data-label="Requested">${new Date(p.requested_at).toLocaleDateString()}</td>
+                            <td data-label="Status">${payoutStatusBadge(p)}</td>
                             <td data-label="Actions">
                                 <button onclick="viewVendorWallet(${p.vendor_id})" style="background:#fff; color:#1a1a2e; border:1px solid #1a1a2e; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">View Wallet</button>
-                                <button onclick="markVendorPayoutPaid(${p.id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Mark Paid</button>
+                                <button onclick="markVendorPayoutPaid(${p.id})" ${disabledAttrs}>Mark Paid</button>
                                 <button onclick="rejectVendorPayoutRequest(${p.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Reject</button>
                             </td>
                         </tr>
-                    `).join("")}
+                        `;
+                    }).join("")}
                 </tbody>
             </table>
         `;
@@ -6640,11 +6676,16 @@ async function markVendorPayoutPaid(id) {
     if (!confirm("Confirm the MoMo transfer has actually been sent?")) return;
     try {
         const token = getToken();
-        await fetch(`${API_URL}/api/admin/vendor-payouts/${id}/paid`, {
+        const res = await fetch(`${API_URL}/api/admin/vendor-payouts/${id}/paid`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
             body: JSON.stringify({ reference })
         });
+        const data = await res.json();
+        if (!res.ok || data.error) {
+            alert(data.message || data.error || "Could not mark payout as paid.");
+            return;
+        }
         loadPendingVendorPayouts();
     } catch (error) {
         console.error("Mark vendor payout paid error:", error);
