@@ -247,7 +247,12 @@ exports.uploadMyKycDocument = async (req, res) => {
                 format = $5,
                 original_filename = $6,
                 bytes = $7,
-                uploaded_at = now()`,
+                uploaded_at = now(),
+                review_status = 'pending',
+                rejection_reason = NULL,
+                action_required_reason = NULL,
+                reviewed_by = NULL,
+                reviewed_at = NULL`,
             [vendor.id, documentType, uploaded.public_id, uploaded.resource_type, uploaded.format, req.file.originalname, uploaded.bytes]
         );
 
@@ -555,6 +560,108 @@ exports.updateVendorUrsbVerification = async (req, res) => {
             `URSB check recorded: ${ursb_verified ? "verified" : "not verified"}`);
 
         res.json({ message: "URSB verification recorded.", ursb_verified });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Review a single KYC document. Accepts, rejects, or flags a document as
+// needing action from the vendor. When decision is 'rejected' or
+// 'action_required' (Q1=A), the overall KYC status is auto-flipped to
+// 'action_required' so the admin doesn't have to remember to do it.
+// Only 'action_required' -> 'under_review' is a legal reverse transition,
+// done automatically when all docs are accepted or pending.
+exports.reviewVendorKycDocumentAdmin = async (req, res) => {
+    try {
+        const { id, documentType } = req.params;
+        const { decision, reason } = req.body;
+
+        if (!["accepted", "rejected", "action_required", "pending"].includes(decision)) {
+            return res.status(400).json({ error: "decision must be accepted, rejected, action_required, or pending." });
+        }
+        if ((decision === "rejected" || decision === "action_required") && (!reason || !reason.trim())) {
+            return res.status(400).json({ error: "A reason is required when rejecting or asking for action." });
+        }
+
+        const docRow = await pool.query(
+            "SELECT id FROM vendor_kyc_documents WHERE vendor_id = $1 AND document_type = $2",
+            [id, documentType]
+        );
+        if (docRow.rows.length === 0) {
+            return res.status(404).json({ error: "No document on file for this vendor and type." });
+        }
+
+        await pool.query(
+            `UPDATE vendor_kyc_documents
+             SET review_status = $1,
+                 rejection_reason = $2,
+                 action_required_reason = $3,
+                 reviewed_by = $4,
+                 reviewed_at = now()
+             WHERE vendor_id = $5 AND document_type = $6`,
+            [
+                decision,
+                decision === "rejected" ? reason : null,
+                decision === "action_required" ? reason : null,
+                req.user.userId,
+                id,
+                documentType
+            ]
+        );
+
+        // Auto-flip overall KYC status per Q1=A:
+        //  - rejected OR action_required on any doc -> overall action_required
+        //  - all docs accepted/pending -> overall under_review (if currently action_required)
+        const docSummary = await pool.query(
+            `SELECT
+                COUNT(*) FILTER (WHERE review_status = 'rejected') AS rejected_count,
+                COUNT(*) FILTER (WHERE review_status = 'action_required') AS action_count,
+                COUNT(*) FILTER (WHERE review_status IN ('accepted','pending')) AS ok_count
+             FROM vendor_kyc_documents WHERE vendor_id = $1`,
+            [id]
+        );
+        const summary = docSummary.rows[0];
+        const kycRow = await pool.query("SELECT kyc_status FROM vendor_kyc WHERE vendor_id = $1", [id]);
+        const currentStatus = kycRow.rows[0] ? kycRow.rows[0].kyc_status : null;
+        let newOverallStatus = currentStatus;
+
+        if (summary.rejected_count > 0 || summary.action_count > 0) {
+            newOverallStatus = "action_required";
+        } else if (currentStatus === "action_required") {
+            newOverallStatus = "under_review";
+        }
+
+        if (newOverallStatus !== currentStatus && currentStatus) {
+            await pool.query(
+                `UPDATE vendor_kyc SET kyc_status = $1, updated_at = now() WHERE vendor_id = $2`,
+                [newOverallStatus, id]
+            );
+            await pool.query(
+                `INSERT INTO vendor_kyc_audit_log (vendor_id, from_status, to_status, changed_by, note)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [id, currentStatus, newOverallStatus, req.user.userId,
+                 `Auto-flip from document review: ${documentType} -> ${decision}`]
+            );
+        }
+
+        // Always log the document action itself
+        await pool.query(
+            `INSERT INTO vendor_kyc_audit_log (vendor_id, from_status, to_status, changed_by, note)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [id, currentStatus || "unknown", newOverallStatus || currentStatus || "unknown",
+             req.user.userId,
+             `Document ${documentType}: ${decision}${reason ? " - " + reason : ""}`]
+        );
+
+        logActivity(req.user.userId, "vendor_kyc_document_review", "vendor", id,
+            `Document ${documentType}: ${decision}`);
+
+        res.json({
+            message: "Document review recorded.",
+            decision,
+            overall_kyc_status: newOverallStatus,
+            auto_flipped: newOverallStatus !== currentStatus
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

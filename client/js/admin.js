@@ -8094,6 +8094,7 @@ async function openVendorKycReviewModal(vendorId) {
                     <tr><td style="font-weight:600; padding:4px 12px 4px 0;">Account Type</td><td>${detail.account_type === "company" ? "Company" : "Individual"}</td></tr>
                 </tbody>
             </table>
+            ${renderDocumentsSection(detail, vendorId)}
             ${detail.account_type === "company" ? renderUrsbSection(detail, vendorId) : ""}
             ${transitionButtons.length > 0 ? `
                 <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Move to:</label>
@@ -8146,6 +8147,72 @@ async function reviewVendorKyc(vendorId, newStatus) {
 // vendors. The admin opens URSB's eRegistry in a new tab, searches the
 // registration number manually, then records the outcome here. Required
 // before kyc_status can be set to 'verified' for a company vendor.
+function renderDocumentsSection(detail, vendorId) {
+    if (!detail.documents || detail.documents.length === 0) {
+        return "";
+    }
+    const rows = detail.documents.map(d => {
+        const status = d.review_status || "pending";
+        const statusInfo = {
+            pending: { cls: "status-pending", label: "Pending" },
+            accepted: { cls: "status-paid", label: "Accepted" },
+            rejected: { cls: "status-cancelled", label: "Rejected" },
+            action_required: { cls: "status-pending", label: "Needs better" }
+        }[status] || { cls: "status-pending", label: status };
+
+        const reason = d.rejection_reason || d.action_required_reason || "";
+        const label = (d.document_type || "").replace(/_/g, " ");
+
+        return `
+            <div style="border:1px solid #e5e7eb; border-radius:6px; padding:10px; margin-bottom:8px;">
+                <div style="font-size:13px; margin-bottom:6px;">
+                    <strong>${label}</strong>
+                    <span class="status-badge ${statusInfo.cls}" style="margin-left:8px;">${statusInfo.label}</span>
+                </div>
+                ${reason ? `<div style="font-size:12px; color:#666; margin-bottom:6px;"><em>${reason}</em></div>` : ""}
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <button onclick="reviewDocument(${vendorId}, '${d.document_type}', 'accepted')" style="background:#059669; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Accept</button>
+                    <button onclick="reviewDocument(${vendorId}, '${d.document_type}', 'action_required')" style="background:#d97706; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Needs better</button>
+                    <button onclick="reviewDocument(${vendorId}, '${d.document_type}', 'rejected')" style="background:#dc2626; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Reject</button>
+                </div>
+            </div>
+        `;
+    }).join("");
+
+    return `
+        <div style="margin-bottom:14px;">
+            <h3 style="font-size:14px; margin:0 0 8px 0;">Uploaded Documents</h3>
+            ${rows}
+        </div>
+    `;
+}
+
+async function reviewDocument(vendorId, documentType, decision) {
+    let reason = "";
+    if (decision === "rejected" || decision === "action_required") {
+        reason = prompt("Reason (shown to the vendor):");
+        if (!reason || !reason.trim()) return;
+    }
+    try {
+        const token = getToken();
+        const res = await fetch(`${API_URL}/api/admin/vendors/${vendorId}/kyc/documents/${documentType}/review`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ decision, reason: reason || null })
+        });
+        const data = await res.json();
+        if (data.error) {
+            alert(data.message || data.error);
+            return;
+        }
+        closeGenericModal();
+        loadVendorKycAdmin();
+    } catch (error) {
+        console.error("Review document error:", error);
+        alert("Something went wrong.");
+    }
+}
+
 function renderUrsbSection(detail, vendorId) {
     const regNum = detail.registration_number || "-";
     const isVerified = detail.ursb_verified === true;

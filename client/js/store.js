@@ -57,9 +57,31 @@ const STORE_DELIVERY_LABELS = {
     payment_first: { text: "\ud83d\udcb3 Payment First", className: "prepay" }
 };
 
-function stRenderVendor(vendor) {
+function stRenderBadges(badges) {
+    const container = document.getElementById("store-verified-badges");
+    if (!container) return;
+    container.innerHTML = "";
+    if (!badges) return;
+
+    if (badges.is_registered_business) {
+        const b = document.createElement("span");
+        b.className = "store-badge store-badge-registered";
+        b.style.cssText = "display:inline-flex; align-items:center; gap:4px; background:#059669; color:#fff; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; margin-top:4px;";
+        b.textContent = "✓ Registered Business";
+        container.appendChild(b);
+    } else if (badges.is_verified) {
+        const b = document.createElement("span");
+        b.className = "store-badge store-badge-verified";
+        b.style.cssText = "display:inline-flex; align-items:center; gap:4px; background:#16264f; color:#fff; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; margin-top:4px;";
+        b.textContent = "✓ Verified Seller";
+        container.appendChild(b);
+    }
+}
+
+function stRenderVendor(vendor, badges) {
     document.getElementById("store-name").textContent = vendor.business_name || "";
     document.title = `${vendor.business_name} | Lizimas Store`;
+    stRenderBadges(badges);
 
     const badgeEl = document.getElementById("store-delivery-badge");
     const badgeInfo = STORE_DELIVERY_LABELS[vendor.delivery_method];
@@ -114,7 +136,7 @@ async function loadStore() {
             return;
         }
         const data = await res.json();
-        stRenderVendor(data.vendor);
+        stRenderVendor(data.vendor, data.badges);
         stRenderProducts(data.products);
         document.getElementById("store-content").hidden = false;
 

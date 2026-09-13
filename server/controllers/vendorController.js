@@ -748,15 +748,22 @@ exports.getPublicStorefront = async (req, res) => {
         const { slug } = req.params;
 
         const vendorResult = await pool.query(
-            `SELECT id, business_name, slug, about, delivery_method,
-                    shop_active, holiday_mode_active, holiday_mode_start_date, holiday_mode_end_date
-             FROM vendors WHERE slug = $1 AND status = 'approved' LIMIT 1`,
+            `SELECT v.id, v.business_name, v.slug, v.about, v.delivery_method,
+                    v.shop_active, v.holiday_mode_active, v.holiday_mode_start_date, v.holiday_mode_end_date,
+                    (COALESCE(k.kyc_status, 'not_started') = 'verified') AS is_verified,
+                    (COALESCE(k.kyc_status, 'not_started') = 'verified'
+                     AND v.account_type = 'company'
+                     AND k.ursb_verified = true) AS is_registered_business
+             FROM vendors v
+             LEFT JOIN vendor_kyc k ON k.vendor_id = v.id
+             WHERE v.slug = $1 AND v.status = 'approved' LIMIT 1`,
             [slug]
         );
         if (vendorResult.rows.length === 0) {
             return res.status(404).json({ error: "Store not found." });
         }
-        const { shop_active, holiday_mode_active, holiday_mode_start_date, holiday_mode_end_date, ...vendor } = vendorResult.rows[0];
+        const { shop_active, holiday_mode_active, holiday_mode_start_date, holiday_mode_end_date,
+                is_verified, is_registered_business, ...vendor } = vendorResult.rows[0];
 
         // Holiday Mode / Shop Activation (migration 081): the storefront
         // page itself still resolves - a shopper following an old link
@@ -793,6 +800,10 @@ exports.getPublicStorefront = async (req, res) => {
 
         res.json({
             vendor,
+            badges: {
+                is_verified: is_verified === true,
+                is_registered_business: is_registered_business === true
+            },
             products: productsResult.rows,
             followerCount: followerResult.rows[0].n,
             sellerScore,
