@@ -1,0 +1,5 @@
+{
+  "watch": ["server", "client/js"],
+  "ignore": [".git/", "node_modules/", "client_backup_session12/", "*.bak"],
+  "ext": "js,json,html"
+}
