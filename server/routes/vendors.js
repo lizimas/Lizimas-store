@@ -19,6 +19,11 @@ const {
 } = require("../controllers/vendorController");
 const { getMyKyc, updateMyKyc } = require("../controllers/vendorKycController");
 const {
+    downloadStatementPdfVendor,
+    downloadStatementCsvVendor,
+    shareStatementVendor
+} = require("../controllers/billingController");
+const {
     addProduct,
     updateProduct,
     deleteProduct,
@@ -192,5 +197,10 @@ router.post("/me/jumia/products/:id/push", pushProductToJumia);
 router.post("/me/jumia/products/push-bulk", pushProductsToJumiaBulk);
 router.get("/me/jumia/remote-products", getJumiaRemoteProducts);
 router.post("/me/jumia/import", importJumiaProducts);
+
+// --- Phase 4: vendor statement downloads + share (behind auth gate) ---
+router.get("/me/statements/:id/pdf", downloadStatementPdfVendor);
+router.get("/me/statements/:id/csv", downloadStatementCsvVendor);
+router.post("/me/statements/:id/share", shareStatementVendor);
 
 module.exports = router;

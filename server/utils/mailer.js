@@ -903,4 +903,99 @@ async function sendStaffMessageAlert(details) {
     }
 }
 
-module.exports = { sendOrderConfirmationEmail, sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert, sendPerformanceReportEmail, sendStaffMessageAlert, sendDataDeletionAlert, sendVendorApplicationReceivedEmail, sendVendorSignupAbandonedAlert, sendVendorSignupReminderEmail };
+
+// --- Phase 4: billing statement emails -----------------------------------
+
+// Sent to a vendor when a billing cycle closes and their statement is
+// generated. Attaches the statement PDF. Statement ready != paid.
+async function sendStatementReadyEmail(email, name, statement, cycle, pdfBuffer, filename) {
+    if (!email) return false;
+    try {
+        const stmtNo = statement.statement_number || ("STMT-" + statement.id);
+        const amtStr = Number(statement.amount_due).toLocaleString("en-UG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const currency = statement.currency || "UGX";
+        const cycleStr = cycle && cycle.period_start && cycle.period_end
+            ? cycle.period_start + " to " + cycle.period_end
+            : "this cycle";
+
+        await transporter.sendMail({
+            from: `"Lizimas Store" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+            to: email,
+            subject: `Your statement is ready (${cycleStr}) - Lizimas Store`,
+            text: renderCustomerText([
+                `Hi ${name},`,
+                "",
+                `Your Lizimas Store statement for ${cycleStr} is ready.`,
+                `Statement number: ${stmtNo}`,
+                `Amount due: ${currency} ${amtStr}`,
+                "",
+                "The full itemized statement is attached as a PDF. You can also view it in your vendor portal under Account Statements.",
+                "",
+                "Payout will follow once reviewed and confirmed."
+            ]),
+            html: renderCustomerEmail({
+                title: "Your statement is ready",
+                bodyHtml:
+                    `<p style="margin:0 0 12px">Hi ${escHtml(name)},</p>` +
+                    `<p style="margin:0 0 12px">Your Lizimas Store statement for <strong>${escHtml(cycleStr)}</strong> is ready.</p>` +
+                    `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:12px 0;font-size:15px;line-height:1.7">` +
+                    `<tr><td style="padding:2px 14px 2px 0;color:#666">Statement</td><td style="font-weight:700">${escHtml(stmtNo)}</td></tr>` +
+                    `<tr><td style="padding:2px 14px 2px 0;color:#666">Amount due</td><td style="font-weight:700">${escHtml(currency)} ${escHtml(amtStr)}</td></tr>` +
+                    `</table>` +
+                    `<p style="margin:0 0 12px">The full itemized statement is attached as a PDF. You can also view it in your vendor portal under <strong>Account Statements</strong>.</p>` +
+                    `<p style="margin:0 0 12px;color:#666;font-size:13.5px">Payout will follow once reviewed and confirmed.</p>`
+            }),
+            attachments: [{ filename, content: pdfBuffer, contentType: "application/pdf" }]
+        });
+        return true;
+    } catch (error) {
+        console.error("Statement ready email error:", error);
+        return false;
+    }
+}
+
+// Sent to a vendor when their statement is marked paid (money sent).
+async function sendStatementPaidEmail(email, name, statement, cycle, pdfBuffer, filename) {
+    if (!email) return false;
+    try {
+        const stmtNo = statement.statement_number || ("STMT-" + statement.id);
+        const amtStr = Number(statement.amount_due).toLocaleString("en-UG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const currency = statement.currency || "UGX";
+        const cycleStr = cycle && cycle.period_start && cycle.period_end
+            ? cycle.period_start + " to " + cycle.period_end
+            : "this cycle";
+
+        await transporter.sendMail({
+            from: `"Lizimas Store" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+            to: email,
+            subject: `Payout sent (${cycleStr}) - Lizimas Store`,
+            text: renderCustomerText([
+                `Hi ${name},`,
+                "",
+                `Your Lizimas Store payout for ${cycleStr} has been sent.`,
+                `Statement number: ${stmtNo}`,
+                `Amount: ${currency} ${amtStr}`,
+                "",
+                "The full itemized statement is attached as a PDF for your records."
+            ]),
+            html: renderCustomerEmail({
+                title: "Payout sent",
+                bodyHtml:
+                    `<p style="margin:0 0 12px">Hi ${escHtml(name)},</p>` +
+                    `<p style="margin:0 0 12px">Your Lizimas Store payout for <strong>${escHtml(cycleStr)}</strong> has been sent.</p>` +
+                    `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:12px 0;font-size:15px;line-height:1.7">` +
+                    `<tr><td style="padding:2px 14px 2px 0;color:#666">Statement</td><td style="font-weight:700">${escHtml(stmtNo)}</td></tr>` +
+                    `<tr><td style="padding:2px 14px 2px 0;color:#666">Amount</td><td style="font-weight:700">${escHtml(currency)} ${escHtml(amtStr)}</td></tr>` +
+                    `</table>` +
+                    `<p style="margin:0 0 12px">The full itemized statement is attached as a PDF for your records.</p>`
+            }),
+            attachments: [{ filename, content: pdfBuffer, contentType: "application/pdf" }]
+        });
+        return true;
+    } catch (error) {
+        console.error("Statement paid email error:", error);
+        return false;
+    }
+}
+
+module.exports = { sendOrderConfirmationEmail, sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert, sendPerformanceReportEmail, sendStaffMessageAlert, sendDataDeletionAlert, sendVendorApplicationReceivedEmail, sendVendorSignupAbandonedAlert, sendVendorSignupReminderEmail, sendStatementReadyEmail, sendStatementPaidEmail };

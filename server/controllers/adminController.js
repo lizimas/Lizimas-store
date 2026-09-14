@@ -171,6 +171,25 @@ exports.updateOrderStatus = async (req, res) => {
 
         const updatedOrder = result.rows[0];
 
+        // Phase 4 - Billing Cycles: stamp delivered_at on every item the
+        // first time the order reaches 'delivered', so the statement
+        // generator can attribute each earning to the right cycle.
+        // Idempotent: only fills NULLs, so repeated status updates don't
+        // re-stamp.
+        if (status === "delivered") {
+            try {
+                await pool.query(
+                    `UPDATE order_items SET delivered_at = now()
+                     WHERE order_id = $1 AND delivered_at IS NULL`,
+                    [updatedOrder.id]
+                );
+            } catch (deliveredAtError) {
+                // Never block the status update on this - worst case the
+                // item is attributed to the next cycle instead.
+                console.error("Failed to stamp order_items.delivered_at:", deliveredAtError);
+            }
+        }
+
         // Status change notifications - best-effort, never block the response
         sendOrderStatusSms(updatedOrder.phone, updatedOrder, status).catch(err => console.error("SMS notify error:", err));
 

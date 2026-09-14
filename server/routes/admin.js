@@ -108,6 +108,20 @@ const {
 } = require("../controllers/vendorKycController");
 
 const {
+    getCurrentCycle,
+    ensureCurrentCycle,
+    listCyclesAdmin,
+    closeCycleAndGenerateStatements,
+    listStatementsAdmin,
+    getStatementDetail,
+    batchApproveStatements,
+    markStatementPaid,
+    rejectStatement,
+    downloadStatementPdfAdmin,
+    downloadStatementCsvAdmin
+} = require("../controllers/billingController");
+
+const {
     generateCode,
     listDiscountCodes,
     createDiscountCode,
@@ -246,6 +260,19 @@ router.get("/vendors/:id/kyc", getVendorKycAdminDetail);
 router.patch("/vendors/:id/kyc/review", reviewVendorKycAdmin);
 router.patch("/vendors/:id/kyc/ursb", updateVendorUrsbVerification);
 router.patch("/vendors/:id/kyc/documents/:documentType/review", reviewVendorKycDocumentAdmin);
+
+// --- Billing Cycles (Phase 4) ---
+router.get("/billing/current", getCurrentCycle);
+router.post("/billing/ensure-current", ensureCurrentCycle);
+router.get("/billing/cycles", listCyclesAdmin);
+router.post("/billing/cycles/:id/close", closeCycleAndGenerateStatements);
+router.get("/billing/statements", listStatementsAdmin);
+router.get("/billing/statements/:id", getStatementDetail);
+router.post("/billing/statements/batch-approve", batchApproveStatements);
+router.post("/billing/statements/:id/mark-paid", markStatementPaid);
+router.post("/billing/statements/:id/reject", rejectStatement);
+router.get("/billing/statements/:id/pdf", downloadStatementPdfAdmin);
+router.get("/billing/statements/:id/csv", downloadStatementCsvAdmin);
 
 // Vendor Wallet & Payouts (Task #61).
 router.get("/vendor-payouts", getVendorPayoutRequests);

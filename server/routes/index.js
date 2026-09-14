@@ -24,4 +24,7 @@ router.use("/reports", reportLimiter, require("./reports"));
 router.use("/track", require("./track"));
 router.use("/staff-messages", require("./staffMessages"));
 
+// Phase 4: public statement share links (no auth - token is the credential)
+router.use("/statements", require("./statementShare"));
+
 module.exports = router;

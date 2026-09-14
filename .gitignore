@@ -28,3 +28,8 @@ fix_*.py
 
 # stray backups
 *.bak
+
+# Environment variables - never commit
+.env
+.env.*
+!.env.example
