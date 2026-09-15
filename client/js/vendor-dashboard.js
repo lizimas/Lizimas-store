@@ -1619,27 +1619,81 @@ async function loadVendorOrders() {
     }
 }
 
+function getVendorOrdersFiltered() {
+    let rows = vendorOrdersFilter === "all"
+        ? vendorOrdersCache
+        : vendorOrdersCache.filter(o => o.stage === vendorOrdersFilter);
+
+    const searchOrder = (document.getElementById("vendor-orders-search-order")?.value || "").trim().toLowerCase();
+    const searchSku = (document.getElementById("vendor-orders-search-sku")?.value || "").trim().toLowerCase();
+
+    if (searchOrder) {
+        rows = rows.filter(o => String(o.order_id || "").toLowerCase().includes(searchOrder));
+    }
+    if (searchSku) {
+        rows = rows.filter(o => String(o.sku || "").toLowerCase().includes(searchSku));
+    }
+    return rows;
+}
+
+function setVendorOrdersSearch() {
+    renderVendorOrdersTable();
+}
+
 function renderVendorOrdersTable() {
     const container = document.getElementById("vendor-orders-list");
     if (!container) return;
 
-    const rows = vendorOrdersFilter === "all"
-        ? vendorOrdersCache
-        : vendorOrdersCache.filter(o => o.stage === vendorOrdersFilter);
+    const rows = getVendorOrdersFiltered();
 
     if (rows.length === 0) {
-        container.innerHTML = `<p class="no-data">No orders in this view.</p>`;
+        container.innerHTML = `<p class="no-data">No orders match these filters.</p>`;
         return;
     }
 
     container.innerHTML = `
         <table>
-            <thead><tr><th>Product</th><th>Qty</th><th>Order Date</th><th>Status</th><th>Action</th></tr></thead>
+            <thead><tr><th>Product</th><th>SKU</th><th>Qty</th><th>Order Date</th><th>Status</th><th>Action</th></tr></thead>
             <tbody>
                 ${rows.map(o => vendorOrderRow(o)).join("")}
             </tbody>
         </table>
     `;
+}
+
+function exportVendorOrdersCsv() {
+    const rows = getVendorOrdersFiltered();
+    if (rows.length === 0) {
+        alert("No orders to export in the current filter.");
+        return;
+    }
+
+    function esc(v) {
+        const s = v == null ? "" : String(v);
+        return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }
+
+    let csv = "Order ID,Product,SKU,Qty,Price,Order Date,Status\r\n";
+    for (const o of rows) {
+        csv += [
+            o.order_id,
+            o.product_name,
+            o.sku || "",
+            o.quantity,
+            o.price,
+            new Date(o.created_at).toISOString().slice(0, 10),
+            o.stageLabel || o.stage
+        ].map(esc).join(",") + "\r\n";
+    }
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "lizimas-orders-" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
 }
 
 function vendorOrderRow(o) {
@@ -1664,6 +1718,7 @@ function vendorOrderRow(o) {
     return `
         <tr>
             <td data-label="Product">${o.product_name}${rejectedNote}</td>
+            <td data-label="SKU">${o.sku ? vendorEsc(o.sku) : "—"}</td>
             <td data-label="Qty">${o.quantity}</td>
             <td data-label="Order Date">${new Date(o.created_at).toLocaleDateString()}</td>
             <td data-label="Status"><span class="status-badge ${badgeClass}">${o.stageLabel}</span></td>

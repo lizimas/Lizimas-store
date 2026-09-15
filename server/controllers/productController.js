@@ -1,4 +1,5 @@
 const pool = require("../config/database");
+const { generateSku } = require("../utils/sku");
 const cloudinary = require("../config/cloudinary");
 const { logActivity } = require("../utils/activityLog");
 const { canApplyComplianceAction } = require("../utils/vendorCompliance");
@@ -115,7 +116,7 @@ exports.addProduct = async (req, res) => {
                 packageSize, warrantyMonths,
                 brand || null, gtin || null, mpn || null, vendorId,
                 pricingSnapshot.vendor_desired_payout, pricingSnapshot.commission_rate_applied,
-                pricingSnapshot.fixed_fee_applied, pricingSnapshot.commission_rule_id, sku || null]
+                pricingSnapshot.fixed_fee_applied, pricingSnapshot.commission_rule_id, sku || generateSku(brand, vendorId)]
         );
 
         const newProduct = product.rows[0];

@@ -525,7 +525,7 @@ exports.getMyVendorOrders = async (req, res) => {
                     p.name AS product_name, p.image AS product_image,
                     o.status AS order_status, o.created_at,
                     oi.handover_status, oi.handed_over_at, oi.rejection_reason,
-                    oi.vendor_fulfilment_stage, oi.dropoff_point_id, dp.name AS dropoff_point_name
+                    oi.vendor_fulfilment_stage, oi.sku, oi.dropoff_point_id, dp.name AS dropoff_point_name
              FROM order_items oi
              JOIN products p ON p.id = oi.product_id
              JOIN orders o ON o.id = oi.order_id

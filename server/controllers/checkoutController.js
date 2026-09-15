@@ -62,7 +62,7 @@ exports.checkout = async (req, res) => {
 
             if (variantId) {
                 const variantResult = await client.query(
-                    "SELECT v.id, v.product_id, v.variant_name, v.price, v.stock, p.name AS product_name, p.vendor_id, p.commission_rate_applied, p.fixed_fee_applied, p.commission_rule_id, COALESCE(v.image_path, p.image) AS image_url, c.name AS color_name, s.name AS size_name FROM product_variants v JOIN products p ON p.id = v.product_id LEFT JOIN product_colors c ON c.id = v.color_id LEFT JOIN product_sizes s ON s.id = v.size_id WHERE v.id = $1 AND v.product_id = $2",
+                    "SELECT v.id, v.product_id, v.variant_name, v.price, v.stock, p.name AS product_name, p.sku, p.vendor_id, p.commission_rate_applied, p.fixed_fee_applied, p.commission_rule_id, COALESCE(v.image_path, p.image) AS image_url, c.name AS color_name, s.name AS size_name FROM product_variants v JOIN products p ON p.id = v.product_id LEFT JOIN product_colors c ON c.id = v.color_id LEFT JOIN product_sizes s ON s.id = v.size_id WHERE v.id = $1 AND v.product_id = $2",
                     [variantId, productId]
                 );
 
@@ -87,7 +87,7 @@ exports.checkout = async (req, res) => {
                     productId,
                     variantId,
                     vendorId: variant.vendor_id,
-                    productName: variant.product_name, imageUrl: variant.image_url, variantColor: variant.color_name || variant.variant_name, variantSize: variant.size_name || null,
+                    productName: variant.product_name, sku: variant.sku, imageUrl: variant.image_url, variantColor: variant.color_name || variant.variant_name, variantSize: variant.size_name || null,
                     quantity,
                     price: itemPrice,
                     // Order-time commission lock (Task #67): snapshotted from
@@ -101,7 +101,7 @@ exports.checkout = async (req, res) => {
 
             } else {
                 const productResult = await client.query(
-                    "SELECT id, name, price, stock, vendor_id, commission_rate_applied, fixed_fee_applied, commission_rule_id, COALESCE(image, (SELECT image_path FROM product_images WHERE product_id = products.id ORDER BY COALESCE(display_order, 999999), id LIMIT 1)) AS image FROM products WHERE id = $1",
+                    "SELECT id, name, sku, price, stock, vendor_id, commission_rate_applied, fixed_fee_applied, commission_rule_id, COALESCE(image, (SELECT image_path FROM product_images WHERE product_id = products.id ORDER BY COALESCE(display_order, 999999), id LIMIT 1)) AS image FROM products WHERE id = $1",
                     [productId]
                 );
 
@@ -174,7 +174,7 @@ exports.checkout = async (req, res) => {
                     productId,
                     variantId: null,
                     vendorId: product.vendor_id,
-                    productName: product.name, imageUrl: product.image, variantColor: colorName, variantSize: sizeName,
+                    productName: product.name, sku: product.sku, imageUrl: product.image, variantColor: colorName, variantSize: sizeName,
                     quantity,
                     price: itemPrice,
                     // Order-time commission lock (Task #67): see the
@@ -355,9 +355,9 @@ exports.checkout = async (req, res) => {
             const vendorFulfilmentStage = item.vendorId ? "new" : null;
 
             await client.query(
-                `INSERT INTO order_items (order_id, product_id, quantity, price, product_name, image_url, variant_color, variant_size, handover_status, vendor_fulfilment_stage, commission_rate_applied, fixed_fee_applied, commission_rule_id)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-                [order.id, item.productId, item.quantity, item.price, item.productName, item.imageUrl, item.variantColor, item.variantSize, handoverStatus, vendorFulfilmentStage, item.commissionRateApplied, item.fixedFeeApplied, item.commissionRuleId]
+                `INSERT INTO order_items (order_id, product_id, quantity, price, product_name, sku, image_url, variant_color, variant_size, handover_status, vendor_fulfilment_stage, commission_rate_applied, fixed_fee_applied, commission_rule_id)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+                [order.id, item.productId, item.quantity, item.price, item.productName, item.sku || null, item.imageUrl, item.variantColor, item.variantSize, handoverStatus, vendorFulfilmentStage, item.commissionRateApplied, item.fixedFeeApplied, item.commissionRuleId]
             );
 
             if (item.variantId) {

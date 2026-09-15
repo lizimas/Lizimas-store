@@ -900,6 +900,11 @@
                         <a href="../vendor-policies.html#fulfilment" target="_blank">Fulfilment Guidelines</a> and mark
                         it handed over. Lizimas Store inspects each item before accepting it and taking over delivery.
                     </p>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+                        <input type="text" id="vendor-orders-search-order" placeholder="Search by order number" oninput="setVendorOrdersSearch()" style="flex:1; min-width:200px; padding:9px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:13px;">
+                        <input type="text" id="vendor-orders-search-sku" placeholder="Search by Seller SKU" oninput="setVendorOrdersSearch()" style="flex:1; min-width:200px; padding:9px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:13px;">
+                        <button type="button" onclick="exportVendorOrdersCsv()" style="background:#f59e0b; color:#fff; border:none; border-radius:8px; padding:9px 18px; font-size:13px; font-weight:600; cursor:pointer;">Export</button>
+                    </div>
                     <div id="vendor-orders-filters" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;"></div>
                     <div class="panel">
                         <div id="vendor-orders-list">Loading...</div>

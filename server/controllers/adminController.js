@@ -1,4 +1,5 @@
 const pool = require("../config/database");
+const { generateSku } = require("../utils/sku");
 const { sendOrderStatusSms } = require("../utils/sms");
 const { sendOrderStatusEmail } = require("../utils/mailer");
 const XLSX = require("xlsx");
@@ -442,7 +443,7 @@ exports.importProducts = async (req, res) => {
                      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
                     [
                         name, description, price, stock, categoryId, req.user.userId, statusRaw || "approved",
-                        sku || null, brand || null, gtin || null, mpn || null, material || null, color || null,
+                        sku || generateSku(brand, null), brand || null, gtin || null, mpn || null, material || null, color || null,
                         sleeve || null, style || null, length || null, fit || null, pattern || null,
                         careInstructions || null, occasion || null, warrantyMonths, packageSize || "Small",
                         imageRaw || null
