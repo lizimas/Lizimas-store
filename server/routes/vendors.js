@@ -19,10 +19,23 @@ const {
 } = require("../controllers/vendorController");
 const { getMyKyc, updateMyKyc } = require("../controllers/vendorKycController");
 const {
+    getMyBrandAuthorizations,
+    submitBrandAuthorization,
+    uploadMyBrandAuthDocument,
+    getMyBrandAuthDocumentUrl
+} = require("../controllers/vendorBrandAuthController");
+const {
+    getMyPaymentInstruments,
+    addMyPaymentInstrument,
+    updateMyPaymentInstrument,
+    setPreferredPaymentInstrument
+} = require("../controllers/vendorPaymentInstrumentsController");
+const {
     listVendorStatements,
     downloadStatementPdfVendor,
     downloadStatementCsvVendor,
-    shareStatementVendor
+    shareStatementVendor,
+    updateMyPreferredCurrency
 } = require("../controllers/billingController");
 const {
     addProduct,
@@ -107,6 +120,16 @@ router.patch("/me/holiday-mode", updateVendorHolidayMode);
 // verification, separate from the profile above (Ryan, Sept 2026).
 router.get("/me/kyc", getMyKyc);
 router.patch("/me/kyc", updateMyKyc);
+
+router.get("/me/brand-authorizations", getMyBrandAuthorizations);
+router.post("/me/brand-authorizations", submitBrandAuthorization);
+router.post("/me/brand-authorizations/:authorizationId/documents", upload.kycDocument.single("document"), uploadMyBrandAuthDocument);
+router.get("/me/brand-authorizations/:authorizationId/documents/url", getMyBrandAuthDocumentUrl);
+
+router.get("/me/payment-instruments", getMyPaymentInstruments);
+router.post("/me/payment-instruments", addMyPaymentInstrument);
+router.patch("/me/payment-instruments/:id", updateMyPaymentInstrument);
+router.patch("/me/payment-instruments/preferred", setPreferredPaymentInstrument);
 router.get("/orders", getMyVendorOrders);
 router.patch("/order-items/:orderItemId/stage", advanceVendorOrderStage);
 router.get("/dashboard-summary", getVendorDashboardSummary);
@@ -201,6 +224,7 @@ router.post("/me/jumia/import", importJumiaProducts);
 
 // --- Phase 4: vendor statement downloads + share (behind auth gate) ---
 router.get("/me/statements", listVendorStatements);
+router.patch("/me/currency", updateMyPreferredCurrency);
 router.get("/me/statements/:id/pdf", downloadStatementPdfVendor);
 router.get("/me/statements/:id/csv", downloadStatementCsvVendor);
 router.post("/me/statements/:id/share", shareStatementVendor);

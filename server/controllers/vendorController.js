@@ -779,7 +779,7 @@ exports.getPublicStorefront = async (req, res) => {
             && today <= holiday_mode_end_date.toISOString().slice(0, 10);
         const shopUnavailable = shop_active === false || onHoliday;
 
-        const [productsResult, followerResult, sellerScore] = await Promise.all([
+        const [productsResult, followerResult, sellerScore, brandAuthResult] = await Promise.all([
             shopUnavailable
                 ? Promise.resolve({ rows: [] })
                 : pool.query(
@@ -795,7 +795,17 @@ exports.getPublicStorefront = async (req, res) => {
                     [vendor.id]
                 ),
             pool.query(`SELECT COUNT(*)::int AS n FROM vendor_followers WHERE vendor_id = $1`, [vendor.id]),
-            computeSellerScore(vendor.id)
+            computeSellerScore(vendor.id),
+            // Phase 7: only ever surface VERIFIED brand authorizations
+            // publicly - submitted/under_review/rejected/etc. stay
+            // admin+vendor-only, same boundary vendor_kyc already draws
+            // with is_verified above.
+            pool.query(
+                `SELECT brand_name, tier FROM vendor_brand_authorizations
+                 WHERE vendor_id = $1 AND status = 'verified'
+                 ORDER BY brand_name`,
+                [vendor.id]
+            )
         ]);
 
         res.json({
@@ -804,6 +814,7 @@ exports.getPublicStorefront = async (req, res) => {
                 is_verified: is_verified === true,
                 is_registered_business: is_registered_business === true
             },
+            brand_authorizations: brandAuthResult.rows,
             products: productsResult.rows,
             followerCount: followerResult.rows[0].n,
             sellerScore,

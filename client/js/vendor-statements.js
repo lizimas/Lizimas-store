@@ -117,9 +117,33 @@ async function loadVendorStatementsView() {
     }
 }
 
+// Phase 4 Beat 2 Mobile - injects the media query this view needs exactly
+// once per page load. Everything here is otherwise inline-styled (matching
+// the rest of vendor-dashboard.js), and an inline style attribute always
+// wins the cascade over a plain stylesheet rule - so the rules that need
+// to win at phone width use !important, scoped tightly to the two classes
+// below rather than applied broadly.
+function ensureVendorStatementsResponsiveStyles() {
+    if (document.getElementById("vs-responsive-style")) return;
+    const style = document.createElement("style");
+    style.id = "vs-responsive-style";
+    style.textContent = `
+        @media (max-width: 720px) {
+            .vs-main-grid {
+                grid-template-columns: 1fr !important;
+            }
+            .vs-filter-row {
+                margin-left: 0 !important;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
 function renderStatementsFull() {
     const root = document.getElementById("vendor-statements-root");
     if (!root || !vendorStatementsState.data) return;
+    ensureVendorStatementsResponsiveStyles();
     const d = vendorStatementsState.data;
 
     root.innerHTML = `
@@ -137,19 +161,53 @@ function renderStatementsFull() {
                 ${renderFilterChip("paid", "PAID")}
                 ${renderFilterChip("unpaid", "UNPAID")}
             </div>
-            <div style="display:flex; gap:6px; align-items:center; margin-left:auto;">
+            <div class="vs-filter-row" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-left:auto;">
                 <span style="font-size:11px; font-weight:700; color:#6b7280; letter-spacing:.5px;">CURRENCY:</span>
-                <span title="USD payouts are coming soon" style="padding:4px 10px; border-radius:999px; background:#f3f4f6; color:#9ca3af; font-size:12px; font-weight:600;">USD</span>
-                <span style="padding:4px 10px; border-radius:999px; background:#16264f; color:#fff; font-size:12px; font-weight:600;">LOCAL (UGX)</span>
+                ${renderCurrencyChip(d.currency, "USD", "USD")}
+                ${renderCurrencyChip(d.currency, "UGX", "LOCAL (UGX)")}
             </div>
         </div>
 
-        <div style="display:grid; grid-template-columns: minmax(260px, 340px) 1fr; gap:16px; align-items:start;">
+        <div class="vs-main-grid" style="display:grid; grid-template-columns: minmax(260px, 340px) 1fr; gap:16px; align-items:start;">
             <div>${renderStatementsList(d)}</div>
             <div>${renderStatementsDetail(d)}</div>
         </div>
     `;
 }
+
+// Phase 4 Beat 3 - clickable currency chip. Active currency is highlighted;
+// clicking the inactive one updates the vendor's preferred_currency and
+// reloads the whole statements view (only affects statements generated
+// AFTER this change - already-closed statements keep their own locked
+// currency, same as vendors.preferred_currency behaves server-side).
+function renderCurrencyChip(activeCurrency, code, label) {
+    const isActive = (activeCurrency || "UGX") === code;
+    const style = isActive
+        ? "padding:4px 10px; border-radius:999px; background:#16264f; color:#fff; font-size:12px; font-weight:600; border:none; cursor:default;"
+        : "padding:4px 10px; border-radius:999px; background:#f3f4f6; color:#374151; font-size:12px; font-weight:600; border:none; cursor:pointer;";
+    if (isActive) {
+        return `<span style="${style}">${vendorEsc(label)}</span>`;
+    }
+    return `<button type="button" onclick="setVendorPreferredCurrency('${code}')" style="${style}">${vendorEsc(label)}</button>`;
+}
+
+window.setVendorPreferredCurrency = async function (currency) {
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/me/currency", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ preferred_currency: currency })
+        });
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        await loadVendorStatementsView();
+    } catch (error) {
+        console.error("setVendorPreferredCurrency error:", error);
+        alert("Could not update currency preference. Please try again.");
+    }
+};
 
 function renderStatementsCards(d) {
     const c = d.currency || "UGX";

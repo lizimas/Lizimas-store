@@ -19,6 +19,7 @@ const crypto = require("crypto");
 const { generateStatementPdf } = require("../utils/statementPdf");
 const { generateStatementCsv } = require("../utils/statementCsv");
 const { statementNumber } = require("../utils/statementNumber");
+const { getUsdToUgxRate, convertUgxToUsd, normalizeAmount, round2 } = require("../utils/fxRate");
 const { sendStatementReadyEmail, sendStatementPaidEmail } = require("../utils/mailer");
 
 // --- Helpers ------------------------------------------------------------
@@ -121,7 +122,15 @@ exports.listCyclesAdmin = async (req, res) => {
                     c.closes_at, c.status, c.is_test,
                     c.statements_generated_at, c.created_at,
                     COUNT(s.id)::int AS statement_count,
-                    COALESCE(SUM(s.amount_due), 0)::numeric AS total_due,
+                    -- Phase 4 Beat 3: a cycle can contain both UGX and USD
+                    -- statements, so this MUST sum a common unit (UGX
+                    -- equivalent) rather than raw amount_due, which would
+                    -- otherwise silently add USD numbers onto a UGX total.
+                    COALESCE(SUM(
+                        CASE WHEN s.currency = 'USD' AND s.fx_rate_used IS NOT NULL
+                             THEN s.amount_due * s.fx_rate_used
+                             ELSE s.amount_due END
+                    ), 0)::numeric AS total_due,
                     COUNT(s.id) FILTER (WHERE s.status = 'paid')::int AS paid_count,
                     COUNT(s.id) FILTER (WHERE s.status = 'pending')::int AS pending_count
              FROM vendor_billing_cycles c
@@ -247,7 +256,7 @@ exports.closeCycleAndGenerateStatements = async (req, res) => {
         // 2. All vendors with any activity during the cycle, plus anyone
         //    with a rolled-forward balance.
         const { rows: vendorRows } = await client.query(
-            `SELECT DISTINCT v.id AS vendor_id, v.business_name
+            `SELECT DISTINCT v.id AS vendor_id, v.business_name, v.preferred_currency
              FROM vendors v
              LEFT JOIN products p ON p.vendor_id = v.id
              LEFT JOIN order_items oi ON oi.product_id = p.id
@@ -259,6 +268,16 @@ exports.closeCycleAndGenerateStatements = async (req, res) => {
                )`,
             [cycle.period_start, cycle.period_end, Array.from(rolledByVendor.keys()).length ? Array.from(rolledByVendor.keys()) : [0]]
         );
+
+        // Phase 4 Beat 3: lock ONE USD exchange rate for this entire cycle
+        // close (not per-vendor) - every USD-denominated statement out of
+        // this close should share the same rate, and this fails the whole
+        // close loudly (before any statement is written) rather than ever
+        // silently guessing a rate for a real payout.
+        let fxRateForThisClose = null;
+        if (vendorRows.some((v) => v.preferred_currency === "USD")) {
+            fxRateForThisClose = (await getUsdToUgxRate()).rate;
+        }
 
         let created = 0;
         let totalDue = 0;
@@ -348,17 +367,37 @@ exports.closeCycleAndGenerateStatements = async (req, res) => {
             const amountDue = openingBalance + earnings - commissions - refunds + adjustments;
 
             // 6. Roll forward if below minimum OR negative
+            // NOTE: the MIN_PAYOUT_UGX threshold and the rolled-forward
+            // carry-forward logic both stay in raw UGX terms deliberately -
+            // MIN_PAYOUT_UGX is a UGX constant, and rolledByVendor (step 1)
+            // reads back amount_due assuming UGX for anyone not yet on USD.
             const status = amountDue < MIN_PAYOUT_UGX ? "rolled_forward" : "pending";
+
+            // Phase 4 Beat 3: statement currency. Everything computed above
+            // stays real UGX ledger math - only the STATEMENT's own summary
+            // (and, below, its itemized lines) get converted into the
+            // vendor's preferred_currency using the one rate locked for this
+            // close. currency/fx_rate_used are what statementPdf.js and
+            // statementCsv.js already read to label amounts - see
+            // migrations/100_statement_currency_columns.sql.
+            const vendorCurrency = vendor.preferred_currency === "USD" ? "USD" : "UGX";
+            const fxRateUsed = vendorCurrency === "USD" ? fxRateForThisClose : null;
+            const displayOpeningBalance = vendorCurrency === "USD" ? convertUgxToUsd(openingBalance, fxRateUsed) : openingBalance;
+            const displayEarnings = vendorCurrency === "USD" ? convertUgxToUsd(earnings, fxRateUsed) : earnings;
+            const displayCommissions = vendorCurrency === "USD" ? convertUgxToUsd(commissions, fxRateUsed) : commissions;
+            const displayRefunds = vendorCurrency === "USD" ? convertUgxToUsd(refunds, fxRateUsed) : refunds;
+            const displayAdjustments = vendorCurrency === "USD" ? convertUgxToUsd(adjustments, fxRateUsed) : adjustments;
+            const displayAmountDue = vendorCurrency === "USD" ? convertUgxToUsd(amountDue, fxRateUsed) : amountDue;
 
             // 7. Insert statement
             const { rows: stmtRows } = await client.query(
                 `INSERT INTO vendor_statements
                  (cycle_id, vendor_id, opening_balance, earnings, commissions,
-                  refund_deductions, adjustments, amount_due, status)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                  refund_deductions, adjustments, amount_due, status, currency, fx_rate_used)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                  RETURNING id`,
-                [cycleId, vendorId, openingBalance, earnings, commissions,
-                 refunds, adjustments, amountDue, status]
+                [cycleId, vendorId, displayOpeningBalance, displayEarnings, displayCommissions,
+                 displayRefunds, displayAdjustments, displayAmountDue, status, vendorCurrency, fxRateUsed]
             );
             const statementId = stmtRows[0].id;
 
@@ -378,7 +417,15 @@ exports.closeCycleAndGenerateStatements = async (req, res) => {
                 amount: amountDue
             });
 
-            for (const line of lines) {
+            // Convert every line into the same currency as the statement itself
+            // (including the synthetic opening/closing lines just added above)
+            // so the PDF/CSV/UI, which format every line with the statement's
+            // one `currency` field, never show a UGX number mislabeled as USD.
+            const linesToInsert = vendorCurrency === "USD"
+                ? lines.map((l) => ({ ...l, amount: convertUgxToUsd(l.amount, fxRateUsed) }))
+                : lines;
+
+            for (const line of linesToInsert) {
                 await client.query(
                     `INSERT INTO vendor_statement_lines (statement_id, line_type, reference_id, description, amount)
                      VALUES ($1, $2, $3, $4, $5)`,
@@ -457,6 +504,10 @@ exports.listStatementsAdmin = async (req, res) => {
             `SELECT s.id, s.cycle_id, s.vendor_id, s.opening_balance, s.earnings,
                     s.commissions, s.refund_deductions, s.adjustments, s.amount_due,
                     s.status, s.approved_at, s.paid_at, s.failure_reason, s.created_at,
+                    s.currency, s.fx_rate_used,
+                    (CASE WHEN s.currency = 'USD' AND s.fx_rate_used IS NOT NULL
+                          THEN s.amount_due * s.fx_rate_used
+                          ELSE s.amount_due END) AS ugx_equivalent,
                     v.business_name, v.phone,
                     COALESCE(k.kyc_status, 'not_started') AS kyc_status
              FROM vendor_statements s
@@ -553,6 +604,39 @@ exports.markStatementPaid = async (req, res) => {
         }
         if (!s.momo_number) {
             return res.status(400).json({ error: "Vendor has no MoMo number on file." });
+        }
+
+        // Phase 5: payment instrument approval. The check above only ever
+        // confirmed a MoMo number EXISTS, never that it was reviewed or
+        // belongs to this vendor under their own verified legal name - a
+        // fully KYC-verified vendor could still have quietly changed
+        // vendors.momo_number to someone else's account. Once a vendor has
+        // engaged with the reviewed-instrument system at all (has at least
+        // one row here), their PREFERRED instrument must be approved
+        // before any payout goes out. Vendors who haven't yet submitted
+        // any instrument fall through to the legacy momo_number check
+        // above unchanged, so existing payouts aren't blocked store-wide
+        // the moment this ships - only once someone's the actual audit
+        // trail for a mismatch review, e.g. the account was flagged for
+        // review, this gate takes over.
+        const anyInstrument = await client.query(
+            "SELECT 1 FROM vendor_payment_instruments WHERE vendor_id = $1 LIMIT 1",
+            [s.vendor_id]
+        );
+        if (anyInstrument.rows.length > 0) {
+            const preferredRow = await client.query(
+                `SELECT vpi.status FROM vendors v
+                 LEFT JOIN vendor_payment_instruments vpi ON vpi.id = v.preferred_instrument_id
+                 WHERE v.id = $1`,
+                [s.vendor_id]
+            );
+            const preferredStatus = preferredRow.rows[0] ? preferredRow.rows[0].status : null;
+            if (preferredStatus !== "approved") {
+                return res.status(409).json({
+                    error: "no_approved_payment_instrument",
+                    message: "This vendor's preferred payment instrument isn't approved yet. Review and approve a payment instrument (Payment Instruments queue) before paying this statement."
+                });
+            }
         }
 
         await client.query("BEGIN");
@@ -872,9 +956,28 @@ exports.listVendorStatements = async (req, res) => {
                    AND oi.delivered_at < $3::date + INTERVAL '1 day'`,
                 [vendorId, c.period_start, c.period_end]
             );
-            const earnings = Number(estRows[0].earnings) || 0;
-            const commissions = Number(estRows[0].commissions) || 0;
-            const estimatedAmount = earnings - commissions;
+            const earningsUgx = Number(estRows[0].earnings) || 0;
+            const commissionsUgx = Number(estRows[0].commissions) || 0;
+            const estimatedAmountUgx = earningsUgx - commissionsUgx;
+
+            // Phase 4 Beat 3: this cycle is still OPEN - nothing is locked
+            // yet, so this is a live-rate estimate purely for display. The
+            // real fx_rate_used gets locked once, for real, at cycle close
+            // (closeCycleAndGenerateStatements) - that's what determines the
+            // actual payout amount, not this preview.
+            let estimatedAmount = estimatedAmountUgx;
+            let estCurrency = currency;
+            if (currency === "USD") {
+                try {
+                    const { rate } = await getUsdToUgxRate();
+                    estimatedAmount = convertUgxToUsd(estimatedAmountUgx, rate);
+                } catch (fxError) {
+                    // Live rate unavailable right now - fall back to the
+                    // real UGX number rather than mislabeling it as USD.
+                    console.error("listVendorStatements: fx conversion failed for open-cycle estimate:", fxError.message);
+                    estCurrency = "UGX";
+                }
+            }
 
             currentCycle = {
                 id: c.id,
@@ -883,7 +986,7 @@ exports.listVendorStatements = async (req, res) => {
                 closes_at: c.closes_at,
                 daysRemaining,
                 estimatedAmount,
-                currency
+                currency: estCurrency
             };
         }
 
@@ -891,7 +994,7 @@ exports.listVendorStatements = async (req, res) => {
         const { rows: statements } = await pool.query(
             `SELECT s.id, s.cycle_id, s.opening_balance, s.earnings, s.commissions,
                     s.refund_deductions, s.adjustments, s.amount_due, s.status,
-                    s.paid_at, s.created_at, s.currency,
+                    s.paid_at, s.created_at, s.currency, s.fx_rate_used,
                     c.period_start::text AS period_start,
                     c.period_end::text AS period_end
              FROM vendor_statements s
@@ -923,7 +1026,8 @@ exports.listVendorStatements = async (req, res) => {
                 display_status: display,
                 paid_at: s.paid_at,
                 created_at: s.created_at,
-                currency: s.currency || currency
+                currency: s.currency || currency,
+                fx_rate_used: s.fx_rate_used !== null && s.fx_rate_used !== undefined ? Number(s.fx_rate_used) : null
             };
         });
 
@@ -934,13 +1038,26 @@ exports.listVendorStatements = async (req, res) => {
         threeMonthsAgo.setUTCDate(threeMonthsAgo.getUTCDate() - 90);
 
         for (const s of statements) {
+            const amount = Number(s.amount_due);
+            // Phase 4 Beat 3: normalize into the vendor's CURRENT preferred
+            // currency before summing - a vendor who switched currency
+            // between cycles otherwise gets USD and UGX statement amounts
+            // added together as if they were the same unit.
+            let normalized = amount;
+            if ((s.currency || "UGX") !== currency) {
+                try {
+                    normalized = normalizeAmount(amount, s.currency || "UGX", s.fx_rate_used, currency);
+                } catch (normError) {
+                    console.error("listVendorStatements: could not normalize statement", s.id, "for metrics:", normError.message);
+                }
+            }
             if (s.status === "paid") {
                 if (s.paid_at && new Date(s.paid_at) >= threeMonthsAgo) {
-                    paidLast3Months += Number(s.amount_due);
+                    paidLast3Months += normalized;
                 }
             } else if (s.status !== "rejected") {
                 // pending, approved, failed, rolled_forward all count as "unpaid"
-                dueAndUnpaid += Number(s.amount_due);
+                dueAndUnpaid += normalized;
             }
         }
 
@@ -956,6 +1073,46 @@ exports.listVendorStatements = async (req, res) => {
             },
             currency
         });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// --- Endpoint: updateMyPreferredCurrency (Phase 4 Beat 3) --------------
+// A vendor's own statement-display currency preference. Only affects
+// statements generated AFTER this change - already-generated statements
+// keep whatever currency was locked in at their own cycle close, exactly
+// like changing your bank's statement currency doesn't rewrite last
+// month's PDF.
+exports.updateMyPreferredCurrency = async (req, res) => {
+    try {
+        const { preferred_currency } = req.body;
+        if (!["UGX", "USD"].includes(preferred_currency)) {
+            return res.status(400).json({ error: "preferred_currency must be UGX or USD." });
+        }
+
+        const vendorRow = await pool.query(
+            "SELECT id, preferred_currency FROM vendors WHERE user_id = $1",
+            [req.user.userId]
+        );
+        if (vendorRow.rows.length === 0) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendor = vendorRow.rows[0];
+
+        if (vendor.preferred_currency === preferred_currency) {
+            return res.json({ message: "Already set.", preferred_currency });
+        }
+
+        await pool.query(
+            "UPDATE vendors SET preferred_currency = $1 WHERE id = $2",
+            [preferred_currency, vendor.id]
+        );
+
+        logActivity(req.user.userId, "vendor_currency_changed", "vendor", vendor.id,
+            `${vendor.preferred_currency} -> ${preferred_currency}`);
+
+        res.json({ message: "Preferred currency updated.", preferred_currency });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
