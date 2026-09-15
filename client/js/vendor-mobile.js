@@ -1427,6 +1427,256 @@ async function vmRequestPayout() {
     }
 }
 
+// --- Account Statements: sub-tabs + Jumia-style statements view -------------
+// The Wallet sub-view reuses vmLoadWallet()/vmRenderWallet() above.
+// The Statements sub-view mirrors the desktop experience: 3 metric cards,
+// filter chips, tappable statement rows, tap opens a detail screen.
+
+let vmStatementsState = {
+    loaded: false,
+    loading: false,
+    data: null,
+    filter: "all",
+    selectedStatementId: null
+};
+
+function vmFormatMoneyMobile(amount, currency) {
+    const n = Number(amount) || 0;
+    const abs = Math.abs(n).toLocaleString("en-UG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (n < 0 ? "-" : "") + abs + " " + (currency || "UGX");
+}
+
+function vmFormatPeriodMobile(start, end) {
+    if (!start || !end) return "-";
+    const s = new Date(start);
+    const e = new Date(end);
+    const sameMonth = s.getUTCMonth() === e.getUTCMonth() && s.getUTCFullYear() === e.getUTCFullYear();
+    if (sameMonth) {
+        return s.getUTCDate() + " - " + e.getUTCDate() + " " + e.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+    }
+    return s.toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) + " - " + e.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function vmStatusStyleMobile(displayStatus) {
+    if (displayStatus === "PAID") return { bg: "#dcfce7", fg: "#166534" };
+    if (displayStatus === "REJECTED") return { bg: "#fee2e2", fg: "#991b1b" };
+    return { bg: "#fef3c7", fg: "#92400e" };
+}
+
+window.vmSwitchWalletSubTab = function (which) {
+    const walletView = document.getElementById("vm-wallet-subview-wallet");
+    const statementsView = document.getElementById("vm-wallet-subview-statements");
+    const btnWallet = document.getElementById("vm-wallet-subtab-wallet");
+    const btnStatements = document.getElementById("vm-wallet-subtab-statements");
+    if (!walletView || !statementsView) return;
+
+    const activeStyle = "background:none; border:none; padding:8px 12px; font-size:14px; font-weight:600; color:#16264f; cursor:pointer; border-bottom:2px solid #16264f; margin-bottom:-1px;";
+    const inactiveStyle = "background:none; border:none; padding:8px 12px; font-size:14px; font-weight:600; color:#6b7280; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px;";
+
+    if (which === "statements") {
+        walletView.style.display = "none";
+        statementsView.style.display = "block";
+        btnWallet.setAttribute("style", inactiveStyle);
+        btnStatements.setAttribute("style", activeStyle);
+        if (!vmStatementsState.loaded && !vmStatementsState.loading) {
+            vmLoadStatements();
+        }
+    } else {
+        statementsView.style.display = "none";
+        walletView.style.display = "block";
+        btnStatements.setAttribute("style", inactiveStyle);
+        btnWallet.setAttribute("style", activeStyle);
+    }
+};
+
+async function vmLoadStatements() {
+    const el = document.getElementById("vm-statements-body");
+    if (!el) return;
+    vmStatementsState.loading = true;
+    el.innerHTML = '<div class="vm-loading-state">Loading statements...</div>';
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/me/statements");
+        if (data.error) {
+            el.innerHTML = '<div class="vm-loading-state">' + vendorEsc(data.error) + "</div>";
+            vmStatementsState.loading = false;
+            return;
+        }
+        vmStatementsState.data = data;
+        vmStatementsState.loaded = true;
+        vmStatementsState.loading = false;
+        el.innerHTML = vmRenderStatements();
+    } catch (error) {
+        console.error("vmLoadStatements error:", error);
+        el.innerHTML = '<div class="vm-loading-state">Could not load statements.</div>';
+        vmStatementsState.loading = false;
+    }
+}
+
+function vmRenderStatements() {
+    const d = vmStatementsState.data;
+    if (!d) return "";
+    const c = d.currency || "UGX";
+
+    const cards = [
+        { label: "Due & Unpaid", value: vmFormatMoneyMobile(d.metrics.due_and_unpaid, c) },
+        { label: "Open Statement", value: vmFormatMoneyMobile(d.metrics.open_statement_estimated, c) },
+        { label: "Paid in the last 3 months", value: vmFormatMoneyMobile(d.metrics.paid_last_3_months, c) }
+    ];
+    const metricsHtml = '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:14px;">' +
+        cards.map((card, i) => {
+            const span = i === 2 ? 'grid-column: span 2;' : '';
+            return '<div class="vm-card" style="' + span + ' margin:0; padding:14px;">' +
+                '<div style="font-size:19px; font-weight:800; color:#16264f; margin-bottom:4px;">' + vendorEsc(card.value) + '</div>' +
+                '<div style="font-size:11.5px; color:#6b7280;">' + vendorEsc(card.label) + '</div>' +
+            '</div>';
+        }).join("") + '</div>';
+
+    const filterHtml = '<div style="display:flex; gap:6px; padding:0 14px 12px; overflow-x:auto; white-space:nowrap;">' +
+        ["all", "open", "paid", "unpaid"].map(key => {
+            const active = vmStatementsState.filter === key;
+            const label = key.toUpperCase();
+            const style = active
+                ? "background:#16264f; color:#fff; border:none; padding:5px 12px; border-radius:999px; font-size:11.5px; font-weight:700; cursor:pointer; flex-shrink:0;"
+                : "background:#f3f4f6; color:#374151; border:1px solid #d1d5db; padding:5px 12px; border-radius:999px; font-size:11.5px; font-weight:600; cursor:pointer; flex-shrink:0;";
+            return '<button onclick="vmSetStatementsFilter(&#39;" + key + "&#39;)" style="' + style + '">' + label + '</button>';
+        }).join("") + '</div>';
+
+    return metricsHtml + filterHtml + '<div style="padding:0 14px 14px;">' + vmRenderStatementsList(d) + '</div>';
+}
+
+window.vmSetStatementsFilter = function (key) {
+    vmStatementsState.filter = key;
+    const el = document.getElementById("vm-statements-body");
+    if (el) el.innerHTML = vmRenderStatements();
+};
+
+function vmFilterStatements(statements) {
+    const f = vmStatementsState.filter;
+    if (f === "all") return statements;
+    if (f === "open") return [];
+    if (f === "paid") return statements.filter(s => s.display_status === "PAID");
+    if (f === "unpaid") return statements.filter(s => s.display_status !== "PAID" && s.display_status !== "REJECTED");
+    return statements;
+}
+
+function vmRenderStatementsList(d) {
+    const filtered = vmFilterStatements(d.statements);
+    const current = d.currentCycle;
+    let html = "";
+
+    if (current && (vmStatementsState.filter === "all" || vmStatementsState.filter === "open")) {
+        html += '<div class="vm-card" style="margin-bottom:10px; border:2px solid #f59e0b; background:#fffbeb;">' +
+            '<div style="font-size:11.5px; font-weight:700; color:#92400e; margin-bottom:4px;">OPEN</div>' +
+            '<div style="font-size:13.5px; font-weight:600; margin-bottom:4px;">' + vendorEsc(vmFormatPeriodMobile(current.period_start, current.period_end)) + '</div>' +
+            '<div style="font-size:11.5px; color:#6b7280; margin-bottom:6px;">Closes in ' + current.daysRemaining + ' day' + (current.daysRemaining === 1 ? "" : "s") + '</div>' +
+            '<div style="font-size:15px; font-weight:800; color:#16264f;">' + vendorEsc(vmFormatMoneyMobile(current.estimatedAmount, current.currency)) + '</div>' +
+        '</div>';
+    }
+
+    if (filtered.length === 0 && !(current && (vmStatementsState.filter === "all" || vmStatementsState.filter === "open"))) {
+        html += '<div class="vm-empty-state" style="padding:30px 0;">No statements in this filter.</div>';
+    } else {
+        html += filtered.map(s => {
+            const st = vmStatusStyleMobile(s.display_status);
+            return '<div class="vm-card" onclick="vmOpenStatementDetail(' + s.id + ')" style="margin-bottom:10px; cursor:pointer;">' +
+                '<div class="vm-order-card-top" style="margin-bottom:6px;">' +
+                    '<span style="font-size:13.5px; font-weight:600;">' + vendorEsc(vmFormatPeriodMobile(s.period_start, s.period_end)) + '</span>' +
+                    '<span style="font-size:12.5px; font-weight:700;">' + vendorEsc(vmFormatMoneyMobile(s.amount_due, s.currency)) + '</span>' +
+                '</div>' +
+                '<div style="font-size:11px; color:#6b7280; margin-bottom:6px; word-break:break-all;">' + vendorEsc(s.statement_number) + '</div>' +
+                '<span style="display:inline-block; background:' + st.bg + '; color:' + st.fg + '; padding:3px 9px; border-radius:999px; font-size:10.5px; font-weight:700;">' + vendorEsc(s.display_status) + '</span>' +
+            '</div>';
+        }).join("");
+    }
+    return html;
+}
+
+window.vmOpenStatementDetail = function (id) {
+    vmStatementsState.selectedStatementId = id;
+    const d = vmStatementsState.data;
+    if (!d) return;
+    const s = d.statements.find(x => x.id === id);
+    if (!s) return;
+
+    const body = document.getElementById("vm-statement-detail-body");
+    const st = vmStatusStyleMobile(s.display_status);
+
+    body.innerHTML = '<div style="padding:14px;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; gap:10px;">' +
+            '<div>' +
+                '<div style="font-size:16px; font-weight:700; margin-bottom:4px;">' + vendorEsc(vmFormatPeriodMobile(s.period_start, s.period_end)) + '</div>' +
+                '<div style="font-size:11.5px; color:#6b7280; word-break:break-all;">' + vendorEsc(s.statement_number) + '</div>' +
+            '</div>' +
+            '<span style="background:' + st.bg + '; color:' + st.fg + '; padding:4px 10px; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap;">' + vendorEsc(s.display_status) + '</span>' +
+        '</div>' +
+
+        '<div class="vm-card" style="margin-bottom:12px;">' +
+            '<div style="display:flex; justify-content:space-between; font-size:13.5px; padding-bottom:10px; border-bottom:1px solid #e5e7eb; margin-bottom:10px;">' +
+                '<span>Opening Balance</span><span>' + vendorEsc(vmFormatMoneyMobile(s.opening_balance, s.currency)) + '</span>' +
+            '</div>' +
+            '<div style="display:flex; justify-content:space-between; font-size:13.5px; margin-bottom:8px;"><span>Earnings</span><span>' + vendorEsc(vmFormatMoneyMobile(s.earnings, s.currency)) + '</span></div>' +
+            '<div style="display:flex; justify-content:space-between; font-size:13.5px; margin-bottom:8px;"><span>Marketplace charges</span><span>-' + vendorEsc(vmFormatMoneyMobile(s.commissions, s.currency)) + '</span></div>' +
+            '<div style="display:flex; justify-content:space-between; font-size:13.5px; margin-bottom:8px;"><span>Refunds</span><span>-' + vendorEsc(vmFormatMoneyMobile(s.refund_deductions, s.currency)) + '</span></div>' +
+            (s.adjustments !== 0 ? '<div style="display:flex; justify-content:space-between; font-size:13.5px; margin-bottom:8px;"><span>Adjustments</span><span>' + vendorEsc(vmFormatMoneyMobile(s.adjustments, s.currency)) + '</span></div>' : "") +
+            '<div style="display:flex; justify-content:space-between; font-size:14.5px; font-weight:800; color:#16264f; padding-top:10px; border-top:2px solid #16264f; margin-top:10px;"><span>CLOSING BALANCE</span><span>' + vendorEsc(vmFormatMoneyMobile(s.amount_due, s.currency)) + '</span></div>' +
+            '<div style="display:flex; justify-content:space-between; font-size:14.5px; font-weight:800; color:#16264f; padding-top:10px; border-top:1px solid #e5e7eb; margin-top:10px;"><span>PAYOUT</span><span>' + vendorEsc(vmFormatMoneyMobile(s.amount_due, s.currency)) + '</span></div>' +
+        '</div>' +
+
+        '<button class="vm-btn-primary" onclick="vmDownloadMobileStatement(&#39;pdf&#39;, ' + s.id + ')" style="width:100%; margin-bottom:8px;">Download all transactions</button>' +
+        '<div style="display:flex; gap:8px;">' +
+            '<button class="vm-btn-primary" onclick="vmDownloadMobileStatement(&#39;csv&#39;, ' + s.id + ')" style="flex:1; background:#fff; color:#16264f; border:1px solid #16264f;">CSV</button>' +
+            '<button class="vm-btn-primary" onclick="vmShareMobileStatement(' + s.id + ')" style="flex:1; background:#fff; color:#16264f; border:1px solid #16264f;">Share</button>' +
+        '</div>' +
+    '</div>';
+
+    vmShowScreen("statement-detail");
+};
+
+window.vmBackFromStatementDetail = function () {
+    vmShowScreen("wallet");
+    vmSwitchWalletSubTab("statements");
+};
+
+window.vmDownloadMobileStatement = async function (kind, id) {
+    try {
+        const token = getVendorToken();
+        const url = kind === "csv"
+            ? "/api/vendors/me/statements/" + id + "/csv"
+            : "/api/vendors/me/statements/" + id + "/pdf";
+        const res = await fetch(url, { headers: { "Authorization": "Bearer " + token } });
+        if (!res.ok) { alert("Could not download statement."); return; }
+        const blob = await res.blob();
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "statement-" + id + (kind === "csv" ? ".csv" : ".pdf");
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+    } catch (e) {
+        console.error("Download statement error:", e);
+        alert("Could not download statement.");
+    }
+};
+
+window.vmShareMobileStatement = async function (id) {
+    if (!confirm("Generate a shareable link for this statement? It expires in 30 days.")) return;
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/me/statements/" + id + "/share", { method: "POST" });
+        if (data.error) { alert(data.error); return; }
+        const full = (data.full_url && data.full_url.startsWith("http")) ? data.full_url : (window.location.origin + data.share_url);
+        try {
+            await navigator.clipboard.writeText(full);
+            alert("Shareable link copied:\n\n" + full);
+        } catch (e) {
+            prompt("Copy this link:", full);
+        }
+    } catch (e) {
+        console.error("Share statement error:", e);
+        alert("Could not generate share link.");
+    }
+};
+
 // --- Profile ----------------------------------------------------------------
 // Merges what the desktop splits across two tabs (Overview's profile
 // details + Account's notices/logout) into one mobile screen, plus the

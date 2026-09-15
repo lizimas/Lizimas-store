@@ -349,7 +349,25 @@
     <!-- Account Statements (Wallet) ---------------------------------------------- -->
     <div class="vm-screen" id="vm-screen-wallet">
         <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Account Statements</span></div>
-        <div id="vm-wallet-body"><div class="vm-loading-state">Loading...</div></div>
+
+        <div style="display:flex; gap:6px; padding:0 14px 12px; border-bottom:1px solid #e5e7eb;">
+            <button type="button" id="vm-wallet-subtab-wallet" onclick="vmSwitchWalletSubTab('wallet')" style="background:none; border:none; padding:8px 12px; font-size:14px; font-weight:600; color:#16264f; cursor:pointer; border-bottom:2px solid #16264f; margin-bottom:-1px;">Wallet</button>
+            <button type="button" id="vm-wallet-subtab-statements" onclick="vmSwitchWalletSubTab('statements')" style="background:none; border:none; padding:8px 12px; font-size:14px; font-weight:600; color:#6b7280; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px;">Statements</button>
+        </div>
+
+        <div id="vm-wallet-subview-wallet">
+            <div id="vm-wallet-body"><div class="vm-loading-state">Loading...</div></div>
+        </div>
+
+        <div id="vm-wallet-subview-statements" style="display:none;">
+            <div id="vm-statements-body"><div class="vm-loading-state">Loading...</div></div>
+        </div>
+    </div>
+
+    <!-- Statement Detail (mobile) -------------------------------------------------- -->
+    <div class="vm-screen" id="vm-screen-statement-detail">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" onclick="vmBackFromStatementDetail()"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Statement Details</span></div>
+        <div id="vm-statement-detail-body"><div class="vm-loading-state">Loading...</div></div>
     </div>
 
     <!-- Profile ------------------------------------------------------------------- -->
