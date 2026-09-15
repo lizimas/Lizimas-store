@@ -225,6 +225,28 @@
                 <section id="tab-orders" class="tab-content hidden">
                     <h2 class="admin-page-title">All Orders</h2>
                     <input type="text" id="order-search-input" class="product-search-input" placeholder="Search orders by #, customer, or status..." oninput="renderOrdersTable()">
+                    <!-- Phase B - orders filter panel (date range, payment method) -->
+                    <div id="order-filter-panel" style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin:10px 0 16px;">
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <label for="order-filter-date-from" style="font-size:11px; font-weight:700; color:#6b7280; letter-spacing:.5px;">FROM</label>
+                            <input type="date" id="order-filter-date-from" onchange="renderOrdersTable()" style="padding:7px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;">
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <label for="order-filter-date-to" style="font-size:11px; font-weight:700; color:#6b7280; letter-spacing:.5px;">TO</label>
+                            <input type="date" id="order-filter-date-to" onchange="renderOrdersTable()" style="padding:7px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;">
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <label for="order-filter-payment-method" style="font-size:11px; font-weight:700; color:#6b7280; letter-spacing:.5px;">PAYMENT METHOD</label>
+                            <select id="order-filter-payment-method" onchange="renderOrdersTable()" style="padding:7px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;">
+                                <option value="">All methods</option>
+                                <option value="Mobile Money">Mobile Money (MTN / Airtel)</option>
+                                <option value="Card Payment">Card Payment</option>
+                                <option value="FlexiPay">FlexiPay</option>
+                                <option value="Cash on Delivery">Cash on Delivery</option>
+                            </select>
+                        </div>
+                        <button type="button" onclick="clearOrderFilters()" style="padding:8px 14px; border:1px solid #d1d5db; border-radius:6px; background:#fff; font-size:13px; font-weight:600; cursor:pointer; color:#374151;">Clear filters</button>
+                    </div>
                     <div id="orders-table">Loading...</div>
                 </section>
 

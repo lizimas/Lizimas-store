@@ -496,18 +496,37 @@ function renderOrdersTable() {
     const searchInput = document.getElementById("order-search-input");
     const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : "";
 
+    // Phase B - date range + payment method filter panel. Client-side,
+    // matching the existing search filter's approach (adminOrders is
+    // already loaded in full - see loadOrders() above).
+    const dateFromInput = document.getElementById("order-filter-date-from");
+    const dateToInput = document.getElementById("order-filter-date-to");
+    const paymentMethodSelect = document.getElementById("order-filter-payment-method");
+    const dateFrom = dateFromInput && dateFromInput.value ? new Date(dateFromInput.value + "T00:00:00") : null;
+    const dateTo = dateToInput && dateToInput.value ? new Date(dateToInput.value + "T23:59:59") : null;
+    const paymentMethod = paymentMethodSelect ? paymentMethodSelect.value : "";
+
     let orders = adminOrders;
     if (searchTerm) {
-        orders = adminOrders.filter(order => {
+        orders = orders.filter(order => {
             const customer = (order.customer_name || order.customer_email || "guest").toLowerCase();
             return String(order.id).includes(searchTerm)
                 || customer.includes(searchTerm)
                 || (order.status || "").toLowerCase().includes(searchTerm);
         });
     }
+    if (dateFrom) {
+        orders = orders.filter(order => new Date(order.created_at) >= dateFrom);
+    }
+    if (dateTo) {
+        orders = orders.filter(order => new Date(order.created_at) <= dateTo);
+    }
+    if (paymentMethod) {
+        orders = orders.filter(order => order.payment_method === paymentMethod);
+    }
 
     if (orders.length === 0) {
-        ordersTable.innerHTML = `<p class="no-data">No orders found.</p>`;
+        ordersTable.innerHTML = `<p class="no-data">No orders match these filters.</p>`;
         return;
     }
 
@@ -549,6 +568,19 @@ function renderOrdersTable() {
             </tbody>
         </table>
     `;
+}
+
+// Phase B - resets the orders filter panel and re-renders.
+function clearOrderFilters() {
+    const searchInput = document.getElementById("order-search-input");
+    const dateFromInput = document.getElementById("order-filter-date-from");
+    const dateToInput = document.getElementById("order-filter-date-to");
+    const paymentMethodSelect = document.getElementById("order-filter-payment-method");
+    if (searchInput) searchInput.value = "";
+    if (dateFromInput) dateFromInput.value = "";
+    if (dateToInput) dateToInput.value = "";
+    if (paymentMethodSelect) paymentMethodSelect.value = "";
+    renderOrdersTable();
 }
 
 async function updateOrderStatus(orderId, newStatus) {

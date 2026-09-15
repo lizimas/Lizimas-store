@@ -106,6 +106,23 @@ const {
     updateVendorUrsbVerification,
     reviewVendorKycDocumentAdmin
 } = require("../controllers/vendorKycController");
+const {
+    listBrandAuthorizationsAdmin,
+    getBrandAuthorizationAdminDetail,
+    reviewBrandAuthorizationAdmin,
+    reviewBrandAuthDocumentAdmin,
+    getBrandAuthDocumentAdmin
+} = require("../controllers/vendorBrandAuthController");
+const {
+    listPaymentInstrumentsAdmin,
+    reviewPaymentInstrumentAdmin
+} = require("../controllers/vendorPaymentInstrumentsController");
+const {
+    listProhibitedItemsAdmin,
+    addProhibitedItemAdmin,
+    updateProhibitedItemAdmin,
+    deleteProhibitedItemAdmin
+} = require("../controllers/prohibitedItemsController");
 
 const {
     getCurrentCycle,
@@ -260,6 +277,20 @@ router.get("/vendors/:id/kyc", getVendorKycAdminDetail);
 router.patch("/vendors/:id/kyc/review", reviewVendorKycAdmin);
 router.patch("/vendors/:id/kyc/ursb", updateVendorUrsbVerification);
 router.patch("/vendors/:id/kyc/documents/:documentType/review", reviewVendorKycDocumentAdmin);
+
+router.get("/brand-authorizations", listBrandAuthorizationsAdmin);
+router.get("/brand-authorizations/:id", getBrandAuthorizationAdminDetail);
+router.patch("/brand-authorizations/:id/review", reviewBrandAuthorizationAdmin);
+router.patch("/brand-authorizations/:id/documents/:documentType/review", reviewBrandAuthDocumentAdmin);
+router.get("/brand-authorizations/:id/documents/:documentType/url", getBrandAuthDocumentAdmin);
+
+router.get("/payment-instruments", listPaymentInstrumentsAdmin);
+router.patch("/payment-instruments/:id/review", reviewPaymentInstrumentAdmin);
+
+router.get("/prohibited-items", listProhibitedItemsAdmin);
+router.post("/prohibited-items", addProhibitedItemAdmin);
+router.patch("/prohibited-items/:id", updateProhibitedItemAdmin);
+router.delete("/prohibited-items/:id", deleteProhibitedItemAdmin);
 
 // --- Billing Cycles (Phase 4) ---
 router.get("/billing/current", getCurrentCycle);

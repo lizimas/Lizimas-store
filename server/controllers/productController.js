@@ -5,6 +5,25 @@ const { logActivity } = require("../utils/activityLog");
 const { canApplyComplianceAction } = require("../utils/vendorCompliance");
 const { createVendorNotification } = require("./vendorController");
 const { calculatePricing } = require("../utils/commissionEngine");
+const { checkProductAgainstProhibitedList } = require("../utils/prohibitedItems");
+
+// Phase 8: shared helper - loads the active prohibited-items list and
+// checks one product against it. Used by both addProduct and
+// updateProduct so a vendor can't slip a banned listing through either
+// path. Returns null when clear, or a ready-to-send 400 error body when
+// blocked.
+async function checkProhibitedOrNull({ name, description, brand, category_id }) {
+    const { rows: activeList } = await pool.query(
+        `SELECT keyword, category_id, reason FROM prohibited_items WHERE is_active = true`
+    );
+    const result = checkProductAgainstProhibitedList({ name, description, brand, category_id }, activeList);
+    if (!result.blocked) return null;
+    return {
+        error: "prohibited_item",
+        message: "This listing can't be saved - it matches an item Lizimas doesn't allow.",
+        matches: result.matches.map((m) => ({ type: m.type, reason: m.reason }))
+    };
+}
 
 // Upload a single file buffer to Cloudinary, returns the secure URL
 function uploadBufferToCloudinary(fileBuffer) {
@@ -54,6 +73,12 @@ exports.addProduct = async (req, res) => {
 
         const packageSize = safePackageSize(package_size);
         const warrantyMonths = warranty_months ? Number(warranty_months) : null;
+
+        // Phase 8: prohibited items. Checked first, before any image
+        // upload or pricing work, so a blocked listing never even reaches
+        // Cloudinary.
+        const prohibitedError = await checkProhibitedOrNull({ name, description, brand, category_id });
+        if (prohibitedError) return res.status(400).json(prohibitedError);
 
         const status = ["product_staff", "vendor"].includes(req.user.role) ? "pending" : "approved";
 
@@ -840,6 +865,11 @@ exports.updateProduct = async (req, res) => {
 
         const packageSize = safePackageSize(package_size);
         const warrantyMonths = warranty_months ? Number(warranty_months) : null;
+
+        // Phase 8: prohibited items - a vendor editing a listing into
+        // something prohibited is blocked exactly like a new listing would be.
+        const prohibitedError = await checkProhibitedOrNull({ name, description, brand, category_id });
+        if (prohibitedError) return res.status(400).json(prohibitedError);
 
         const uploadedFiles = req.files || [];
         const newImagePaths = await Promise.all(
