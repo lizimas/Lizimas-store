@@ -932,21 +932,34 @@
                 </section>
 
                 <section id="tab-wallet" class="tab-content hidden">
-                    <h2 class="admin-page-title">Wallet</h2>
+                    <h2 class="admin-page-title">Account Statements</h2>
                     <p class="admin-page-subtitle">
-                        Your available balance is what delivered orders are worth to you right now, after Lizimas'
-                        marketplace charges. Once it reaches the minimum payout, request a MoMo payout below.
+                        Your earnings are paid out on a weekly cycle (Monday to Sunday). Each closed cycle generates a statement you can download, and Lizimas sends your MoMo payout after admin review.
                     </p>
-                    <div class="panel">
-                        <div id="vendor-wallet-summary">Loading...</div>
+
+                    <div style="display:flex; gap:8px; margin-bottom:16px; border-bottom:1px solid #e5e7eb; padding-bottom:0;">
+                        <button type="button" id="wallet-subtab-wallet" class="wallet-subtab active" onclick="switchWalletSubTab('wallet')" style="background:none; border:none; padding:10px 14px; font-size:14px; font-weight:600; color:#16264f; cursor:pointer; border-bottom:2px solid #16264f; margin-bottom:-1px;">Wallet</button>
+                        <button type="button" id="wallet-subtab-statements" class="wallet-subtab" onclick="switchWalletSubTab('statements')" style="background:none; border:none; padding:10px 14px; font-size:14px; font-weight:600; color:#6b7280; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px;">Statements</button>
                     </div>
-                    <div class="panel" style="margin-top:16px;">
-                        <h3 style="margin:0 0 10px;">Payout History</h3>
-                        <div id="vendor-payout-history">Loading...</div>
+
+                    <!-- Wallet sub-view (existing content) -->
+                    <div id="wallet-subview-wallet">
+                        <div class="panel">
+                            <div id="vendor-wallet-summary">Loading...</div>
+                        </div>
+                        <div class="panel" style="margin-top:16px;">
+                            <h3 style="margin:0 0 10px;">Payout History</h3>
+                            <div id="vendor-payout-history">Loading...</div>
+                        </div>
+                        <div class="panel" style="margin-top:16px;">
+                            <h3 style="margin:0 0 10px;">Balance Adjustments</h3>
+                            <div id="vendor-ledger-adjustments">Loading...</div>
+                        </div>
                     </div>
-                    <div class="panel" style="margin-top:16px;">
-                        <h3 style="margin:0 0 10px;">Balance Adjustments</h3>
-                        <div id="vendor-ledger-adjustments">Loading...</div>
+
+                    <!-- Statements sub-view (new) -->
+                    <div id="wallet-subview-statements" style="display:none;">
+                        <div id="vendor-statements-root">Loading...</div>
                     </div>
                 </section>
 
@@ -1251,6 +1264,7 @@
     <script src="../js/prepare-picked-file.js?v=10"></script>
     <script src="../js/description-block-editor.js?v=1"></script>
     <script src="../js/vendor-dashboard.js?v=20"></script>
+    <script src="../js/vendor-statements.js?v=1"></script>
 <script src="../js/vendor-mobile.js?v=2"></script>
 </body>
 </html>

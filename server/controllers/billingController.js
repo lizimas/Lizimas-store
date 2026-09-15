@@ -822,6 +822,145 @@ exports.serveSharedStatement = async (req, res) => {
     }
 };
 
+
+// --- Endpoint: listVendorStatements (vendor's own) --------------------
+// Powers the vendor's Account Statements page. Returns:
+//   - currentCycle: the OPEN cycle right now (or null), with days remaining
+//   - statements:   ALL of this vendor's statements, newest first
+//   - metrics:      the 3 Jumia-style summary cards
+//     * due_and_unpaid         = sum of UNPAID statements (pending + approved + failed + rolled)
+//     * open_statement_estimated = current cycle's running total (not yet closed)
+//     * paid_last_3_months     = sum of paid statements in the last 90 days
+exports.listVendorStatements = async (req, res) => {
+    try {
+        const vendorRow = await pool.query("SELECT id, preferred_currency FROM vendors WHERE user_id = $1", [req.user.userId]);
+        if (vendorRow.rows.length === 0) return res.status(404).json({ error: "No vendor profile." });
+        const vendorId = vendorRow.rows[0].id;
+        const currency = vendorRow.rows[0].preferred_currency || "UGX";
+
+        // --- Current open cycle ---
+        const { rows: cycleRows } = await pool.query(
+            `SELECT id, period_start::text AS period_start, period_end::text AS period_end,
+                    closes_at, status, is_test
+             FROM vendor_billing_cycles
+             WHERE status = 'open'
+             ORDER BY period_start DESC LIMIT 1`
+        );
+        let currentCycle = null;
+        if (cycleRows.length > 0) {
+            const c = cycleRows[0];
+            const ms = new Date(c.closes_at) - new Date();
+            const daysRemaining = Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+
+            // Running estimate for this cycle: earnings delivered during the
+            // window, minus commissions, minus refunds, plus adjustments.
+            const { rows: estRows } = await pool.query(
+                `SELECT
+                    COALESCE(SUM(oi.price * oi.quantity), 0) AS earnings,
+                    COALESCE(SUM(
+                      CASE WHEN oi.commission_rate_applied IS NOT NULL
+                           THEN oi.price * oi.quantity * oi.commission_rate_applied
+                                + COALESCE(oi.fixed_fee_applied, 0) * oi.quantity
+                           ELSE 0 END
+                    ), 0) AS commissions
+                 FROM order_items oi
+                 JOIN orders o ON o.id = oi.order_id
+                 JOIN products p ON p.id = oi.product_id
+                 WHERE p.vendor_id = $1
+                   AND o.status = 'delivered'
+                   AND oi.delivered_at >= $2
+                   AND oi.delivered_at < $3::date + INTERVAL '1 day'`,
+                [vendorId, c.period_start, c.period_end]
+            );
+            const earnings = Number(estRows[0].earnings) || 0;
+            const commissions = Number(estRows[0].commissions) || 0;
+            const estimatedAmount = earnings - commissions;
+
+            currentCycle = {
+                id: c.id,
+                period_start: c.period_start,
+                period_end: c.period_end,
+                closes_at: c.closes_at,
+                daysRemaining,
+                estimatedAmount,
+                currency
+            };
+        }
+
+        // --- All statements (newest first) ---
+        const { rows: statements } = await pool.query(
+            `SELECT s.id, s.cycle_id, s.opening_balance, s.earnings, s.commissions,
+                    s.refund_deductions, s.adjustments, s.amount_due, s.status,
+                    s.paid_at, s.created_at, s.currency,
+                    c.period_start::text AS period_start,
+                    c.period_end::text AS period_end
+             FROM vendor_statements s
+             JOIN vendor_billing_cycles c ON c.id = s.cycle_id
+             WHERE s.vendor_id = $1
+             ORDER BY c.period_end DESC, s.id DESC`,
+            [vendorId]
+        );
+
+        // Add display_status and statement_number per row
+        const statementsOut = statements.map(s => {
+            let display;
+            if (s.status === "paid") display = "PAID";
+            else if (s.status === "rejected") display = "REJECTED";
+            else display = "UNPAID"; // pending, approved, failed, rolled_forward
+            return {
+                id: s.id,
+                cycle_id: s.cycle_id,
+                period_start: s.period_start,
+                period_end: s.period_end,
+                statement_number: statementNumber({ vendorId, periodEnd: s.period_end }),
+                opening_balance: Number(s.opening_balance),
+                earnings: Number(s.earnings),
+                commissions: Number(s.commissions),
+                refund_deductions: Number(s.refund_deductions),
+                adjustments: Number(s.adjustments),
+                amount_due: Number(s.amount_due),
+                status: s.status,
+                display_status: display,
+                paid_at: s.paid_at,
+                created_at: s.created_at,
+                currency: s.currency || currency
+            };
+        });
+
+        // --- Metrics ---
+        let dueAndUnpaid = 0;
+        let paidLast3Months = 0;
+        const threeMonthsAgo = new Date();
+        threeMonthsAgo.setUTCDate(threeMonthsAgo.getUTCDate() - 90);
+
+        for (const s of statements) {
+            if (s.status === "paid") {
+                if (s.paid_at && new Date(s.paid_at) >= threeMonthsAgo) {
+                    paidLast3Months += Number(s.amount_due);
+                }
+            } else if (s.status !== "rejected") {
+                // pending, approved, failed, rolled_forward all count as "unpaid"
+                dueAndUnpaid += Number(s.amount_due);
+            }
+        }
+
+        const openStatementEstimated = currentCycle ? currentCycle.estimatedAmount : 0;
+
+        res.json({
+            currentCycle,
+            statements: statementsOut,
+            metrics: {
+                due_and_unpaid: dueAndUnpaid,
+                open_statement_estimated: openStatementEstimated,
+                paid_last_3_months: paidLast3Months
+            },
+            currency
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 module.exports = exports;
 module.exports.cycleBoundsForDate = cycleBoundsForDate;
 module.exports.closesAtForPeriodEnd = closesAtForPeriodEnd;

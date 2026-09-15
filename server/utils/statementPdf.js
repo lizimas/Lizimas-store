@@ -1,13 +1,9 @@
-// Statement PDF generator (Phase 4).
+// Statement PDF generator (Phase 4) - compact single-page layout.
 //
-// Layout matches Jumia's Vendor Center statement panel:
-//   Header (logo + statement number + cycle dates)
-//   Vendor block (name, owner, phone, MoMo)
-//   Opening Balance
-//   Line items table
-//   CLOSING BALANCE
-//   PAYOUT
-//   Footer (payment method, dispute window, contact)
+// Fits header, vendor block, Opening Balance, itemized transactions,
+// CLOSING BALANCE, PAYOUT and footer on ONE A4 portrait page for
+// statements with up to ~25 line items. Longer statements auto-flow to
+// page 2 rather than overflowing.
 //
 // Pure function - no DB, no HTTP. Returns a Promise<Buffer>.
 
@@ -23,29 +19,25 @@ const GREY_LINE = "#e5e7eb";
 
 const LOGO_PATH = path.resolve(__dirname, "..", "..", "client", "images", "logo", "lizimas-store-logo.jpg");
 
-// Format UGX value with suffix, matching Jumia: "561,060.00 UGX"
+const MARGIN = 36;
+const LEFT = MARGIN;
+const RIGHT = 595.28 - MARGIN;   // A4 width in points minus margin
+const CENTER = (LEFT + RIGHT) / 2;
+const PAGE_HEIGHT = 841.89;      // A4 height in points
+const BOTTOM_LIMIT = PAGE_HEIGHT - MARGIN;
+
 function formatMoney(n, currency) {
     const num = Number(n) || 0;
-    const abs = Math.abs(num).toLocaleString("en-UG", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    });
+    const abs = Math.abs(num).toLocaleString("en-UG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return (num < 0 ? "-" : "") + abs + " " + (currency || "UGX");
 }
 
 function formatDate(d) {
     if (!d) return "-";
     const dt = new Date(d);
-    return dt.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric"
-    });
+    return dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-// PAID / UNPAID - what the vendor sees. Everything except paid shows as
-// UNPAID in Beat 1 (pending, approved, failed, rolled_forward). Rejected
-// shows as UNPAID too, since the vendor needs to know it's not been paid.
 function displayStatus(internalStatus) {
     if (internalStatus === "paid") return "PAID";
     return "UNPAID";
@@ -56,9 +48,6 @@ function displayStatusColor(internalStatus) {
     return "#c99a00";
 }
 
-// Main generator. Options object shape:
-//   { statement, lines, vendor, cycle }
-// All fields passed in, no DB access.
 function generateStatementPdf(opts) {
     return new Promise((resolve, reject) => {
         try {
@@ -67,7 +56,7 @@ function generateStatementPdf(opts) {
             const vendor = opts.vendor || {};
             const cycle = opts.cycle || {};
 
-            const doc = new PDFDocument({ size: "A4", margin: 50 });
+            const doc = new PDFDocument({ size: "A4", margin: MARGIN });
             const chunks = [];
             doc.on("data", (c) => chunks.push(c));
             doc.on("end", () => resolve(Buffer.concat(chunks)));
@@ -81,115 +70,112 @@ function generateStatementPdf(opts) {
 
             // ---- Header ----
             try {
-                doc.image(LOGO_PATH, 50, 48, { width: 70 });
+                doc.image(LOGO_PATH, LEFT, MARGIN, { width: 42 });
             } catch (imgErr) {
-                // Fall back to text if the logo file is missing.
-                doc.fillColor(BRAND_NAVY).fontSize(18).font("Helvetica-Bold")
-                   .text("LIZIMAS", 50, 55);
+                doc.fillColor(BRAND_NAVY).fontSize(14).font("Helvetica-Bold")
+                   .text("LIZIMAS STORE", LEFT, MARGIN);
             }
 
-            doc.fillColor(BRAND_NAVY).fontSize(10).font("Helvetica-Bold")
-               .text("LIZIMAS STORE", 130, 52);
-            doc.fontSize(8).font("Helvetica").fillColor(GREY_TEXT)
-               .text("Kampala, Uganda", 130, 68)
-               .text("support@lizimasstore.com", 130, 80);
+            doc.fillColor(BRAND_NAVY).fontSize(9).font("Helvetica-Bold")
+               .text("LIZIMAS STORE", LEFT + 52, MARGIN + 2);
+            doc.fontSize(7).font("Helvetica").fillColor(GREY_TEXT)
+               .text("Kampala, Uganda", LEFT + 52, MARGIN + 15)
+               .text("support@lizimasstore.com", LEFT + 52, MARGIN + 25);
 
             // Right side: statement identifier
-            doc.fillColor(BRAND_NAVY).fontSize(14).font("Helvetica-Bold")
-               .text("VENDOR STATEMENT", 300, 52, { width: 245, align: "right" });
-            doc.fontSize(10).font("Helvetica").fillColor(GREY_TEXT)
-               .text(stmtNo, 300, 72, { width: 245, align: "right" })
+            doc.fillColor(BRAND_NAVY).fontSize(13).font("Helvetica-Bold")
+               .text("VENDOR STATEMENT", 300, MARGIN + 2, { width: RIGHT - 300, align: "right" });
+            doc.fontSize(9).font("Helvetica").fillColor(GREY_TEXT)
+               .text(stmtNo, 300, MARGIN + 20, { width: RIGHT - 300, align: "right" })
                .text("Cycle: " + formatDate(cycle.period_start) + " - " + formatDate(cycle.period_end),
-                     300, 86, { width: 245, align: "right" });
+                     300, MARGIN + 32, { width: RIGHT - 300, align: "right" });
 
-            // Status pill
             const statusLabel = displayStatus(statement.status);
             const statusColor = displayStatusColor(statement.status);
-            doc.fillColor(statusColor).fontSize(10).font("Helvetica-Bold")
-               .text(statusLabel, 300, 104, { width: 245, align: "right" });
+            doc.fillColor(statusColor).fontSize(9).font("Helvetica-Bold")
+               .text(statusLabel, 300, MARGIN + 46, { width: RIGHT - 300, align: "right" });
 
             // Divider
-            doc.moveTo(50, 145).lineTo(545, 145).strokeColor(BRAND_NAVY).lineWidth(1.5).stroke();
+            let y = MARGIN + 66;
+            doc.moveTo(LEFT, y).lineTo(RIGHT, y).strokeColor(BRAND_NAVY).lineWidth(1).stroke();
+            y += 10;
 
-            // ---- Vendor block ----
-            doc.fillColor(BRAND_NAVY).fontSize(11).font("Helvetica-Bold").text("Vendor", 50, 162);
-            doc.fontSize(10).font("Helvetica").fillColor("#111")
-               .text(vendor.business_name || "-", 50, 180)
-               .text("Owner: " + (vendor.owner_name || "-"), 50, 196)
-               .text("Phone: " + (vendor.phone || "-"), 50, 212)
-               .text("MoMo: " + (vendor.momo_number || "-"), 50, 228);
+            // ---- Vendor block (2-column, compact) ----
+            doc.fillColor(BRAND_NAVY).fontSize(10).font("Helvetica-Bold").text("Vendor", LEFT, y);
+            doc.fillColor("#111").fontSize(8.5).font("Helvetica")
+               .text(vendor.business_name || "-", LEFT, y + 13)
+               .text("Owner: " + (vendor.owner_name || "-"), LEFT, y + 24)
+               .text("Phone: " + (vendor.phone || "-") + "   MoMo: " + (vendor.momo_number || "-"), LEFT, y + 35);
 
-            doc.fillColor(GREY_TEXT).fontSize(9).font("Helvetica")
-               .text("Issued: " + formatDate(statement.created_at), 300, 180, { width: 245, align: "right" })
-               .text("Currency: " + currency, 300, 196, { width: 245, align: "right" });
+            doc.fillColor(GREY_TEXT).fontSize(8).font("Helvetica")
+               .text("Issued: " + formatDate(statement.created_at), 340, y + 13, { width: RIGHT - 340, align: "right" })
+               .text("Currency: " + currency, 340, y + 24, { width: RIGHT - 340, align: "right" });
+            y += 52;
 
             // ---- Opening Balance band ----
-            let y = 270;
-            doc.rect(50, y, 495, 32).fillColor("#f9fafb").fill();
-            doc.fillColor("#111").fontSize(11).font("Helvetica-Bold")
-               .text("Opening Balance", 62, y + 10);
-            doc.fillColor("#111").fontSize(11).font("Helvetica-Bold")
-               .text(formatMoney(statement.opening_balance, currency), 300, y + 10, { width: 233, align: "right" });
-            y += 50;
+            doc.rect(LEFT, y, RIGHT - LEFT, 20).fillColor("#f9fafb").fill();
+            doc.fillColor("#111").fontSize(9.5).font("Helvetica-Bold")
+               .text("Opening Balance", LEFT + 8, y + 5.5);
+            doc.fillColor("#111").fontSize(9.5).font("Helvetica-Bold")
+               .text(formatMoney(statement.opening_balance, currency), 300, y + 5.5, { width: RIGHT - 308, align: "right" });
+            y += 28;
 
-            // ---- Line items ----
+            // ---- Transactions ----
             if (lines.length > 0) {
-                doc.fontSize(11).font("Helvetica-Bold").fillColor(BRAND_NAVY)
-                   .text("Transactions", 50, y);
-                y += 20;
-
-                doc.fontSize(9).font("Helvetica-Bold").fillColor(GREY_TEXT);
-                doc.text("Type", 55, y);
-                doc.text("Description", 155, y);
-                doc.text("Amount", 320, y, { width: 220, align: "right" });
+                doc.fontSize(10).font("Helvetica-Bold").fillColor(BRAND_NAVY)
+                   .text("Transactions", LEFT, y);
                 y += 14;
-                doc.moveTo(50, y).lineTo(545, y).strokeColor(GREY_LINE).lineWidth(0.5).stroke();
-                y += 8;
 
-                doc.fontSize(9).font("Helvetica").fillColor("#111");
+                doc.fontSize(8).font("Helvetica-Bold").fillColor(GREY_TEXT);
+                doc.text("Type", LEFT + 4, y);
+                doc.text("Description", LEFT + 100, y);
+                doc.text("Amount", 300, y, { width: RIGHT - 308, align: "right" });
+                y += 10;
+                doc.moveTo(LEFT, y).lineTo(RIGHT, y).strokeColor(GREY_LINE).lineWidth(0.5).stroke();
+                y += 5;
+
+                doc.fontSize(8).font("Helvetica");
                 for (const line of lines) {
-                    if (y > 700) {
+                    if (y > BOTTOM_LIMIT - 120) {
                         doc.addPage();
-                        y = 60;
+                        y = MARGIN;
                     }
                     const typeLabel = String(line.line_type || "").replace(/_/g, " ");
-                    const desc = line.description || "";
+                    const desc = String(line.description || "").slice(0, 48);
                     const amountStr = formatMoney(line.amount, currency);
 
-                    doc.fillColor("#111").text(typeLabel, 55, y, { width: 95 });
-                    doc.fillColor(GREY_TEXT).text(desc, 155, y, { width: 160 });
-                    doc.fillColor("#111").text(amountStr, 320, y, { width: 220, align: "right" });
-                    y += 15;
+                    doc.fillColor("#111").text(typeLabel, LEFT + 4, y, { width: 92, lineBreak: false });
+                    doc.fillColor(GREY_TEXT).text(desc, LEFT + 100, y, { width: 195, lineBreak: false });
+                    doc.fillColor("#111").text(amountStr, 300, y, { width: RIGHT - 308, align: "right", lineBreak: false });
+                    y += 11;
                 }
-
-                y += 10;
+                y += 6;
             }
 
-            // ---- Closing Balance + Payout (Jumia's key numbers) ----
-            const summaryY = Math.max(y, 620);
-            doc.moveTo(50, summaryY).lineTo(545, summaryY).strokeColor(GREY_LINE).lineWidth(1).stroke();
+            // ---- CLOSING BALANCE + PAYOUT (bottom-anchored if space allows) ----
+            const remaining = BOTTOM_LIMIT - y - 90;
+            const summaryY = remaining > 0 ? BOTTOM_LIMIT - 90 : y + 10;
 
-            doc.fillColor("#111").fontSize(12).font("Helvetica-Bold")
-               .text("CLOSING BALANCE", 50, summaryY + 14);
-            doc.fillColor("#111").fontSize(12).font("Helvetica-Bold")
-               .text(formatMoney(statement.amount_due, currency), 320, summaryY + 14, { width: 225, align: "right" });
+            doc.moveTo(LEFT, summaryY).lineTo(RIGHT, summaryY).strokeColor(GREY_LINE).lineWidth(1).stroke();
 
-            doc.moveTo(50, summaryY + 40).lineTo(545, summaryY + 40).strokeColor(GREY_LINE).lineWidth(0.5).stroke();
+            doc.fillColor("#111").fontSize(10.5).font("Helvetica-Bold")
+               .text("CLOSING BALANCE", LEFT, summaryY + 8);
+            doc.fillColor("#111").fontSize(10.5).font("Helvetica-Bold")
+               .text(formatMoney(statement.amount_due, currency), 300, summaryY + 8, { width: RIGHT - 308, align: "right" });
 
-            doc.fillColor("#111").fontSize(12).font("Helvetica-Bold")
-               .text("PAYOUT", 50, summaryY + 52);
-            doc.fillColor("#111").fontSize(12).font("Helvetica-Bold")
-               .text(formatMoney(statement.amount_due, currency), 320, summaryY + 52, { width: 225, align: "right" });
+            doc.moveTo(LEFT, summaryY + 26).lineTo(RIGHT, summaryY + 26).strokeColor(GREY_LINE).lineWidth(0.5).stroke();
 
-            // ---- Footer ----
-            const footerY = 780;
-            doc.moveTo(50, footerY).lineTo(545, footerY).strokeColor(GREY_LINE).lineWidth(0.5).stroke();
+            doc.fillColor("#111").fontSize(10.5).font("Helvetica-Bold")
+               .text("PAYOUT", LEFT, summaryY + 34);
+            doc.fillColor("#111").fontSize(10.5).font("Helvetica-Bold")
+               .text(formatMoney(statement.amount_due, currency), 300, summaryY + 34, { width: RIGHT - 308, align: "right" });
 
-            doc.fontSize(8).font("Helvetica").fillColor(GREY_TEXT)
-               .text("Payment method: MTN MoMo " + (vendor.momo_number || "not on file"),
-                     50, footerY + 8, { width: 495, align: "center" })
-               .text("Disputes accepted within 90 days of cycle end. Questions? support@lizimasstore.com",
-                     50, footerY + 20, { width: 495, align: "center" });
+            // ---- Footer (single line, no wrap) ----
+            const footerY = BOTTOM_LIMIT - 14;
+            doc.moveTo(LEFT, footerY).lineTo(RIGHT, footerY).strokeColor(GREY_LINE).lineWidth(0.5).stroke();
+            doc.fontSize(7).font("Helvetica").fillColor(GREY_TEXT)
+               .text("Payment: MTN MoMo " + (vendor.momo_number || "not on file") + "  |  Disputes within 90 days  |  support@lizimasstore.com",
+                     LEFT, footerY + 4, { width: RIGHT - LEFT, align: "center", lineBreak: false });
 
             doc.end();
         } catch (err) {
