@@ -2,6 +2,7 @@ const pool = require("../config/database");
 const { logActivity } = require("../utils/activityLog");
 const { uploadBuffer } = require("../utils/cloudinaryUpload");
 const { canRecordRefundDecision } = require("../utils/vendorReturns");
+const { resolveRefundTier, suggestedRefundAmount } = require("../utils/refundTiers");
 const { createVendorNotification } = require("./vendorController");
 
 // --- Drop-off points (admin-managed) ---------------------------------
@@ -330,7 +331,7 @@ exports.getReturnsAwaitingRefundDecision = async (req, res) => {
         const result = await pool.query(
             `SELECT oi.id AS order_item_id, oi.order_id, oi.quantity, oi.price,
                     oi.return_reason, oi.returned_at, oi.return_evidence_image,
-                    oi.vendor_response, oi.vendor_responded_at,
+                    oi.vendor_response, oi.vendor_responded_at, oi.delivered_at,
                     p.name AS product_name, v.business_name AS vendor_business_name
              FROM order_items oi
              JOIN products p ON p.id = oi.product_id
@@ -338,7 +339,21 @@ exports.getReturnsAwaitingRefundDecision = async (req, res) => {
              WHERE oi.return_reason IS NOT NULL AND oi.refund_decision IS NULL
              ORDER BY oi.returned_at ASC`
         );
-        res.json(result.rows);
+        // Phase 6: attach the policy-suggested tier/amount so admin has
+        // guidance before typing a number - see server/utils/refundTiers.js.
+        const withTiers = result.rows.map((row) => {
+            const tier = resolveRefundTier(row.delivered_at, row.returned_at || new Date());
+            const saleAmount = Number(row.price) * Number(row.quantity);
+            return {
+                ...row,
+                suggested_refund_tier: tier.key,
+                suggested_refund_percentage: tier.percentage,
+                suggested_refund_tier_label: tier.label,
+                days_since_delivery: tier.daysSinceDelivery,
+                suggested_refund_amount: suggestedRefundAmount(saleAmount, tier)
+            };
+        });
+        res.json(withTiers);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -408,7 +423,8 @@ exports.approveReturnRefund = async (req, res) => {
         }
 
         const current = await pool.query(
-            `SELECT oi.return_reason, oi.refund_decision, oi.product_name, p.vendor_id
+            `SELECT oi.return_reason, oi.refund_decision, oi.product_name, oi.delivered_at,
+                    oi.returned_at, oi.price, oi.quantity, p.vendor_id
              FROM order_items oi
              LEFT JOIN products p ON p.id = oi.product_id
              WHERE oi.id = $1`,
@@ -422,15 +438,26 @@ exports.approveReturnRefund = async (req, res) => {
             return res.status(409).json({ error: eligibility.reason });
         }
 
+        // Phase 6: record which policy tier applied and whether admin's
+        // amount diverges from it. This is informational, not a block -
+        // Lizimas/admin retains final authority (see this function's own
+        // header comment) - but the divergence is now visible for reporting.
+        const item = current.rows[0];
+        const tier = resolveRefundTier(item.delivered_at, item.returned_at || new Date());
+        const saleAmount = Number(item.price) * Number(item.quantity);
+        const tierSuggestedAmount = suggestedRefundAmount(saleAmount, tier);
+        const overridden = Math.abs(numericAmount - tierSuggestedAmount) >= 1;
+
         const result = await pool.query(
             `UPDATE order_items
              SET refund_decision = 'approved', refund_amount = $1, refund_notes = $2,
-                 refund_decided_at = now(), refund_decided_by = $3
-             WHERE id = $4 RETURNING *`,
-            [numericAmount, notes || null, req.user.userId, orderItemId]
+                 refund_decided_at = now(), refund_decided_by = $3,
+                 refund_tier = $4, refund_tier_percentage = $5, refund_tier_overridden = $6
+             WHERE id = $7 RETURNING *`,
+            [numericAmount, notes || null, req.user.userId, tier.key, tier.percentage, overridden, orderItemId]
         );
         logActivity(req.user.userId, "return_refund_approved", "order_item", orderItemId,
-            `UGX ${numericAmount.toLocaleString()} approved`);
+            `UGX ${numericAmount.toLocaleString()} approved (tier: ${tier.key}, suggested UGX ${tierSuggestedAmount.toLocaleString()}${overridden ? ", OVERRIDDEN" : ""})`);
         if (current.rows[0].vendor_id) {
             await createVendorNotification(current.rows[0].vendor_id, "refund_decision", {
                 decision: "approved",
@@ -454,7 +481,8 @@ exports.denyReturnRefund = async (req, res) => {
         }
 
         const current = await pool.query(
-            `SELECT oi.return_reason, oi.refund_decision, oi.product_name, p.vendor_id
+            `SELECT oi.return_reason, oi.refund_decision, oi.product_name, oi.delivered_at,
+                    oi.returned_at, p.vendor_id
              FROM order_items oi
              LEFT JOIN products p ON p.id = oi.product_id
              WHERE oi.id = $1`,
@@ -468,12 +496,17 @@ exports.denyReturnRefund = async (req, res) => {
             return res.status(409).json({ error: eligibility.reason });
         }
 
+        // Phase 6: record the tier that applied even on a denial - useful
+        // for reporting "how many full-refund-window returns got denied".
+        const deniedTier = resolveRefundTier(current.rows[0].delivered_at, current.rows[0].returned_at || new Date());
+
         const result = await pool.query(
             `UPDATE order_items
              SET refund_decision = 'denied', refund_notes = $1,
-                 refund_decided_at = now(), refund_decided_by = $2
-             WHERE id = $3 RETURNING *`,
-            [notes, req.user.userId, orderItemId]
+                 refund_decided_at = now(), refund_decided_by = $2,
+                 refund_tier = $3, refund_tier_percentage = $4
+             WHERE id = $5 RETURNING *`,
+            [notes, req.user.userId, deniedTier.key, deniedTier.percentage, orderItemId]
         );
         logActivity(req.user.userId, "return_refund_denied", "order_item", orderItemId, notes);
         if (current.rows[0].vendor_id) {

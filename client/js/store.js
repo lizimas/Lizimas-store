@@ -57,7 +57,7 @@ const STORE_DELIVERY_LABELS = {
     payment_first: { text: "\ud83d\udcb3 Payment First", className: "prepay" }
 };
 
-function stRenderBadges(badges) {
+function stRenderBadges(badges, brandAuthorizations) {
     const container = document.getElementById("store-verified-badges");
     if (!container) return;
     container.innerHTML = "";
@@ -76,12 +76,27 @@ function stRenderBadges(badges) {
         b.textContent = "✓ Verified Seller";
         container.appendChild(b);
     }
+
+    // Phase 7: one small badge per brand this vendor is verified to sell.
+    // Official Brand Store reads as the brand itself; Authorized
+    // Distributor is deliberately a lighter-weight chip so it never reads
+    // as "this store IS the brand" - see server/utils/vendorBrandAuth.js.
+    (brandAuthorizations || []).forEach((auth) => {
+        const b = document.createElement("span");
+        const isOfficial = auth.tier === "official_store";
+        b.className = "store-badge store-badge-brand-auth";
+        b.style.cssText = `display:inline-flex; align-items:center; gap:4px; background:${isOfficial ? "#b45309" : "#f3f4f6"}; color:${isOfficial ? "#fff" : "#374151"}; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; margin-top:4px; margin-left:6px; border:${isOfficial ? "none" : "1px solid #d1d5db"};`;
+        b.textContent = isOfficial
+            ? `✓ ${auth.brand_name} Official Store`
+            : `${auth.brand_name} – Authorized Distributor`;
+        container.appendChild(b);
+    });
 }
 
-function stRenderVendor(vendor, badges) {
+function stRenderVendor(vendor, badges, brandAuthorizations) {
     document.getElementById("store-name").textContent = vendor.business_name || "";
     document.title = `${vendor.business_name} | Lizimas Store`;
-    stRenderBadges(badges);
+    stRenderBadges(badges, brandAuthorizations);
 
     const badgeEl = document.getElementById("store-delivery-badge");
     const badgeInfo = STORE_DELIVERY_LABELS[vendor.delivery_method];
@@ -136,7 +151,7 @@ async function loadStore() {
             return;
         }
         const data = await res.json();
-        stRenderVendor(data.vendor, data.badges);
+        stRenderVendor(data.vendor, data.badges, data.brand_authorizations);
         stRenderProducts(data.products);
         document.getElementById("store-content").hidden = false;
 
