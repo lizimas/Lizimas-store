@@ -1112,6 +1112,13 @@ function setProductFilter(filter) {
     renderProductsTable();
 }
 
+function adminQualityScoreBadge(p) {
+    if (p.quality_score === null || p.quality_score === undefined) return `<span style="font-size:12px; color:#999;">&mdash;</span>`;
+    const score = p.quality_score;
+    const color = score >= 80 ? "#16A34A" : (score >= 50 ? "#B45309" : "#DC2626");
+    return `<span style="font-weight:700; font-size:13px; color:${color};">${score}%</span>`;
+}
+
 function renderProductsTable() {
     const productsTable = document.getElementById("products-table");
     const searchInput = document.getElementById("product-search-input");
@@ -1142,6 +1149,7 @@ function renderProductsTable() {
                     <th>Category</th>
                     <th>Price</th>
                     <th>Stock</th>
+                    <th>Quality</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -1149,10 +1157,11 @@ function renderProductsTable() {
                 ${filtered.map(p => `
                     <tr>
                         <td data-label=""><img class="product-table-thumb" src="${p.image || ''}" onerror="this.style.visibility='hidden'"></td>
-                        <td data-label="Name">${p.name} <span style="color:#999; font-size:0.85em; white-space:nowrap;">#${p.id}</span></td>
+                        <td data-label="Name">${p.name} <span style="color:#999; font-size:0.85em; white-space:nowrap;">#${p.id}</span>${p.possible_duplicate_of ? `<div style="font-size:11px; color:#B45309; margin-top:2px;">&#9888; possible duplicate of #${p.possible_duplicate_of}</div>` : ""}</td>
                         <td data-label="Category">${p.category || "—"}</td>
                         <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
                         <td data-label="Stock">${p.stock}</td>
+                        <td data-label="Quality">${adminQualityScoreBadge(p)}</td>
                         <td data-label="Actions">
                             <button onclick="editProduct(${p.id})">Edit</button>
                             <button onclick="openManageStock(${p.id})" data-pname="${String(p.name || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;")}">Stock</button>
@@ -2449,6 +2458,10 @@ function setupTabs() {
                 loadApprovedVendorPromotions();
                 loadVendorMessagesAdmin();
                 loadVendorKycAdmin();
+                loadProductTiers();
+                loadConsignmentsAdmin();
+                loadAdCampaignsAdmin();
+                loadAdSettings();
             }
 
             if (button.dataset.tab === "team-messages") {
@@ -6346,6 +6359,499 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // --- Vendors tab: applications, drop-off points, handovers, returns ------
 
+// Product-count limit tiers (Jumia Vendor Center comparison, Sept 2026) -
+// see adminProductTierController.js / migrations/109_vendor_product_tiers.sql.
+
+let adminProductTiersCache = [];
+
+async function loadProductTiers() {
+    const container = document.getElementById("product-tiers-list");
+    if (!container) return;
+    try {
+        const tiers = await authorizedFetch("/api/admin/product-tiers");
+        if (!Array.isArray(tiers)) { container.innerHTML = `<p class="no-data">Could not load tiers.</p>`; return; }
+        adminProductTiersCache = tiers;
+        renderProductTiersTable(tiers);
+    } catch (error) {
+        console.error("loadProductTiers error:", error);
+        container.innerHTML = `<p class="no-data">Could not load tiers.</p>`;
+    }
+}
+
+function renderProductTiersTable(tiers) {
+    const container = document.getElementById("product-tiers-list");
+    if (!container) return;
+    container.innerHTML = `
+        <table>
+            <thead><tr><th>Tier</th><th>Min. 90-day GMV (UGX)</th><th>Listing Cap</th><th></th></tr></thead>
+            <tbody>
+                ${tiers.map(t => `
+                    <tr>
+                        <td data-label="Tier"><input type="text" id="tier-name-${t.tier_code}" value="${(t.tier_name || "").replace(/"/g, "&quot;")}" style="padding:6px; border:1px solid #ccc; border-radius:6px; width:130px;"></td>
+                        <td data-label="Min. GMV"><input type="number" id="tier-gmv-${t.tier_code}" value="${t.min_gmv_90d}" min="0" style="padding:6px; border:1px solid #ccc; border-radius:6px; width:130px;"></td>
+                        <td data-label="Cap"><input type="number" id="tier-cap-${t.tier_code}" value="${t.max_active_products === null ? "" : t.max_active_products}" min="0" placeholder="Unlimited" style="padding:6px; border:1px solid #ccc; border-radius:6px; width:110px;"></td>
+                        <td data-label=""><button onclick="saveProductTier('${t.tier_code}')" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;">Save</button></td>
+                    </tr>
+                `).join("")}
+            </tbody>
+        </table>
+    `;
+}
+
+async function saveProductTier(tierCode) {
+    const tierName = document.getElementById(`tier-name-${tierCode}`).value.trim();
+    const gmv = document.getElementById(`tier-gmv-${tierCode}`).value;
+    const capRaw = document.getElementById(`tier-cap-${tierCode}`).value;
+    const cap = capRaw === "" ? null : Number(capRaw);
+
+    try {
+        const result = await authorizedFetch(`/api/admin/product-tiers/${tierCode}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tier_name: tierName, min_gmv_90d: gmv, max_active_products: cap })
+        });
+        if (result.error) { alert(result.error); return; }
+        loadProductTiers();
+    } catch (error) {
+        console.error("saveProductTier error:", error);
+        alert("Could not save this tier.");
+    }
+}
+
+async function lookupVendorTierStatus() {
+    const vendorId = document.getElementById("tier-override-vendor-id").value.trim();
+    const statusEl = document.getElementById("vendor-tier-override-status");
+    if (!vendorId) { statusEl.textContent = "Enter a vendor ID."; return; }
+    statusEl.textContent = "Loading...";
+    try {
+        const status = await authorizedFetch(`/api/admin/vendors/${vendorId}/product-tier`);
+        if (status.error) { statusEl.textContent = status.error; return; }
+
+        const tierOptions = status.availableTiers.map(t =>
+            `<option value="${t.tier_code}" ${status.override === t.tier_code ? "selected" : ""}>${t.tier_name}</option>`
+        ).join("");
+
+        statusEl.innerHTML = `
+            <div style="margin-bottom:8px;">
+                Trailing 90-day GMV: <strong>UGX ${Number(status.gmv90d).toLocaleString()}</strong><br>
+                Current effective tier: <strong>${status.tier ? status.tier.name : "None"}</strong>
+                (${status.currentCount} of ${status.maxAllowed === null ? "unlimited" : status.maxAllowed} listings used)
+                ${status.atLimit ? ` <span style="color:#DC2626; font-weight:600;">&mdash; at limit</span>` : ""}
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <label style="font-size:13px; font-weight:600;">Manual override:</label>
+                <select id="tier-override-select" style="padding:6px; border:1px solid #ccc; border-radius:6px;">
+                    <option value="">None (use GMV ladder)</option>
+                    ${tierOptions}
+                </select>
+                <button onclick="applyVendorTierOverride(${vendorId})" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:8px 14px; cursor:pointer; font-size:12px;">Apply</button>
+            </div>
+        `;
+    } catch (error) {
+        console.error("lookupVendorTierStatus error:", error);
+        statusEl.textContent = "Could not look up this vendor.";
+    }
+}
+
+async function applyVendorTierOverride(vendorId) {
+    const select = document.getElementById("tier-override-select");
+    const tierCode = select.value || null;
+    try {
+        const result = await authorizedFetch(`/api/admin/vendors/${vendorId}/product-tier-override`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tierCode })
+        });
+        if (result.error) { alert(result.error); return; }
+        lookupVendorTierStatus();
+    } catch (error) {
+        console.error("applyVendorTierOverride error:", error);
+        alert("Could not update this vendor's tier override.");
+    }
+}
+
+// --- Fulfillment by Lizimas (Consignments) ----------------------------
+// Jumia Vendor Center comparison, Sept 2026 - see
+// migrations/110_vendor_consignments.sql / adminConsignmentController.js.
+
+let adminConsignmentsCache = [];
+let adminConsignmentStatusFilter = "";
+let adminConsignmentReviewingId = null;
+
+function adminConsignmentStatusBadge(status) {
+    const map = {
+        requested: ["status-pending", "Requested"],
+        in_transit: ["status-pending", "In Transit"],
+        received: ["status-active", "Received"],
+        partially_received: ["status-active", "Partially Received"],
+        rejected: ["status-cancelled", "Rejected"],
+        cancelled: ["status-cancelled", "Cancelled"]
+    };
+    const [cls, label] = map[status] || ["status-pending", status];
+    return `<span class="status-badge ${cls}">${label}</span>`;
+}
+
+function setAdminConsignmentFilter(status) {
+    adminConsignmentStatusFilter = status;
+    document.querySelectorAll(".consignment-status-filter-btn").forEach(btn => {
+        const active = btn.dataset.status === status;
+        btn.classList.toggle("active", active);
+        btn.style.background = active ? "#1a1a2e" : "#fff";
+        btn.style.color = active ? "#fff" : "#333";
+        btn.style.borderColor = active ? "#1a1a2e" : "#ddd";
+    });
+    loadConsignmentsAdmin();
+}
+
+async function loadConsignmentsAdmin() {
+    const container = document.getElementById("admin-consignments-list");
+    if (!container) return;
+    try {
+        const qs = adminConsignmentStatusFilter ? `?status=${adminConsignmentStatusFilter}` : "";
+        const consignments = await authorizedFetch(`/api/admin/consignments${qs}`);
+        if (!Array.isArray(consignments)) { container.innerHTML = `<p class="no-data">Could not load consignments.</p>`; return; }
+        adminConsignmentsCache = consignments;
+        if (consignments.length === 0) {
+            container.innerHTML = `<p class="no-data">No consignments${adminConsignmentStatusFilter ? " with this status" : ""}.</p>`;
+            return;
+        }
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>#</th><th>Vendor</th><th>Hub</th><th>Items</th><th>Status</th><th>Requested</th><th></th></tr></thead>
+                <tbody>
+                    ${consignments.map(c => {
+                        const itemsSummary = (c.items || []).map(i => `${adminEsc(i.product_name)} &times; ${i.quantity_requested}${i.quantity_received != null ? ` (recv ${i.quantity_received})` : ""}`).join("<br>");
+                        const canReview = c.status === "requested" || c.status === "in_transit";
+                        return `
+                            <tr>
+                                <td data-label="#">${c.id}</td>
+                                <td data-label="Vendor">${adminEsc(c.vendor_business_name)}</td>
+                                <td data-label="Hub">${adminEsc(c.dropoff_point_name)}</td>
+                                <td data-label="Items">${itemsSummary}</td>
+                                <td data-label="Status">${adminConsignmentStatusBadge(c.status)}</td>
+                                <td data-label="Requested">${new Date(c.created_at).toLocaleDateString()}</td>
+                                <td data-label="">${canReview ? `<button onclick="openAdminConsignmentReview(${c.id})" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;">Review</button>` : ""}</td>
+                            </tr>`;
+                    }).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("loadConsignmentsAdmin error:", error);
+        container.innerHTML = `<p class="no-data">Could not load consignments.</p>`;
+    }
+}
+
+function openAdminConsignmentReview(id) {
+    const c = adminConsignmentsCache.find(x => x.id === id);
+    if (!c) return;
+    adminConsignmentReviewingId = id;
+    document.getElementById("admin-consignment-review-error").textContent = "";
+    document.getElementById("admin-consignment-review-notes").value = "";
+    document.getElementById("admin-consignment-review-id").textContent = `#${c.id}`;
+    document.getElementById("admin-consignment-review-meta").textContent = `${c.vendor_business_name} - shipping to ${c.dropoff_point_name}${c.vendor_notes ? ` - vendor note: ${c.vendor_notes}` : ""}`;
+
+    document.getElementById("admin-consignment-review-lines").innerHTML = `
+        <table>
+            <thead><tr><th>Product</th><th>Requested</th><th>Received</th></tr></thead>
+            <tbody>
+                ${(c.items || []).map(i => `
+                    <tr>
+                        <td data-label="Product">${adminEsc(i.product_name)}${i.product_sku ? ` (${adminEsc(i.product_sku)})` : ""}</td>
+                        <td data-label="Requested">${i.quantity_requested}</td>
+                        <td data-label="Received"><input type="number" class="admin-cline-received" data-item-id="${i.id}" value="${i.quantity_requested}" min="0" style="width:90px; padding:6px; border:1px solid #ccc; border-radius:6px;"></td>
+                    </tr>`).join("")}
+            </tbody>
+        </table>
+    `;
+
+    const overlay = document.getElementById("admin-consignment-review-overlay");
+    overlay.hidden = false;
+    overlay.style.display = "flex";
+}
+
+function closeAdminConsignmentReview() {
+    adminConsignmentReviewingId = null;
+    const overlay = document.getElementById("admin-consignment-review-overlay");
+    overlay.hidden = true;
+    overlay.style.display = "none";
+}
+
+async function receiveConsignmentAdmin() {
+    if (!adminConsignmentReviewingId) return;
+    const errorEl = document.getElementById("admin-consignment-review-error");
+    errorEl.textContent = "";
+    const notes = document.getElementById("admin-consignment-review-notes").value.trim();
+
+    const items = Array.from(document.querySelectorAll(".admin-cline-received")).map(input => ({
+        item_id: Number(input.dataset.itemId),
+        quantity_received: Number(input.value)
+    }));
+    if (items.some(i => isNaN(i.quantity_received) || i.quantity_received < 0)) {
+        errorEl.textContent = "Each received quantity must be zero or more.";
+        return;
+    }
+
+    try {
+        const result = await authorizedFetch(`/api/admin/consignments/${adminConsignmentReviewingId}/receive`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items, admin_notes: notes || null })
+        });
+        if (result.error) { errorEl.textContent = result.error; return; }
+        closeAdminConsignmentReview();
+        loadConsignmentsAdmin();
+    } catch (error) {
+        console.error("receiveConsignmentAdmin error:", error);
+        errorEl.textContent = "Could not save this. Please try again.";
+    }
+}
+
+async function rejectConsignmentAdmin() {
+    if (!adminConsignmentReviewingId) return;
+    if (!confirm("Reject this consignment request? The vendor will be notified.")) return;
+    const errorEl = document.getElementById("admin-consignment-review-error");
+    const notes = document.getElementById("admin-consignment-review-notes").value.trim();
+    try {
+        const result = await authorizedFetch(`/api/admin/consignments/${adminConsignmentReviewingId}/reject`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ admin_notes: notes || null })
+        });
+        if (result.error) { errorEl.textContent = result.error; return; }
+        closeAdminConsignmentReview();
+        loadConsignmentsAdmin();
+    } catch (error) {
+        console.error("rejectConsignmentAdmin error:", error);
+        errorEl.textContent = "Could not reject this. Please try again.";
+    }
+}
+
+// --- Manage Pickers Lookup (Jumia Vendor Center comparison, Sept 2026) ----
+// Hub-desk search across every vendor's picker list - see
+// adminPickerController.js. Read-only; vendors manage their own list.
+
+async function searchPickersAdmin() {
+    const q = document.getElementById("picker-search-query").value.trim();
+    const resultsEl = document.getElementById("picker-search-results");
+    if (!q) { resultsEl.innerHTML = `<p class="no-data">Enter a name or phone number to search.</p>`; return; }
+    resultsEl.textContent = "Searching...";
+    try {
+        const results = await authorizedFetch(`/api/admin/pickers/search?q=${encodeURIComponent(q)}`);
+        if (!Array.isArray(results)) { resultsEl.innerHTML = `<p class="no-data">Could not search pickers.</p>`; return; }
+        if (results.length === 0) { resultsEl.innerHTML = `<p class="no-data">No matching pickers found.</p>`; return; }
+        resultsEl.innerHTML = `
+            <table>
+                <thead><tr><th>Name</th><th>Phone</th><th>ID Number</th><th>Vendor</th><th>Status</th></tr></thead>
+                <tbody>
+                    ${results.map(pk => `
+                        <tr>
+                            <td data-label="Name">${adminEsc(pk.full_name)}</td>
+                            <td data-label="Phone">${adminEsc(pk.phone)}</td>
+                            <td data-label="ID Number">${pk.id_number ? adminEsc(pk.id_number) : "—"}</td>
+                            <td data-label="Vendor">${adminEsc(pk.vendor_business_name)}</td>
+                            <td data-label="Status">${pk.is_active ? '<span class="status-badge status-active">Active</span>' : '<span class="status-badge status-cancelled">Disabled</span>'}</td>
+                        </tr>`).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("searchPickersAdmin error:", error);
+        resultsEl.innerHTML = `<p class="no-data">Could not search pickers.</p>`;
+    }
+}
+
+// --- Advertise Your Products (Jumia Vendor Center comparison, Sept 2026) --
+// Admin-side review + platform-wide settings. See
+// migrations/112_vendor_ad_campaigns.sql / adminAdController.js.
+
+let adminAdCampaignsCache = [];
+let adminAdCampaignStatusFilter = "";
+let adminAdCampaignReviewingId = null;
+
+function adminAdCampaignStatusBadge(status) {
+    const map = {
+        draft: ["#888", "Draft"],
+        pending_review: ["#B45309", "Pending Review"],
+        active: ["#166534", "Active"],
+        paused: ["#B45309", "Paused"],
+        rejected: ["#DC2626", "Rejected"],
+        completed: ["#888", "Completed"],
+        budget_exhausted: ["#888", "Budget Exhausted"]
+    };
+    const [color, label] = map[status] || ["#888", status];
+    return `<span style="font-weight:600; color:${color};">${label}</span>`;
+}
+
+function setAdminAdCampaignFilter(status) {
+    adminAdCampaignStatusFilter = status;
+    document.querySelectorAll(".ad-campaign-status-filter-btn").forEach(btn => {
+        const active = btn.dataset.status === status;
+        btn.classList.toggle("active", active);
+        btn.style.background = active ? "#1a1a2e" : "#fff";
+        btn.style.color = active ? "#fff" : "#333";
+        btn.style.borderColor = active ? "#1a1a2e" : "#ddd";
+    });
+    loadAdCampaignsAdmin();
+}
+
+async function loadAdCampaignsAdmin() {
+    const container = document.getElementById("admin-ad-campaigns-list");
+    if (!container) return;
+    try {
+        const qs = adminAdCampaignStatusFilter ? `?status=${adminAdCampaignStatusFilter}` : "";
+        const campaigns = await authorizedFetch(`/api/admin/ad-campaigns${qs}`);
+        if (!Array.isArray(campaigns)) { container.innerHTML = `<p class="no-data">Could not load ad campaigns.</p>`; return; }
+        adminAdCampaignsCache = campaigns;
+        if (campaigns.length === 0) {
+            container.innerHTML = `<p class="no-data">No campaigns${adminAdCampaignStatusFilter ? " with this status" : ""}.</p>`;
+            return;
+        }
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Campaign</th><th>Vendor</th><th>Products</th><th>Budget</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                    ${campaigns.map(c => {
+                        const productNames = (c.products || []).map(p => adminEsc(p.product_name)).join(", ");
+                        const canReview = c.status === "pending_review";
+                        const canPause = c.status === "active";
+                        const canResume = c.status === "paused";
+                        return `
+                            <tr>
+                                <td data-label="Campaign">${adminEsc(c.name)}</td>
+                                <td data-label="Vendor">${adminEsc(c.vendor_business_name)}</td>
+                                <td data-label="Products">${productNames}</td>
+                                <td data-label="Budget">${Number(c.budget_spent).toLocaleString()} / ${Number(c.total_budget).toLocaleString()}</td>
+                                <td data-label="Status">${adminAdCampaignStatusBadge(c.status)}</td>
+                                <td data-label="">
+                                    ${canReview ? `<button onclick="openAdminAdCampaignReview(${c.id})" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer; margin-right:6px;">Review</button>` : ""}
+                                    ${canPause ? `<button onclick="setAdCampaignPausedAdmin(${c.id}, true)" style="background:#fff; border:1px solid #ccc; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;">Pause</button>` : ""}
+                                    ${canResume ? `<button onclick="setAdCampaignPausedAdmin(${c.id}, false)" style="background:#fff; border:1px solid #ccc; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;">Resume</button>` : ""}
+                                </td>
+                            </tr>`;
+                    }).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("loadAdCampaignsAdmin error:", error);
+        container.innerHTML = `<p class="no-data">Could not load ad campaigns.</p>`;
+    }
+}
+
+function openAdminAdCampaignReview(id) {
+    const c = adminAdCampaignsCache.find(x => x.id === id);
+    if (!c) return;
+    adminAdCampaignReviewingId = id;
+    document.getElementById("admin-ad-campaign-review-error").textContent = "";
+    document.getElementById("admin-ad-campaign-review-notes").value = "";
+    document.getElementById("admin-ad-campaign-review-title").textContent = c.name;
+    const productNames = (c.products || []).map(p => adminEsc(p.product_name)).join(", ");
+    document.getElementById("admin-ad-campaign-review-meta").innerHTML =
+        `${adminEsc(c.vendor_business_name)} &middot; CPC ${Number(c.cpc_rate).toLocaleString()} &middot; ${Number(c.daily_budget).toLocaleString()}/day, total ${Number(c.total_budget).toLocaleString()}<br>Products: ${productNames}`;
+
+    const overlay = document.getElementById("admin-ad-campaign-review-overlay");
+    overlay.hidden = false;
+    overlay.style.display = "flex";
+}
+
+function closeAdminAdCampaignReview() {
+    adminAdCampaignReviewingId = null;
+    const overlay = document.getElementById("admin-ad-campaign-review-overlay");
+    overlay.hidden = true;
+    overlay.style.display = "none";
+}
+
+async function approveAdCampaignAdmin() {
+    if (!adminAdCampaignReviewingId) return;
+    const errorEl = document.getElementById("admin-ad-campaign-review-error");
+    const notes = document.getElementById("admin-ad-campaign-review-notes").value.trim();
+    try {
+        const result = await authorizedFetch(`/api/admin/ad-campaigns/${adminAdCampaignReviewingId}/approve`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ admin_notes: notes || null })
+        });
+        if (result.error) { errorEl.textContent = result.error; return; }
+        closeAdminAdCampaignReview();
+        loadAdCampaignsAdmin();
+    } catch (error) {
+        console.error("approveAdCampaignAdmin error:", error);
+        errorEl.textContent = "Could not approve this campaign.";
+    }
+}
+
+async function rejectAdCampaignAdmin() {
+    if (!adminAdCampaignReviewingId) return;
+    if (!confirm("Reject this campaign? The vendor will be notified.")) return;
+    const errorEl = document.getElementById("admin-ad-campaign-review-error");
+    const notes = document.getElementById("admin-ad-campaign-review-notes").value.trim();
+    try {
+        const result = await authorizedFetch(`/api/admin/ad-campaigns/${adminAdCampaignReviewingId}/reject`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ admin_notes: notes || null })
+        });
+        if (result.error) { errorEl.textContent = result.error; return; }
+        closeAdminAdCampaignReview();
+        loadAdCampaignsAdmin();
+    } catch (error) {
+        console.error("rejectAdCampaignAdmin error:", error);
+        errorEl.textContent = "Could not reject this campaign.";
+    }
+}
+
+async function setAdCampaignPausedAdmin(id, paused) {
+    if (!confirm(paused ? "Pause this campaign?" : "Resume this campaign?")) return;
+    try {
+        const result = await authorizedFetch(`/api/admin/ad-campaigns/${id}/paused`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ paused })
+        });
+        if (result.error) { alert(result.error); return; }
+        loadAdCampaignsAdmin();
+    } catch (error) {
+        console.error("setAdCampaignPausedAdmin error:", error);
+        alert("Could not update this campaign.");
+    }
+}
+
+async function loadAdSettings() {
+    try {
+        const settings = await authorizedFetch("/api/admin/ad-settings");
+        if (settings.error) return;
+        document.getElementById("ad-settings-cpc").value = settings.default_cpc_rate;
+        document.getElementById("ad-settings-min-budget").value = settings.min_daily_budget;
+        document.getElementById("ad-settings-max-budget").value = settings.max_daily_budget;
+    } catch (error) {
+        console.error("loadAdSettings error:", error);
+    }
+}
+
+async function saveAdSettings() {
+    const statusEl = document.getElementById("ad-settings-status");
+    statusEl.textContent = "Saving...";
+    try {
+        const result = await authorizedFetch("/api/admin/ad-settings", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                default_cpc_rate: document.getElementById("ad-settings-cpc").value,
+                min_daily_budget: document.getElementById("ad-settings-min-budget").value,
+                max_daily_budget: document.getElementById("ad-settings-max-budget").value
+            })
+        });
+        if (result.error) { statusEl.textContent = result.error; statusEl.style.color = "#DC2626"; return; }
+        statusEl.style.color = "#166534";
+        statusEl.textContent = "Saved.";
+    } catch (error) {
+        console.error("saveAdSettings error:", error);
+        statusEl.style.color = "#DC2626";
+        statusEl.textContent = "Could not save these settings.";
+    }
+}
+
 async function loadPendingVendors() {
     try {
         const vendors = await authorizedFetch("/api/admin/vendors/pending");
@@ -6933,11 +7439,16 @@ function renderVendorCompliancePanel() {
 
     container.innerHTML = `
         <table>
-            <thead><tr><th>Business</th><th>Owner</th><th>Status</th><th>Payouts</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Business</th><th>Shop ID</th><th>Owner</th><th>Status</th><th>Payouts</th><th>Actions</th></tr></thead>
             <tbody>
                 ${vendorComplianceCache.map(v => `
                     <tr>
                         <td data-label="Business">${v.business_name}</td>
+                        <td data-label="Shop ID">${v.shop_id
+                            ? `<span style="font-family:monospace; font-weight:600;">${v.shop_id}</span>`
+                            : (v.status === "approved"
+                                ? `<button onclick="regenerateVendorShopIdAction(${v.id})" style="background:#fff; color:#1a1a2e; border:1px solid #1a1a2e; border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">Assign</button>`
+                                : `<span style="color:#bbb;">-</span>`)}</td>
                         <td data-label="Owner">${v.owner_name}<br><span style="color:#888; font-size:12px;">${v.owner_email}</span></td>
                         <td data-label="Status"><span class="status-badge ${v.status === "suspended" ? "status-cancelled" : "status-paid"}">${v.status}</span></td>
                         <td data-label="Payouts">${v.payout_frozen ? `<span class="status-badge status-cancelled">Frozen</span>` : `<span class="status-badge status-paid">Active</span>`}</td>
@@ -6963,6 +7474,29 @@ function renderVendorCompliancePanel() {
 
     if (vendorComplianceOpenProductsId !== null) {
         loadVendorComplianceProducts(vendorComplianceOpenProductsId);
+    }
+}
+
+// Shop ID (Jumia Vendor Center comparison) - rare admin escape hatch for a
+// vendor approved before migration 113 shipped (regenerateVendorShopId
+// never overwrites an existing shop_id, so this is safe to offer whenever
+// one is missing).
+async function regenerateVendorShopIdAction(vendorId) {
+    try {
+        const token = getToken();
+        const response = await fetch(`${API_URL}/api/admin/vendors/${vendorId}/regenerate-shop-id`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            alert(result.error || "Could not assign a Shop ID.");
+            return;
+        }
+        loadVendorCompliancePanel();
+    } catch (error) {
+        console.error("Regenerate vendor shop ID error:", error);
+        alert("Something went wrong.");
     }
 }
 

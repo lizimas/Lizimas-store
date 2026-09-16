@@ -29,6 +29,11 @@
     <!-- Manage Products ---------------------------------------------------- -->
     <div class="vm-screen" id="vm-screen-products">
         <div class="vm-pm-title">Product Management</div>
+        <div id="vm-product-tier-status" style="font-size:11.5px; color:#888; margin:-6px 16px 8px;"></div>
+        <button class="vm-list-row" style="margin:0 14px 8px; border-radius:10px;" onclick="vmShowScreen('consignments')">
+            <span>Fulfillment by Lizimas</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
         <div class="vm-pm-status-label">Status:</div>
         <div class="vm-pm-all-pill">All</div>
         <div class="vm-pm-group-label">Filter</div>
@@ -58,6 +63,119 @@
         </div>
     </div>
 
+    <!-- Fulfillment by Lizimas (Consignments) ----------------------------------- -->
+    <div class="vm-screen" id="vm-screen-consignments">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Fulfillment by Lizimas</span></div>
+        <div class="vm-card">
+            <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:10px;">
+                Ship stock to a Lizimas hub and we hold, pick and pack it for you.
+            </div>
+            <div id="vm-consignments-list"><div class="vm-loading-state">Loading...</div></div>
+        </div>
+        <div class="vm-btn-row">
+            <button class="vm-btn-primary" onclick="vmShowConsignmentCreate()">+ Request Consignment</button>
+        </div>
+    </div>
+
+    <!-- Stock Recommendation -------------------------------------------------- -->
+    <div class="vm-screen" id="vm-screen-stock-recommendation">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Stock Recommendation</span></div>
+        <div class="vm-card">
+            <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:10px;">
+                Based on your trailing 30-day delivered sales for each product.
+            </div>
+            <div id="vm-stock-recommendations-list"><div class="vm-loading-state">Loading...</div></div>
+        </div>
+    </div>
+
+    <!-- Manage Pickers ---------------------------------------------------------- -->
+    <div class="vm-screen" id="vm-screen-pickers">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Manage Pickers</span></div>
+        <div class="vm-card">
+            <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:10px;">
+                People you've authorized to hand over packages on your behalf at a Lizimas drop-off point.
+            </div>
+            <div id="vm-pickers-list"><div class="vm-loading-state">Loading...</div></div>
+        </div>
+        <div class="vm-btn-row">
+            <button class="vm-btn-primary" onclick="vmShowPickerCreate()">+ Add Picker</button>
+        </div>
+    </div>
+
+    <!-- Add a picker -------------------------------------------------------------- -->
+    <div class="vm-screen" id="vm-screen-pickers-create">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Add Picker</span></div>
+        <div class="vm-card">
+            <div class="vm-field">
+                <label class="vm-field-label">Full Name</label>
+                <input type="text" id="vm-picker-new-name" class="vm-field-input" placeholder="Full name">
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">Phone</label>
+                <input type="text" id="vm-picker-new-phone" class="vm-field-input" placeholder="e.g. 07XXXXXXXX">
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">ID Number (optional)</label>
+                <input type="text" id="vm-picker-new-id" class="vm-field-input" placeholder="National ID / voter card">
+            </div>
+            <div class="vm-btn-help" id="vm-picker-new-error" style="color:#DC2626;"></div>
+        </div>
+        <div class="vm-btn-row">
+            <button class="vm-btn-primary" onclick="vmCreatePicker()">Save Picker</button>
+        </div>
+    </div>
+
+    <!-- Edit a picker --------------------------------------------------------------- -->
+    <div class="vm-screen" id="vm-screen-pickers-edit">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Edit Picker</span></div>
+        <div class="vm-card">
+            <div class="vm-field">
+                <label class="vm-field-label">Full Name</label>
+                <input type="text" id="vm-picker-edit-name" class="vm-field-input">
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">Phone</label>
+                <input type="text" id="vm-picker-edit-phone" class="vm-field-input">
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">ID Number (optional)</label>
+                <input type="text" id="vm-picker-edit-id" class="vm-field-input">
+            </div>
+            <div class="vm-btn-help" id="vm-picker-edit-error" style="color:#DC2626;"></div>
+        </div>
+        <div class="vm-btn-row">
+            <button class="vm-btn-primary" onclick="vmSavePickerEdit()">Save</button>
+        </div>
+        <div class="vm-btn-row">
+            <button class="vm-btn-primary" id="vm-picker-edit-toggle-btn" style="background:#fff; border:1.5px solid var(--vm-navy); color:var(--vm-navy);" onclick="vmTogglePickerActive()">Disable</button>
+            <button class="vm-btn-primary" style="background:#fff; border:1.5px solid #DC2626; color:#DC2626;" onclick="vmDeletePicker()">Remove</button>
+        </div>
+    </div>
+
+    <!-- Request a consignment ---------------------------------------------------- -->
+    <div class="vm-screen" id="vm-screen-consignments-create">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Request Consignment</span></div>
+        <div class="vm-card">
+            <div class="vm-field">
+                <label class="vm-field-label">Ship to hub</label>
+                <select id="vm-consignment-hub" class="vm-field-input"></select>
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">Products &amp; quantities</label>
+                <div id="vm-consignment-lines" style="display:flex; flex-direction:column; gap:8px; margin-top:6px;"></div>
+                <button type="button" class="vm-list-row" style="margin-top:8px; justify-content:center;" onclick="vmAddConsignmentLine()">+ Add another product</button>
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">Notes (optional)</label>
+                <textarea id="vm-consignment-notes" class="vm-field-input" rows="2"></textarea>
+            </div>
+            <div class="vm-btn-help" id="vm-consignment-create-error" style="color:#DC2626;"></div>
+        </div>
+        <div class="vm-btn-row">
+            <button class="vm-btn-primary" onclick="vmSubmitConsignment()">Submit Request</button>
+        </div>
+    </div>
+
     <!-- Menu --------------------------------------------------------------- -->
     <!-- Settings ------------------------------------------------------------- -->
     <div class="vm-screen" id="vm-screen-settings">
@@ -74,13 +192,19 @@
                 <span id="vm-shop-active-sub" style="font-size:12px; color:#888; margin-right:10px;">Loading...</span>
                 <button id="vm-shop-active-toggle" class="vm-checkbox" onclick="vmToggleShopActive()"></button>
             </div>
-            <div class="vm-list-row vm-muted" style="cursor:default;"><span class="vm-list-row-label">Users</span><span class="vm-badge-soon">Coming soon</span></div>
+            <button class="vm-list-row" id="vm-users-nav-row" onclick="vmShowScreen('users')">
+                <span class="vm-list-row-label">Users</span>
+                <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
+            </button>
             <button class="vm-list-row" onclick="vmShowScreen('jumia')">
                 <span class="vm-list-row-label">Applications</span>
                 <span id="vm-jumia-status-sub" style="font-size:12px; color:#888; margin-right:6px;">Not connected</span>
                 <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
             </button>
-            <div class="vm-list-row vm-muted" style="cursor:default;"><span class="vm-list-row-label">Manage Pickers</span><span class="vm-badge-soon">Coming soon</span></div>
+            <button class="vm-list-row" onclick="vmShowScreen('pickers')">
+                <span class="vm-list-row-label">Manage Pickers</span>
+                <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
+            </button>
         </div>
         <div class="vm-card" style="padding:4px 16px;">
             <div class="vm-group-header"><span class="vm-group-header-label">Platform Settings</span></div>
@@ -93,6 +217,62 @@
                 <span class="vm-list-row-label">Manage Products</span>
                 <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
             </button>
+        </div>
+    </div>
+
+    <!-- Users (Settings > Users, matching Jumia Vendor Center) --------------- -->
+    <div class="vm-screen" id="vm-screen-users">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Users</span></div>
+        <div class="vm-card">
+            <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:10px;">
+                Invite staff to help run your shop. Each person only sees and does what you give them permission for.
+            </div>
+            <div id="vm-users-list"><div class="vm-loading-state">Loading...</div></div>
+        </div>
+        <div class="vm-btn-row">
+            <button class="vm-btn-primary" onclick="vmShowUsersCreate()">+ Add User</button>
+        </div>
+    </div>
+
+    <!-- Add a staff user ------------------------------------------------------- -->
+    <div class="vm-screen" id="vm-screen-users-create">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Add User</span></div>
+        <div class="vm-card">
+            <div class="vm-field">
+                <label class="vm-field-label">Name</label>
+                <input type="text" id="vm-users-new-name" class="vm-field-input" placeholder="Full name">
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">Email</label>
+                <input type="email" id="vm-users-new-email" class="vm-field-input" placeholder="name@example.com">
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">Roles</label>
+                <div id="vm-users-new-roles" style="display:flex; flex-direction:column; gap:8px; margin-top:6px;"></div>
+            </div>
+            <div class="vm-btn-help" id="vm-users-new-error" style="color:#DC2626;"></div>
+        </div>
+        <div class="vm-btn-row">
+            <button class="vm-btn-primary" onclick="vmCreateUser()">Send Invite</button>
+        </div>
+    </div>
+
+    <!-- Edit a staff user's roles ------------------------------------------------ -->
+    <div class="vm-screen" id="vm-screen-users-edit">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title" id="vm-users-edit-title">Edit User</span></div>
+        <div class="vm-card">
+            <div class="vm-field">
+                <label class="vm-field-label">Roles</label>
+                <div id="vm-users-edit-roles" style="display:flex; flex-direction:column; gap:8px; margin-top:6px;"></div>
+            </div>
+            <div class="vm-btn-help" id="vm-users-edit-error" style="color:#DC2626;"></div>
+        </div>
+        <div class="vm-btn-row">
+            <button class="vm-btn-primary" onclick="vmSaveUserRoles()">Save Roles</button>
+        </div>
+        <div class="vm-btn-row">
+            <button class="vm-btn-primary" id="vm-users-edit-toggle-btn" style="background:#fff; border:1.5px solid var(--vm-navy); color:var(--vm-navy);" onclick="vmToggleUserEnabled()">Disable</button>
+            <button class="vm-btn-primary" style="background:#fff; border:1.5px solid #DC2626; color:#DC2626;" onclick="vmDeleteUser()">Remove</button>
         </div>
     </div>
 
@@ -346,6 +526,49 @@
         <div id="vm-promotions-list" style="margin:0 14px 24px;"><div class="vm-loading-state">Loading...</div></div>
     </div>
 
+    <!-- Advertise Your Products --------------------------------------------------- -->
+    <div class="vm-screen" id="vm-screen-ads">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Advertise Your Products</span></div>
+        <div class="vm-card">
+            <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:10px;">
+                Pay only when a shopper clicks a sponsored product. Lizimas reviews every campaign before it goes live.
+            </div>
+            <div id="vm-ad-campaigns-list"><div class="vm-loading-state">Loading...</div></div>
+        </div>
+        <div class="vm-btn-row">
+            <button class="vm-btn-primary" onclick="vmShowAdCampaignCreate()">+ New Campaign</button>
+        </div>
+    </div>
+
+    <!-- New ad campaign ------------------------------------------------------------ -->
+    <div class="vm-screen" id="vm-screen-ads-create">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">New Ad Campaign</span></div>
+        <div class="vm-card">
+            <div class="vm-field">
+                <label class="vm-field-label">Campaign Name</label>
+                <input type="text" id="vm-ad-campaign-name" class="vm-field-input" placeholder="e.g. September Push">
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">Daily Budget (UGX)</label>
+                <input type="number" id="vm-ad-campaign-daily-budget" class="vm-field-input">
+            </div>
+            <div class="vm-field">
+                <label class="vm-field-label">Total Budget (UGX)</label>
+                <input type="number" id="vm-ad-campaign-total-budget" class="vm-field-input">
+            </div>
+            <div class="vm-btn-help" id="vm-ad-campaign-rate-hint"></div>
+            <div class="vm-field">
+                <label class="vm-field-label">Products to Advertise</label>
+                <div id="vm-ad-campaign-products" style="display:flex; flex-direction:column; gap:6px; margin-top:6px;"></div>
+            </div>
+            <div class="vm-btn-help" id="vm-ad-campaign-create-error" style="color:#DC2626;"></div>
+        </div>
+        <div class="vm-btn-row">
+            <button class="vm-btn-primary" style="background:#fff; border:1.5px solid var(--vm-navy); color:var(--vm-navy);" onclick="vmSaveAdCampaignDraft()">Save as Draft</button>
+            <button class="vm-btn-primary" onclick="vmSubmitAdCampaign()">Save &amp; Submit</button>
+        </div>
+    </div>
+
     <!-- Account Statements (Wallet) ---------------------------------------------- -->
     <div class="vm-screen" id="vm-screen-wallet">
         <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Account Statements</span></div>
@@ -420,6 +643,7 @@
                         <div class="vd-nav-children">
                             <button class="tab-btn vd-sub-item" data-tab="products">Manage Products</button>
                             <button class="tab-btn vd-sub-item" data-tab="add-product">Add Products</button>
+                            <button class="tab-btn vd-sub-item" data-tab="consignments">Fulfillment by Lizimas</button>
                         </div>
                     </div>
 
@@ -429,6 +653,10 @@
 
                     <button class="tab-btn" data-tab="promotions">
                         <span class="sidebar-icon">&#127991;</span> Promotions
+                    </button>
+
+                    <button class="tab-btn" data-tab="ads">
+                        <span class="sidebar-icon">&#128226;</span> Advertise Your Products
                     </button>
 
                     <button class="tab-btn" data-tab="wallet">
@@ -694,7 +922,23 @@
                 <section id="tab-products" class="tab-content hidden">
                     <h2 class="admin-page-title">My Products</h2>
                     <p class="admin-page-subtitle">Products you've listed. New listings need admin approval before they go live. Deactivating a product pulls it off the storefront without deleting it or losing its approval.</p>
+                    <div id="vd-product-tier-status" style="font-size:12.5px; color:#666; margin:-6px 0 14px;"></div>
                     <div id="vendor-products-filters" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;"></div>
+
+                    <div style="margin-bottom:12px;">
+                        <button type="button" onclick="vdToggleProductImportPanel()" style="background:#fff; color:var(--vd-navy); border:1.5px solid var(--vd-navy); border-radius:8px; padding:9px 16px; cursor:pointer; font-weight:600; font-size:13px;">Import Products</button>
+                    </div>
+
+                    <div id="vd-product-import-panel" hidden class="panel" style="margin-bottom:16px;">
+                        <h3 style="margin:0 0 4px;">Import Products</h3>
+                        <p style="font-size:12.5px; color:#888; margin:0 0 10px; max-width:640px;">Upload a .csv, .xlsx, or .xls file to add or update several products at once - the bulk-upload equivalent of Jumia's "Add multiple products". Columns: <code>name</code>, <code>desired_payout</code> (what you want to earn per unit - required), <code>stock</code>, <code>description</code>, <code>category</code> (must match an existing category name), <code>sku</code>, <code>package_size</code>, <code>brand</code>, <code>gtin</code>, <code>mpn</code>, <code>material</code>, <code>color</code>, <code>sleeve</code>, <code>style</code>, <code>length</code>, <code>fit</code>, <code>pattern</code>, <code>care_instructions</code>, <code>occasion</code>, <code>warranty_months</code>, <code>image</code> (an already-hosted image URL). Give a row an <code>id</code> or a <code>sku</code> that matches one of your existing products to update it - everything else creates a new listing. Every new or changed row goes in as pending, same as adding or editing one product by hand.</p>
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <input type="file" id="vd-product-import-file" accept=".csv,.xlsx,.xls" style="font-size:13px;">
+                            <button type="button" onclick="vdUploadProductsCsv()" id="vd-product-import-btn" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:9px 16px; cursor:pointer; font-weight:600; font-size:13px;">Upload &amp; Import</button>
+                        </div>
+                        <div id="vd-product-import-results" style="margin-top:14px; font-size:12.5px;"></div>
+                    </div>
+
                     <div id="vendor-products-bulk-bar" hidden style="align-items:center; gap:10px; background:#F0F4FF; border:1px solid #C7D2FE; border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:13px;">
                         <span id="vendor-products-selected-count">0 selected</span>
                         <button onclick="bulkVendorProductAction('activate')" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Activate</button>
@@ -725,6 +969,45 @@
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
                                 <button id="vd-bulk-download-report-btn" onclick="downloadVdBulkErrorReport()" hidden style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:9px 14px; font-size:12.5px; cursor:pointer;">Download Error Report</button>
                                 <button onclick="closeVdBulkResults()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:9px 16px; font-size:13px; font-weight:600; cursor:pointer; margin-left:auto;">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-consignments" class="tab-content hidden">
+                    <h2 class="admin-page-title">Fulfillment by Lizimas</h2>
+                    <p class="admin-page-subtitle">
+                        Ship stock to a Lizimas hub and we hold, pick and pack it for you. Once we count a shipment
+                        in, those units show as Lizimas-fulfilled on the product and no longer need your own handover
+                        for each order.
+                    </p>
+
+                    <div style="display:flex; justify-content:flex-end; margin-bottom:14px;">
+                        <button onclick="vdShowCreateConsignmentForm()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer;">+ Request Consignment</button>
+                    </div>
+
+                    <div class="panel">
+                        <div id="vd-consignments-list">Loading...</div>
+                    </div>
+
+                    <div id="vd-consignment-create-overlay" hidden style="position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center;">
+                        <div style="background:#fff; border-radius:14px; padding:24px; width:600px; max-width:94vw; max-height:86vh; overflow-y:auto;">
+                            <h3 style="margin:0 0 14px; font-size:16px; color:#1a1a2e;">Request a Consignment</h3>
+                            <div id="vd-consignment-create-error" style="color:#DC2626; font-size:12.5px; margin-bottom:10px;"></div>
+
+                            <label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:4px;">Ship to hub</label>
+                            <select id="vd-consignment-hub" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:8px; margin-bottom:14px; font-size:13px;"></select>
+
+                            <label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:4px;">Products &amp; quantities</label>
+                            <div id="vd-consignment-lines" style="margin-bottom:8px;"></div>
+                            <button type="button" onclick="vdAddConsignmentLine()" style="background:#fff; border:1px solid #ccc; border-radius:8px; padding:7px 12px; font-size:12.5px; cursor:pointer; margin-bottom:14px;">+ Add another product</button>
+
+                            <label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:4px;">Notes (optional)</label>
+                            <textarea id="vd-consignment-notes" rows="2" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:8px; margin-bottom:16px; font-size:13px;"></textarea>
+
+                            <div style="display:flex; justify-content:flex-end; gap:8px;">
+                                <button onclick="vdHideCreateConsignmentForm()" style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:9px 16px; font-size:13px; cursor:pointer;">Cancel</button>
+                                <button onclick="vdSubmitConsignment()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:9px 18px; font-size:13px; font-weight:600; cursor:pointer;">Submit Request</button>
                             </div>
                         </div>
                     </div>
@@ -907,6 +1190,16 @@
                     <div class="panel">
                         <div id="vendor-inventory-list">Loading...</div>
                     </div>
+
+                    <div class="panel" style="margin-top:18px;">
+                        <h2 style="margin-top:0;">Stock Recommendation</h2>
+                        <p style="font-size:13px; color:#666; margin:0 0 12px;">
+                            Based on your trailing 30-day delivered sales for each product. "Reorder Now" means
+                            you're projected to run out within a week at the current pace; "Reorder Soon" means
+                            within two weeks.
+                        </p>
+                        <div id="vd-stock-recommendations-list">Loading...</div>
+                    </div>
                 </section>
 
                 <section id="tab-orders" class="tab-content hidden">
@@ -1030,6 +1323,54 @@
                     </div>
                 </section>
 
+                <section id="tab-ads" class="tab-content hidden">
+                    <h2 class="admin-page-title">Advertise Your Products</h2>
+                    <p class="admin-page-subtitle" id="vd-ads-rate-note">
+                        Pay only when a shopper clicks one of your sponsored products. Set a daily and total
+                        budget, pick the products to promote, and submit - Lizimas reviews every campaign
+                        before it goes live.
+                    </p>
+
+                    <div style="display:flex; justify-content:flex-end; margin-bottom:14px;">
+                        <button onclick="vdShowCreateAdCampaignForm()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer;">+ New Campaign</button>
+                    </div>
+
+                    <div class="panel">
+                        <div id="vd-ad-campaigns-list">Loading...</div>
+                    </div>
+
+                    <div id="vd-ad-campaign-create-overlay" hidden style="position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center;">
+                        <div style="background:#fff; border-radius:14px; padding:24px; width:600px; max-width:94vw; max-height:86vh; overflow-y:auto;">
+                            <h3 style="margin:0 0 14px; font-size:16px; color:#1a1a2e;">New Ad Campaign</h3>
+                            <div id="vd-ad-campaign-create-error" style="color:#DC2626; font-size:12.5px; margin-bottom:10px;"></div>
+
+                            <label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:4px;">Campaign Name</label>
+                            <input type="text" id="vd-ad-campaign-name" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:8px; margin-bottom:14px; font-size:13px; box-sizing:border-box;" placeholder="e.g. September Push">
+
+                            <div style="display:flex; gap:12px; margin-bottom:14px;">
+                                <div style="flex:1;">
+                                    <label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:4px;">Daily Budget (UGX)</label>
+                                    <input type="number" id="vd-ad-campaign-daily-budget" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:8px; font-size:13px; box-sizing:border-box;">
+                                </div>
+                                <div style="flex:1;">
+                                    <label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:4px;">Total Budget (UGX)</label>
+                                    <input type="number" id="vd-ad-campaign-total-budget" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:8px; font-size:13px; box-sizing:border-box;">
+                                </div>
+                            </div>
+                            <p id="vd-ad-campaign-rate-hint" style="font-size:12px; color:#888; margin:-8px 0 14px;"></p>
+
+                            <label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:4px;">Products to Advertise</label>
+                            <div id="vd-ad-campaign-products" style="max-height:200px; overflow-y:auto; border:1px solid #eee; border-radius:8px; padding:10px; margin-bottom:16px;"></div>
+
+                            <div style="display:flex; justify-content:flex-end; gap:8px;">
+                                <button onclick="vdHideCreateAdCampaignForm()" style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:9px 16px; font-size:13px; cursor:pointer;">Cancel</button>
+                                <button onclick="vdSaveAdCampaignDraft()" style="background:#fff; border:1px solid #1a1a2e; color:#1a1a2e; border-radius:8px; padding:9px 16px; font-size:13px; font-weight:600; cursor:pointer;">Save as Draft</button>
+                                <button onclick="vdSubmitAdCampaign()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:9px 18px; font-size:13px; font-weight:600; cursor:pointer;">Save &amp; Submit</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <section id="tab-reports" class="tab-content hidden">
                     <h2 class="admin-page-title">Reports</h2>
                     <p class="admin-page-subtitle">Sales, orders and payouts over the last 30 days.</p>
@@ -1130,6 +1471,49 @@
                             </div>
                         </div>
                         <p id="profile-save-status" style="font-size:13px; color:#666; margin-top:8px;"></p>
+                    </div>
+
+                    <!-- Shop ID (Jumia Vendor Center comparison, Sept 2026) -
+                         Jumia shows every seller a public Shop ID (e.g.
+                         UG140DI) on their own profile; read-only here,
+                         assigned once at approval - see vendorController.js's
+                         approveVendor/generateShopId. -->
+                    <div class="panel" id="vd-shop-id-panel">
+                        <h3 style="margin:0 0 4px;">Shop ID</h3>
+                        <p style="font-size:12.5px; color:#888; margin:0 0 10px;">Your Lizimas Store seller identifier - use it when contacting support.</p>
+                        <div id="vd-shop-id-value" style="font-size:18px; font-weight:700; color:var(--vd-navy); letter-spacing:0.5px;">Loading...</div>
+                    </div>
+
+                    <div class="panel" id="vd-shop-status-panel">
+                        <h3 style="margin:0 0 10px;">Shop Status</h3>
+                        <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee;">
+                            <div>
+                                <div style="font-weight:600; font-size:13.5px; color:var(--vd-navy);">Shop Active</div>
+                                <div id="vd-shop-active-sub" style="font-size:12px; color:#888;">Loading...</div>
+                            </div>
+                            <button id="vd-shop-active-toggle" class="vm-checkbox" onclick="vdToggleShopActive()"></button>
+                        </div>
+                        <div style="padding-top:14px;">
+                            <div style="font-weight:600; font-size:13.5px; color:var(--vd-navy); margin-bottom:4px;">Holiday Mode</div>
+                            <p style="font-size:12.5px; color:#888; margin:0 0 12px; max-width:520px;">Turning on Holiday Mode temporarily delists all of your active products from Lizimas Store, so customers can't place new orders with you while you're away. Orders already placed before Holiday Mode starts still need to be fulfilled as normal. Your shop and products come back automatically on the end date you choose.</p>
+                            <div id="vd-holiday-form" style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end;">
+                                <div>
+                                    <label style="display:block; font-size:12px; color:#666; margin-bottom:4px;">Start date</label>
+                                    <input type="date" id="vd-holiday-start" onchange="vdUpdateHolidaySaveState()" style="padding:9px 10px; border:1px solid #ccc; border-radius:8px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; font-size:12px; color:#666; margin-bottom:4px;">End date</label>
+                                    <input type="date" id="vd-holiday-end" onchange="vdUpdateHolidaySaveState()" style="padding:9px 10px; border:1px solid #ccc; border-radius:8px;">
+                                </div>
+                                <button id="vd-holiday-save-btn" disabled onclick="vdSaveHolidayMode()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Save</button>
+                            </div>
+                            <div id="vd-holiday-help" style="font-size:12px; color:#888; margin-top:8px;">Choose a start and end date to turn on Holiday Mode.</div>
+                            <div id="vd-holiday-active-view" hidden style="margin-top:8px;">
+                                <div style="font-size:13px; color:#555;">Holiday Mode is currently <strong style="color:var(--vd-green-text);">On</strong></div>
+                                <div id="vd-holiday-active-dates" style="font-size:13px; font-weight:600; color:var(--vd-navy); margin-top:4px;"></div>
+                                <button type="button" onclick="vdTurnOffHolidayMode()" style="margin-top:10px; background:#fff; border:1.5px solid var(--vd-red); color:var(--vd-red); border-radius:8px; padding:8px 14px; cursor:pointer; font-weight:600;">Turn Off Holiday Mode</button>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="panel" id="vd-jumia-panel">
@@ -1251,6 +1635,104 @@
                         <div style="display:flex; gap:10px; margin-top:12px;">
                             <button type="button" onclick="vdImportSelectedJumiaProducts()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Import Selected</button>
                             <button type="button" onclick="vdHideJumiaImport()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                        </div>
+                    </div>
+
+                    <div class="panel" id="vd-staff-panel" hidden>
+                        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:4px;">
+                            <div>
+                                <h3 style="margin:0 0 4px;">Users</h3>
+                                <p style="font-size:12.5px; color:#888; margin:0;">Invite staff to help run your shop. Each person only sees and does what you give them permission for below - matching Jumia Vendor Center's own Users screen.</p>
+                            </div>
+                            <button type="button" onclick="vdShowCreateStaffForm()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600; font-size:13px; white-space:nowrap;">+ Add User</button>
+                        </div>
+
+                        <div id="vd-staff-table" style="margin-top:14px; overflow-x:auto;"></div>
+
+                        <div id="vd-staff-create-view" hidden style="margin-top:16px; border-top:1px solid #eee; padding-top:16px; max-width:480px; display:none; flex-direction:column; gap:12px;">
+                            <div>
+                                <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Name</label>
+                                <input type="text" id="vd-staff-new-name" placeholder="Full name" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Email</label>
+                                <input type="email" id="vd-staff-new-email" placeholder="name@example.com" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:8px;">Roles</label>
+                                <div id="vd-staff-new-roles" style="display:flex; flex-direction:column; gap:6px;"></div>
+                            </div>
+                            <p id="vd-staff-new-error" style="font-size:12.5px; color:#DC2626; margin:0;"></p>
+                            <div style="display:flex; gap:10px;">
+                                <button type="button" onclick="vdCreateStaffUser()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Send Invite</button>
+                                <button type="button" onclick="vdHideCreateStaffForm()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                            </div>
+                        </div>
+
+                        <div id="vd-staff-edit-view" hidden style="margin-top:16px; border-top:1px solid #eee; padding-top:16px; max-width:480px; display:none; flex-direction:column; gap:12px;">
+                            <div style="font-size:13.5px; font-weight:600; color:var(--vd-navy);" id="vd-staff-edit-title"></div>
+                            <div>
+                                <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:8px;">Roles</label>
+                                <div id="vd-staff-edit-roles" style="display:flex; flex-direction:column; gap:6px;"></div>
+                            </div>
+                            <p id="vd-staff-edit-error" style="font-size:12.5px; color:#DC2626; margin:0;"></p>
+                            <div style="display:flex; gap:10px;">
+                                <button type="button" onclick="vdSaveStaffRoles()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Save</button>
+                                <button type="button" onclick="vdHideEditStaffRoles()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel" id="vd-pickers-panel">
+                        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:4px;">
+                            <div>
+                                <h3 style="margin:0 0 4px;">Manage Pickers</h3>
+                                <p style="font-size:12.5px; color:#888; margin:0;">People you've authorized to hand over packages on your behalf at a Lizimas drop-off point - matching Jumia Vendor Center's own Manage Pickers screen.</p>
+                            </div>
+                            <button type="button" onclick="vdShowCreatePickerForm()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600; font-size:13px; white-space:nowrap;">+ Add Picker</button>
+                        </div>
+
+                        <div id="vd-pickers-table" style="margin-top:14px; overflow-x:auto;"></div>
+
+                        <div id="vd-picker-create-view" hidden style="margin-top:16px; border-top:1px solid #eee; padding-top:16px; max-width:420px; display:none; flex-direction:column; gap:12px;">
+                            <div>
+                                <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Full Name</label>
+                                <input type="text" id="vd-picker-new-name" placeholder="Full name" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Phone</label>
+                                <input type="text" id="vd-picker-new-phone" placeholder="e.g. 07XXXXXXXX" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">ID Number <span style="font-weight:400; color:#888;">(optional)</span></label>
+                                <input type="text" id="vd-picker-new-id" placeholder="National ID / voter card" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+                            <p id="vd-picker-new-error" style="font-size:12.5px; color:#DC2626; margin:0;"></p>
+                            <div style="display:flex; gap:10px;">
+                                <button type="button" onclick="vdCreatePicker()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Save Picker</button>
+                                <button type="button" onclick="vdHideCreatePickerForm()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                            </div>
+                        </div>
+
+                        <div id="vd-picker-edit-view" hidden style="margin-top:16px; border-top:1px solid #eee; padding-top:16px; max-width:420px; display:none; flex-direction:column; gap:12px;">
+                            <div style="font-size:13.5px; font-weight:600; color:var(--vd-navy);">Edit Picker</div>
+                            <div>
+                                <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Full Name</label>
+                                <input type="text" id="vd-picker-edit-name" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Phone</label>
+                                <input type="text" id="vd-picker-edit-phone" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">ID Number <span style="font-weight:400; color:#888;">(optional)</span></label>
+                                <input type="text" id="vd-picker-edit-id" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+                            <p id="vd-picker-edit-error" style="font-size:12.5px; color:#DC2626; margin:0;"></p>
+                            <div style="display:flex; gap:10px;">
+                                <button type="button" onclick="vdSavePickerEdit()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Save</button>
+                                <button type="button" onclick="vdHideEditPickerForm()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                            </div>
                         </div>
                     </div>
 

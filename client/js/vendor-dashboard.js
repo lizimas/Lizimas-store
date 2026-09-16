@@ -53,8 +53,10 @@ function setupVendorTabs() {
             if (parentGroup) parentGroup.classList.add("vd-nav-open");
 
             if (button.dataset.tab === "overview") { loadVendorStatus(); loadVendorKyc(); loadVendorPremiumDashboard(); }
-            if (button.dataset.tab === "products") loadVendorProducts();
+            if (button.dataset.tab === "products") { loadVendorProducts(); vdLoadProductTierStatus(); }
+            if (button.dataset.tab === "consignments") vdLoadConsignments();
             if (button.dataset.tab === "inventory") loadVendorInventory();
+            if (button.dataset.tab === "inventory") vdLoadStockRecommendations();
             if (button.dataset.tab === "add-product" && staffCategoriesLoaded === false) loadVendorCategories();
             if (button.dataset.tab === "add-product" && !document.getElementById("product-id").value) {
                 const blockHost = document.getElementById("desc-blocks-editor");
@@ -68,7 +70,8 @@ function setupVendorTabs() {
             if (button.dataset.tab === "wallet") loadVendorWallet();
             if (button.dataset.tab === "reviews") loadVendorReviews();
             if (button.dataset.tab === "promotions") loadVendorPromotionsTab();
-            if (button.dataset.tab === "account") { loadVendorComplianceNotices(); vdLoadJumia(); }
+            if (button.dataset.tab === "ads") vdLoadAdCampaigns();
+            if (button.dataset.tab === "account") { loadVendorComplianceNotices(); vdLoadJumia(); vdLoadShopStatus(); vdLoadStaff(); vdLoadPickers(); }
             if (button.dataset.tab === "reports") loadVendorReports();
             if (button.dataset.tab === "storefront") loadVendorStorefront();
             if (button.dataset.tab === "messages") loadVendorMessages();
@@ -122,6 +125,11 @@ async function loadVendorStatus() {
         const avatarInitial = document.getElementById("vd-avatar-initial");
         if (avatarName) avatarName.textContent = v.business_name || "Vendor";
         if (avatarInitial) avatarInitial.textContent = (v.business_name || "V").trim().charAt(0).toUpperCase();
+
+        // Shop ID (Jumia Vendor Center comparison) - assigned at approval,
+        // so a not-yet-approved vendor sees a plain explanatory placeholder.
+        const shopIdEl = document.getElementById("vd-shop-id-value");
+        if (shopIdEl) shopIdEl.textContent = v.shop_id || "Assigned once your shop is approved";
 
         const banner = document.getElementById("vendor-status-banner");
         const s = vendorStatusLabel(v.status);
@@ -336,6 +344,32 @@ const VENDOR_PRODUCT_FILTERS = [
     ["inactive", "Deactivated"]
 ];
 
+// Per-listing Quality Score badge (Jumia Vendor Center comparison, Sept
+// 2026 - see migrations/108_product_quality_score.sql). Clicking it shows
+// exactly what's missing, using the cached breakdown so no extra request
+// is needed.
+function vendorQualityScoreBadge(p) {
+    if (p.quality_score === null || p.quality_score === undefined) {
+        return `<span style="font-size:12px; color:#999;">&mdash;</span>`;
+    }
+    const score = p.quality_score;
+    const color = score >= 80 ? "#16A34A" : (score >= 50 ? "#B45309" : "#DC2626");
+    return `<button type="button" onclick="vendorShowQualityTips(${p.id})" style="background:none; border:none; padding:0; cursor:pointer; font-weight:700; font-size:13px; color:${color};">${score}%</button>`;
+}
+
+function vendorShowQualityTips(productId) {
+    const p = vendorProductsCache.find(x => Number(x.id) === Number(productId));
+    if (!p || !p.quality_score_breakdown) return;
+    const breakdown = typeof p.quality_score_breakdown === "string" ? JSON.parse(p.quality_score_breakdown) : p.quality_score_breakdown;
+    const tips = breakdown.tips || [];
+    if (tips.length === 0) {
+        alert(`Quality Score: ${p.quality_score}%\n\nThis listing is fully complete.`);
+        return;
+    }
+    const lines = tips.map(t => `- ${t.label} (+${t.points - t.earned} pts)`).join("\n");
+    alert(`Quality Score: ${p.quality_score}%\n\nTo improve:\n${lines}`);
+}
+
 function vendorProductStatusBadge(p) {
     const key = vendorProductFilterKey(p);
     const map = {
@@ -520,6 +554,91 @@ function downloadVdBulkErrorReport() {
     URL.revokeObjectURL(url);
 }
 
+// --- Bulk product import (CSV/XLSX): desktop Products tab -----------------
+// Vendor-side counterpart to the admin Products tab's Import/Export panel,
+// calling POST /api/vendors/products/import (server/controllers/
+// productController.js's importVendorProducts). Vendor CSV *export* is
+// client-side already (vmExportProductsCsv, built from whatever's loaded
+// in the table) - only import needed a new endpoint and panel.
+function vdToggleProductImportPanel() {
+    const panel = document.getElementById("vd-product-import-panel");
+    if (!panel) return;
+    panel.hidden = !panel.hidden;
+    if (!panel.hidden) document.getElementById("vd-product-import-results").innerHTML = "";
+}
+
+function vdImportEsc(value) {
+    return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+async function vdUploadProductsCsv() {
+    const fileInput = document.getElementById("vd-product-import-file");
+    const resultsEl = document.getElementById("vd-product-import-results");
+    const btn = document.getElementById("vd-product-import-btn");
+    const file = fileInput.files[0];
+    if (!file) {
+        resultsEl.innerHTML = '<p style="color:#DC2626;">Choose a .csv, .xlsx, or .xls file first.</p>';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Importing...";
+    resultsEl.innerHTML = '<p style="color:#666;">Uploading and importing - this can take a moment for large files...</p>';
+
+    try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const data = await vendorAuthorizedFetch("/api/vendors/products/import", {
+            method: "POST",
+            body: formData
+        });
+
+        if (data.error) {
+            resultsEl.innerHTML = `<p style="color:#DC2626;">${vdImportEsc(data.error)}</p>`;
+            return;
+        }
+
+        let html = `<p style="color:#16A34A; font-weight:600;">Import complete: ${data.created} created, ${data.updated} updated, ${data.skipped} skipped (${data.totalRows} rows total). New and changed listings are pending admin approval.</p>`;
+        if (data.errors && data.errors.length) {
+            html += '<div style="margin-top:8px; max-height:220px; overflow-y:auto; border:1px solid #eee; border-radius:6px; padding:8px;">';
+            html += data.errors.map(e =>
+                `<div style="padding:4px 0; border-bottom:1px solid #f2f2f2;"><b>Row ${e.row}</b> (${vdImportEsc(e.name || "")}): ${vdImportEsc((e.errors || []).join("; "))}</div>`
+            ).join("");
+            html += "</div>";
+        }
+        resultsEl.innerHTML = html;
+
+        fileInput.value = "";
+        if (typeof loadVendorProducts === "function") loadVendorProducts();
+    } catch (error) {
+        console.error("vdUploadProductsCsv error:", error);
+        resultsEl.innerHTML = '<p style="color:#DC2626;">Could not connect to server.</p>';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Upload & Import";
+    }
+}
+
+// Product-count limit tier status (Jumia Vendor Center comparison, Sept
+// 2026) - a one-line "X of Y listings used" strip above the Products tab
+// filters. Not cached in vendorProductsCache since it comes from its own
+// endpoint (tier/GMV, not product rows).
+async function vdLoadProductTierStatus() {
+    const el = document.getElementById("vd-product-tier-status");
+    if (!el) return;
+    try {
+        const status = await vendorAuthorizedFetch("/api/vendors/me/product-tier");
+        if (status.error || !status.tier) { el.textContent = ""; return; }
+        const capText = status.maxAllowed === null ? "unlimited" : `${status.currentCount} of ${status.maxAllowed}`;
+        const warn = status.atLimit ? ` <span style="color:#DC2626; font-weight:600;">&mdash; limit reached</span>` : "";
+        el.innerHTML = `Tier: <strong>${status.tier.name}</strong> &bull; Listings: ${capText}${warn}`;
+    } catch (error) {
+        console.error("vdLoadProductTierStatus error:", error);
+        el.textContent = "";
+    }
+}
+
 async function loadVendorProducts() {
     try {
         const products = await vendorAuthorizedFetch("/api/vendors/products");
@@ -565,16 +684,17 @@ function renderVendorProductsTable() {
         <table>
             <thead><tr>
                 <th><input type="checkbox" ${allSelected ? "checked" : ""} onchange="toggleAllVendorProductsSelect(this.checked, ${JSON.stringify(visibleIds)})"></th>
-                <th>Product</th><th>SKU</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th>
+                <th>Product</th><th>SKU</th><th>Price</th><th>Stock</th><th>Quality</th><th>Status</th><th>Actions</th>
             </tr></thead>
             <tbody>
                 ${rows.map(p => `
                     <tr>
                         <td><input type="checkbox" ${vendorProductsSelected.has(Number(p.id)) ? "checked" : ""} onchange="toggleVendorProductSelect(${p.id}, this.checked)"></td>
-                        <td data-label="Product">${p.name}</td>
+                        <td data-label="Product">${p.name}${p.possible_duplicate_of ? `<div style="font-size:11px; color:#B45309; margin-top:3px;">&#9888; Looks similar to another listing of yours</div>` : ""}</td>
                         <td data-label="SKU">${p.sku || "—"}</td>
                         <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
                         <td data-label="Stock">${p.stock}</td>
+                        <td data-label="Quality">${vendorQualityScoreBadge(p)}</td>
                         <td data-label="Status">${vendorProductStatusBadge(p)}${p.status === "rejected" && p.rejection_reason ? `<div style="font-size:11px; color:#991B1B; margin-top:4px;">${p.rejection_reason}</div>` : ""}</td>
                         <td data-label="Actions">
                             <button onclick="editVendorProduct(${p.id})" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Edit</button>
@@ -1899,6 +2019,56 @@ function setVendorInventoryFilter(key) {
     renderVendorInventoryList();
 }
 
+// --- Stock Recommendation (Jumia Vendor Center comparison, Sept 2026) ------
+// A real reorder-quantity engine on top of the plain low/out-of-stock list
+// above - see server/utils/stockRecommendation.js for the sales-velocity math.
+
+function vdStockUrgencyBadge(urgency) {
+    const map = {
+        reorder_now: ["#DC2626", "Reorder Now"],
+        reorder_soon: ["#B45309", "Reorder Soon"],
+        ok: ["#166534", "OK"],
+        no_recent_sales: ["#888", "No recent sales"]
+    };
+    const [color, label] = map[urgency] || ["#888", urgency];
+    return `<span style="font-weight:600; color:${color};">${label}</span>`;
+}
+
+async function vdLoadStockRecommendations() {
+    const host = document.getElementById("vd-stock-recommendations-list");
+    if (!host) return;
+    try {
+        const recs = await vendorAuthorizedFetch("/api/vendors/me/stock-recommendations");
+        if (recs.error) { host.innerHTML = `<p class="no-data">${vendorEsc(recs.error)}</p>`; return; }
+        const actionable = (recs || []).filter(r => r.urgency === "reorder_now" || r.urgency === "reorder_soon")
+            .sort((a, b) => (a.daysOfStockRemaining ?? 999) - (b.daysOfStockRemaining ?? 999));
+
+        if (actionable.length === 0) {
+            host.innerHTML = `<p class="no-data">Nothing needs reordering right now based on your recent sales.</p>`;
+            return;
+        }
+
+        host.innerHTML = `
+            <table>
+                <thead><tr><th>Product</th><th>Stock</th><th>Est. Days Remaining</th><th>Recommended Reorder Qty</th><th>Status</th></tr></thead>
+                <tbody>
+                    ${actionable.map(r => `
+                        <tr>
+                            <td data-label="Product">${vendorEsc(r.name)}${r.sku ? ` <span style="color:#999;">(${vendorEsc(r.sku)})</span>` : ""}</td>
+                            <td data-label="Stock">${r.stock}</td>
+                            <td data-label="Days Remaining">${r.daysOfStockRemaining === null ? "—" : r.daysOfStockRemaining}</td>
+                            <td data-label="Recommended Qty"><strong>${r.recommendedReorderQty}</strong></td>
+                            <td data-label="Status">${vdStockUrgencyBadge(r.urgency)}</td>
+                        </tr>`).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("vdLoadStockRecommendations error:", error);
+        host.innerHTML = `<p class="no-data">Could not load stock recommendations.</p>`;
+    }
+}
+
 async function loadVendorInventory() {
     try {
         if (!vendorProductsCache || vendorProductsCache.length === 0) {
@@ -3107,6 +3277,907 @@ window.addEventListener("profilePhotoChanged", (e) => {
 
 let vdJumiaApplications = [];
 let vdJumiaSetupAppId = null;
+
+// --- Shop Status (Shop Active + Holiday Mode): desktop Account tab -------
+// Desktop counterpart to vmLoadSettings/vmToggleShopActive/vmLoadHolidayMode/
+// vmSaveHolidayMode/vmTurnOffHolidayMode in vendor-mobile.js. Deliberately
+// reuses vmShopStatusCache (defined in vendor-mobile.js, loaded before this
+// file runs any of these) rather than a separate vd-prefixed cache - same
+// "single source of truth either way" reasoning already used for the Jumia
+// connection cache shared between the two shells.
+async function vdLoadShopStatus() {
+    try {
+        const s = await vendorAuthorizedFetch("/api/vendors/me/shop-status");
+        if (s.error) return;
+        vmShopStatusCache = s;
+
+        const toggle = document.getElementById("vd-shop-active-toggle");
+        toggle.classList.toggle("checked", !!s.shopActive);
+        toggle.innerHTML = s.shopActive ? "&#10003;" : "";
+        document.getElementById("vd-shop-active-sub").textContent = s.shopActive ? "Your shop is visible to customers" : "Your shop is hidden from customers";
+
+        const active = s.holidayMode.active;
+        document.getElementById("vd-holiday-form").hidden = active;
+        document.getElementById("vd-holiday-active-view").hidden = !active;
+        if (active) {
+            document.getElementById("vd-holiday-active-dates").textContent = `${s.holidayMode.startDate} to ${s.holidayMode.endDate}`;
+        } else {
+            document.getElementById("vd-holiday-start").value = "";
+            document.getElementById("vd-holiday-end").value = "";
+            vdUpdateHolidaySaveState();
+        }
+    } catch (error) {
+        console.error("vdLoadShopStatus error:", error);
+    }
+}
+
+async function vdToggleShopActive() {
+    const turningOff = vmShopStatusCache.shopActive;
+    const msg = turningOff
+        ? "Turn your shop off? All of your products will be hidden from customers immediately."
+        : "Turn your shop back on? Your products will become visible to customers again.";
+    if (!confirm(msg)) return;
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/shop-active", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ active: !vmShopStatusCache.shopActive })
+        });
+        if (result.error) { alert(result.error); return; }
+        vmShopStatusCache.shopActive = result.shopActive;
+        vdLoadShopStatus();
+    } catch (error) {
+        console.error("vdToggleShopActive error:", error);
+        alert("Could not update shop status.");
+    }
+}
+
+function vdUpdateHolidaySaveState() {
+    const start = document.getElementById("vd-holiday-start").value;
+    const end = document.getElementById("vd-holiday-end").value;
+    const btn = document.getElementById("vd-holiday-save-btn");
+    const help = document.getElementById("vd-holiday-help");
+    const valid = start && end && end >= start;
+    btn.disabled = !valid;
+    help.textContent = valid ? "" : (start && end && end < start ? "End date must be after start date." : "Choose a start and end date to turn on Holiday Mode.");
+    help.style.color = "";
+}
+
+async function vdSaveHolidayMode() {
+    const startDate = document.getElementById("vd-holiday-start").value;
+    const endDate = document.getElementById("vd-holiday-end").value;
+    const help = document.getElementById("vd-holiday-help");
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/holiday-mode", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ active: true, startDate, endDate })
+        });
+        if (result.error) { help.textContent = result.error; help.style.color = "var(--vd-red)"; return; }
+        vdLoadShopStatus();
+    } catch (error) {
+        console.error("vdSaveHolidayMode error:", error);
+        help.textContent = "Could not save. Please try again.";
+    }
+}
+
+async function vdTurnOffHolidayMode() {
+    if (!confirm("Turn off Holiday Mode? Your products will become visible again right away.")) return;
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/holiday-mode", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ active: false })
+        });
+        if (result.error) { alert(result.error); return; }
+        vdLoadShopStatus();
+    } catch (error) {
+        console.error("vdTurnOffHolidayMode error:", error);
+        alert("Could not update Holiday Mode.");
+    }
+}
+
+let vdStaffCache = [];
+let vdStaffAvailableRoles = [];
+let vdStaffEditingId = null;
+
+function vdRoleLabel(code) {
+    const r = vdStaffAvailableRoles.find((x) => x.code === code);
+    return r ? r.label : code;
+}
+
+function vdBuildRoleCheckboxes(container, checkedCodes) {
+    container.innerHTML = "";
+    vdStaffAvailableRoles.forEach((role) => {
+        const label = document.createElement("label");
+        label.style.cssText = "display:flex; align-items:center; gap:8px; font-size:13px; color:#333; cursor:pointer;";
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.value = role.code;
+        input.checked = checkedCodes.includes(role.code);
+        label.appendChild(input);
+        label.appendChild(document.createTextNode(role.label));
+        container.appendChild(label);
+    });
+}
+
+function vdReadCheckedRoles(container) {
+    return Array.from(container.querySelectorAll("input[type=checkbox]:checked")).map((el) => el.value);
+}
+
+async function vdLoadStaff() {
+    const panel = document.getElementById("vd-staff-panel");
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/staff");
+        if (result.error) {
+            // Owner-only endpoint - a vendor_staff login gets 403 here, so the
+            // Users panel simply stays hidden for them rather than showing an error.
+            panel.hidden = true;
+            return;
+        }
+        panel.hidden = false;
+        vdStaffCache = result.staff || [];
+        vdStaffAvailableRoles = result.availableRoles || [];
+        vdRenderStaffTable();
+    } catch (error) {
+        console.error("vdLoadStaff error:", error);
+        panel.hidden = true;
+    }
+}
+
+function vdRenderStaffTable() {
+    const container = document.getElementById("vd-staff-table");
+    container.innerHTML = "";
+
+    if (vdStaffCache.length === 0) {
+        const empty = document.createElement("p");
+        empty.style.cssText = "font-size:13px; color:#888; margin:8px 0;";
+        empty.textContent = "You haven't added any staff yet.";
+        container.appendChild(empty);
+        return;
+    }
+
+    const table = document.createElement("table");
+    table.style.cssText = "width:100%; border-collapse:collapse; font-size:13px;";
+    const thead = document.createElement("thead");
+    thead.innerHTML = '<tr style="text-align:left; border-bottom:2px solid #eee; color:#888; font-size:12px;">' +
+        '<th style="padding:8px 10px;">Name</th><th style="padding:8px 10px;">Email</th>' +
+        '<th style="padding:8px 10px;">Roles</th><th style="padding:8px 10px;">Status</th>' +
+        '<th style="padding:8px 10px;"></th></tr>';
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    vdStaffCache.forEach((s) => {
+        const tr = document.createElement("tr");
+        tr.style.borderBottom = "1px solid #f2f2f2";
+
+        const tdName = document.createElement("td");
+        tdName.style.padding = "10px";
+        tdName.textContent = s.name;
+        tr.appendChild(tdName);
+
+        const tdEmail = document.createElement("td");
+        tdEmail.style.padding = "10px";
+        tdEmail.textContent = s.email;
+        tr.appendChild(tdEmail);
+
+        const tdRoles = document.createElement("td");
+        tdRoles.style.padding = "10px";
+        tdRoles.style.maxWidth = "260px";
+        tdRoles.textContent = (s.roles || []).map(vdRoleLabel).join(", ") || "—";
+        tr.appendChild(tdRoles);
+
+        const tdStatus = document.createElement("td");
+        tdStatus.style.padding = "10px";
+        const statusSpan = document.createElement("span");
+        statusSpan.style.cssText = s.enabled
+            ? "color:var(--vd-green-text); font-weight:600;"
+            : "color:#999; font-weight:600;";
+        statusSpan.textContent = s.enabled ? "Active" : "Disabled";
+        tdStatus.appendChild(statusSpan);
+        if (s.must_reset_password) {
+            const pending = document.createElement("div");
+            pending.style.cssText = "font-size:11px; color:#888; margin-top:2px;";
+            pending.textContent = "Invite pending";
+            tdStatus.appendChild(pending);
+        }
+        tr.appendChild(tdStatus);
+
+        const tdActions = document.createElement("td");
+        tdActions.style.cssText = "padding:10px; white-space:nowrap;";
+
+        const editBtn = document.createElement("button");
+        editBtn.type = "button";
+        editBtn.textContent = "Edit Roles";
+        editBtn.style.cssText = "background:#fff; color:var(--vd-navy); border:1.5px solid var(--vd-navy); border-radius:6px; padding:6px 10px; cursor:pointer; font-size:12px; margin-right:6px;";
+        editBtn.onclick = () => vdShowEditStaffRoles(s.id);
+        tdActions.appendChild(editBtn);
+
+        const toggleBtn = document.createElement("button");
+        toggleBtn.type = "button";
+        toggleBtn.textContent = s.enabled ? "Disable" : "Enable";
+        toggleBtn.style.cssText = "background:#fff; color:#555; border:1.5px solid #ccc; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:12px; margin-right:6px;";
+        toggleBtn.onclick = () => vdToggleStaffEnabled(s.id, !s.enabled);
+        tdActions.appendChild(toggleBtn);
+
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.textContent = "Remove";
+        removeBtn.style.cssText = "background:#fff; color:var(--vd-red); border:1.5px solid var(--vd-red); border-radius:6px; padding:6px 10px; cursor:pointer; font-size:12px;";
+        removeBtn.onclick = () => vdDeleteStaffUser(s.id);
+        tdActions.appendChild(removeBtn);
+
+        tr.appendChild(tdActions);
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
+}
+
+function vdShowCreateStaffForm() {
+    document.getElementById("vd-staff-new-name").value = "";
+    document.getElementById("vd-staff-new-email").value = "";
+    document.getElementById("vd-staff-new-error").textContent = "";
+    vdBuildRoleCheckboxes(document.getElementById("vd-staff-new-roles"), []);
+    const view = document.getElementById("vd-staff-create-view");
+    view.hidden = false;
+    view.style.display = "flex";
+    document.getElementById("vd-staff-edit-view").hidden = true;
+    document.getElementById("vd-staff-edit-view").style.display = "none";
+}
+
+function vdHideCreateStaffForm() {
+    const view = document.getElementById("vd-staff-create-view");
+    view.hidden = true;
+    view.style.display = "none";
+}
+
+async function vdCreateStaffUser() {
+    const name = document.getElementById("vd-staff-new-name").value.trim();
+    const email = document.getElementById("vd-staff-new-email").value.trim();
+    const roles = vdReadCheckedRoles(document.getElementById("vd-staff-new-roles"));
+    const errorEl = document.getElementById("vd-staff-new-error");
+    errorEl.textContent = "";
+
+    if (!name) { errorEl.textContent = "Name is required."; return; }
+    if (!email) { errorEl.textContent = "Email is required."; return; }
+    if (roles.length === 0) { errorEl.textContent = "Select at least one role."; return; }
+
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/staff", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, email, roles })
+        });
+        if (result.error) { errorEl.textContent = result.error; return; }
+        vdHideCreateStaffForm();
+        vdLoadStaff();
+    } catch (error) {
+        console.error("vdCreateStaffUser error:", error);
+        errorEl.textContent = "Could not create the staff account. Please try again.";
+    }
+}
+
+function vdShowEditStaffRoles(id) {
+    const staff = vdStaffCache.find((s) => s.id === id);
+    if (!staff) return;
+    vdStaffEditingId = id;
+    document.getElementById("vd-staff-edit-title").textContent = `${staff.name} — ${staff.email}`;
+    document.getElementById("vd-staff-edit-error").textContent = "";
+    vdBuildRoleCheckboxes(document.getElementById("vd-staff-edit-roles"), staff.roles || []);
+    const view = document.getElementById("vd-staff-edit-view");
+    view.hidden = false;
+    view.style.display = "flex";
+    document.getElementById("vd-staff-create-view").hidden = true;
+    document.getElementById("vd-staff-create-view").style.display = "none";
+}
+
+function vdHideEditStaffRoles() {
+    vdStaffEditingId = null;
+    const view = document.getElementById("vd-staff-edit-view");
+    view.hidden = true;
+    view.style.display = "none";
+}
+
+async function vdSaveStaffRoles() {
+    if (!vdStaffEditingId) return;
+    const roles = vdReadCheckedRoles(document.getElementById("vd-staff-edit-roles"));
+    const errorEl = document.getElementById("vd-staff-edit-error");
+    if (roles.length === 0) { errorEl.textContent = "Select at least one role."; return; }
+
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/staff/${vdStaffEditingId}/roles`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ roles })
+        });
+        if (result.error) { errorEl.textContent = result.error; return; }
+        vdHideEditStaffRoles();
+        vdLoadStaff();
+    } catch (error) {
+        console.error("vdSaveStaffRoles error:", error);
+        errorEl.textContent = "Could not save. Please try again.";
+    }
+}
+
+async function vdToggleStaffEnabled(id, enabled) {
+    const staff = vdStaffCache.find((s) => s.id === id);
+    const msg = enabled
+        ? `Re-enable ${staff ? staff.name : "this user"}'s access?`
+        : `Disable ${staff ? staff.name : "this user"}'s access? They will no longer be able to use any part of your vendor account.`;
+    if (!confirm(msg)) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/staff/${id}/enabled`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ enabled })
+        });
+        if (result.error) { alert(result.error); return; }
+        vdLoadStaff();
+    } catch (error) {
+        console.error("vdToggleStaffEnabled error:", error);
+        alert("Could not update this user.");
+    }
+}
+
+async function vdDeleteStaffUser(id) {
+    const staff = vdStaffCache.find((s) => s.id === id);
+    if (!confirm(`Remove ${staff ? staff.name : "this user"} from your account? This can't be undone - you'll need to invite them again if you change your mind.`)) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/staff/${id}`, { method: "DELETE" });
+        if (result.error) { alert(result.error); return; }
+        vdLoadStaff();
+    } catch (error) {
+        console.error("vdDeleteStaffUser error:", error);
+        alert("Could not remove this user.");
+    }
+}
+
+// --- Fulfillment by Lizimas (Consignments) ----------------------------
+// Jumia Vendor Center comparison, Sept 2026 - see
+// migrations/110_vendor_consignments.sql / vendorConsignmentController.js.
+// Vendor ships stock to a hub; nothing here touches stock/fulfillment_type
+// directly - that only happens once admin counts a shipment in.
+
+let vdConsignmentsCache = [];
+let vdConsignmentHubsCache = [];
+let vdConsignmentProductsCache = [];
+let vdConsignmentLineSeq = 0;
+
+function vdConsignmentStatusBadge(status) {
+    const map = {
+        requested: ["status-pending", "Requested"],
+        in_transit: ["status-pending", "In Transit"],
+        received: ["status-active", "Received"],
+        partially_received: ["status-active", "Partially Received"],
+        rejected: ["status-cancelled", "Rejected"],
+        cancelled: ["status-cancelled", "Cancelled"]
+    };
+    const [cls, label] = map[status] || ["status-pending", status];
+    return `<span class="status-badge ${cls}">${label}</span>`;
+}
+
+async function vdLoadConsignments() {
+    const container = document.getElementById("vd-consignments-list");
+    if (!container) return;
+    try {
+        const consignments = await vendorAuthorizedFetch("/api/vendors/me/consignments");
+        if (consignments.error) { container.innerHTML = `<p class="no-data">${vendorEsc(consignments.error)}</p>`; return; }
+        vdConsignmentsCache = consignments || [];
+        if (vdConsignmentsCache.length === 0) {
+            container.innerHTML = `<p class="no-data">You haven't requested any consignments yet.</p>`;
+            return;
+        }
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>#</th><th>Hub</th><th>Items</th><th>Status</th><th>Requested</th><th></th></tr></thead>
+                <tbody>
+                    ${vdConsignmentsCache.map(c => {
+                        const itemsSummary = (c.items || []).map(i => `${vendorEsc(i.product_name)} &times; ${i.quantity_requested}${i.quantity_received != null ? ` (received ${i.quantity_received})` : ""}`).join("<br>");
+                        const canShip = c.status === "requested";
+                        const canCancel = c.status === "requested" || c.status === "in_transit";
+                        return `
+                            <tr>
+                                <td data-label="#">${c.id}</td>
+                                <td data-label="Hub">${vendorEsc(c.dropoff_point_name)}</td>
+                                <td data-label="Items">${itemsSummary}</td>
+                                <td data-label="Status">${vdConsignmentStatusBadge(c.status)}</td>
+                                <td data-label="Requested">${new Date(c.created_at).toLocaleDateString()}</td>
+                                <td data-label="">
+                                    ${canShip ? `<button onclick="vdMarkConsignmentInTransit(${c.id})" style="background:#fff; border:1px solid #ccc; border-radius:6px; padding:5px 10px; font-size:11.5px; cursor:pointer; margin-right:6px;">Mark Shipped</button>` : ""}
+                                    ${canCancel ? `<button onclick="vdCancelConsignment(${c.id})" style="background:#fff; border:1px solid #DC2626; color:#DC2626; border-radius:6px; padding:5px 10px; font-size:11.5px; cursor:pointer;">Cancel</button>` : ""}
+                                    ${c.admin_notes ? `<div style="font-size:11px; color:#888; margin-top:4px;">Note: ${vendorEsc(c.admin_notes)}</div>` : ""}
+                                </td>
+                            </tr>`;
+                    }).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("vdLoadConsignments error:", error);
+        container.innerHTML = `<p class="no-data">Could not load consignments.</p>`;
+    }
+}
+
+async function vdShowCreateConsignmentForm() {
+    document.getElementById("vd-consignment-create-error").textContent = "";
+    document.getElementById("vd-consignment-notes").value = "";
+    document.getElementById("vd-consignment-lines").innerHTML = "";
+    vdConsignmentLineSeq = 0;
+
+    const hubSelect = document.getElementById("vd-consignment-hub");
+    hubSelect.innerHTML = `<option value="">Loading hubs...</option>`;
+    try {
+        const [points, products] = await Promise.all([
+            vendorAuthorizedFetch("/api/vendors/dropoff-points"),
+            vendorAuthorizedFetch("/api/vendors/products")
+        ]);
+        vdConsignmentHubsCache = (Array.isArray(points) ? points : []).filter(p => p.is_hub);
+        vdConsignmentProductsCache = Array.isArray(products) ? products : (products.products || []);
+
+        if (vdConsignmentHubsCache.length === 0) {
+            hubSelect.innerHTML = `<option value="">No central hub available right now</option>`;
+        } else {
+            hubSelect.innerHTML = vdConsignmentHubsCache.map(h => `<option value="${h.id}">${vendorEsc(h.name)} - ${vendorEsc(h.address)}</option>`).join("");
+        }
+        vdAddConsignmentLine();
+        document.getElementById("vd-consignment-create-overlay").hidden = false;
+    } catch (error) {
+        console.error("vdShowCreateConsignmentForm error:", error);
+        document.getElementById("vd-consignment-create-error").textContent = "Could not load hubs/products. Please try again.";
+    }
+}
+
+function vdHideCreateConsignmentForm() {
+    document.getElementById("vd-consignment-create-overlay").hidden = true;
+}
+
+function vdAddConsignmentLine() {
+    const lineId = `vd-cline-${++vdConsignmentLineSeq}`;
+    const host = document.getElementById("vd-consignment-lines");
+    const productOptions = vdConsignmentProductsCache.map(p => `<option value="${p.id}">${vendorEsc(p.name)}${p.sku ? ` (${vendorEsc(p.sku)})` : ""}</option>`).join("");
+    const row = document.createElement("div");
+    row.id = lineId;
+    row.style.cssText = "display:flex; gap:8px; margin-bottom:8px; align-items:center;";
+    row.innerHTML = `
+        <select class="vd-cline-product" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:8px; font-size:13px;">${productOptions}</select>
+        <input type="number" class="vd-cline-qty" value="1" min="1" style="width:90px; padding:8px; border:1px solid #ccc; border-radius:8px; font-size:13px;">
+        <button type="button" onclick="document.getElementById('${lineId}').remove()" style="background:#fff; border:1px solid #ddd; border-radius:6px; padding:7px 10px; font-size:12px; cursor:pointer;">&times;</button>
+    `;
+    host.appendChild(row);
+}
+
+async function vdSubmitConsignment() {
+    const errorEl = document.getElementById("vd-consignment-create-error");
+    errorEl.textContent = "";
+    const hubId = document.getElementById("vd-consignment-hub").value;
+    const notes = document.getElementById("vd-consignment-notes").value.trim();
+    if (!hubId) { errorEl.textContent = "Choose a hub to ship to."; return; }
+
+    const lines = Array.from(document.querySelectorAll("#vd-consignment-lines > div")).map(row => ({
+        product_id: Number(row.querySelector(".vd-cline-product").value),
+        quantity: Number(row.querySelector(".vd-cline-qty").value)
+    })).filter(l => l.product_id && l.quantity > 0);
+
+    if (lines.length === 0) { errorEl.textContent = "Add at least one product line."; return; }
+
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/consignments", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ dropoff_point_id: Number(hubId), vendor_notes: notes || null, items: lines })
+        });
+        if (result.error) { errorEl.textContent = result.error; return; }
+        vdHideCreateConsignmentForm();
+        vdLoadConsignments();
+    } catch (error) {
+        console.error("vdSubmitConsignment error:", error);
+        errorEl.textContent = "Could not submit this request. Please try again.";
+    }
+}
+
+async function vdMarkConsignmentInTransit(id) {
+    if (!confirm("Mark this consignment as shipped?")) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/consignments/${id}/in-transit`, { method: "POST" });
+        if (result.error) { alert(result.error); return; }
+        vdLoadConsignments();
+    } catch (error) {
+        console.error("vdMarkConsignmentInTransit error:", error);
+        alert("Could not update this consignment.");
+    }
+}
+
+async function vdCancelConsignment(id) {
+    if (!confirm("Cancel this consignment request?")) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/consignments/${id}/cancel`, { method: "POST" });
+        if (result.error) { alert(result.error); return; }
+        vdLoadConsignments();
+    } catch (error) {
+        console.error("vdCancelConsignment error:", error);
+        alert("Could not cancel this consignment.");
+    }
+}
+
+// --- Manage Pickers (Jumia Vendor Center comparison, Sept 2026) -----------
+// People the vendor has authorized to hand over packages on their behalf -
+// see migrations/111_vendor_pickers.sql / vendorPickerController.js. Owner
+// and staff with vc_shop_manager/vc_shop_viewer can both see this panel
+// (unlike Users, which is owner-only), matching the endpoint's permission
+// gate in routes/vendors.js.
+
+let vdPickersCache = [];
+let vdPickerEditingId = null;
+
+async function vdLoadPickers() {
+    const panel = document.getElementById("vd-pickers-panel");
+    const table = document.getElementById("vd-pickers-table");
+    if (!panel || !table) return;
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/pickers");
+        if (result.error) {
+            table.innerHTML = `<p style="font-size:13px; color:#888; margin:8px 0;">${vendorEsc(result.error)}</p>`;
+            return;
+        }
+        vdPickersCache = result || [];
+        vdRenderPickersTable();
+    } catch (error) {
+        console.error("vdLoadPickers error:", error);
+        table.innerHTML = `<p style="font-size:13px; color:#DC2626; margin:8px 0;">Could not load pickers.</p>`;
+    }
+}
+
+function vdRenderPickersTable() {
+    const container = document.getElementById("vd-pickers-table");
+    if (!container) return;
+    if (vdPickersCache.length === 0) {
+        container.innerHTML = `<p style="font-size:13px; color:#888; margin:8px 0;">You haven't added any pickers yet.</p>`;
+        return;
+    }
+    container.innerHTML = `
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead><tr style="text-align:left; border-bottom:2px solid #eee; color:#888; font-size:12px;">
+                <th style="padding:8px 10px;">Name</th><th style="padding:8px 10px;">Phone</th>
+                <th style="padding:8px 10px;">ID Number</th><th style="padding:8px 10px;">Status</th>
+                <th style="padding:8px 10px;"></th>
+            </tr></thead>
+            <tbody>
+                ${vdPickersCache.map(pk => `
+                    <tr style="border-bottom:1px solid #f2f2f2; ${pk.is_active ? "" : "opacity:.55;"}">
+                        <td style="padding:10px;">${vendorEsc(pk.full_name)}</td>
+                        <td style="padding:10px;">${vendorEsc(pk.phone)}</td>
+                        <td style="padding:10px;">${pk.id_number ? vendorEsc(pk.id_number) : "—"}</td>
+                        <td style="padding:10px; color:${pk.is_active ? "#166534" : "#888"}; font-weight:600;">${pk.is_active ? "Active" : "Disabled"}</td>
+                        <td style="padding:10px; white-space:nowrap;">
+                            <button onclick="vdShowEditPickerForm(${pk.id})" style="background:#fff; border:1px solid #ccc; border-radius:6px; padding:5px 10px; font-size:11.5px; cursor:pointer; margin-right:6px;">Edit</button>
+                            <button onclick="vdTogglePickerActive(${pk.id})" style="background:#fff; border:1px solid #ccc; border-radius:6px; padding:5px 10px; font-size:11.5px; cursor:pointer; margin-right:6px;">${pk.is_active ? "Disable" : "Enable"}</button>
+                            <button onclick="vdDeletePicker(${pk.id})" style="background:#fff; border:1px solid #DC2626; color:#DC2626; border-radius:6px; padding:5px 10px; font-size:11.5px; cursor:pointer;">Remove</button>
+                        </td>
+                    </tr>`).join("")}
+            </tbody>
+        </table>
+    `;
+}
+
+function vdShowCreatePickerForm() {
+    document.getElementById("vd-picker-new-name").value = "";
+    document.getElementById("vd-picker-new-phone").value = "";
+    document.getElementById("vd-picker-new-id").value = "";
+    document.getElementById("vd-picker-new-error").textContent = "";
+    const view = document.getElementById("vd-picker-create-view");
+    view.hidden = false;
+    view.style.display = "flex";
+}
+
+function vdHideCreatePickerForm() {
+    const view = document.getElementById("vd-picker-create-view");
+    view.hidden = true;
+    view.style.display = "none";
+}
+
+async function vdCreatePicker() {
+    const name = document.getElementById("vd-picker-new-name").value.trim();
+    const phone = document.getElementById("vd-picker-new-phone").value.trim();
+    const idNumber = document.getElementById("vd-picker-new-id").value.trim();
+    const errorEl = document.getElementById("vd-picker-new-error");
+    errorEl.textContent = "";
+
+    if (!name) { errorEl.textContent = "Full name is required."; return; }
+    if (!phone) { errorEl.textContent = "Phone number is required."; return; }
+
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/pickers", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ full_name: name, phone, id_number: idNumber || null })
+        });
+        if (result.error) { errorEl.textContent = result.error; return; }
+        vdHideCreatePickerForm();
+        vdLoadPickers();
+    } catch (error) {
+        console.error("vdCreatePicker error:", error);
+        errorEl.textContent = "Could not add this picker. Please try again.";
+    }
+}
+
+function vdShowEditPickerForm(id) {
+    const picker = vdPickersCache.find(p => p.id === id);
+    if (!picker) return;
+    vdPickerEditingId = id;
+    document.getElementById("vd-picker-edit-name").value = picker.full_name;
+    document.getElementById("vd-picker-edit-phone").value = picker.phone;
+    document.getElementById("vd-picker-edit-id").value = picker.id_number || "";
+    document.getElementById("vd-picker-edit-error").textContent = "";
+    const view = document.getElementById("vd-picker-edit-view");
+    view.hidden = false;
+    view.style.display = "flex";
+}
+
+function vdHideEditPickerForm() {
+    vdPickerEditingId = null;
+    const view = document.getElementById("vd-picker-edit-view");
+    view.hidden = true;
+    view.style.display = "none";
+}
+
+async function vdSavePickerEdit() {
+    if (!vdPickerEditingId) return;
+    const name = document.getElementById("vd-picker-edit-name").value.trim();
+    const phone = document.getElementById("vd-picker-edit-phone").value.trim();
+    const idNumber = document.getElementById("vd-picker-edit-id").value.trim();
+    const errorEl = document.getElementById("vd-picker-edit-error");
+    errorEl.textContent = "";
+
+    if (!name) { errorEl.textContent = "Full name is required."; return; }
+    if (!phone) { errorEl.textContent = "Phone number is required."; return; }
+
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/pickers/${vdPickerEditingId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ full_name: name, phone, id_number: idNumber || null })
+        });
+        if (result.error) { errorEl.textContent = result.error; return; }
+        vdHideEditPickerForm();
+        vdLoadPickers();
+    } catch (error) {
+        console.error("vdSavePickerEdit error:", error);
+        errorEl.textContent = "Could not save changes. Please try again.";
+    }
+}
+
+async function vdTogglePickerActive(id) {
+    const picker = vdPickersCache.find(p => p.id === id);
+    const nextActive = picker ? !picker.is_active : true;
+    const msg = nextActive ? "Re-enable this picker?" : "Disable this picker? They will no longer show as an active authorized picker.";
+    if (!confirm(msg)) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/pickers/${id}/active`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ is_active: nextActive })
+        });
+        if (result.error) { alert(result.error); return; }
+        vdLoadPickers();
+    } catch (error) {
+        console.error("vdTogglePickerActive error:", error);
+        alert("Could not update this picker.");
+    }
+}
+
+async function vdDeletePicker(id) {
+    const picker = vdPickersCache.find(p => p.id === id);
+    if (!confirm(`Remove ${picker ? picker.full_name : "this picker"}? This can't be undone.`)) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/pickers/${id}`, { method: "DELETE" });
+        if (result.error) { alert(result.error); return; }
+        vdLoadPickers();
+    } catch (error) {
+        console.error("vdDeletePicker error:", error);
+        alert("Could not remove this picker.");
+    }
+}
+
+// --- Advertise Your Products (Jumia Vendor Center comparison, Sept 2026) --
+// Cost-per-click sponsored campaigns - see
+// migrations/112_vendor_ad_campaigns.sql / vendorAdController.js. Storefront
+// placement of sponsored slots is a deliberately NOT-built follow-up; this
+// is the campaign management control plane only.
+
+let vdAdCampaignsCache = [];
+let vdAdRatesCache = null;
+let vdAdCampaignProductsCache = [];
+
+function vdAdCampaignStatusBadge(status) {
+    const map = {
+        draft: ["#888", "Draft"],
+        pending_review: ["#B45309", "Pending Review"],
+        active: ["#166534", "Active"],
+        paused: ["#B45309", "Paused"],
+        rejected: ["#DC2626", "Rejected"],
+        completed: ["#888", "Completed"],
+        budget_exhausted: ["#888", "Budget Exhausted"]
+    };
+    const [color, label] = map[status] || ["#888", status];
+    return `<span style="font-weight:600; color:${color};">${label}</span>`;
+}
+
+async function vdLoadAdCampaigns() {
+    const container = document.getElementById("vd-ad-campaigns-list");
+    if (!container) return;
+    try {
+        const campaigns = await vendorAuthorizedFetch("/api/vendors/me/ad-campaigns");
+        if (campaigns.error) { container.innerHTML = `<p class="no-data">${vendorEsc(campaigns.error)}</p>`; return; }
+        vdAdCampaignsCache = campaigns || [];
+        if (vdAdCampaignsCache.length === 0) {
+            container.innerHTML = `<p class="no-data">You haven't created any ad campaigns yet.</p>`;
+            return;
+        }
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Campaign</th><th>Products</th><th>Budget</th><th>Clicks</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                    ${vdAdCampaignsCache.map(c => {
+                        const totalClicks = (c.products || []).reduce((sum, p) => sum + Number(p.clicks || 0), 0);
+                        const productNames = (c.products || []).map(p => vendorEsc(p.product_name)).join(", ");
+                        const canSubmit = c.status === "draft" || c.status === "rejected";
+                        const canPause = c.status === "active";
+                        const canResume = c.status === "paused";
+                        const canDelete = c.status === "draft";
+                        return `
+                            <tr>
+                                <td data-label="Campaign"><strong>${vendorEsc(c.name)}</strong>${c.admin_notes ? `<div style="font-size:11px; color:#888; margin-top:3px;">Note: ${vendorEsc(c.admin_notes)}</div>` : ""}</td>
+                                <td data-label="Products">${productNames}</td>
+                                <td data-label="Budget">${vendorFmtUgx(c.budget_spent)} / ${vendorFmtUgx(c.total_budget)}<div style="font-size:11px; color:#888;">${vendorFmtUgx(c.daily_budget)}/day &middot; CPC ${vendorFmtUgx(c.cpc_rate)}</div></td>
+                                <td data-label="Clicks">${totalClicks}</td>
+                                <td data-label="Status">${vdAdCampaignStatusBadge(c.status)}</td>
+                                <td data-label="">
+                                    ${canSubmit ? `<button onclick="vdSubmitExistingAdCampaign(${c.id})" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:5px 10px; font-size:11.5px; cursor:pointer; margin-right:6px;">Submit</button>` : ""}
+                                    ${canPause ? `<button onclick="vdSetAdCampaignPaused(${c.id}, true)" style="background:#fff; border:1px solid #ccc; border-radius:6px; padding:5px 10px; font-size:11.5px; cursor:pointer; margin-right:6px;">Pause</button>` : ""}
+                                    ${canResume ? `<button onclick="vdSetAdCampaignPaused(${c.id}, false)" style="background:#fff; border:1px solid #ccc; border-radius:6px; padding:5px 10px; font-size:11.5px; cursor:pointer; margin-right:6px;">Resume</button>` : ""}
+                                    ${canDelete ? `<button onclick="vdDeleteAdCampaign(${c.id})" style="background:#fff; border:1px solid #DC2626; color:#DC2626; border-radius:6px; padding:5px 10px; font-size:11.5px; cursor:pointer;">Delete</button>` : ""}
+                                </td>
+                            </tr>`;
+                    }).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("vdLoadAdCampaigns error:", error);
+        container.innerHTML = `<p class="no-data">Could not load ad campaigns.</p>`;
+    }
+}
+
+async function vdShowCreateAdCampaignForm() {
+    document.getElementById("vd-ad-campaign-create-error").textContent = "";
+    document.getElementById("vd-ad-campaign-name").value = "";
+    document.getElementById("vd-ad-campaign-daily-budget").value = "";
+    document.getElementById("vd-ad-campaign-total-budget").value = "";
+    const productsHost = document.getElementById("vd-ad-campaign-products");
+    productsHost.innerHTML = "Loading products...";
+
+    try {
+        const [rates, products] = await Promise.all([
+            vendorAuthorizedFetch("/api/vendors/me/ad-rates"),
+            vendorAuthorizedFetch("/api/vendors/products")
+        ]);
+        vdAdRatesCache = rates;
+        vdAdCampaignProductsCache = Array.isArray(products) ? products : (products.products || []);
+
+        document.getElementById("vd-ad-campaign-rate-hint").textContent =
+            `Cost per click: ${vendorFmtUgx(rates.cpcRate)}. Daily budget must be between ${vendorFmtUgx(rates.minDailyBudget)} and ${vendorFmtUgx(rates.maxDailyBudget)}.`;
+
+        productsHost.innerHTML = vdAdCampaignProductsCache.length === 0
+            ? `<p style="font-size:12.5px; color:#888; margin:0;">Add some products first before creating a campaign.</p>`
+            : vdAdCampaignProductsCache.map(p => `
+                <label style="display:flex; align-items:center; gap:8px; padding:6px 0; font-size:13px;">
+                    <input type="checkbox" class="vd-ad-campaign-product-cb" value="${p.id}">
+                    ${vendorEsc(p.name)}${p.sku ? ` <span style="color:#999;">(${vendorEsc(p.sku)})</span>` : ""}
+                </label>`).join("");
+
+        document.getElementById("vd-ad-campaign-create-overlay").hidden = false;
+    } catch (error) {
+        console.error("vdShowCreateAdCampaignForm error:", error);
+        productsHost.innerHTML = `<p style="font-size:12.5px; color:#DC2626;">Could not load your products/rates.</p>`;
+    }
+}
+
+function vdHideCreateAdCampaignForm() {
+    document.getElementById("vd-ad-campaign-create-overlay").hidden = true;
+}
+
+function vdReadAdCampaignForm() {
+    return {
+        name: document.getElementById("vd-ad-campaign-name").value.trim(),
+        daily_budget: Number(document.getElementById("vd-ad-campaign-daily-budget").value),
+        total_budget: Number(document.getElementById("vd-ad-campaign-total-budget").value),
+        product_ids: Array.from(document.querySelectorAll(".vd-ad-campaign-product-cb:checked")).map(cb => Number(cb.value))
+    };
+}
+
+async function vdCreateAdCampaignRequest() {
+    const form = vdReadAdCampaignForm();
+    const errorEl = document.getElementById("vd-ad-campaign-create-error");
+    errorEl.textContent = "";
+    if (!form.name) { errorEl.textContent = "Campaign name is required."; return null; }
+    if (form.product_ids.length === 0) { errorEl.textContent = "Select at least one product."; return null; }
+
+    const result = await vendorAuthorizedFetch("/api/vendors/me/ad-campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+    });
+    if (result.error) { errorEl.textContent = result.error; return null; }
+    return result.campaign;
+}
+
+async function vdSaveAdCampaignDraft() {
+    try {
+        const campaign = await vdCreateAdCampaignRequest();
+        if (!campaign) return;
+        vdHideCreateAdCampaignForm();
+        vdLoadAdCampaigns();
+    } catch (error) {
+        console.error("vdSaveAdCampaignDraft error:", error);
+        document.getElementById("vd-ad-campaign-create-error").textContent = "Could not save this campaign.";
+    }
+}
+
+async function vdSubmitAdCampaign() {
+    const errorEl = document.getElementById("vd-ad-campaign-create-error");
+    try {
+        const campaign = await vdCreateAdCampaignRequest();
+        if (!campaign) return;
+        const submitResult = await vendorAuthorizedFetch(`/api/vendors/me/ad-campaigns/${campaign.id}/submit`, { method: "POST" });
+        if (submitResult.error) { errorEl.textContent = submitResult.error; return; }
+        vdHideCreateAdCampaignForm();
+        vdLoadAdCampaigns();
+    } catch (error) {
+        console.error("vdSubmitAdCampaign error:", error);
+        errorEl.textContent = "Could not submit this campaign.";
+    }
+}
+
+async function vdSubmitExistingAdCampaign(id) {
+    if (!confirm("Submit this campaign for review?")) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/ad-campaigns/${id}/submit`, { method: "POST" });
+        if (result.error) { alert(result.error); return; }
+        vdLoadAdCampaigns();
+    } catch (error) {
+        console.error("vdSubmitExistingAdCampaign error:", error);
+        alert("Could not submit this campaign.");
+    }
+}
+
+async function vdSetAdCampaignPaused(id, paused) {
+    if (!confirm(paused ? "Pause this campaign?" : "Resume this campaign?")) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/ad-campaigns/${id}/paused`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ paused })
+        });
+        if (result.error) { alert(result.error); return; }
+        vdLoadAdCampaigns();
+    } catch (error) {
+        console.error("vdSetAdCampaignPaused error:", error);
+        alert("Could not update this campaign.");
+    }
+}
+
+async function vdDeleteAdCampaign(id) {
+    if (!confirm("Delete this draft campaign? This can't be undone.")) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/ad-campaigns/${id}`, { method: "DELETE" });
+        if (result.error) { alert(result.error); return; }
+        vdLoadAdCampaigns();
+    } catch (error) {
+        console.error("vdDeleteAdCampaign error:", error);
+        alert("Could not delete this campaign.");
+    }
+}
 
 async function vdLoadJumia() {
     try {

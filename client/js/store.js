@@ -25,11 +25,31 @@ function stEscape(value) {
         .replace(/"/g, "&quot;");
 }
 
+// Advertise Your Products (Jumia Vendor Center comparison, Sept 2026):
+// fire-and-forget click-billing beacon, same one products.js's
+// trackSponsoredAdClick sends - duplicated here rather than shared since
+// store.js deliberately doesn't load products.js (see file header).
+function stTrackSponsoredAdClick(productId) {
+    try {
+        fetch(`/api/ads/track-click`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId }),
+            keepalive: true
+        }).catch(() => {});
+    } catch (error) {
+        // Beacon best-effort only - never let a tracking failure block navigation.
+    }
+}
+
 function stBuildProductCard(product) {
     const card = document.createElement("div");
     card.className = "product-card";
     card.style.cursor = "pointer";
     card.onclick = () => {
+        if (product.ad_sponsored) {
+            stTrackSponsoredAdClick(product.id);
+        }
         window.location.href = `/product/${product.id}`;
     };
 

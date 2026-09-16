@@ -604,6 +604,14 @@
     display: flex;
 }
 
+.vendor-desktop-shell #vd-consignment-create-overlay:not([hidden]) {
+    display: flex;
+}
+
+.vendor-desktop-shell #vd-ad-campaign-create-overlay:not([hidden]) {
+    display: flex;
+}
+
 .vendor-desktop-shell #vendor-products-bulk-bar:not([hidden]) {
     display: flex;
 }

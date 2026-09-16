@@ -185,6 +185,22 @@ Lizimas Store | Online Shopping in Uganda
   </div>
 </section>
 
+<!-- Sponsored Products: vendor-funded CPC ad campaigns (Advertise Your
+     Products / Jumia Vendor Center comparison, Sept 2026). Hidden until at
+     least one active, unexhausted campaign has products. Populated by
+     loadSponsoredRow() in products.js from GET /api/ads/sponsored-products
+     (adTrackingController.js). Cards reuse buildProductCard() - same
+     "Sponsored" badge and click-billing beacon as a sponsored card
+     anywhere else on the site. -->
+<section class="ls-row" id="ls-sponsored" hidden>
+  <div class="ls-row-head">
+    <h2 class="ls-row-title">Sponsored</h2>
+  </div>
+  <div class="ls-row-body">
+    <div class="ls-row-scroll" id="ls-sponsored-scroll"></div>
+  </div>
+</section>
+
 <!-- Curated category tile grid (promotions slot 5). Small square tiles,
      admin-managed. Hidden until at least one is published. -->
 <section class="ls-cat-grid ls-cat-grid--tiles" id="ls-cat-tiles" hidden>

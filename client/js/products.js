@@ -186,6 +186,24 @@ function buildPriceHtml(product) {
     return `<p class="product-price">UGX ${priceFormatted}</p>`;
 }
 
+// Advertise Your Products (Jumia Vendor Center comparison, Sept 2026):
+// fire-and-forget click-billing beacon for a CPC ad-sponsored product card.
+// `keepalive: true` lets the request finish even though the click also
+// navigates the page away immediately after. Never awaited/blocking - a
+// slow or failed tracking call must not delay the customer.
+function trackSponsoredAdClick(productId) {
+    try {
+        fetch(`${API_URL}/api/ads/track-click`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId }),
+            keepalive: true
+        }).catch(() => {});
+    } catch (error) {
+        // Beacon best-effort only - never let a tracking failure block navigation.
+    }
+}
+
 // Builds one product card. Extracted so grouped sections and search results
 // render identical markup - editing one used to leave the other behind.
 function buildProductCard(product) {
@@ -195,6 +213,15 @@ function buildProductCard(product) {
     card.onclick = (event) => {
         if (event.target.closest(".add-to-cart-btn")) {
             return;
+        }
+        // Advertise Your Products (Jumia Vendor Center comparison, Sept
+        // 2026): a CPC-billed ad placement (ad_sponsored - see
+        // adTrackingController.js/productController.js) fires a
+        // click-tracking beacon before navigating away, so the vendor's
+        // campaign budget is charged. A plain vendor_promotions "sponsored"
+        // card (is_sponsored only) is not CPC-billed and does not.
+        if (product.ad_sponsored) {
+            trackSponsoredAdClick(product.id);
         }
         window.location.href = `/product/${product.id}`;
     };
@@ -1861,3 +1888,38 @@ async function loadFlashSale() {
 }
 
 document.addEventListener("DOMContentLoaded", loadFlashSale);
+
+// Sponsored Products row (Advertise Your Products / Jumia Vendor Center
+// comparison, Sept 2026): the dedicated storefront showcase for vendor CPC
+// ad campaigns - see #ls-sponsored in index.html and
+// GET /api/ads/sponsored-products (adTrackingController.js). No-ops on any
+// page without the section (products.html, categories.html, etc. all load
+// this same file). Hidden whenever there are currently no active,
+// unexhausted campaigns with products to show.
+async function loadSponsoredRow() {
+    const section = document.getElementById("ls-sponsored");
+    if (!section) return;
+
+    try {
+        const response = await fetch(`${API_URL}/api/ads/sponsored-products?limit=12`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const items = await response.json();
+
+        if (!Array.isArray(items) || items.length === 0) {
+            section.hidden = true;
+            return;
+        }
+
+        const scroll = document.getElementById("ls-sponsored-scroll");
+        scroll.innerHTML = "";
+        items.forEach(product => scroll.appendChild(buildProductCard(product)));
+
+        section.hidden = false;
+        autoScrollRow(scroll);
+    } catch (error) {
+        console.error("Load sponsored products error:", error);
+        section.hidden = true;
+    }
+}
+
+document.addEventListener("DOMContentLoaded", loadSponsoredRow);

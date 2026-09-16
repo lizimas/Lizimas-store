@@ -33,7 +33,18 @@ const VM_NAV_FALLBACK = {
     "holiday-mode": "account",
     "commissions-fees": "account",
     "jumia": "account",
-    "jumia-import": "account"
+    "jumia-import": "account",
+    "users": "account",
+    "users-create": "account",
+    "users-edit": "account",
+    "consignments": "products",
+    "consignments-create": "products",
+    "stock-recommendation": "account",
+    "pickers": "account",
+    "pickers-create": "account",
+    "pickers-edit": "account",
+    "ads": "account",
+    "ads-create": "account"
 };
 
 function vmShowScreen(name, opts) {
@@ -65,6 +76,11 @@ function vmShowScreen(name, opts) {
     if (name === "add-product") vmLoadAddProduct();
     if (name === "promotions") vmLoadPromotions();
     if (name === "wallet") vmLoadWallet();
+    if (name === "users") vmLoadUsers();
+    if (name === "consignments") vmLoadConsignments();
+    if (name === "stock-recommendation") vmLoadStockRecommendations();
+    if (name === "pickers") vmLoadPickers();
+    if (name === "ads") vmLoadAdCampaigns();
 }
 
 function vmGoBack() {
@@ -280,9 +296,27 @@ async function vmLoadProducts() {
         vmRenderProductsPills();
         vmRenderProductsList();
         vmUpdateBulkBar();
+        vmLoadProductTierStatus();
     } catch (error) {
         console.error("vmLoadProducts error:", error);
         listEl.innerHTML = '<div class="vm-loading-state">Could not load products.</div>';
+    }
+}
+
+// Shares the /api/vendors/me/product-tier endpoint with the desktop shell's
+// vdLoadProductTierStatus - just a different, mobile-styled target element.
+async function vmLoadProductTierStatus() {
+    const el = document.getElementById("vm-product-tier-status");
+    if (!el) return;
+    try {
+        const status = await vendorAuthorizedFetch("/api/vendors/me/product-tier");
+        if (status.error || !status.tier) { el.textContent = ""; return; }
+        const capText = status.maxAllowed === null ? "unlimited" : `${status.currentCount} of ${status.maxAllowed}`;
+        const warn = status.atLimit ? ` <span style="color:#DC2626; font-weight:600;">&mdash; limit reached</span>` : "";
+        el.innerHTML = `Tier: <strong>${status.tier.name}</strong> &bull; Listings: ${capText}${warn}`;
+    } catch (error) {
+        console.error("vmLoadProductTierStatus error:", error);
+        el.textContent = "";
     }
 }
 
@@ -307,7 +341,7 @@ function vmProductCard(p) {
         <button class="vm-checkbox${checked ? " checked" : ""}" onclick="vmToggleProduct(${p.id})">${checked ? VM_ICON.check : ""}</button>
         <div style="flex:1; min-width:0;">
             <div class="vm-order-card-top"><span style="font-size:13px; font-weight:600; color:var(--vm-navy);">${p.name}</span>${vendorProductStatusBadge(p)}</div>
-            <div class="vm-order-meta">Stock ${p.stock != null ? p.stock : "-"}</div>
+            <div class="vm-order-meta">Stock ${p.stock != null ? p.stock : "-"} &bull; Quality ${vendorQualityScoreBadge(p)}${p.possible_duplicate_of ? ` <span style="color:#B45309;">&#9888; possible duplicate</span>` : ""}</div>
             <div class="vm-order-bottom"><span class="vm-order-amount">${vmFmtUgx(p.price)}</span></div>
         </div>
     </div>`;
@@ -511,6 +545,662 @@ let vmJumiaImportSelected = new Set();
 
 let vmJumiaApplications = [];
 let vmJumiaSetupAppId = null;
+
+// --- Users (Settings > Users) ----------------------------------------------
+// Shares vdStaffCache/vdStaffAvailableRoles/vdBuildRoleCheckboxes/
+// vdReadCheckedRoles/vdRoleLabel with the desktop shell (vendor-dashboard.js,
+// loaded first) rather than re-deriving the same list/role logic here.
+
+let vmUsersEditingId = null;
+
+async function vmLoadUsers() {
+    const host = document.getElementById("vm-users-list");
+    const navRow = document.getElementById("vm-users-nav-row");
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/staff");
+        if (result.error) {
+            // Owner-only - a vendor_staff login gets 403 here.
+            if (host) host.innerHTML = '<div style="font-size:12.5px; color:#888;">Only the shop owner can manage Users.</div>';
+            return;
+        }
+        vdStaffCache = result.staff || [];
+        vdStaffAvailableRoles = result.availableRoles || [];
+        vmRenderUsersList(vdStaffCache);
+    } catch (error) {
+        console.error("vmLoadUsers error:", error);
+        if (host) host.innerHTML = '<div style="font-size:12.5px; color:#DC2626;">Could not load Users.</div>';
+    }
+}
+
+function vmRenderUsersList(staff) {
+    const host = document.getElementById("vm-users-list");
+    if (!host) return;
+    if (!staff || staff.length === 0) {
+        host.innerHTML = '<div style="font-size:12.5px; color:#888; padding:8px 0;">You haven\'t added any staff yet.</div>';
+        return;
+    }
+    host.innerHTML = staff.map(s => {
+        const roleText = (s.roles || []).map(vdRoleLabel).join(", ") || "No roles";
+        const statusColor = s.enabled ? "#16A34A" : "#999";
+        const statusText = s.enabled ? "Active" : "Disabled";
+        return `<button type="button" onclick="vmShowUsersEdit(${s.id})" style="display:block; width:100%; text-align:left; background:none; border:none; padding:10px 0; border-bottom:1px solid #eee; cursor:pointer;">
+            <div style="font-size:13px; font-weight:600; color:var(--vm-navy);">${vendorEsc(s.name)}</div>
+            <div style="font-size:11.5px; color:#999; margin-top:2px;">${vendorEsc(s.email)}</div>
+            <div style="font-size:11.5px; color:#666; margin-top:2px;">${vendorEsc(roleText)}</div>
+            <div style="font-size:11px; font-weight:600; color:${statusColor}; margin-top:4px;">${statusText}${s.must_reset_password ? " &bull; Invite pending" : ""}</div>
+        </button>`;
+    }).join("");
+}
+
+function vmShowUsersCreate() {
+    document.getElementById("vm-users-new-name").value = "";
+    document.getElementById("vm-users-new-email").value = "";
+    document.getElementById("vm-users-new-error").textContent = "";
+    vdBuildRoleCheckboxes(document.getElementById("vm-users-new-roles"), []);
+    vmShowScreen("users-create");
+}
+
+async function vmCreateUser() {
+    const name = document.getElementById("vm-users-new-name").value.trim();
+    const email = document.getElementById("vm-users-new-email").value.trim();
+    const roles = vdReadCheckedRoles(document.getElementById("vm-users-new-roles"));
+    const errorEl = document.getElementById("vm-users-new-error");
+    errorEl.textContent = "";
+
+    if (!name) { errorEl.textContent = "Name is required."; return; }
+    if (!email) { errorEl.textContent = "Email is required."; return; }
+    if (roles.length === 0) { errorEl.textContent = "Select at least one role."; return; }
+
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/staff", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, email, roles })
+        });
+        if (result.error) { errorEl.textContent = result.error; return; }
+        await vmLoadUsers();
+        vmGoBack();
+    } catch (error) {
+        console.error("vmCreateUser error:", error);
+        errorEl.textContent = "Could not create the staff account. Please try again.";
+    }
+}
+
+function vmShowUsersEdit(id) {
+    const staff = vdStaffCache.find((s) => s.id === id);
+    if (!staff) return;
+    vmUsersEditingId = id;
+    document.getElementById("vm-users-edit-title").textContent = staff.name;
+    document.getElementById("vm-users-edit-error").textContent = "";
+    vdBuildRoleCheckboxes(document.getElementById("vm-users-edit-roles"), staff.roles || []);
+    const toggleBtn = document.getElementById("vm-users-edit-toggle-btn");
+    toggleBtn.textContent = staff.enabled ? "Disable" : "Enable";
+    vmShowScreen("users-edit");
+}
+
+async function vmSaveUserRoles() {
+    if (!vmUsersEditingId) return;
+    const roles = vdReadCheckedRoles(document.getElementById("vm-users-edit-roles"));
+    const errorEl = document.getElementById("vm-users-edit-error");
+    if (roles.length === 0) { errorEl.textContent = "Select at least one role."; return; }
+
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/staff/${vmUsersEditingId}/roles`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ roles })
+        });
+        if (result.error) { errorEl.textContent = result.error; return; }
+        await vmLoadUsers();
+        vmGoBack();
+    } catch (error) {
+        console.error("vmSaveUserRoles error:", error);
+        errorEl.textContent = "Could not save. Please try again.";
+    }
+}
+
+async function vmToggleUserEnabled() {
+    if (!vmUsersEditingId) return;
+    const staff = vdStaffCache.find((s) => s.id === vmUsersEditingId);
+    const enabled = staff ? !staff.enabled : true;
+    const msg = enabled
+        ? `Re-enable ${staff ? staff.name : "this user"}'s access?`
+        : `Disable ${staff ? staff.name : "this user"}'s access? They will no longer be able to use any part of your vendor account.`;
+    if (!confirm(msg)) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/staff/${vmUsersEditingId}/enabled`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ enabled })
+        });
+        if (result.error) { alert(result.error); return; }
+        await vmLoadUsers();
+        vmGoBack();
+    } catch (error) {
+        console.error("vmToggleUserEnabled error:", error);
+        alert("Could not update this user.");
+    }
+}
+
+async function vmDeleteUser() {
+    if (!vmUsersEditingId) return;
+    const staff = vdStaffCache.find((s) => s.id === vmUsersEditingId);
+    if (!confirm(`Remove ${staff ? staff.name : "this user"} from your account? This can't be undone.`)) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/staff/${vmUsersEditingId}`, { method: "DELETE" });
+        if (result.error) { alert(result.error); return; }
+        await vmLoadUsers();
+        vmGoBack();
+    } catch (error) {
+        console.error("vmDeleteUser error:", error);
+        alert("Could not remove this user.");
+    }
+}
+
+// --- Fulfillment by Lizimas (Consignments) ----------------------------
+// Shares vdConsignmentsCache/vdConsignmentHubsCache/vdConsignmentProductsCache/
+// vdConsignmentStatusBadge with the desktop shell (vendor-dashboard.js,
+// loaded first) rather than re-deriving the same list/status logic here.
+
+async function vmLoadConsignments() {
+    const host = document.getElementById("vm-consignments-list");
+    try {
+        const consignments = await vendorAuthorizedFetch("/api/vendors/me/consignments");
+        if (consignments.error) {
+            if (host) host.innerHTML = `<div style="font-size:12.5px; color:#DC2626;">${vendorEsc(consignments.error)}</div>`;
+            return;
+        }
+        vdConsignmentsCache = consignments || [];
+        vmRenderConsignmentsList(vdConsignmentsCache);
+    } catch (error) {
+        console.error("vmLoadConsignments error:", error);
+        if (host) host.innerHTML = '<div style="font-size:12.5px; color:#DC2626;">Could not load consignments.</div>';
+    }
+}
+
+function vmRenderConsignmentsList(consignments) {
+    const host = document.getElementById("vm-consignments-list");
+    if (!host) return;
+    if (!consignments || consignments.length === 0) {
+        host.innerHTML = '<div style="font-size:12.5px; color:#888; padding:8px 0;">You haven\'t requested any consignments yet.</div>';
+        return;
+    }
+    host.innerHTML = consignments.map(c => {
+        const itemsSummary = (c.items || []).map(i => `${vendorEsc(i.product_name)} &times; ${i.quantity_requested}`).join(", ");
+        const canShip = c.status === "requested";
+        const canCancel = c.status === "requested" || c.status === "in_transit";
+        return `<div style="padding:10px 0; border-bottom:1px solid #eee;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:13px; font-weight:600; color:var(--vm-navy);">#${c.id} &middot; ${vendorEsc(c.dropoff_point_name)}</span>
+                ${vdConsignmentStatusBadge(c.status)}
+            </div>
+            <div style="font-size:11.5px; color:#666; margin-top:4px;">${itemsSummary}</div>
+            ${c.admin_notes ? `<div style="font-size:11px; color:#888; margin-top:4px;">Note: ${vendorEsc(c.admin_notes)}</div>` : ""}
+            ${(canShip || canCancel) ? `<div style="display:flex; gap:8px; margin-top:8px;">
+                ${canShip ? `<button onclick="vmMarkConsignmentInTransit(${c.id})" style="flex:1; background:#fff; border:1px solid #ccc; border-radius:8px; padding:7px; font-size:11.5px; cursor:pointer;">Mark Shipped</button>` : ""}
+                ${canCancel ? `<button onclick="vmCancelConsignment(${c.id})" style="flex:1; background:#fff; border:1px solid #DC2626; color:#DC2626; border-radius:8px; padding:7px; font-size:11.5px; cursor:pointer;">Cancel</button>` : ""}
+            </div>` : ""}
+        </div>`;
+    }).join("");
+}
+
+async function vmShowConsignmentCreate() {
+    document.getElementById("vm-consignment-create-error").textContent = "";
+    document.getElementById("vm-consignment-notes").value = "";
+    document.getElementById("vm-consignment-lines").innerHTML = "";
+    vdConsignmentLineSeq = 0;
+
+    const hubSelect = document.getElementById("vm-consignment-hub");
+    hubSelect.innerHTML = `<option value="">Loading hubs...</option>`;
+    try {
+        const [points, products] = await Promise.all([
+            vendorAuthorizedFetch("/api/vendors/dropoff-points"),
+            vendorAuthorizedFetch("/api/vendors/products")
+        ]);
+        vdConsignmentHubsCache = (Array.isArray(points) ? points : []).filter(p => p.is_hub);
+        vdConsignmentProductsCache = Array.isArray(products) ? products : (products.products || []);
+
+        hubSelect.innerHTML = vdConsignmentHubsCache.length === 0
+            ? `<option value="">No central hub available right now</option>`
+            : vdConsignmentHubsCache.map(h => `<option value="${h.id}">${vendorEsc(h.name)} - ${vendorEsc(h.address)}</option>`).join("");
+        vmAddConsignmentLine();
+        vmShowScreen("consignments-create");
+    } catch (error) {
+        console.error("vmShowConsignmentCreate error:", error);
+        vmShowScreen("consignments-create");
+        document.getElementById("vm-consignment-create-error").textContent = "Could not load hubs/products. Please try again.";
+    }
+}
+
+function vmAddConsignmentLine() {
+    const lineId = `vm-cline-${++vdConsignmentLineSeq}`;
+    const host = document.getElementById("vm-consignment-lines");
+    const productOptions = vdConsignmentProductsCache.map(p => `<option value="${p.id}">${vendorEsc(p.name)}${p.sku ? ` (${vendorEsc(p.sku)})` : ""}</option>`).join("");
+    const row = document.createElement("div");
+    row.id = lineId;
+    row.style.cssText = "display:flex; gap:8px; align-items:center;";
+    row.innerHTML = `
+        <select class="vm-cline-product vm-field-input" style="flex:1;">${productOptions}</select>
+        <input type="number" class="vm-cline-qty vm-field-input" value="1" min="1" style="width:70px;">
+        <button type="button" onclick="document.getElementById('${lineId}').remove()" style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:8px 10px; font-size:13px; cursor:pointer;">&times;</button>
+    `;
+    host.appendChild(row);
+}
+
+async function vmSubmitConsignment() {
+    const errorEl = document.getElementById("vm-consignment-create-error");
+    errorEl.textContent = "";
+    const hubId = document.getElementById("vm-consignment-hub").value;
+    const notes = document.getElementById("vm-consignment-notes").value.trim();
+    if (!hubId) { errorEl.textContent = "Choose a hub to ship to."; return; }
+
+    const lines = Array.from(document.querySelectorAll("#vm-consignment-lines > div")).map(row => ({
+        product_id: Number(row.querySelector(".vm-cline-product").value),
+        quantity: Number(row.querySelector(".vm-cline-qty").value)
+    })).filter(l => l.product_id && l.quantity > 0);
+
+    if (lines.length === 0) { errorEl.textContent = "Add at least one product line."; return; }
+
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/consignments", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ dropoff_point_id: Number(hubId), vendor_notes: notes || null, items: lines })
+        });
+        if (result.error) { errorEl.textContent = result.error; return; }
+        await vmLoadConsignments();
+        vmGoBack();
+    } catch (error) {
+        console.error("vmSubmitConsignment error:", error);
+        errorEl.textContent = "Could not submit this request. Please try again.";
+    }
+}
+
+async function vmMarkConsignmentInTransit(id) {
+    if (!confirm("Mark this consignment as shipped?")) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/consignments/${id}/in-transit`, { method: "POST" });
+        if (result.error) { alert(result.error); return; }
+        vmLoadConsignments();
+    } catch (error) {
+        console.error("vmMarkConsignmentInTransit error:", error);
+        alert("Could not update this consignment.");
+    }
+}
+
+async function vmCancelConsignment(id) {
+    if (!confirm("Cancel this consignment request?")) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/consignments/${id}/cancel`, { method: "POST" });
+        if (result.error) { alert(result.error); return; }
+        vmLoadConsignments();
+    } catch (error) {
+        console.error("vmCancelConsignment error:", error);
+        alert("Could not cancel this consignment.");
+    }
+}
+
+// --- Stock Recommendation ----------------------------------------------
+// Shares vdStockUrgencyBadge with the desktop shell (vendor-dashboard.js,
+// loaded first) rather than re-deriving the same urgency-label logic here.
+
+async function vmLoadStockRecommendations() {
+    const host = document.getElementById("vm-stock-recommendations-list");
+    if (!host) return;
+    try {
+        const recs = await vendorAuthorizedFetch("/api/vendors/me/stock-recommendations");
+        if (recs.error) { host.innerHTML = `<div style="font-size:12.5px; color:#DC2626;">${vendorEsc(recs.error)}</div>`; return; }
+        const actionable = (recs || []).filter(r => r.urgency === "reorder_now" || r.urgency === "reorder_soon")
+            .sort((a, b) => (a.daysOfStockRemaining ?? 999) - (b.daysOfStockRemaining ?? 999));
+
+        if (actionable.length === 0) {
+            host.innerHTML = '<div style="font-size:12.5px; color:#888; padding:8px 0;">Nothing needs reordering right now based on your recent sales.</div>';
+            return;
+        }
+
+        host.innerHTML = actionable.map(r => `
+            <div style="padding:10px 0; border-bottom:1px solid #eee;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:13px; font-weight:600; color:var(--vm-navy);">${vendorEsc(r.name)}</span>
+                    ${vdStockUrgencyBadge(r.urgency)}
+                </div>
+                <div style="font-size:11.5px; color:#666; margin-top:4px;">
+                    Stock: ${r.stock} &middot; Est. ${r.daysOfStockRemaining === null ? "—" : r.daysOfStockRemaining} days remaining &middot; Recommend reordering <strong>${r.recommendedReorderQty}</strong>
+                </div>
+            </div>`).join("");
+    } catch (error) {
+        console.error("vmLoadStockRecommendations error:", error);
+        host.innerHTML = '<div style="font-size:12.5px; color:#DC2626;">Could not load stock recommendations.</div>';
+    }
+}
+
+// --- Manage Pickers ------------------------------------------------------
+// Shares vdPickersCache with the desktop shell (vendor-dashboard.js, loaded
+// first) rather than re-deriving the same list/CRUD logic here.
+
+let vmPickerEditingId = null;
+
+async function vmLoadPickers() {
+    const host = document.getElementById("vm-pickers-list");
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/pickers");
+        if (result.error) {
+            if (host) host.innerHTML = `<div style="font-size:12.5px; color:#DC2626;">${vendorEsc(result.error)}</div>`;
+            return;
+        }
+        vdPickersCache = result || [];
+        vmRenderPickersList(vdPickersCache);
+    } catch (error) {
+        console.error("vmLoadPickers error:", error);
+        if (host) host.innerHTML = '<div style="font-size:12.5px; color:#DC2626;">Could not load pickers.</div>';
+    }
+}
+
+function vmRenderPickersList(pickers) {
+    const host = document.getElementById("vm-pickers-list");
+    if (!host) return;
+    if (!pickers || pickers.length === 0) {
+        host.innerHTML = '<div style="font-size:12.5px; color:#888; padding:8px 0;">You haven\'t added any pickers yet.</div>';
+        return;
+    }
+    host.innerHTML = pickers.map(pk => {
+        const statusColor = pk.is_active ? "#16A34A" : "#999";
+        const statusText = pk.is_active ? "Active" : "Disabled";
+        return `<button type="button" onclick="vmShowPickerEdit(${pk.id})" style="display:block; width:100%; text-align:left; background:none; border:none; padding:10px 0; border-bottom:1px solid #eee; cursor:pointer;">
+            <div style="font-size:13px; font-weight:600; color:var(--vm-navy);">${vendorEsc(pk.full_name)}</div>
+            <div style="font-size:11.5px; color:#999; margin-top:2px;">${vendorEsc(pk.phone)}</div>
+            <div style="font-size:11px; font-weight:600; color:${statusColor}; margin-top:4px;">${statusText}</div>
+        </button>`;
+    }).join("");
+}
+
+function vmShowPickerCreate() {
+    document.getElementById("vm-picker-new-name").value = "";
+    document.getElementById("vm-picker-new-phone").value = "";
+    document.getElementById("vm-picker-new-id").value = "";
+    document.getElementById("vm-picker-new-error").textContent = "";
+    vmShowScreen("pickers-create");
+}
+
+async function vmCreatePicker() {
+    const name = document.getElementById("vm-picker-new-name").value.trim();
+    const phone = document.getElementById("vm-picker-new-phone").value.trim();
+    const idNumber = document.getElementById("vm-picker-new-id").value.trim();
+    const errorEl = document.getElementById("vm-picker-new-error");
+    errorEl.textContent = "";
+
+    if (!name) { errorEl.textContent = "Full name is required."; return; }
+    if (!phone) { errorEl.textContent = "Phone number is required."; return; }
+
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/pickers", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ full_name: name, phone, id_number: idNumber || null })
+        });
+        if (result.error) { errorEl.textContent = result.error; return; }
+        await vmLoadPickers();
+        vmGoBack();
+    } catch (error) {
+        console.error("vmCreatePicker error:", error);
+        errorEl.textContent = "Could not add this picker. Please try again.";
+    }
+}
+
+function vmShowPickerEdit(id) {
+    const picker = vdPickersCache.find((p) => p.id === id);
+    if (!picker) return;
+    vmPickerEditingId = id;
+    document.getElementById("vm-picker-edit-name").value = picker.full_name;
+    document.getElementById("vm-picker-edit-phone").value = picker.phone;
+    document.getElementById("vm-picker-edit-id").value = picker.id_number || "";
+    document.getElementById("vm-picker-edit-error").textContent = "";
+    const toggleBtn = document.getElementById("vm-picker-edit-toggle-btn");
+    toggleBtn.textContent = picker.is_active ? "Disable" : "Enable";
+    vmShowScreen("pickers-edit");
+}
+
+async function vmSavePickerEdit() {
+    if (!vmPickerEditingId) return;
+    const name = document.getElementById("vm-picker-edit-name").value.trim();
+    const phone = document.getElementById("vm-picker-edit-phone").value.trim();
+    const idNumber = document.getElementById("vm-picker-edit-id").value.trim();
+    const errorEl = document.getElementById("vm-picker-edit-error");
+    errorEl.textContent = "";
+
+    if (!name) { errorEl.textContent = "Full name is required."; return; }
+    if (!phone) { errorEl.textContent = "Phone number is required."; return; }
+
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/pickers/${vmPickerEditingId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ full_name: name, phone, id_number: idNumber || null })
+        });
+        if (result.error) { errorEl.textContent = result.error; return; }
+        await vmLoadPickers();
+        vmGoBack();
+    } catch (error) {
+        console.error("vmSavePickerEdit error:", error);
+        errorEl.textContent = "Could not save. Please try again.";
+    }
+}
+
+async function vmTogglePickerActive() {
+    if (!vmPickerEditingId) return;
+    const picker = vdPickersCache.find((p) => p.id === vmPickerEditingId);
+    const nextActive = picker ? !picker.is_active : true;
+    const msg = nextActive
+        ? "Re-enable this picker?"
+        : "Disable this picker? They will no longer show as an active authorized picker.";
+    if (!confirm(msg)) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/pickers/${vmPickerEditingId}/active`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ is_active: nextActive })
+        });
+        if (result.error) { alert(result.error); return; }
+        await vmLoadPickers();
+        vmGoBack();
+    } catch (error) {
+        console.error("vmTogglePickerActive error:", error);
+        alert("Could not update this picker.");
+    }
+}
+
+async function vmDeletePicker() {
+    if (!vmPickerEditingId) return;
+    const picker = vdPickersCache.find((p) => p.id === vmPickerEditingId);
+    if (!confirm(`Remove ${picker ? picker.full_name : "this picker"}? This can't be undone.`)) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/pickers/${vmPickerEditingId}`, { method: "DELETE" });
+        if (result.error) { alert(result.error); return; }
+        await vmLoadPickers();
+        vmGoBack();
+    } catch (error) {
+        console.error("vmDeletePicker error:", error);
+        alert("Could not remove this picker.");
+    }
+}
+
+// --- Advertise Your Products ---------------------------------------------
+// Shares vdAdCampaignsCache/vdAdRatesCache/vdAdCampaignProductsCache/
+// vdAdCampaignStatusBadge with the desktop shell (vendor-dashboard.js,
+// loaded first) rather than re-deriving the same list/CRUD logic here.
+
+async function vmLoadAdCampaigns() {
+    const host = document.getElementById("vm-ad-campaigns-list");
+    try {
+        const campaigns = await vendorAuthorizedFetch("/api/vendors/me/ad-campaigns");
+        if (campaigns.error) {
+            if (host) host.innerHTML = `<div style="font-size:12.5px; color:#DC2626;">${vendorEsc(campaigns.error)}</div>`;
+            return;
+        }
+        vdAdCampaignsCache = campaigns || [];
+        vmRenderAdCampaignsList(vdAdCampaignsCache);
+    } catch (error) {
+        console.error("vmLoadAdCampaigns error:", error);
+        if (host) host.innerHTML = '<div style="font-size:12.5px; color:#DC2626;">Could not load ad campaigns.</div>';
+    }
+}
+
+function vmRenderAdCampaignsList(campaigns) {
+    const host = document.getElementById("vm-ad-campaigns-list");
+    if (!host) return;
+    if (!campaigns || campaigns.length === 0) {
+        host.innerHTML = '<div style="font-size:12.5px; color:#888; padding:8px 0;">You haven\'t created any ad campaigns yet.</div>';
+        return;
+    }
+    host.innerHTML = campaigns.map(c => {
+        const totalClicks = (c.products || []).reduce((sum, p) => sum + Number(p.clicks || 0), 0);
+        const canSubmit = c.status === "draft" || c.status === "rejected";
+        const canPause = c.status === "active";
+        const canResume = c.status === "paused";
+        const canDelete = c.status === "draft";
+        return `<div style="padding:10px 0; border-bottom:1px solid #eee;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:13px; font-weight:600; color:var(--vm-navy);">${vendorEsc(c.name)}</span>
+                ${vdAdCampaignStatusBadge(c.status)}
+            </div>
+            <div style="font-size:11.5px; color:#666; margin-top:4px;">
+                ${vendorFmtUgx(c.budget_spent)} / ${vendorFmtUgx(c.total_budget)} &middot; ${totalClicks} clicks
+            </div>
+            ${c.admin_notes ? `<div style="font-size:11px; color:#888; margin-top:4px;">Note: ${vendorEsc(c.admin_notes)}</div>` : ""}
+            ${(canSubmit || canPause || canResume || canDelete) ? `<div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+                ${canSubmit ? `<button onclick="vmSubmitExistingAdCampaign(${c.id})" style="flex:1; background:var(--vm-navy); color:#fff; border:none; border-radius:8px; padding:7px; font-size:11.5px; cursor:pointer;">Submit</button>` : ""}
+                ${canPause ? `<button onclick="vmSetAdCampaignPaused(${c.id}, true)" style="flex:1; background:#fff; border:1px solid #ccc; border-radius:8px; padding:7px; font-size:11.5px; cursor:pointer;">Pause</button>` : ""}
+                ${canResume ? `<button onclick="vmSetAdCampaignPaused(${c.id}, false)" style="flex:1; background:#fff; border:1px solid #ccc; border-radius:8px; padding:7px; font-size:11.5px; cursor:pointer;">Resume</button>` : ""}
+                ${canDelete ? `<button onclick="vmDeleteAdCampaign(${c.id})" style="flex:1; background:#fff; border:1px solid #DC2626; color:#DC2626; border-radius:8px; padding:7px; font-size:11.5px; cursor:pointer;">Delete</button>` : ""}
+            </div>` : ""}
+        </div>`;
+    }).join("");
+}
+
+async function vmShowAdCampaignCreate() {
+    document.getElementById("vm-ad-campaign-create-error").textContent = "";
+    document.getElementById("vm-ad-campaign-name").value = "";
+    document.getElementById("vm-ad-campaign-daily-budget").value = "";
+    document.getElementById("vm-ad-campaign-total-budget").value = "";
+    const productsHost = document.getElementById("vm-ad-campaign-products");
+    productsHost.innerHTML = "Loading products...";
+    vmShowScreen("ads-create");
+
+    try {
+        const [rates, products] = await Promise.all([
+            vendorAuthorizedFetch("/api/vendors/me/ad-rates"),
+            vendorAuthorizedFetch("/api/vendors/products")
+        ]);
+        vdAdRatesCache = rates;
+        vdAdCampaignProductsCache = Array.isArray(products) ? products : (products.products || []);
+
+        document.getElementById("vm-ad-campaign-rate-hint").textContent =
+            `Cost per click: ${vendorFmtUgx(rates.cpcRate)}. Daily budget: ${vendorFmtUgx(rates.minDailyBudget)}-${vendorFmtUgx(rates.maxDailyBudget)}.`;
+
+        productsHost.innerHTML = vdAdCampaignProductsCache.length === 0
+            ? '<div style="font-size:12.5px; color:#888;">Add some products first before creating a campaign.</div>'
+            : vdAdCampaignProductsCache.map(p => `
+                <label style="display:flex; align-items:center; gap:8px; font-size:13px;">
+                    <input type="checkbox" class="vm-ad-campaign-product-cb" value="${p.id}">
+                    ${vendorEsc(p.name)}${p.sku ? ` <span style="color:#999;">(${vendorEsc(p.sku)})</span>` : ""}
+                </label>`).join("");
+    } catch (error) {
+        console.error("vmShowAdCampaignCreate error:", error);
+        productsHost.innerHTML = '<div style="font-size:12.5px; color:#DC2626;">Could not load your products/rates.</div>';
+    }
+}
+
+function vmReadAdCampaignForm() {
+    return {
+        name: document.getElementById("vm-ad-campaign-name").value.trim(),
+        daily_budget: Number(document.getElementById("vm-ad-campaign-daily-budget").value),
+        total_budget: Number(document.getElementById("vm-ad-campaign-total-budget").value),
+        product_ids: Array.from(document.querySelectorAll(".vm-ad-campaign-product-cb:checked")).map(cb => Number(cb.value))
+    };
+}
+
+async function vmCreateAdCampaignRequest() {
+    const form = vmReadAdCampaignForm();
+    const errorEl = document.getElementById("vm-ad-campaign-create-error");
+    errorEl.textContent = "";
+    if (!form.name) { errorEl.textContent = "Campaign name is required."; return null; }
+    if (form.product_ids.length === 0) { errorEl.textContent = "Select at least one product."; return null; }
+
+    const result = await vendorAuthorizedFetch("/api/vendors/me/ad-campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+    });
+    if (result.error) { errorEl.textContent = result.error; return null; }
+    return result.campaign;
+}
+
+async function vmSaveAdCampaignDraft() {
+    try {
+        const campaign = await vmCreateAdCampaignRequest();
+        if (!campaign) return;
+        await vmLoadAdCampaigns();
+        vmGoBack();
+    } catch (error) {
+        console.error("vmSaveAdCampaignDraft error:", error);
+        document.getElementById("vm-ad-campaign-create-error").textContent = "Could not save this campaign.";
+    }
+}
+
+async function vmSubmitAdCampaign() {
+    const errorEl = document.getElementById("vm-ad-campaign-create-error");
+    try {
+        const campaign = await vmCreateAdCampaignRequest();
+        if (!campaign) return;
+        const submitResult = await vendorAuthorizedFetch(`/api/vendors/me/ad-campaigns/${campaign.id}/submit`, { method: "POST" });
+        if (submitResult.error) { errorEl.textContent = submitResult.error; return; }
+        await vmLoadAdCampaigns();
+        vmGoBack();
+    } catch (error) {
+        console.error("vmSubmitAdCampaign error:", error);
+        errorEl.textContent = "Could not submit this campaign.";
+    }
+}
+
+async function vmSubmitExistingAdCampaign(id) {
+    if (!confirm("Submit this campaign for review?")) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/ad-campaigns/${id}/submit`, { method: "POST" });
+        if (result.error) { alert(result.error); return; }
+        vmLoadAdCampaigns();
+    } catch (error) {
+        console.error("vmSubmitExistingAdCampaign error:", error);
+        alert("Could not submit this campaign.");
+    }
+}
+
+async function vmSetAdCampaignPaused(id, paused) {
+    if (!confirm(paused ? "Pause this campaign?" : "Resume this campaign?")) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/ad-campaigns/${id}/paused`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ paused })
+        });
+        if (result.error) { alert(result.error); return; }
+        vmLoadAdCampaigns();
+    } catch (error) {
+        console.error("vmSetAdCampaignPaused error:", error);
+        alert("Could not update this campaign.");
+    }
+}
+
+async function vmDeleteAdCampaign(id) {
+    if (!confirm("Delete this draft campaign? This can't be undone.")) return;
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/ad-campaigns/${id}`, { method: "DELETE" });
+        if (result.error) { alert(result.error); return; }
+        vmLoadAdCampaigns();
+    } catch (error) {
+        console.error("vmDeleteAdCampaign error:", error);
+        alert("Could not delete this campaign.");
+    }
+}
 
 async function vmLoadJumia() {
     const host = document.getElementById("vm-jumia-applications-list");
@@ -1714,6 +2404,8 @@ function vmRenderProfile(v, notices) {
 
     const rows = [
         ["Shop Name", v.business_name || "-"],
+        // Shop ID (Jumia Vendor Center comparison) - assigned at approval.
+        ["Shop ID", v.shop_id || "Assigned at approval"],
         ["Account Type", v.account_type === "company" ? "Company" : v.account_type === "individual" ? "Individual" : "-"],
         ["Phone", v.phone || "-"],
         ["Location", v.physical_address || "-"],
@@ -1747,23 +2439,23 @@ function vmRenderProfile(v, notices) {
             <span class="vm-list-row-label">Settings</span>
             <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
         </button>
-        <div class="vm-list-row vm-muted" style="cursor:default;">
+        <button class="vm-list-row" onclick="vmShowScreen('stock-recommendation')">
             <span class="vm-list-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></span>
             <span class="vm-list-row-label">Stock Recommendation</span>
-            <span class="vm-badge-soon">Coming soon</span>
-        </div>
-        <div class="vm-list-row vm-muted" style="cursor:default;">
+            <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
+        </button>
+        <button class="vm-list-row" onclick="vmShowScreen('ads')">
             <span class="vm-list-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h3l4 4V6L7 10H4a1 1 0 0 0-1 1Z"/><path d="M16 8a4 4 0 0 1 0 8"/><path d="M19 5a8 8 0 0 1 0 14"/></svg></span>
             <span class="vm-list-row-label">Advertise your Products</span>
-            <span class="vm-badge-soon">Coming soon</span>
-        </div>
+            <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
+        </button>
         <button class="vm-list-row" onclick="alert('Give us your feedback needs a bigger screen for now \u2014 switch to desktop.')">
             <span class="vm-list-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg></span>
             <span class="vm-list-row-label">Give us your feedback!</span>
             <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
         </button>
     </div>
-    <div class="vm-note vm-note-amber">"Stock Recommendation" and "Advertise your Products" mirror Jumia's marketplace tools and aren't built in Lizimas yet.</div>`;
+    `;
 
     const logoutRow = `<div class="vm-card" style="padding:4px 16px; margin-top:14px;"><button class="vm-list-row vm-danger" onclick="vendorLogout()">
         <span class="vm-list-row-label">Logout</span>

@@ -1193,6 +1193,140 @@
                             <span id="vendor-message-admin-reply-status" style="margin-left:10px; font-size:13px;"></span>
                         </div>
                     </div>
+
+                    <div class="panel">
+                        <h2>Product-Count Limit Tiers</h2>
+                        <p style="font-size:13px; color:#666; margin:0 0 12px;">
+                            Caps how many listings a vendor can carry, rising with their trailing 90-day delivered
+                            GMV (Jumia Vendor Center comparison). A vendor's tier is computed automatically from
+                            this ladder unless manually overridden below.
+                        </p>
+                        <div id="product-tiers-list">Loading...</div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Vendor Tier Override</h2>
+                        <p style="font-size:13px; color:#666; margin:0 0 12px;">
+                            Manually place one vendor on a specific tier - fast-tracking a promising new seller,
+                            or capping someone early. Leave blank to use the GMV ladder above normally.
+                        </p>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
+                            <div>
+                                <label style="font-size:12px; font-weight:600; display:block;">Vendor ID</label>
+                                <input type="number" id="tier-override-vendor-id" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:120px;">
+                            </div>
+                            <button onclick="lookupVendorTierStatus()" style="background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; padding:9px 14px; cursor:pointer;">Look Up</button>
+                        </div>
+                        <div id="vendor-tier-override-status" style="font-size:13px; color:#444; margin-bottom:10px;"></div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Fulfillment by Lizimas &mdash; Consignments</h2>
+                        <p style="font-size:13px; color:#666; margin:0 0 12px;">
+                            Stock vendors have shipped (or requested to ship) to a central hub for Lizimas to
+                            pick and pack. Counting a shipment in updates that product's consigned stock and
+                            flips its fulfillment type automatically.
+                        </p>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                            <button class="consignment-status-filter-btn active" data-status="" onclick="setAdminConsignmentFilter('')" style="padding:6px 12px; border-radius:999px; border:1px solid #1a1a2e; background:#1a1a2e; color:#fff; font-size:12px; cursor:pointer;">All</button>
+                            <button class="consignment-status-filter-btn" data-status="requested" onclick="setAdminConsignmentFilter('requested')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">Requested</button>
+                            <button class="consignment-status-filter-btn" data-status="in_transit" onclick="setAdminConsignmentFilter('in_transit')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">In Transit</button>
+                            <button class="consignment-status-filter-btn" data-status="received" onclick="setAdminConsignmentFilter('received')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">Received</button>
+                            <button class="consignment-status-filter-btn" data-status="rejected" onclick="setAdminConsignmentFilter('rejected')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">Rejected</button>
+                        </div>
+                        <div id="admin-consignments-list">Loading...</div>
+                    </div>
+
+                    <div id="admin-consignment-review-overlay" hidden style="position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center;">
+                        <div style="background:#fff; border-radius:14px; padding:24px; width:600px; max-width:94vw; max-height:86vh; overflow-y:auto;">
+                            <h3 style="margin:0 0 4px; font-size:16px; color:#1a1a2e;">Review Consignment <span id="admin-consignment-review-id"></span></h3>
+                            <div id="admin-consignment-review-meta" style="font-size:12.5px; color:#666; margin-bottom:14px;"></div>
+                            <div id="admin-consignment-review-error" style="color:#DC2626; font-size:12.5px; margin-bottom:10px;"></div>
+                            <div id="admin-consignment-review-lines" style="margin-bottom:14px;"></div>
+                            <label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:4px;">Admin notes (optional)</label>
+                            <textarea id="admin-consignment-review-notes" rows="2" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:8px; margin-bottom:16px; font-size:13px;"></textarea>
+                            <div style="display:flex; justify-content:space-between; gap:8px;">
+                                <button onclick="rejectConsignmentAdmin()" style="background:#fff; border:1px solid #DC2626; color:#DC2626; border-radius:8px; padding:9px 16px; font-size:13px; font-weight:600; cursor:pointer;">Reject</button>
+                                <div style="display:flex; gap:8px;">
+                                    <button onclick="closeAdminConsignmentReview()" style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:9px 16px; font-size:13px; cursor:pointer;">Cancel</button>
+                                    <button onclick="receiveConsignmentAdmin()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:9px 18px; font-size:13px; font-weight:600; cursor:pointer;">Save &amp; Count In</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Manage Pickers &mdash; Lookup</h2>
+                        <p style="font-size:13px; color:#666; margin:0 0 12px;">
+                            For the hub desk: search by name or phone to verify someone claiming to hand over a
+                            package on a vendor's behalf. Read-only here - vendors manage their own picker list
+                            from their dashboard.
+                        </p>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
+                            <div>
+                                <label style="font-size:12px; font-weight:600; display:block;">Name or phone</label>
+                                <input type="text" id="picker-search-query" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:220px;" placeholder="e.g. John or 0772...">
+                            </div>
+                            <button onclick="searchPickersAdmin()" style="background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; padding:9px 14px; cursor:pointer;">Search</button>
+                        </div>
+                        <div id="picker-search-results" style="font-size:13px; color:#444;"></div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Advertise Your Products &mdash; Settings</h2>
+                        <p style="font-size:13px; color:#666; margin:0 0 12px;">
+                            Platform-wide defaults for vendor ad campaigns. A change here only affects new
+                            submissions - a running campaign keeps the CPC rate it was approved at.
+                        </p>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
+                            <div>
+                                <label style="font-size:12px; font-weight:600; display:block;">Default CPC Rate (UGX)</label>
+                                <input type="number" id="ad-settings-cpc" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:140px;">
+                            </div>
+                            <div>
+                                <label style="font-size:12px; font-weight:600; display:block;">Min Daily Budget (UGX)</label>
+                                <input type="number" id="ad-settings-min-budget" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:140px;">
+                            </div>
+                            <div>
+                                <label style="font-size:12px; font-weight:600; display:block;">Max Daily Budget (UGX)</label>
+                                <input type="number" id="ad-settings-max-budget" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:140px;">
+                            </div>
+                            <button onclick="saveAdSettings()" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:9px 16px; cursor:pointer;">Save</button>
+                        </div>
+                        <div id="ad-settings-status" style="font-size:12.5px; color:#666;"></div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Advertise Your Products &mdash; Campaigns</h2>
+                        <p style="font-size:13px; color:#666; margin:0 0 12px;">
+                            Vendor-funded cost-per-click campaigns. Review each submission before it goes live.
+                        </p>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                            <button class="ad-campaign-status-filter-btn active" data-status="" onclick="setAdminAdCampaignFilter('')" style="padding:6px 12px; border-radius:999px; border:1px solid #1a1a2e; background:#1a1a2e; color:#fff; font-size:12px; cursor:pointer;">All</button>
+                            <button class="ad-campaign-status-filter-btn" data-status="pending_review" onclick="setAdminAdCampaignFilter('pending_review')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">Pending Review</button>
+                            <button class="ad-campaign-status-filter-btn" data-status="active" onclick="setAdminAdCampaignFilter('active')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">Active</button>
+                            <button class="ad-campaign-status-filter-btn" data-status="paused" onclick="setAdminAdCampaignFilter('paused')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">Paused</button>
+                            <button class="ad-campaign-status-filter-btn" data-status="rejected" onclick="setAdminAdCampaignFilter('rejected')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">Rejected</button>
+                        </div>
+                        <div id="admin-ad-campaigns-list">Loading...</div>
+                    </div>
+
+                    <div id="admin-ad-campaign-review-overlay" hidden style="position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center;">
+                        <div style="background:#fff; border-radius:14px; padding:24px; width:560px; max-width:94vw; max-height:86vh; overflow-y:auto;">
+                            <h3 style="margin:0 0 4px; font-size:16px; color:#1a1a2e;" id="admin-ad-campaign-review-title"></h3>
+                            <div id="admin-ad-campaign-review-meta" style="font-size:12.5px; color:#666; margin-bottom:14px;"></div>
+                            <div id="admin-ad-campaign-review-error" style="color:#DC2626; font-size:12.5px; margin-bottom:10px;"></div>
+                            <label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:4px;">Admin notes (optional)</label>
+                            <textarea id="admin-ad-campaign-review-notes" rows="2" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:8px; margin-bottom:16px; font-size:13px;"></textarea>
+                            <div style="display:flex; justify-content:space-between; gap:8px;">
+                                <button onclick="rejectAdCampaignAdmin()" style="background:#fff; border:1px solid #DC2626; color:#DC2626; border-radius:8px; padding:9px 16px; font-size:13px; font-weight:600; cursor:pointer;">Reject</button>
+                                <div style="display:flex; gap:8px;">
+                                    <button onclick="closeAdminAdCampaignReview()" style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:9px 16px; font-size:13px; cursor:pointer;">Cancel</button>
+                                    <button onclick="approveAdCampaignAdmin()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:9px 18px; font-size:13px; font-weight:600; cursor:pointer;">Approve</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </section>
 
                 <section id="tab-security" class="tab-content hidden">
