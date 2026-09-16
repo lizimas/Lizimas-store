@@ -249,11 +249,34 @@ exports.getProducts = async (req, res) => {
                      ORDER BY COALESCE(pi.display_order, 999999) ASC, pi.id ASC
                      OFFSET 1 LIMIT 1
                     ) AS hover_image,
+                    (
+                        EXISTS (
+                            SELECT 1 FROM vendor_promotions vp
+                            WHERE vp.product_id = products.id AND vp.sponsored = true
+                              AND vp.status = 'approved' AND vp.starts_at <= now() AND vp.ends_at >= now()
+                        )
+                        OR EXISTS (
+                            SELECT 1 FROM vendor_ad_campaign_products acp
+                            JOIN vendor_ad_campaigns ac ON ac.id = acp.campaign_id
+                            WHERE acp.product_id = products.id
+                              AND ac.status = 'active' AND ac.budget_spent < ac.total_budget
+                              AND (ac.start_date IS NULL OR ac.start_date <= CURRENT_DATE)
+                              AND (ac.end_date IS NULL OR ac.end_date >= CURRENT_DATE)
+                        )
+                    ) AS is_sponsored,
+                    -- Advertise Your Products (Jumia Vendor Center comparison,
+                    -- migration 112): distinguishes a CPC-billed ad placement
+                    -- from the older vendor_promotions "sponsored" flag above,
+                    -- so the storefront only fires the click-billing beacon
+                    -- (POST /api/ads/track-click) for an actual ad campaign.
                     EXISTS (
-                        SELECT 1 FROM vendor_promotions vp
-                        WHERE vp.product_id = products.id AND vp.sponsored = true
-                          AND vp.status = 'approved' AND vp.starts_at <= now() AND vp.ends_at >= now()
-                    ) AS is_sponsored
+                        SELECT 1 FROM vendor_ad_campaign_products acp
+                        JOIN vendor_ad_campaigns ac ON ac.id = acp.campaign_id
+                        WHERE acp.product_id = products.id
+                          AND ac.status = 'active' AND ac.budget_spent < ac.total_budget
+                          AND (ac.start_date IS NULL OR ac.start_date <= CURRENT_DATE)
+                          AND (ac.end_date IS NULL OR ac.end_date >= CURRENT_DATE)
+                    ) AS ad_sponsored
              FROM products
              LEFT JOIN categories ON products.category_id = categories.id
              LEFT JOIN vendors ON vendors.id = products.vendor_id
@@ -267,6 +290,18 @@ exports.getProducts = async (req, res) => {
              ORDER BY is_sponsored DESC, products.id DESC`,
             params
         );
+
+        // One impression per ad-sponsored product returned in this listing -
+        // fire-and-forget, must never hold up the response.
+        const adSponsoredIds = products.rows.filter(p => p.ad_sponsored).map(p => p.id);
+        if (adSponsoredIds.length) {
+            pool.query(
+                `UPDATE vendor_ad_campaign_products SET impressions = impressions + 1
+                 WHERE product_id = ANY($1::int[])
+                   AND campaign_id IN (SELECT id FROM vendor_ad_campaigns WHERE status = 'active' AND budget_spent < total_budget)`,
+                [adSponsoredIds]
+            ).catch(() => {});
+        }
 
         // Public, unauthenticated listing - see getProductById for why all
         // four commission-engine columns are stripped, not just the rate.

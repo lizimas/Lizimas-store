@@ -5,6 +5,7 @@ const { deriveVendorOrderStage, STAGE_LABELS, isValidStage, canAdvanceStage } = 
 const { logActivity } = require("../utils/activityLog");
 const { getVendorProductLimitStatus } = require("../utils/vendorProductTier");
 const { getVendorStockRecommendations } = require("../utils/stockRecommendation");
+const { generateShopId } = require("../utils/shopId");
 const {
     MIN_PAYOUT_UGX,
     classifyOrderItemForWallet,
@@ -46,7 +47,7 @@ exports.getMyVendorProfile = async (req, res) => {
         const result = await pool.query(
             `SELECT id, business_name, account_type, phone,
                     physical_address, momo_number, referral_source, status, rejection_reason,
-                    submitted_at, reviewed_at, slug, about, delivery_method
+                    submitted_at, reviewed_at, slug, about, delivery_method, shop_id
              FROM vendors WHERE id = $1`,
             [req.vendorId]
         );
@@ -652,7 +653,7 @@ exports.advanceVendorOrderStage = async (req, res) => {
 exports.getAllVendors = async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT v.id, v.business_name, v.status, v.payout_frozen, v.phone,
+            `SELECT v.id, v.business_name, v.status, v.payout_frozen, v.phone, v.shop_id,
                     u.name AS owner_name, u.email AS owner_email
              FROM vendors v
              JOIN users u ON u.id = v.user_id
@@ -722,6 +723,14 @@ exports.approveVendor = async (req, res) => {
         if (!vendor.slug) {
             vendor = { ...vendor, slug: await ensureVendorSlug(vendor.id, vendor.business_name) };
         }
+        // Shop ID (Jumia Vendor Center comparison, migration 113): assigned
+        // once, the moment a vendor first becomes approved - matching when
+        // Jumia itself hands a seller their Shop ID.
+        if (!vendor.shop_id) {
+            const shopId = await generateShopId();
+            await pool.query("UPDATE vendors SET shop_id = $1 WHERE id = $2", [shopId, vendor.id]);
+            vendor = { ...vendor, shop_id: shopId };
+        }
         logActivity(req.user.userId, "vendor_approved", "vendor", id, vendor.business_name);
         res.json({ message: "Vendor approved.", vendor });
     } catch (error) {
@@ -761,6 +770,35 @@ exports.rejectVendor = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+// Admin-triggered Shop ID reissue (Jumia Vendor Center comparison) - not
+// something Jumia sellers can do themselves, but a rare admin escape hatch
+// for a vendor approved before migration 113 shipped, or if a shop_id ever
+// needs reissuing. Only allowed on an approved vendor with no shop_id yet,
+// same rule approveVendor itself follows - this never overwrites an
+// existing shop_id.
+exports.regenerateVendorShopId = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const existing = await pool.query("SELECT id, status, shop_id FROM vendors WHERE id = $1", [id]);
+        if (existing.rows.length === 0) {
+            return res.status(404).json({ error: "Vendor not found." });
+        }
+        if (existing.rows[0].status !== "approved") {
+            return res.status(409).json({ error: "Only an approved vendor can have a Shop ID." });
+        }
+        if (existing.rows[0].shop_id) {
+            return res.status(409).json({ error: "This vendor already has a Shop ID." });
+        }
+        const shopId = await generateShopId();
+        await pool.query("UPDATE vendors SET shop_id = $1 WHERE id = $2", [shopId, id]);
+        logActivity(req.user.userId, "vendor_shop_id_assigned", "vendor", id, shopId);
+        res.json({ message: "Shop ID assigned.", shopId });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 // Public storefront (spec section 17): anyone can view an approved vendor's
 // page and their live catalogue, no auth required. A pending/rejected/
 // suspended vendor has no public page - the slug 404s exactly like a vendor
@@ -806,11 +844,33 @@ exports.getPublicStorefront = async (req, res) => {
                 ? Promise.resolve({ rows: [] })
                 : pool.query(
                     `SELECT id, name, price, image, stock, public_code,
+                            (
+                                EXISTS (
+                                    SELECT 1 FROM vendor_promotions vp
+                                    WHERE vp.product_id = products.id AND vp.sponsored = true
+                                      AND vp.status = 'approved' AND vp.starts_at <= now() AND vp.ends_at >= now()
+                                )
+                                OR EXISTS (
+                                    SELECT 1 FROM vendor_ad_campaign_products acp
+                                    JOIN vendor_ad_campaigns ac ON ac.id = acp.campaign_id
+                                    WHERE acp.product_id = products.id
+                                      AND ac.status = 'active' AND ac.budget_spent < ac.total_budget
+                                      AND (ac.start_date IS NULL OR ac.start_date <= CURRENT_DATE)
+                                      AND (ac.end_date IS NULL OR ac.end_date >= CURRENT_DATE)
+                                )
+                            ) AS is_sponsored,
+                            -- Advertise Your Products (Jumia Vendor Center comparison, migration
+                            -- 112): distinguishes a CPC-billed ad placement from the older
+                            -- vendor_promotions "sponsored" flag above, so the storefront knows
+                            -- to fire a click-tracking beacon only for this kind of sponsorship.
                             EXISTS (
-                                SELECT 1 FROM vendor_promotions vp
-                                WHERE vp.product_id = products.id AND vp.sponsored = true
-                                  AND vp.status = 'approved' AND vp.starts_at <= now() AND vp.ends_at >= now()
-                            ) AS is_sponsored
+                                SELECT 1 FROM vendor_ad_campaign_products acp
+                                JOIN vendor_ad_campaigns ac ON ac.id = acp.campaign_id
+                                WHERE acp.product_id = products.id
+                                  AND ac.status = 'active' AND ac.budget_spent < ac.total_budget
+                                  AND (ac.start_date IS NULL OR ac.start_date <= CURRENT_DATE)
+                                  AND (ac.end_date IS NULL OR ac.end_date >= CURRENT_DATE)
+                            ) AS ad_sponsored
                      FROM products
                      WHERE vendor_id = $1 AND status = 'approved' AND is_active = true AND admin_restricted = false AND deleted_at IS NULL
                      ORDER BY is_sponsored DESC, created_at DESC`,
@@ -829,6 +889,20 @@ exports.getPublicStorefront = async (req, res) => {
                 [vendor.id]
             )
         ]);
+
+        // One impression per ad-sponsored product shown on this storefront
+        // page load, same accounting GET /api/ads/sponsored-products uses.
+        // Fire-and-forget - a slow/failed counter update must never hold up
+        // rendering the page for a shopper.
+        const adSponsoredIds = productsResult.rows.filter(p => p.ad_sponsored).map(p => p.id);
+        if (adSponsoredIds.length) {
+            pool.query(
+                `UPDATE vendor_ad_campaign_products SET impressions = impressions + 1
+                 WHERE product_id = ANY($1::int[])
+                   AND campaign_id IN (SELECT id FROM vendor_ad_campaigns WHERE status = 'active' AND budget_spent < total_budget)`,
+                [adSponsoredIds]
+            ).catch(() => {});
+        }
 
         res.json({
             vendor,

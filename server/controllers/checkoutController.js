@@ -6,6 +6,7 @@ const { priceOrder } = require("../utils/deliveryPricing");
 const { DiscountError, resolveDiscountCode, recordDiscountCodeUsage } = require("../utils/discounts");
 const { createVendorNotification } = require("./vendorController");
 const { LOW_STOCK_THRESHOLD } = require("../utils/vendorNotifications");
+const { shouldFulfillFromConsignment } = require("../utils/consignmentFulfillment");
 
 // Base URL for links that leave the app (emails, receipts). Hardcoding the
 // production domain makes locally generated links unusable, since they resolve
@@ -101,7 +102,7 @@ exports.checkout = async (req, res) => {
 
             } else {
                 const productResult = await client.query(
-                    "SELECT id, name, sku, price, stock, vendor_id, commission_rate_applied, fixed_fee_applied, commission_rule_id, COALESCE(image, (SELECT image_path FROM product_images WHERE product_id = products.id ORDER BY COALESCE(display_order, 999999), id LIMIT 1)) AS image FROM products WHERE id = $1",
+                    "SELECT id, name, sku, price, stock, vendor_id, commission_rate_applied, fixed_fee_applied, commission_rule_id, fulfillment_type, consigned_stock, COALESCE(image, (SELECT image_path FROM product_images WHERE product_id = products.id ORDER BY COALESCE(display_order, 999999), id LIMIT 1)) AS image FROM products WHERE id = $1",
                     [productId]
                 );
 
@@ -174,6 +175,13 @@ exports.checkout = async (req, res) => {
                     productId,
                     variantId: null,
                     vendorId: product.vendor_id,
+                    // Consignment order-routing (Jumia "Fulfillment by
+                    // Jumia" comparison, migration 110/114): only plain
+                    // products carry fulfillment_type/consigned_stock -
+                    // product_variants has no equivalent, so variant items
+                    // above always take the normal vendor-handover path.
+                    fulfillmentType: product.fulfillment_type,
+                    consignedStock: product.consigned_stock,
                     productName: product.name, sku: product.sku, imageUrl: product.image, variantColor: colorName, variantSize: sizeName,
                     quantity,
                     price: itemPrice,
@@ -345,19 +353,40 @@ exports.checkout = async (req, res) => {
         }
 
         for (const item of validatedItems) {
+            // Consignment order-routing (Jumia "Fulfillment by Jumia"
+            // comparison, migration 110/114): when Lizimas is already
+            // physically holding enough consigned_stock for a plain product,
+            // skip the vendor handover step entirely - Lizimas already has
+            // it at a hub, counted in when the consignment was received, so
+            // there is nothing left for the vendor to hand over or an admin
+            // to inspect. Requires full coverage of the line item; if
+            // consigned_stock can't cover the whole quantity, this item
+            // falls back to the normal vendor-handover flow unchanged (no
+            // split-fulfillment across two sources for one order_items row).
+            const fulfilledFromConsignment = shouldFulfillFromConsignment({
+                vendorId: item.vendorId,
+                fulfillmentType: item.fulfillmentType,
+                consignedStock: item.consignedStock,
+                quantity: item.quantity
+            });
+
             // Vendor-sourced items start their own handover/inspection/returns
             // lifecycle (see 052_vendor_fulfilment.sql); staff-stocked items
             // (vendorId null) leave handover_status null - not applicable.
-            const handoverStatus = item.vendorId ? "pending_handover" : null;
+            const handoverStatus = item.vendorId
+                ? (fulfilledFromConsignment ? "accepted" : "pending_handover")
+                : null;
             // ...and their own pre-handover New/Accepted/Processing/Ready for
             // Handover progress (see 065_vendor_order_stage.sql), which the
-            // vendor advances themselves before handover ever happens.
-            const vendorFulfilmentStage = item.vendorId ? "new" : null;
+            // vendor advances themselves before handover ever happens - not
+            // applicable either when there's no handover for them to do.
+            const vendorFulfilmentStage = (item.vendorId && !fulfilledFromConsignment) ? "new" : null;
+            const handedOverAt = fulfilledFromConsignment ? new Date() : null;
 
             await client.query(
-                `INSERT INTO order_items (order_id, product_id, quantity, price, product_name, sku, image_url, variant_color, variant_size, handover_status, vendor_fulfilment_stage, commission_rate_applied, fixed_fee_applied, commission_rule_id)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-                [order.id, item.productId, item.quantity, item.price, item.productName, item.sku || null, item.imageUrl, item.variantColor, item.variantSize, handoverStatus, vendorFulfilmentStage, item.commissionRateApplied, item.fixedFeeApplied, item.commissionRuleId]
+                `INSERT INTO order_items (order_id, product_id, quantity, price, product_name, sku, image_url, variant_color, variant_size, handover_status, vendor_fulfilment_stage, commission_rate_applied, fixed_fee_applied, commission_rule_id, handed_over_at, fulfilled_from_consignment)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+                [order.id, item.productId, item.quantity, item.price, item.productName, item.sku || null, item.imageUrl, item.variantColor, item.variantSize, handoverStatus, vendorFulfilmentStage, item.commissionRateApplied, item.fixedFeeApplied, item.commissionRuleId, handedOverAt, fulfilledFromConsignment]
             );
 
             if (item.variantId) {
@@ -375,6 +404,13 @@ exports.checkout = async (req, res) => {
                 // reduce to one "the product is low" number the same way.
                 if (item.vendorId && stockResult.rows.length && Number(stockResult.rows[0].stock) < LOW_STOCK_THRESHOLD) {
                     item.resultingStock = Number(stockResult.rows[0].stock);
+                }
+
+                if (fulfilledFromConsignment) {
+                    await client.query(
+                        "UPDATE products SET consigned_stock = consigned_stock - $1 WHERE id = $2",
+                        [item.quantity, item.productId]
+                    );
                 }
             }
         }

@@ -96,6 +96,7 @@ const {
     getAllVendors,
     approveVendor,
     rejectVendor,
+    regenerateVendorShopId,
     getVendorPayoutRequests,
     markVendorPayoutPaid,
     rejectVendorPayout,
@@ -314,6 +315,7 @@ router.get("/vendors/pending", getPendingVendors);
 router.get("/vendors", getAllVendors);
 router.patch("/vendors/:id/approve", approveVendor);
 router.patch("/vendors/:id/reject", rejectVendor);
+router.patch("/vendors/:id/regenerate-shop-id", regenerateVendorShopId);
 
 // Vendor KYC & Compliance Profile review (Ryan, Sept 2026) - separate
 // from vendor approval above: approval means "allowed to sell," KYC
