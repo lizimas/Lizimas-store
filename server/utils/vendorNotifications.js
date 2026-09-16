@@ -7,7 +7,7 @@
 const NOTIFICATION_TYPES = [
     "new_order", "low_stock", "product_approved", "product_rejected",
     "compliance_action", "payout_update", "refund_decision", "admin_message",
-    "kyc_status_change"
+    "kyc_status_change", "consignment_status", "ad_campaign_status"
 ];
 
 // Matches the `stock < 10` threshold getVendorDashboardSummary already
@@ -90,6 +90,31 @@ function buildNotification(type, context = {}) {
                     ? `Your KYC submission: ${statusLabel}. Note: ${context.note}`
                     : `Your KYC submission: ${statusLabel}.`,
                 linkTab: "kyc"
+            };
+        }
+        case "consignment_status": {
+            const labels = {
+                received: "received in full",
+                partially_received: "partially received",
+                rejected: "rejected"
+            };
+            const statusLabel = labels[context.status] || context.status;
+            return {
+                title: context.status === "rejected" ? "Consignment rejected" : "Consignment received at the hub",
+                message: context.status === "rejected"
+                    ? (context.note || `Your consignment #${context.consignmentId} was rejected.`)
+                    : `Your consignment #${context.consignmentId} was ${statusLabel} at the hub.`,
+                linkTab: "products"
+            };
+        }
+        case "ad_campaign_status": {
+            const isRejected = context.status === "rejected";
+            return {
+                title: isRejected ? "Ad campaign rejected" : "Ad campaign approved",
+                message: isRejected
+                    ? (context.note || `Your campaign "${context.campaignName}" was rejected.`)
+                    : `Your campaign "${context.campaignName}" is now live.`,
+                linkTab: "account"
             };
         }
         default:

@@ -20,18 +20,13 @@ const { logActivity } = require("../utils/activityLog");
 const { uploadPrivateDocument, privateDocumentViewUrl, destroyPrivateDocument } = require("../utils/cloudinaryUpload");
 const { createVendorNotification } = require("./vendorController");
 
-async function getVendorIdForUser(userId) {
-    const { rows } = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [userId]);
-    return rows.length > 0 ? rows[0].id : null;
-}
-
 // --- Vendor-self --------------------------------------------------------
 
 // Every brand authorization this vendor has ever requested, each with its
 // own documents and status.
 exports.getMyBrandAuthorizations = async (req, res) => {
     try {
-        const vendorId = await getVendorIdForUser(req.user.userId);
+        const vendorId = req.vendorId;
         if (!vendorId) return res.status(404).json({ error: "No vendor profile found for this account." });
 
         const { rows: authRows } = await pool.query(
@@ -70,7 +65,7 @@ exports.getMyBrandAuthorizations = async (req, res) => {
 // editable state, same rule as vendor KYC.
 exports.submitBrandAuthorization = async (req, res) => {
     try {
-        const vendorId = await getVendorIdForUser(req.user.userId);
+        const vendorId = req.vendorId;
         if (!vendorId) return res.status(404).json({ error: "No vendor profile found for this account." });
 
         const brandName = (req.body.brand_name || "").trim();
@@ -154,7 +149,7 @@ exports.uploadMyBrandAuthDocument = async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: "No file uploaded." });
 
-        const vendorId = await getVendorIdForUser(req.user.userId);
+        const vendorId = req.vendorId;
         if (!vendorId) return res.status(404).json({ error: "No vendor profile found for this account." });
 
         const { authorizationId } = req.params;
@@ -218,7 +213,7 @@ exports.uploadMyBrandAuthDocument = async (req, res) => {
 // Vendor requests a fresh signed URL to view their own already-uploaded document.
 exports.getMyBrandAuthDocumentUrl = async (req, res) => {
     try {
-        const vendorId = await getVendorIdForUser(req.user.userId);
+        const vendorId = req.vendorId;
         if (!vendorId) return res.status(404).json({ error: "No vendor profile found for this account." });
 
         const { authorizationId } = req.params;

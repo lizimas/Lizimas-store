@@ -3,6 +3,8 @@ const { slugify } = require("../utils/slugify");
 const { computeSellerScore } = require("../utils/sellerScore");
 const { deriveVendorOrderStage, STAGE_LABELS, isValidStage, canAdvanceStage } = require("../utils/vendorOrderStage");
 const { logActivity } = require("../utils/activityLog");
+const { getVendorProductLimitStatus } = require("../utils/vendorProductTier");
+const { getVendorStockRecommendations } = require("../utils/stockRecommendation");
 const {
     MIN_PAYOUT_UGX,
     classifyOrderItemForWallet,
@@ -45,8 +47,8 @@ exports.getMyVendorProfile = async (req, res) => {
             `SELECT id, business_name, account_type, phone,
                     physical_address, momo_number, referral_source, status, rejection_reason,
                     submitted_at, reviewed_at, slug, about, delivery_method
-             FROM vendors WHERE user_id = $1`,
-            [req.user.userId]
+             FROM vendors WHERE id = $1`,
+            [req.vendorId]
         );
 
         if (result.rows.length === 0) {
@@ -80,8 +82,8 @@ exports.getMyVendorProfile = async (req, res) => {
 exports.updateVendorStorefront = async (req, res) => {
     try {
         const vendorRow = await pool.query(
-            "SELECT id, about, delivery_method FROM vendors WHERE user_id = $1",
-            [req.user.userId]
+            "SELECT id, about, delivery_method FROM vendors WHERE id = $1",
+            [req.vendorId]
         );
         if (vendorRow.rows.length === 0) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
@@ -129,8 +131,8 @@ exports.updateVendorStorefront = async (req, res) => {
 exports.updateMyVendorProfile = async (req, res) => {
     try {
         const vendorRow = await pool.query(
-            "SELECT id, account_type FROM vendors WHERE user_id = $1",
-            [req.user.userId]
+            "SELECT id, account_type FROM vendors WHERE id = $1",
+            [req.vendorId]
         );
         if (vendorRow.rows.length === 0) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
@@ -175,12 +177,41 @@ function formatDateOnly(value) {
 // above) without touching products.is_active, which stays a per-product
 // decision the vendor keeps full control of underneath either switch.
 
+// Product-count limit tier (Jumia Vendor Center comparison, Sept 2026) -
+// the vendor's own read-only view of their tier, cap, and how many
+// listings they have left. See server/utils/vendorProductTier.js.
+exports.getMyProductTierStatus = async (req, res) => {
+    try {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const status = await getVendorProductLimitStatus(vendorId);
+        res.json(status);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.getMyStockRecommendations = async (req, res) => {
+    try {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const recommendations = await getVendorStockRecommendations(vendorId);
+        res.json(recommendations);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 exports.getVendorShopStatus = async (req, res) => {
     try {
         const vendorRow = await pool.query(
             `SELECT shop_active, holiday_mode_active, holiday_mode_start_date, holiday_mode_end_date
-             FROM vendors WHERE user_id = $1`,
-            [req.user.userId]
+             FROM vendors WHERE id = $1`,
+            [req.vendorId]
         );
         if (vendorRow.rows.length === 0) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
@@ -206,8 +237,8 @@ exports.updateVendorShopActive = async (req, res) => {
             return res.status(400).json({ error: "active must be true or false." });
         }
         const result = await pool.query(
-            `UPDATE vendors SET shop_active = $1 WHERE user_id = $2 RETURNING id, shop_active`,
-            [active, req.user.userId]
+            `UPDATE vendors SET shop_active = $1 WHERE id = $2 RETURNING id, shop_active`,
+            [active, req.vendorId]
         );
         if (result.rows.length === 0) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
@@ -245,9 +276,9 @@ exports.updateVendorHolidayMode = async (req, res) => {
 
             const result = await pool.query(
                 `UPDATE vendors SET holiday_mode_active = true, holiday_mode_start_date = $1, holiday_mode_end_date = $2
-                 WHERE user_id = $3
+                 WHERE id = $3
                  RETURNING id, holiday_mode_active, holiday_mode_start_date, holiday_mode_end_date`,
-                [startDate, endDate, req.user.userId]
+                [startDate, endDate, req.vendorId]
             );
             if (result.rows.length === 0) {
                 return res.status(404).json({ error: "No vendor profile found for this account." });
@@ -263,9 +294,9 @@ exports.updateVendorHolidayMode = async (req, res) => {
 
         const result = await pool.query(
             `UPDATE vendors SET holiday_mode_active = false, holiday_mode_start_date = NULL, holiday_mode_end_date = NULL
-             WHERE user_id = $1
+             WHERE id = $1
              RETURNING id`,
-            [req.user.userId]
+            [req.vendorId]
         );
         if (result.rows.length === 0) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
@@ -309,12 +340,10 @@ exports.bulkUpdateVendorProducts = async (req, res) => {
             return res.status(400).json({ error: `You can select at most ${BULK_PRODUCT_MAX_IDS} products per bulk action.` });
         }
 
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
-        const vendorId = vendorRow.rows[0].id;
-
         // One lookup covering every requested id (including already-deleted
         // ones, so those are reported as "already deleted" rather than a
         // bare "not found") - classification below happens in JS so the
@@ -431,11 +460,11 @@ exports.bulkUpdateVendorProducts = async (req, res) => {
 // changes later.
 exports.getVendorDashboardSummary = async (req, res) => {
     try {
-        const vendorRow = await pool.query("SELECT id, business_name, slug FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
-        const vendorId = vendorRow.rows[0].id;
+        const vendorRow = await pool.query("SELECT id, business_name, slug FROM vendors WHERE id = $1", [vendorId]);
 
         const [ordersRes, earningsRes, productsRes, sellerScore, followerRes] = await Promise.all([
             pool.query(
@@ -511,15 +540,10 @@ exports.getVendorDashboardSummary = async (req, res) => {
 
 exports.getMyVendorOrders = async (req, res) => {
     try {
-        const vendorRow = await pool.query(
-            "SELECT id FROM vendors WHERE user_id = $1",
-            [req.user.userId]
-        );
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
-        const vendorId = vendorRow.rows[0].id;
-
         const result = await pool.query(
             `SELECT oi.id AS order_item_id, oi.order_id, oi.product_id, oi.quantity, oi.price,
                     p.name AS product_name, p.image AS product_image,
@@ -570,12 +594,10 @@ exports.advanceVendorOrderStage = async (req, res) => {
             });
         }
 
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
-        const vendorId = vendorRow.rows[0].id;
-
         const itemRow = await pool.query(
             `SELECT oi.id, oi.vendor_fulfilment_stage, oi.handover_status, p.vendor_id, o.status AS order_status
              FROM order_items oi
@@ -988,8 +1010,8 @@ function walletResponsePayload(vendor, walletData) {
 exports.getVendorWallet = async (req, res) => {
     try {
         const vendorRow = await pool.query(
-            "SELECT id, momo_number FROM vendors WHERE user_id = $1",
-            [req.user.userId]
+            "SELECT id, momo_number FROM vendors WHERE id = $1",
+            [req.vendorId]
         );
         if (vendorRow.rows.length === 0) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
@@ -1010,8 +1032,8 @@ exports.getVendorWallet = async (req, res) => {
 exports.requestVendorPayout = async (req, res) => {
     try {
         const vendorRow = await pool.query(
-            "SELECT id, momo_number, payout_frozen FROM vendors WHERE user_id = $1",
-            [req.user.userId]
+            "SELECT id, momo_number, payout_frozen FROM vendors WHERE id = $1",
+            [req.vendorId]
         );
         if (vendorRow.rows.length === 0) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
@@ -1234,12 +1256,10 @@ exports.getVendorWalletAdmin = async (req, res) => {
 // and the vendor's own response to that decision.
 exports.getMyReturnsRefunds = async (req, res) => {
     try {
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
-        const vendorId = vendorRow.rows[0].id;
-
         const result = await pool.query(
             `SELECT oi.id AS order_item_id, oi.order_id, oi.quantity, oi.price,
                     oi.return_reason, oi.returned_at, oi.return_evidence_image,
@@ -1280,12 +1300,10 @@ exports.respondToReturn = async (req, res) => {
             return res.status(400).json({ error: "response is required." });
         }
 
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
-        const vendorId = vendorRow.rows[0].id;
-
         const result = await pool.query(
             `UPDATE order_items oi
              SET vendor_response = $1, vendor_responded_at = now()
@@ -1492,8 +1510,8 @@ exports.getVendorComplianceHistory = async (req, res) => {
 // query, scoped to their own vendor_id instead of an admin-supplied id.
 exports.getMyComplianceNotices = async (req, res) => {
     try {
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
         const result = await pool.query(
@@ -1502,7 +1520,7 @@ exports.getMyComplianceNotices = async (req, res) => {
              LEFT JOIN products p ON p.id = vca.product_id
              WHERE vca.vendor_id = $1
              ORDER BY vca.created_at DESC`,
-            [vendorRow.rows[0].id]
+            [vendorId]
         );
         res.json(result.rows);
     } catch (error) {
@@ -1519,12 +1537,10 @@ exports.getMyComplianceNotices = async (req, res) => {
 
 exports.proposeVendorPromotion = async (req, res) => {
     try {
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
-        const vendorId = vendorRow.rows[0].id;
-
         const { product_id, proposed_sale_price, starts_at, ends_at } = req.body;
         const productRow = await pool.query(
             `SELECT id, price FROM products WHERE id = $1 AND vendor_id = $2 AND deleted_at IS NULL`,
@@ -1570,8 +1586,8 @@ exports.proposeVendorPromotion = async (req, res) => {
 // The vendor's own promotions, most recent first.
 exports.getMyVendorPromotions = async (req, res) => {
     try {
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
         const result = await pool.query(
@@ -1580,7 +1596,7 @@ exports.getMyVendorPromotions = async (req, res) => {
              JOIN products p ON p.id = vp.product_id
              WHERE vp.vendor_id = $1
              ORDER BY vp.created_at DESC`,
-            [vendorRow.rows[0].id]
+            [vendorId]
         );
         const rows = result.rows.map(row => ({
             ...row,
@@ -1810,15 +1826,15 @@ exports.createVendorNotification = createVendorNotification;
 
 exports.getMyVendorNotifications = async (req, res) => {
     try {
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
         const result = await pool.query(
             `SELECT id, type, title, message, link_tab, read_at, created_at
              FROM vendor_notifications WHERE vendor_id = $1
              ORDER BY created_at DESC LIMIT 100`,
-            [vendorRow.rows[0].id]
+            [vendorId]
         );
         res.json(result.rows);
     } catch (error) {
@@ -1828,13 +1844,13 @@ exports.getMyVendorNotifications = async (req, res) => {
 
 exports.getMyVendorNotificationsUnreadCount = async (req, res) => {
     try {
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
         const result = await pool.query(
             `SELECT COUNT(*)::int AS n FROM vendor_notifications WHERE vendor_id = $1 AND read_at IS NULL`,
-            [vendorRow.rows[0].id]
+            [vendorId]
         );
         res.json({ unread: result.rows[0].n });
     } catch (error) {
@@ -1845,14 +1861,14 @@ exports.getMyVendorNotificationsUnreadCount = async (req, res) => {
 exports.markVendorNotificationRead = async (req, res) => {
     try {
         const { id } = req.params;
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
         const result = await pool.query(
             `UPDATE vendor_notifications SET read_at = now()
              WHERE id = $1 AND vendor_id = $2 AND read_at IS NULL RETURNING id, read_at`,
-            [id, vendorRow.rows[0].id]
+            [id, vendorId]
         );
         res.json({ message: "Marked read.", notification: result.rows[0] || null });
     } catch (error) {
@@ -1862,14 +1878,14 @@ exports.markVendorNotificationRead = async (req, res) => {
 
 exports.markAllVendorNotificationsRead = async (req, res) => {
     try {
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
         const result = await pool.query(
             `UPDATE vendor_notifications SET read_at = now()
              WHERE vendor_id = $1 AND read_at IS NULL RETURNING id`,
-            [vendorRow.rows[0].id]
+            [vendorId]
         );
         res.json({ message: `${result.rows.length} notification(s) marked read.` });
     } catch (error) {
@@ -1884,12 +1900,10 @@ exports.markAllVendorNotificationsRead = async (req, res) => {
 
 exports.getVendorReports = async (req, res) => {
     try {
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
-        const vendorId = vendorRow.rows[0].id;
-
         const [dailyRes, topProductsRes, statusRes, payoutsRes] = await Promise.all([
             pool.query(
                 `SELECT o.created_at::date AS day,
@@ -1955,8 +1969,8 @@ exports.getVendorReports = async (req, res) => {
 // The vendor's own list of threads, most recently active first.
 exports.getMyVendorMessages = async (req, res) => {
     try {
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
         const result = await pool.query(
@@ -1965,7 +1979,7 @@ exports.getMyVendorMessages = async (req, res) => {
              FROM vendor_messages vm
              WHERE vm.vendor_id = $1
              ORDER BY vm.updated_at DESC`,
-            [vendorRow.rows[0].id]
+            [vendorId]
         );
         res.json(result.rows);
     } catch (error) {
@@ -1977,13 +1991,13 @@ exports.getMyVendorMessages = async (req, res) => {
 exports.getMyVendorMessageThread = async (req, res) => {
     try {
         const { id } = req.params;
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
         const threadRes = await pool.query(
             `SELECT id, subject, status, created_at, updated_at FROM vendor_messages WHERE id = $1 AND vendor_id = $2`,
-            [id, vendorRow.rows[0].id]
+            [id, vendorId]
         );
         if (threadRes.rows.length === 0) {
             return res.status(404).json({ error: "Message thread not found." });
@@ -2010,12 +2024,10 @@ exports.createVendorMessage = async (req, res) => {
         if (!isValidMessageBody(body)) {
             return res.status(400).json({ error: `Message is required and must be ${MAX_BODY_LENGTH} characters or fewer.` });
         }
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
-        const vendorId = vendorRow.rows[0].id;
-
         const threadRes = await pool.query(
             `INSERT INTO vendor_messages (vendor_id, subject) VALUES ($1, $2) RETURNING *`,
             [vendorId, subject.trim()]
@@ -2041,13 +2053,13 @@ exports.replyToVendorMessage = async (req, res) => {
         if (!isValidMessageBody(body)) {
             return res.status(400).json({ error: `Message is required and must be ${MAX_BODY_LENGTH} characters or fewer.` });
         }
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
         const threadRes = await pool.query(
             `SELECT id, status FROM vendor_messages WHERE id = $1 AND vendor_id = $2`,
-            [id, vendorRow.rows[0].id]
+            [id, vendorId]
         );
         if (threadRes.rows.length === 0) {
             return res.status(404).json({ error: "Message thread not found." });

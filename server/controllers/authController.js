@@ -231,7 +231,7 @@ async function staffLogin(req, res) {
     return handleLogin(req, res, STAFF_LOGIN_ROLES, "staff");
 }
 
-const VENDOR_LOGIN_ROLES = ["vendor"];
+const VENDOR_LOGIN_ROLES = ["vendor", "vendor_staff"];
 
 async function vendorLogin(req, res) {
     return handleLogin(req, res, VENDOR_LOGIN_ROLES, "vendor");

@@ -479,6 +479,48 @@ async function sendStaffInviteEmail(email, name, setupLink, validMinutes) {
     }
 }
 
+async function sendVendorStaffInviteEmail(email, name, vendorBusinessName, setupLink, validMinutes) {
+    const body = [
+        `You've been added to a Lizimas Store vendor account!`,
+        ``,
+        `Hi ${name},`,
+        ``,
+        `${vendorBusinessName} has added you as a staff member on their`,
+        `Lizimas Store vendor account. To keep your login secure, you will`,
+        `need to create your own password before you can sign in.`,
+        ``,
+        `Set your password:`,
+        setupLink,
+        ``,
+        `This link expires in ${validMinutes} minutes. If it expires, ask`,
+        `${vendorBusinessName} to send you a new invite.`,
+        ``,
+        `For your security:`,
+        `  - Create a strong, unique password that you do not use elsewhere.`,
+        `  - Keep your login details private and do not share them with anyone.`,
+        `  - This setup link is personal to you and should not be forwarded.`,
+        ``,
+        `Once signed in, you'll only be able to see and do what ${vendorBusinessName}`,
+        `has given you permission for on their vendor account.`,
+        ``,
+        `Warm regards,`,
+        `Lizimas Store`
+    ].join("\n");
+
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: `You've been added to ${vendorBusinessName}'s Lizimas Store account`,
+            text: body
+        });
+        return true;
+    } catch (error) {
+        console.error("Vendor staff invite email error:", error);
+        return false;
+    }
+}
+
 async function sendStaffActivationEmail(email, name) {
     try {
         await transporter.sendMail({
@@ -998,4 +1040,4 @@ async function sendStatementPaidEmail(email, name, statement, cycle, pdfBuffer, 
     }
 }
 
-module.exports = { sendOrderConfirmationEmail, sendStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert, sendPerformanceReportEmail, sendStaffMessageAlert, sendDataDeletionAlert, sendVendorApplicationReceivedEmail, sendVendorSignupAbandonedAlert, sendVendorSignupReminderEmail, sendStatementReadyEmail, sendStatementPaidEmail };
+module.exports = { sendOrderConfirmationEmail, sendStaffInviteEmail, sendVendorStaffInviteEmail, sendDeviceApprovalRequest, sendAdminLoginAlert, sendOrderStatusEmail, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendScopeViolationAlert, sendSecurityLockAlert, sendAccountReportAlert, sendPerformanceReportEmail, sendStaffMessageAlert, sendDataDeletionAlert, sendVendorApplicationReceivedEmail, sendVendorSignupAbandonedAlert, sendVendorSignupReminderEmail, sendStatementReadyEmail, sendStatementPaidEmail };

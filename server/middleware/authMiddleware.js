@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const pool = require("../config/database");
+const { resolveVendorContext } = require("../utils/vendorContext");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -134,10 +135,26 @@ function requireSupportOrAdmin(req, res, next) {
 // for internal staff. Ownership of a given product/order is still checked
 // inside the controllers (a vendor role alone does not imply access to a
 // specific row).
-function requireVendor(req, res, next) {
-    if (!req.user || req.user.role !== "vendor") {
+//
+// Also admits vendor_staff (migrations/107, vendor Users/Roles) - a vendor's
+// own staff sub-accounts. Either way, resolves req.vendorId and
+// req.vendorStaffRoles here, once per request, via
+// server/utils/vendorContext.js: req.vendorStaffRoles is null for the
+// vendor owner (unrestricted) or an array of vc_* codes for staff. The ~30
+// controller functions that used to each run their own
+// "SELECT id FROM vendors WHERE user_id = $1" now read req.vendorId
+// instead - that single change is what makes every one of them work for a
+// staff login too, with no per-controller staff-awareness needed. A staff
+// login whose vendor_staff_users row is disabled, or that resolves to no
+// vendor at all, gets req.vendorId = null and is turned away downstream
+// exactly like a vendor with no profile always was (unchanged 404 shape).
+async function requireVendor(req, res, next) {
+    if (!req.user || (req.user.role !== "vendor" && req.user.role !== "vendor_staff")) {
         return res.status(403).json({ error: "Vendor access required." });
     }
+    const { vendorId, staffRoles } = await resolveVendorContext(req.user);
+    req.vendorId = vendorId;
+    req.vendorStaffRoles = staffRoles;
     next();
 }
 

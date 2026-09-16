@@ -109,12 +109,10 @@ exports.deleteReview = async (req, res) => {
 // GET /api/vendors/reviews
 exports.getVendorReviews = async (req, res) => {
     try {
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
-        const vendorId = vendorRow.rows[0].id;
-
         const result = await pool.query(
             `SELECT r.id, r.product_id, r.rating, r.comment, r.verified_purchase, r.created_at,
                     r.vendor_response, r.vendor_response_at,
@@ -142,12 +140,10 @@ exports.respondToReview = async (req, res) => {
             return res.status(400).json({ error: "response is required." });
         }
 
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
-        const vendorId = vendorRow.rows[0].id;
-
         const result = await pool.query(
             `UPDATE product_reviews r
              SET vendor_response = $1, vendor_response_at = now()

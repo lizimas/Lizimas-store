@@ -52,6 +52,27 @@ const {
 
 const { createStaffAccount, activateStaffAccount, blockStaffAccount, forcePasswordReset, logoutAllDevices, resetStaff2FA, getLoginHistory } = require("../controllers/authController");
 
+const {
+    listProductTiers,
+    updateProductTier,
+    getVendorTierStatus,
+    setVendorTierOverride
+} = require("../controllers/adminProductTierController");
+const {
+    listConsignmentsAdmin,
+    receiveConsignment,
+    rejectConsignment
+} = require("../controllers/adminConsignmentController");
+const { searchPickersAdmin } = require("../controllers/adminPickerController");
+const {
+    listCampaignsAdmin,
+    approveCampaign,
+    rejectCampaign,
+    setCampaignPausedAdmin,
+    getAdSettingsAdmin,
+    updateAdSettingsAdmin
+} = require("../controllers/adminAdController");
+
 const { requireAuth, requireAdmin, requireSupportOrAdmin } = require("./../middleware/authMiddleware");
 const {
     listDropoffPoints,
@@ -176,6 +197,33 @@ router.get("/jumia/oauth/callback", jumiaAdmin.adminJumiaOAuthCallback);
 router.use(requireAuth, requireAdmin);
 
 router.get("/stats", getDashboardStats);
+
+// Product-count limit tiers (Jumia Vendor Center comparison, Sept 2026) -
+// see adminProductTierController.js.
+router.get("/product-tiers", listProductTiers);
+router.patch("/product-tiers/:tierCode", updateProductTier);
+router.get("/vendors/:id/product-tier", getVendorTierStatus);
+router.patch("/vendors/:id/product-tier-override", setVendorTierOverride);
+
+// Fulfillment-by-Lizimas / Consignments (Jumia Vendor Center comparison,
+// Sept 2026) - see migrations/110_vendor_consignments.sql /
+// adminConsignmentController.js.
+router.get("/consignments", listConsignmentsAdmin);
+router.post("/consignments/:id/receive", receiveConsignment);
+router.post("/consignments/:id/reject", rejectConsignment);
+
+// Manage Pickers (Jumia Vendor Center comparison, Sept 2026) - hub-desk
+// lookup only, see adminPickerController.js.
+router.get("/pickers/search", searchPickersAdmin);
+
+// Advertise Your Products (Jumia Vendor Center comparison, Sept 2026) - see
+// migrations/112_vendor_ad_campaigns.sql.
+router.get("/ad-campaigns", listCampaignsAdmin);
+router.post("/ad-campaigns/:id/approve", approveCampaign);
+router.post("/ad-campaigns/:id/reject", rejectCampaign);
+router.patch("/ad-campaigns/:id/paused", setCampaignPausedAdmin);
+router.get("/ad-settings", getAdSettingsAdmin);
+router.patch("/ad-settings", updateAdSettingsAdmin);
 router.get("/visitor-stats", getVisitorStats);
 
 // Cloudflare-style analytics dashboard: accepts either ?start=&end= (custom

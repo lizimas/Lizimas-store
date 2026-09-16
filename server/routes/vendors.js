@@ -2,6 +2,28 @@ const express = require("express");
 const router = express.Router();
 
 const { registerVendor, vendorLogin, requestVendorRegistrationCode, verifyVendorRegistrationCode } = require("../controllers/authController");
+const { requireVendorPermission } = require("../utils/vendorContext");
+const {
+    listMyConsignments,
+    createConsignment,
+    markConsignmentInTransit,
+    cancelConsignment
+} = require("../controllers/vendorConsignmentController");
+const {
+    listMyPickers,
+    createMyPicker,
+    updateMyPicker,
+    togglePickerActive,
+    deleteMyPicker
+} = require("../controllers/vendorPickerController");
+const {
+    listMyCampaigns,
+    getAdRates,
+    createCampaign,
+    submitCampaign,
+    setCampaignPaused,
+    deleteCampaign
+} = require("../controllers/vendorAdController");
 const {
     getMyVendorProfile, getMyVendorOrders, updateMyVendorProfile, getPublicStorefront,
     followVendor, unfollowVendor, getFollowStatus, getVendorDashboardSummary,
@@ -15,9 +37,18 @@ const {
     getVendorReports,
     updateVendorStorefront,
     getMyVendorMessages, getMyVendorMessageThread, createVendorMessage, replyToVendorMessage,
-    getVendorShopStatus, updateVendorShopActive, updateVendorHolidayMode
+    getVendorShopStatus, updateVendorShopActive, updateVendorHolidayMode,
+    getMyProductTierStatus,
+    getMyStockRecommendations
 } = require("../controllers/vendorController");
 const { getMyKyc, updateMyKyc } = require("../controllers/vendorKycController");
+const {
+    listVendorStaff,
+    createVendorStaffUser,
+    updateVendorStaffUserRoles,
+    toggleVendorStaffUserEnabled,
+    deleteVendorStaffUser
+} = require("../controllers/vendorStaffController");
 const {
     getMyBrandAuthorizations,
     submitBrandAuthorization,
@@ -48,7 +79,8 @@ const {
     saveProductOptions,
     generateProductVariants,
     updateVariantStock,
-    setVariantStockMode
+    setVariantStockMode,
+    importVendorProducts
 } = require("../controllers/productController");
 const {
     getDescriptionBlocks,
@@ -75,6 +107,7 @@ const {
 const { requireAuth, requireVendor } = require("../middleware/authMiddleware");
 const { otpLimiter } = require("../middleware/rateLimiter");
 const upload = require("../middleware/upload");
+const csvUpload = require("../middleware/csvUpload");
 
 // Public: a prospective vendor applies, then logs in to check status/manage
 // listings once approved. Login itself is unrestricted by status - the
@@ -110,16 +143,24 @@ router.get("/jumia/oauth/callback", jumiaOAuthCallback);
 router.use(requireAuth, requireVendor);
 
 router.get("/me", getMyVendorProfile);
-router.patch("/me", updateMyVendorProfile);
-router.patch("/me/storefront", updateVendorStorefront);
-router.get("/me/shop-status", getVendorShopStatus);
-router.patch("/me/shop-active", updateVendorShopActive);
-router.patch("/me/holiday-mode", updateVendorHolidayMode);
+router.patch("/me", requireVendorPermission("vc_shop_manager"), updateMyVendorProfile);
+router.patch("/me/storefront", requireVendorPermission("vc_shop_manager"), updateVendorStorefront);
+router.get("/me/shop-status", requireVendorPermission("vc_shop_manager", "vc_shop_viewer"), getVendorShopStatus);
+router.patch("/me/shop-active", requireVendorPermission("vc_shop_manager"), updateVendorShopActive);
+router.patch("/me/holiday-mode", requireVendorPermission("vc_shop_manager"), updateVendorHolidayMode);
 
 // Vendor KYC & Compliance Profile - identity/business-registration
 // verification, separate from the profile above (Ryan, Sept 2026).
 router.get("/me/kyc", getMyKyc);
 router.patch("/me/kyc", updateMyKyc);
+
+// Users/Roles (Settings > Users, matching Jumia Vendor Center) - owner-only,
+// see vendorStaffController.js's header for why.
+router.get("/me/staff", listVendorStaff);
+router.post("/me/staff", createVendorStaffUser);
+router.patch("/me/staff/:id/roles", updateVendorStaffUserRoles);
+router.patch("/me/staff/:id/enabled", toggleVendorStaffUserEnabled);
+router.delete("/me/staff/:id", deleteVendorStaffUser);
 
 router.get("/me/brand-authorizations", getMyBrandAuthorizations);
 router.post("/me/brand-authorizations", submitBrandAuthorization);
@@ -130,20 +171,23 @@ router.get("/me/payment-instruments", getMyPaymentInstruments);
 router.post("/me/payment-instruments", addMyPaymentInstrument);
 router.patch("/me/payment-instruments/:id", updateMyPaymentInstrument);
 router.patch("/me/payment-instruments/preferred", setPreferredPaymentInstrument);
-router.get("/orders", getMyVendorOrders);
-router.patch("/order-items/:orderItemId/stage", advanceVendorOrderStage);
+router.get("/orders", requireVendorPermission("vc_order_manager", "vc_order_viewer"), getMyVendorOrders);
+router.patch("/order-items/:orderItemId/stage", requireVendorPermission("vc_order_manager"), advanceVendorOrderStage);
 router.get("/dashboard-summary", getVendorDashboardSummary);
+router.get("/me/product-tier", getMyProductTierStatus);
+router.get("/me/stock-recommendations", requireVendorPermission("vc_product_manager", "vc_product_viewer", "vc_product_update"), getMyStockRecommendations);
 
 // Vendor Wallet & Payouts (Task #61): the balance is derived on every read
 // from order_items - see server/utils/vendorWallet.js.
-router.get("/wallet", getVendorWallet);
-router.post("/wallet/payout-requests", requestVendorPayout);
+router.get("/wallet", requireVendorPermission("vc_finance_viewer"), getVendorWallet);
+router.post("/wallet/payout-requests", requireVendorPermission("vc_finance_viewer"), requestVendorPayout);
 
-router.get("/products", getMyProducts);
-router.patch("/products/bulk", bulkUpdateVendorProducts);
-router.post("/products", upload.array("images", 20), addProduct);
-router.put("/products/:id", upload.array("images", 20), updateProduct);
-router.delete("/products/:id", deleteProduct);
+router.get("/products", requireVendorPermission("vc_product_manager", "vc_product_viewer", "vc_product_update"), getMyProducts);
+router.patch("/products/bulk", requireVendorPermission("vc_product_manager", "vc_product_update"), bulkUpdateVendorProducts);
+router.post("/products", requireVendorPermission("vc_product_manager"), upload.array("images", 20), addProduct);
+router.post("/products/import", requireVendorPermission("vc_product_manager"), csvUpload.single("file"), importVendorProducts);
+router.put("/products/:id", requireVendorPermission("vc_product_manager", "vc_product_update"), upload.array("images", 20), updateProduct);
+router.delete("/products/:id", requireVendorPermission("vc_product_manager"), deleteProduct);
 router.get("/products/:id/images", getProductImages);
 router.patch("/products/:id/images/order", updateImageOrder);
 router.delete("/products/images/:imageId", deleteProductImage);
@@ -164,13 +208,37 @@ router.post("/products/:id/description-blocks/image", upload.single("image"), up
 router.post("/products/description-blocks/image", upload.single("image"), uploadBlockImage);
 
 router.get("/dropoff-points", listActiveDropoffPoints);
-router.post("/order-items/:orderItemId/handover", vendorMarkHandedOver);
-router.get("/returns", getMyReturns);
+router.post("/order-items/:orderItemId/handover", requireVendorPermission("vc_order_manager"), vendorMarkHandedOver);
+
+// Fulfillment-by-Lizimas / Consignments (Jumia Vendor Center comparison,
+// Sept 2026) - see migrations/110_vendor_consignments.sql.
+router.get("/me/consignments", requireVendorPermission("vc_shop_manager", "vc_shop_viewer"), listMyConsignments);
+router.post("/me/consignments", requireVendorPermission("vc_shop_manager"), createConsignment);
+router.post("/me/consignments/:id/in-transit", requireVendorPermission("vc_shop_manager"), markConsignmentInTransit);
+router.post("/me/consignments/:id/cancel", requireVendorPermission("vc_shop_manager"), cancelConsignment);
+
+// Manage Pickers (Jumia Vendor Center comparison, Sept 2026) - see
+// migrations/111_vendor_pickers.sql.
+router.get("/me/pickers", requireVendorPermission("vc_shop_manager", "vc_shop_viewer"), listMyPickers);
+router.post("/me/pickers", requireVendorPermission("vc_shop_manager"), createMyPicker);
+router.put("/me/pickers/:id", requireVendorPermission("vc_shop_manager"), updateMyPicker);
+router.patch("/me/pickers/:id/active", requireVendorPermission("vc_shop_manager"), togglePickerActive);
+router.delete("/me/pickers/:id", requireVendorPermission("vc_shop_manager"), deleteMyPicker);
+
+// Advertise Your Products (Jumia Vendor Center comparison, Sept 2026) - see
+// migrations/112_vendor_ad_campaigns.sql.
+router.get("/me/ad-rates", requireVendorPermission("vc_advertising_manager"), getAdRates);
+router.get("/me/ad-campaigns", requireVendorPermission("vc_advertising_manager"), listMyCampaigns);
+router.post("/me/ad-campaigns", requireVendorPermission("vc_advertising_manager"), createCampaign);
+router.post("/me/ad-campaigns/:id/submit", requireVendorPermission("vc_advertising_manager"), submitCampaign);
+router.patch("/me/ad-campaigns/:id/paused", requireVendorPermission("vc_advertising_manager"), setCampaignPaused);
+router.delete("/me/ad-campaigns/:id", requireVendorPermission("vc_advertising_manager"), deleteCampaign);
+router.get("/returns", requireVendorPermission("vc_order_manager", "vc_order_viewer"), getMyReturns);
 
 // Returns & Refunds Center (Task #62): the financial/decision view, apart
 // from the collection-logistics-only "Returns" tab above.
-router.get("/returns-refunds", getMyReturnsRefunds);
-router.patch("/order-items/:orderItemId/return-response", respondToReturn);
+router.get("/returns-refunds", requireVendorPermission("vc_order_manager", "vc_order_viewer"), getMyReturnsRefunds);
+router.patch("/order-items/:orderItemId/return-response", requireVendorPermission("vc_order_manager"), respondToReturn);
 
 // Vendor reviews view (Task #63).
 router.get("/reviews", getVendorReviews);
@@ -181,15 +249,15 @@ router.get("/compliance-notices", getMyComplianceNotices);
 
 // Vendor Promotions (Task #64): propose a time-boxed sale price on one of
 // your own products.
-router.post("/promotions", proposeVendorPromotion);
-router.get("/promotions", getMyVendorPromotions);
+router.post("/promotions", requireVendorPermission("vc_promotion_manager"), proposeVendorPromotion);
+router.get("/promotions", requireVendorPermission("vc_promotion_manager"), getMyVendorPromotions);
 
 // Vendor Notifications + Reports (Task #65).
 router.get("/notifications", getMyVendorNotifications);
 router.get("/notifications/unread-count", getMyVendorNotificationsUnreadCount);
 router.patch("/notifications/:id/read", markVendorNotificationRead);
 router.patch("/notifications/read-all", markAllVendorNotificationsRead);
-router.get("/reports", getVendorReports);
+router.get("/reports", requireVendorPermission("vc_order_report", "vc_finance_viewer"), getVendorReports);
 
 // Vendor-to-Admin Messaging (Task #71).
 router.get("/messages", getMyVendorMessages);
@@ -207,8 +275,8 @@ router.post("/pricing/preview", previewPricing);
 // connect/disconnect a vendor's Jumia Vendor Center Application, push
 // Lizimas listings out to Jumia, and pull existing Jumia listings in.
 // See jumiaClient.js for what is/isn't verified against Jumia's real API.
-router.get("/me/jumia/applications", listJumiaApplications);
-router.post("/me/jumia/applications", createJumiaApplication);
+router.get("/me/jumia/applications", requireVendorPermission("vc_shop_manager"), listJumiaApplications);
+router.post("/me/jumia/applications", requireVendorPermission("vc_shop_manager"), createJumiaApplication);
 router.delete("/me/jumia/applications/:id", deleteJumiaApplication);
 router.post("/me/jumia/applications/:id/activate", activateJumiaApplication);
 router.post("/me/jumia/applications/:id/connect", connectJumiaApplication);
@@ -223,10 +291,10 @@ router.get("/me/jumia/remote-products", getJumiaRemoteProducts);
 router.post("/me/jumia/import", importJumiaProducts);
 
 // --- Phase 4: vendor statement downloads + share (behind auth gate) ---
-router.get("/me/statements", listVendorStatements);
-router.patch("/me/currency", updateMyPreferredCurrency);
-router.get("/me/statements/:id/pdf", downloadStatementPdfVendor);
-router.get("/me/statements/:id/csv", downloadStatementCsvVendor);
-router.post("/me/statements/:id/share", shareStatementVendor);
+router.get("/me/statements", requireVendorPermission("vc_finance_viewer"), listVendorStatements);
+router.patch("/me/currency", requireVendorPermission("vc_finance_viewer"), updateMyPreferredCurrency);
+router.get("/me/statements/:id/pdf", requireVendorPermission("vc_finance_viewer"), downloadStatementPdfVendor);
+router.get("/me/statements/:id/csv", requireVendorPermission("vc_finance_viewer"), downloadStatementCsvVendor);
+router.post("/me/statements/:id/share", requireVendorPermission("vc_finance_viewer"), shareStatementVendor);
 
 module.exports = router;

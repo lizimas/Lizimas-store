@@ -29,8 +29,8 @@ const { createVendorNotification } = require("./vendorController");
 exports.getMyKyc = async (req, res) => {
     try {
         const vendorRow = await pool.query(
-            "SELECT id, account_type FROM vendors WHERE user_id = $1",
-            [req.user.userId]
+            "SELECT id, account_type FROM vendors WHERE id = $1",
+            [req.vendorId]
         );
         if (vendorRow.rows.length === 0) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
@@ -91,8 +91,8 @@ exports.getMyKyc = async (req, res) => {
 exports.updateMyKyc = async (req, res) => {
     try {
         const vendorRow = await pool.query(
-            "SELECT id, account_type FROM vendors WHERE user_id = $1",
-            [req.user.userId]
+            "SELECT id, account_type FROM vendors WHERE id = $1",
+            [req.vendorId]
         );
         if (vendorRow.rows.length === 0) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
@@ -206,8 +206,8 @@ exports.uploadMyKycDocument = async (req, res) => {
         }
 
         const vendorRow = await pool.query(
-            "SELECT id, account_type FROM vendors WHERE user_id = $1",
-            [req.user.userId]
+            "SELECT id, account_type FROM vendors WHERE id = $1",
+            [req.vendorId]
         );
         if (vendorRow.rows.length === 0) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
@@ -278,17 +278,13 @@ exports.uploadMyKycDocument = async (req, res) => {
 exports.getMyKycDocumentUrl = async (req, res) => {
     try {
         const { document_type } = req.query;
-        const vendorRow = await pool.query(
-            "SELECT id FROM vendors WHERE user_id = $1",
-            [req.user.userId]
-        );
-        if (vendorRow.rows.length === 0) {
+        const vendorId = req.vendorId;
+        if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
-
         const docRow = await pool.query(
             "SELECT cloudinary_public_id, resource_type, format FROM vendor_kyc_documents WHERE vendor_id = $1 AND document_type = $2",
-            [vendorRow.rows[0].id, document_type]
+            [vendorId, document_type]
         );
         if (docRow.rows.length === 0) {
             return res.status(404).json({ error: "No document on file." });

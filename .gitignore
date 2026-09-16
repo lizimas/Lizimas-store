@@ -33,3 +33,6 @@ fix_*.py
 .env
 .env.*
 !.env.example
+
+# temporary refactor scratch files
+.refactor_scratch/

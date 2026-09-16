@@ -25,11 +25,6 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || "https://lizimasstore.com").replace(/\/+$/, "");
 const JUMIA_OAUTH_CALLBACK_URL = `${PUBLIC_BASE_URL}/api/vendors/jumia/oauth/callback`;
 
-async function getVendorIdForUser(userId) {
-    const row = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [userId]);
-    return row.rows.length ? row.rows[0].id : null;
-}
-
 async function logSync(vendorId, linkId, action, status, detail) {
     await pool.query(
         `INSERT INTO jumia_sync_log (vendor_id, product_link_id, action, status, detail)
@@ -583,7 +578,6 @@ async function listProductLinks(vendorId) {
 }
 
 module.exports = {
-    getVendorIdForUser,
     getConnectionStatus,
     listApplications,
     createApplication,

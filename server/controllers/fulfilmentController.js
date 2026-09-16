@@ -73,11 +73,6 @@ exports.updateDropoffPoint = async (req, res) => {
 
 // --- Vendor side: handover and returns collection --------------------
 
-async function resolveVendorId(userId) {
-    const row = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [userId]);
-    return row.rows.length ? row.rows[0].id : null;
-}
-
 // Vendor marks a line item as physically handed over to a drop-off point.
 // Only the owning vendor can do this, and only from a state where handover
 // is meaningful (freshly ordered, or re-preparing after a rejection).
@@ -90,7 +85,7 @@ exports.vendorMarkHandedOver = async (req, res) => {
             return res.status(400).json({ error: "dropoff_point_id is required." });
         }
 
-        const vendorId = await resolveVendorId(req.user.userId);
+        const vendorId = req.vendorId;
         if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
@@ -140,7 +135,7 @@ exports.vendorMarkHandedOver = async (req, res) => {
 // Vendor's items currently out for return collection, with the 21-day window.
 exports.getMyReturns = async (req, res) => {
     try {
-        const vendorId = await resolveVendorId(req.user.userId);
+        const vendorId = req.vendorId;
         if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }

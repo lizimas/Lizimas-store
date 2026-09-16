@@ -4,8 +4,12 @@ const cloudinary = require("../config/cloudinary");
 const { logActivity } = require("../utils/activityLog");
 const { canApplyComplianceAction } = require("../utils/vendorCompliance");
 const { createVendorNotification } = require("./vendorController");
-const { calculatePricing } = require("../utils/commissionEngine");
+const { calculatePricing, getActiveCommissionRule, computePricing } = require("../utils/commissionEngine");
 const { checkProductAgainstProhibitedList } = require("../utils/prohibitedItems");
+const { computeQualityScore, findPossibleDuplicate } = require("../utils/productQuality");
+const { getVendorProductLimitStatus } = require("../utils/vendorProductTier");
+const XLSX = require("xlsx");
+const { parse: parseCsv } = require("csv-parse/sync");
 
 // Phase 8: shared helper - loads the active prohibited-items list and
 // checks one product against it. Used by both addProduct and
@@ -80,7 +84,7 @@ exports.addProduct = async (req, res) => {
         const prohibitedError = await checkProhibitedOrNull({ name, description, brand, category_id });
         if (prohibitedError) return res.status(400).json(prohibitedError);
 
-        const status = ["product_staff", "vendor"].includes(req.user.role) ? "pending" : "approved";
+        const status = ["product_staff", "vendor", "vendor_staff"].includes(req.user.role) ? "pending" : "approved";
 
         // Vendor-submitted products carry a vendor_id so they can be scoped to
         // that vendor's own listings/orders/payouts, separately from created_by
@@ -92,15 +96,23 @@ exports.addProduct = async (req, res) => {
         // listings leave these null and set price directly, unchanged from
         // before the commission engine existed.
         let pricingSnapshot = { vendor_desired_payout: null, commission_rate_applied: null, fixed_fee_applied: null, commission_rule_id: null };
-        if (req.user.role === "vendor") {
-            const vendorRow = await pool.query(
-                "SELECT id FROM vendors WHERE user_id = $1",
-                [req.user.userId]
-            );
-            if (vendorRow.rows.length === 0) {
+        if (["vendor", "vendor_staff"].includes(req.user.role)) {
+            if (!req.vendorId) {
                 return res.status(403).json({ error: "No vendor profile found for this account." });
             }
-            vendorId = vendorRow.rows[0].id;
+            vendorId = req.vendorId;
+
+            // Product-count limit tiers (Jumia Vendor Center comparison,
+            // Sept 2026 - migrations/109_vendor_product_tiers.sql). Checked
+            // before any upload/pricing work, same spirit as the prohibited-
+            // items check just above.
+            const limitStatus = await getVendorProductLimitStatus(vendorId);
+            if (limitStatus.atLimit) {
+                return res.status(403).json({
+                    error: `You've reached your listing limit (${limitStatus.maxAllowed} products) for your current tier (${limitStatus.tier ? limitStatus.tier.name : "Unknown"}). Grow your sales to unlock a higher tier, or remove an existing listing first.`,
+                    tierLimit: limitStatus
+                });
+            }
 
             // Vendors enter what they want to earn - Lizimas, never the
             // vendor, calculates what the customer pays (spec section 83).
@@ -154,6 +166,22 @@ exports.addProduct = async (req, res) => {
             );
             imageRecords.push(ins.rows[0]);
         }
+
+        // Per-listing Quality Score + advisory duplicate check (Jumia Vendor
+        // Center comparison, Sept 2026 - migrations/108_product_quality_score.sql).
+        // Cached on the row now rather than computed on every read.
+        const quality = computeQualityScore(newProduct, imageRecords.length);
+        let duplicateOf = null;
+        if (vendorId) {
+            const dup = await findPossibleDuplicate(vendorId, name, category_id, newProduct.id);
+            duplicateOf = dup ? dup.id : null;
+        }
+        const qualityUpdate = await pool.query(
+            `UPDATE products SET quality_score = $1, quality_score_breakdown = $2, possible_duplicate_of = $3
+             WHERE id = $4 RETURNING quality_score, quality_score_breakdown, possible_duplicate_of`,
+            [quality.score, JSON.stringify(quality), duplicateOf, newProduct.id]
+        );
+        Object.assign(newProduct, qualityUpdate.rows[0]);
 
         logActivity(req.user.userId, "added_product", "product", newProduct.id, `Added "${name}" (status: ${status})`);
 
@@ -945,6 +973,23 @@ exports.updateProduct = async (req, res) => {
             imageRecords.push(ins.rows[0]);
         }
 
+        // Per-listing Quality Score + advisory duplicate check, recomputed on
+        // every edit (see addProduct's identical wiring for why).
+        const totalImagesRes = await pool.query("SELECT COUNT(*)::int AS n FROM product_images WHERE product_id = $1", [id]);
+        const updatedProduct = product.rows[0];
+        const quality = computeQualityScore(updatedProduct, totalImagesRes.rows[0].n);
+        let duplicateOf = null;
+        if (updatedProduct.vendor_id) {
+            const dup = await findPossibleDuplicate(updatedProduct.vendor_id, name, category_id, updatedProduct.id);
+            duplicateOf = dup ? dup.id : null;
+        }
+        const qualityUpdate = await pool.query(
+            `UPDATE products SET quality_score = $1, quality_score_breakdown = $2, possible_duplicate_of = $3
+             WHERE id = $4 RETURNING quality_score, quality_score_breakdown, possible_duplicate_of`,
+            [quality.score, JSON.stringify(quality), duplicateOf, updatedProduct.id]
+        );
+        Object.assign(updatedProduct, qualityUpdate.rows[0]);
+
         logActivity(req.user.userId, "edited_product", "product", Number(id), `Edited "${name}"`);
 
         const message = ["product_staff", "vendor"].includes(req.user.role)
@@ -956,6 +1001,309 @@ exports.updateProduct = async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
+};
+
+// Bulk product creation/update from a CSV or XLSX file, vendor-scoped -
+// the vendor-side counterpart to adminController.js's importProducts,
+// deliberately NOT a shared function with it: a vendor upload has to go
+// through the same rules a manual Add/Edit Product submission does
+// (checkProhibitedOrNull, the commission engine, forced-pending status on
+// every save - see addProduct/updateProduct above), none of which apply to
+// an admin import. Matches Jumia Vendor Center's "Add multiple products"
+// bulk-upload entry point; CSV/XLSX export of a vendor's own catalogue
+// already exists client-side (vmExportProductsCsv in vendor-mobile.js).
+//
+// Columns: name, desired_payout, stock, description, category, sku,
+// package_size, brand, gtin, mpn, material, color, sleeve, style, length,
+// fit, pattern, care_instructions, occasion, warranty_months, image, id.
+// `id` (or a matching `sku`) targets one of this vendor's own existing
+// products for an update; anything else creates a new one. `desired_payout`
+// is required on every row, same as the manual form - Lizimas computes the
+// customer-facing price from it, a vendor never sets price directly.
+// `status` is not a column here at all: new rows are always "pending" and
+// an update always resets status to "pending" for re-review, exactly like
+// editing one product by hand does. `category` must match an existing
+// category name (case-insensitive) - unlike the admin import, this never
+// auto-creates a category, so a vendor can't seed the category tree with
+// typos.
+exports.importVendorProducts = async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded (field name must be \"file\")." });
+    }
+
+    const vendorId = req.vendorId;
+    if (!vendorId) {
+        return res.status(404).json({ error: "No vendor profile found for this account." });
+    }
+    let rows;
+    try {
+        const isCsv = req.file.originalname.toLowerCase().endsWith(".csv");
+        if (isCsv) {
+            rows = parseCsv(req.file.buffer.toString("utf-8"), {
+                columns: true,
+                skip_empty_lines: true,
+                trim: true
+            });
+        } else {
+            const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        }
+    } catch (error) {
+        return res.status(400).json({ error: `Could not parse file: ${error.message}` });
+    }
+
+    if (!rows.length) {
+        return res.status(400).json({ error: "File contains no rows." });
+    }
+    if (rows.length > 2000) {
+        return res.status(400).json({ error: `File has ${rows.length} rows - please split it into batches of 2000 or fewer.` });
+    }
+
+    const { rows: prohibitedList } = await pool.query(
+        `SELECT keyword, category_id, reason FROM prohibited_items WHERE is_active = true`
+    );
+
+    // Existing products this vendor owns, loaded once rather than queried
+    // per row - same reasoning as bulkUpdateVendorProducts' byId Map.
+    const { rows: ownProducts } = await pool.query(
+        `SELECT id, sku, admin_restricted, deleted_at FROM products WHERE vendor_id = $1`,
+        [vendorId]
+    );
+    const byId = new Map(ownProducts.map(r => [r.id, r]));
+    const bySku = new Map(ownProducts.filter(r => r.sku).map(r => [r.sku.toLowerCase(), r]));
+
+    // Product-count limit tiers (Jumia Vendor Center comparison, Sept 2026 -
+    // migrations/109_vendor_product_tiers.sql). Counts how many rows in this
+    // file would create a NEW listing (no matching id/sku among this
+    // vendor's own products), using the same id-then-sku resolution the
+    // per-row loop below uses, and rejects the whole file upfront rather
+    // than partially importing past the vendor's cap.
+    const wouldBeNewCount = rows.filter((row) => {
+        const rowExistingId = row.id ? Number(row.id) : null;
+        const rowSku = row.sku !== undefined ? String(row.sku).trim() : "";
+        if (rowExistingId) return !byId.has(rowExistingId);
+        if (rowSku) return !bySku.has(rowSku.toLowerCase());
+        return true;
+    }).length;
+    if (wouldBeNewCount > 0) {
+        const limitStatus = await getVendorProductLimitStatus(vendorId);
+        if (limitStatus.remaining !== null && wouldBeNewCount > limitStatus.remaining) {
+            return res.status(403).json({
+                error: `This file would add ${wouldBeNewCount} new listing(s), but you only have room for ${limitStatus.remaining} more on your current tier (${limitStatus.tier ? limitStatus.tier.name : "Unknown"}, limit ${limitStatus.maxAllowed}). Split the file, remove some existing listings, or grow your sales to unlock a higher tier.`,
+                tierLimit: limitStatus
+            });
+        }
+    }
+
+    const results = { created: 0, updated: 0, skipped: 0, errors: [] };
+    const categoryCache = new Map();
+    const commissionRuleCache = new Map();
+
+    async function ruleForCategory(categoryId) {
+        const key = categoryId || 0;
+        if (commissionRuleCache.has(key)) return commissionRuleCache.get(key);
+        const rule = await getActiveCommissionRule(categoryId);
+        commissionRuleCache.set(key, rule);
+        return rule;
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        for (let i = 0; i < rows.length; i++) {
+            const rowNum = i + 2;
+            const row = rows[i];
+
+            const name = String(row.name || "").trim();
+            const description = String(row.description || "").trim();
+            const categoryName = String(row.category || "").trim();
+            const existingId = row.id ? Number(row.id) : null;
+            const sku = row.sku !== undefined ? String(row.sku).trim() : "";
+            const stockRaw = row.stock === "" || row.stock === undefined ? "0" : String(row.stock).trim();
+            const stock = Number(stockRaw);
+            const payoutRaw = row.desired_payout !== undefined ? String(row.desired_payout).trim() : "";
+            const desiredPayout = Number(payoutRaw);
+
+            const packageSizeRaw = row.package_size !== undefined ? String(row.package_size).trim() : "";
+            const brand = row.brand !== undefined ? String(row.brand).trim() : "";
+            const gtin = row.gtin !== undefined ? String(row.gtin).trim() : "";
+            const mpn = row.mpn !== undefined ? String(row.mpn).trim() : "";
+            const material = row.material !== undefined ? String(row.material).trim() : "";
+            const color = row.color !== undefined ? String(row.color).trim() : "";
+            const sleeve = row.sleeve !== undefined ? String(row.sleeve).trim() : "";
+            const style = row.style !== undefined ? String(row.style).trim() : "";
+            const length = row.length !== undefined ? String(row.length).trim() : "";
+            const fit = row.fit !== undefined ? String(row.fit).trim() : "";
+            const pattern = row.pattern !== undefined ? String(row.pattern).trim() : "";
+            const careInstructions = row.care_instructions !== undefined ? String(row.care_instructions).trim() : "";
+            const occasion = row.occasion !== undefined ? String(row.occasion).trim() : "";
+            const warrantyMonthsRaw = row.warranty_months !== undefined ? String(row.warranty_months).trim() : "";
+            const imageRaw = row.image !== undefined ? String(row.image).trim() : "";
+
+            const rowErrors = [];
+            if (!name) rowErrors.push("name is required");
+            if (!payoutRaw || isNaN(desiredPayout) || desiredPayout <= 0) {
+                rowErrors.push("desired_payout is required and must be a positive number");
+            }
+            if (isNaN(stock) || stock < 0) rowErrors.push("stock must be a non-negative number");
+
+            let warrantyMonths = null;
+            if (warrantyMonthsRaw) {
+                warrantyMonths = Number(warrantyMonthsRaw);
+                if (isNaN(warrantyMonths) || warrantyMonths < 0) {
+                    rowErrors.push("warranty_months must be a non-negative number");
+                    warrantyMonths = null;
+                }
+            }
+
+            const packageSize = packageSizeRaw ? safePackageSize(packageSizeRaw) : null;
+
+            let categoryId = null;
+            if (categoryName) {
+                const key = categoryName.toLowerCase();
+                if (categoryCache.has(key)) {
+                    categoryId = categoryCache.get(key);
+                } else {
+                    const existingCat = await client.query(
+                        "SELECT id FROM categories WHERE LOWER(name) = LOWER($1)",
+                        [categoryName]
+                    );
+                    categoryId = existingCat.rows.length ? existingCat.rows[0].id : undefined;
+                    categoryCache.set(key, categoryId);
+                }
+                if (categoryId === undefined) {
+                    rowErrors.push(`Unknown category "${categoryName}" - check spelling or create it first.`);
+                    categoryId = null;
+                }
+            }
+
+            if (rowErrors.length) {
+                results.skipped++;
+                results.errors.push({ row: rowNum, name: name || "(missing)", errors: rowErrors });
+                continue;
+            }
+
+            const prohibited = checkProductAgainstProhibitedList(
+                { name, description, brand, category_id: categoryId },
+                prohibitedList
+            );
+            if (prohibited.blocked) {
+                results.skipped++;
+                results.errors.push({
+                    row: rowNum, name,
+                    errors: ["Matches an item Lizimas doesn't allow: " + prohibited.matches.map(m => m.reason).join("; ")]
+                });
+                continue;
+            }
+
+            let pricing;
+            try {
+                const rule = await ruleForCategory(categoryId);
+                if (!rule) throw new Error("No commission rule is configured yet. Contact Lizimas support.");
+                pricing = computePricing({ vendorPayout: desiredPayout, rate: rule.commission_rate, fixedFee: rule.fixed_processing_fee });
+                pricing.ruleId = rule.id;
+            } catch (pricingError) {
+                results.skipped++;
+                results.errors.push({ row: rowNum, name, errors: [pricingError.message] });
+                continue;
+            }
+
+            // Resolve which existing row (if any) this line targets, scoped
+            // to this vendor's own products only - an id or sku belonging to
+            // another vendor (or to Lizimas' own catalogue) is treated as
+            // "not found", never edited.
+            let targetRow = null;
+            if (existingId) {
+                targetRow = byId.get(existingId) || null;
+            } else if (sku) {
+                targetRow = bySku.get(sku.toLowerCase()) || null;
+            }
+
+            if (targetRow) {
+                if (targetRow.deleted_at) {
+                    results.skipped++;
+                    results.errors.push({ row: rowNum, name, errors: ["This product has been deleted."] });
+                    continue;
+                }
+                if (targetRow.admin_restricted) {
+                    results.skipped++;
+                    results.errors.push({ row: rowNum, name, errors: ["Restricted by admin - contact support to change this listing."] });
+                    continue;
+                }
+
+                const setClauses = [
+                    "name = $1", "description = $2", "price = $3", "stock = $4", "category_id = $5",
+                    "brand = $6", "gtin = $7", "mpn = $8", "material = $9", "color = $10",
+                    "sleeve = $11", "style = $12", "length = $13", "fit = $14", "pattern = $15",
+                    "care_instructions = $16", "occasion = $17", "warranty_months = $18",
+                    "vendor_desired_payout = $19", "commission_rate_applied = $20",
+                    "fixed_fee_applied = $21", "commission_rule_id = $22", "status = 'pending'"
+                ];
+                const params = [
+                    name, description, pricing.customerPrice, stock, categoryId,
+                    brand || null, gtin || null, mpn || null, material || null, color || null,
+                    sleeve || null, style || null, length || null, fit || null, pattern || null,
+                    careInstructions || null, occasion || null, warrantyMonths,
+                    pricing.vendorPayout, pricing.commissionRate, pricing.fixedFee, pricing.ruleId
+                ];
+
+                if (packageSize) { params.push(packageSize); setClauses.push(`package_size = $${params.length}`); }
+                if (sku) { params.push(sku); setClauses.push(`sku = $${params.length}`); }
+                if (imageRaw) { params.push(imageRaw); setClauses.push(`image = $${params.length}`); }
+
+                params.push(targetRow.id, vendorId);
+                await client.query(
+                    `UPDATE products SET ${setClauses.join(", ")} WHERE id = $${params.length - 1} AND vendor_id = $${params.length} AND deleted_at IS NULL`,
+                    params
+                );
+                results.updated++;
+            } else {
+                const inserted = await client.query(
+                    `INSERT INTO products (
+                        name, description, price, stock, category_id, created_by, status, vendor_id,
+                        sku, brand, gtin, mpn, material, color, sleeve, style, length, fit, pattern,
+                        care_instructions, occasion, warranty_months, package_size, image,
+                        vendor_desired_payout, commission_rate_applied, fixed_fee_applied, commission_rule_id
+                     ) VALUES ($1,$2,$3,$4,$5,$6,'pending',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
+                     RETURNING id, sku`,
+                    [
+                        name, description, pricing.customerPrice, stock, categoryId, req.user.userId, vendorId,
+                        sku || generateSku(brand, vendorId), brand || null, gtin || null, mpn || null, material || null, color || null,
+                        sleeve || null, style || null, length || null, fit || null, pattern || null,
+                        careInstructions || null, occasion || null, warrantyMonths, packageSize || "Small",
+                        imageRaw || null,
+                        pricing.vendorPayout, pricing.commissionRate, pricing.fixedFee, pricing.ruleId
+                    ]
+                );
+                // Keep the in-memory maps current so a later row in the same
+                // file can target the product this row just created (e.g. by
+                // the sku it was just given).
+                const newRow = { id: inserted.rows[0].id, sku: inserted.rows[0].sku, admin_restricted: false, deleted_at: null };
+                byId.set(newRow.id, newRow);
+                if (newRow.sku) bySku.set(newRow.sku.toLowerCase(), newRow);
+                results.created++;
+            }
+        }
+
+        await client.query("COMMIT");
+    } catch (error) {
+        await client.query("ROLLBACK");
+        console.error("Vendor import products error:", error);
+        return res.status(500).json({ error: "Import failed and was rolled back." });
+    } finally {
+        client.release();
+    }
+
+    logActivity(req.user.userId, "bulk_imported_products", "product", null,
+        `Bulk import: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped`);
+
+    res.json({
+        message: "Import complete. Every new or changed listing is pending admin approval, same as a manual edit.",
+        totalRows: rows.length,
+        ...results
+    });
 };
 
 // Delete a single product image

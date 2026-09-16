@@ -21,7 +21,7 @@ const { JumiaApiError } = require("../services/jumiaClient");
 const PUSH_BULK_MAX_IDS = 100;
 
 async function requireVendorId(req, res) {
-    const vendorId = await jumiaSync.getVendorIdForUser(req.user.userId);
+    const vendorId = req.vendorId;
     if (!vendorId) {
         res.status(404).json({ error: "No vendor profile found for this account." });
         return null;

@@ -785,9 +785,8 @@ exports.downloadStatementCsvAdmin = async (req, res) => {
 // --- Endpoint: download PDF (vendor's own) ----------------------------
 exports.downloadStatementPdfVendor = async (req, res) => {
     try {
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) return res.status(404).json({ error: "No vendor profile." });
-        const vendorId = vendorRow.rows[0].id;
+        const vendorId = req.vendorId;
+        if (!vendorId) return res.status(404).json({ error: "No vendor profile." });
 
         const ownerCheck = await pool.query(
             "SELECT vendor_id FROM vendor_statements WHERE id = $1",
@@ -811,9 +810,8 @@ exports.downloadStatementPdfVendor = async (req, res) => {
 // --- Endpoint: download CSV (vendor's own) ----------------------------
 exports.downloadStatementCsvVendor = async (req, res) => {
     try {
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) return res.status(404).json({ error: "No vendor profile." });
-        const vendorId = vendorRow.rows[0].id;
+        const vendorId = req.vendorId;
+        if (!vendorId) return res.status(404).json({ error: "No vendor profile." });
 
         const ownerCheck = await pool.query(
             "SELECT vendor_id FROM vendor_statements WHERE id = $1",
@@ -838,9 +836,8 @@ exports.downloadStatementCsvVendor = async (req, res) => {
 // 30-day default expiry. Returns a URL like /api/statements/share/<token>.
 exports.shareStatementVendor = async (req, res) => {
     try {
-        const vendorRow = await pool.query("SELECT id FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) return res.status(404).json({ error: "No vendor profile." });
-        const vendorId = vendorRow.rows[0].id;
+        const vendorId = req.vendorId;
+        if (!vendorId) return res.status(404).json({ error: "No vendor profile." });
 
         const ownerCheck = await pool.query(
             "SELECT vendor_id FROM vendor_statements WHERE id = $1",
@@ -917,10 +914,10 @@ exports.serveSharedStatement = async (req, res) => {
 //     * paid_last_3_months     = sum of paid statements in the last 90 days
 exports.listVendorStatements = async (req, res) => {
     try {
-        const vendorRow = await pool.query("SELECT id, preferred_currency FROM vendors WHERE user_id = $1", [req.user.userId]);
-        if (vendorRow.rows.length === 0) return res.status(404).json({ error: "No vendor profile." });
-        const vendorId = vendorRow.rows[0].id;
-        const currency = vendorRow.rows[0].preferred_currency || "UGX";
+        const vendorId = req.vendorId;
+        if (!vendorId) return res.status(404).json({ error: "No vendor profile." });
+        const vendorCurrencyRow = await pool.query("SELECT preferred_currency FROM vendors WHERE id = $1", [vendorId]);
+        const currency = vendorCurrencyRow.rows[0]?.preferred_currency || "UGX";
 
         // --- Current open cycle ---
         const { rows: cycleRows } = await pool.query(
@@ -1091,10 +1088,11 @@ exports.updateMyPreferredCurrency = async (req, res) => {
             return res.status(400).json({ error: "preferred_currency must be UGX or USD." });
         }
 
-        const vendorRow = await pool.query(
-            "SELECT id, preferred_currency FROM vendors WHERE user_id = $1",
-            [req.user.userId]
-        );
+        const vendorId = req.vendorId;
+        if (!vendorId) {
+            return res.status(404).json({ error: "No vendor profile found for this account." });
+        }
+        const vendorRow = await pool.query("SELECT id, preferred_currency FROM vendors WHERE id = $1", [vendorId]);
         if (vendorRow.rows.length === 0) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }

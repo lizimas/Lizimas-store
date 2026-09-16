@@ -26,5 +26,6 @@ router.use("/staff-messages", require("./staffMessages"));
 
 // Phase 4: public statement share links (no auth - token is the credential)
 router.use("/statements", require("./statementShare"));
+router.use("/ads", require("./ads"));
 
 module.exports = router;

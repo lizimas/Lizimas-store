@@ -7,15 +7,17 @@ const {
     buildNotification
 } = require("../server/utils/vendorNotifications.js");
 
-test("NOTIFICATION_TYPES has exactly the nine known types", () => {
+test("NOTIFICATION_TYPES has exactly the eleven known types", () => {
     // Pre-existing drift found while running the full suite for Phase 5-8/
     // Beat 2-3 (Sept 2026): kyc_status_change was added to the source list
     // when vendor KYC Stage 2 shipped (migration 088) but this test was
     // never updated to match - unrelated to that work, fixed here.
+    // consignment_status added with Fulfillment-by-Lizimas (migration 110).
+    // ad_campaign_status added with Advertise Your Products (migration 112).
     assert.deepEqual(NOTIFICATION_TYPES, [
         "new_order", "low_stock", "product_approved", "product_rejected",
         "compliance_action", "payout_update", "refund_decision", "admin_message",
-        "kyc_status_change"
+        "kyc_status_change", "consignment_status", "ad_campaign_status"
     ]);
 });
 
