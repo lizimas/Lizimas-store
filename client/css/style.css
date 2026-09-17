@@ -3831,7 +3831,17 @@ body.sheet-open {
     #ls-promo-1,
     #ls-promo-2 {
         aspect-ratio: auto;
-        height: 300px;
+        height: 360px;
+    }
+}
+
+/* A little taller again on big screens, same idea as the rest of the
+   storefront's tiered breakpoints - keeps the banners from looking
+   short and thin once the page is at its full 1800px width. */
+@media (min-width: 1600px) {
+    #ls-promo-1,
+    #ls-promo-2 {
+        height: 420px;
     }
 }
 

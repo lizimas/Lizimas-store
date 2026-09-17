@@ -180,6 +180,14 @@ const csvUpload = require("../middleware/csvUpload");
 const jumiaAdmin = require("../controllers/jumiaAdminController");
 const { getSecurityLogins, unlockAccount, getAccountReports, updateAccountReport } = require("../controllers/adminController");
 
+const {
+    listNotes,
+    createNote,
+    updateNote,
+    setNotePinned,
+    deleteNote
+} = require("../controllers/adminNotesController");
+
 // Vendor messages (Task #71/#76) - reachable by customer_support as well
 // as admin, so these are registered ahead of the requireAdmin gate below
 // with their own requireSupportOrAdmin check instead of inheriting it.
@@ -198,6 +206,15 @@ router.get("/jumia/oauth/callback", jumiaAdmin.adminJumiaOAuthCallback);
 router.use(requireAuth, requireAdmin);
 
 router.get("/stats", getDashboardStats);
+
+// Admin-only reference notes (Samsung Notes-style scratchpad) - see
+// adminNotesController.js / migrations/116_admin_notes.sql. Inherits the
+// requireAuth + requireAdmin gate above; no staff or vendor access.
+router.get("/notes", listNotes);
+router.post("/notes", createNote);
+router.put("/notes/:id", updateNote);
+router.patch("/notes/:id/pin", setNotePinned);
+router.delete("/notes/:id", deleteNote);
 
 // Product-count limit tiers (Jumia Vendor Center comparison, Sept 2026) -
 // see adminProductTierController.js.

@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Admin Dashboard</title>
-<link rel="stylesheet" href="css/admin.css?v=20">
+<link rel="stylesheet" href="css/admin.css?v=21">
 </head>
 <body>
 
@@ -116,6 +116,9 @@
                     </button>
                     <button class="tab-btn" data-tab="account">
                         <span class="sidebar-icon">&#9881;</span> Account
+                    </button>
+                    <button class="tab-btn" data-tab="notes">
+                        <span class="sidebar-icon">&#128221;</span> Notes
                     </button>
                 </nav>
 
@@ -1501,6 +1504,59 @@
                     </div>
                 </section>
 
+                <section id="tab-notes" class="tab-content hidden">
+                    <h2 class="admin-page-title">Admin Notes</h2>
+                    <p class="promo-hint">A private reference space for admin use &mdash; quick notes,
+                       reminders, and how-tos (photo-sizing steps, vendor callback numbers, anything
+                       worth keeping handy). Only admin accounts can see this tab; it is not visible
+                       to staff, vendors, or customers.</p>
+
+                    <div class="notes-toolbar">
+                        <button class="add-btn" onclick="openNoteForm()">+ New Note</button>
+                        <input type="text" id="notes-search" class="notes-search-input"
+                               placeholder="Search notes&hellip;" oninput="filterAdminNotes(this.value)">
+                    </div>
+
+                    <div id="note-form-container" class="hidden panel">
+                        <h3 id="note-form-title">New Note</h3>
+                        <input type="hidden" id="note-id">
+
+                        <div class="field-row">
+                            <input type="text" id="note-title-input" maxlength="200" placeholder="Title">
+                            <label class="note-pin-toggle">
+                                <input type="checkbox" id="note-pinned-input"> Pin to top
+                            </label>
+                        </div>
+
+                        <div class="note-color-row" id="note-color-row">
+                            <button type="button" class="note-color-swatch selected" data-color="default"
+                                    style="background:#ffffff" onclick="setNoteColor('default')" title="Default"></button>
+                            <button type="button" class="note-color-swatch" data-color="yellow"
+                                    style="background:#fdf6dd" onclick="setNoteColor('yellow')" title="Yellow"></button>
+                            <button type="button" class="note-color-swatch" data-color="green"
+                                    style="background:#e8f4ea" onclick="setNoteColor('green')" title="Green"></button>
+                            <button type="button" class="note-color-swatch" data-color="blue"
+                                    style="background:#e6f0fa" onclick="setNoteColor('blue')" title="Blue"></button>
+                            <button type="button" class="note-color-swatch" data-color="pink"
+                                    style="background:#fde8e8" onclick="setNoteColor('pink')" title="Pink"></button>
+                            <button type="button" class="note-color-swatch" data-color="purple"
+                                    style="background:#f0ecf9" onclick="setNoteColor('purple')" title="Purple"></button>
+                            <button type="button" class="note-color-swatch" data-color="gray"
+                                    style="background:#f2f3f5" onclick="setNoteColor('gray')" title="Gray"></button>
+                        </div>
+
+                        <textarea id="note-body-input" rows="10" placeholder="Write your note&hellip;"></textarea>
+
+                        <p id="note-form-error" class="form-error"></p>
+                        <div class="form-actions">
+                            <button class="save-btn" onclick="saveNote()">Save Note</button>
+                            <button class="cancel-btn" onclick="closeNoteForm()">Cancel</button>
+                        </div>
+                    </div>
+
+                    <div class="notes-grid" id="notes-grid"></div>
+                </section>
+
             </main>
 
         </div>
@@ -1534,7 +1590,7 @@
 <script src="js/description-block-editor.js?v=13"></script>
 <script src="js/category-select.js?v=2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
-<script src="js/admin.js?v=66"></script>
+<script src="js/admin.js?v=67"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

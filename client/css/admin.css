@@ -1796,3 +1796,153 @@ table.lz-dr-cal td {
 .tm-emoji-tab:hover { background: #f0f1f6; }
 .tm-emoji-tab.active { background: #eef0f6; }
 .tm-emoji-grid { overflow-y: auto; padding: 6px; }
+
+/* ---------------------------------------------------------------------- */
+/* Admin Notes tab - a private, admin-only reference scratchpad (Samsung  */
+/* Notes style: title + body + colour + optional pin). See               */
+/* adminNotesController.js / migrations/116_admin_notes.sql.              */
+
+.notes-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.notes-search-input {
+    flex: 1 1 240px;
+    max-width: 320px;
+    padding: 8px 12px;
+    border: 1px solid #dcdfe6;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.note-pin-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #4a5568;
+    white-space: nowrap;
+}
+
+.note-color-row {
+    display: flex;
+    gap: 8px;
+    margin: 10px 0 14px;
+}
+
+.note-color-swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid #dcdfe6;
+    cursor: pointer;
+    padding: 0;
+}
+
+.note-color-swatch.selected {
+    border-color: #0f1b3d;
+    box-shadow: 0 0 0 2px rgba(15,27,61,0.15);
+}
+
+#note-form-container #note-title-input {
+    flex: 1 1 auto;
+    padding: 9px 12px;
+    border: 1px solid #dcdfe6;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+#note-form-container .field-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+#note-body-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px;
+    border: 1px solid #dcdfe6;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    margin-bottom: 10px;
+}
+
+.notes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+}
+
+.note-card {
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+    min-height: 140px;
+}
+
+.note-card-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.note-pin-badge {
+    font-size: 13px;
+    line-height: 1;
+}
+
+.note-card-title {
+    margin: 0;
+    font-size: 15px;
+    color: #1a1a2e;
+    word-break: break-word;
+}
+
+.note-card-body {
+    font-size: 13.5px;
+    color: #333;
+    white-space: pre-wrap;
+    word-break: break-word;
+    flex: 1 1 auto;
+    margin-bottom: 10px;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.note-card-meta {
+    font-size: 11.5px;
+    color: #8b93a5;
+    margin-bottom: 8px;
+}
+
+.note-card-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.note-card-actions button {
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid #dcdfe6;
+    background: rgba(255,255,255,0.7);
+    cursor: pointer;
+}
+
+.note-card-actions button:hover {
+    background: #fff;
+    border-color: #b8bfcc;
+}

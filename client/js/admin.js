@@ -2503,6 +2503,10 @@ function setupTabs() {
                 loadAdminFlashSales();
             }
 
+            if (button.dataset.tab === "notes") {
+                loadAdminNotes();
+            }
+
             if (button.dataset.tab === "analytics" && lzAnalyticsChart) {
                 // The canvas was width:0 while the tab sat behind .hidden -
                 // Chart.js needs an explicit resize once it's actually visible.
@@ -5168,6 +5172,181 @@ async function deletePromo(id) {
         await loadAdminPromos();
     } catch (error) {
         console.error("Delete promotion error:", error);
+        alert("Could not delete.");
+    }
+}
+
+
+// ---------------------------------------------------------------------------
+// Admin Notes - a private, admin-only reference scratchpad (Samsung Notes
+// style: title + body + colour + optional pin). See adminNotesController.js
+// and migrations/116_admin_notes.sql. Every request here hits routes gated
+// by requireAuth + requireAdmin server-side, so there is no separate
+// client-side role check needed beyond the admin panel's own login gate.
+let adminNotes = [];
+let noteSearchQuery = "";
+let noteColorSelected = "default";
+
+function noteEsc(str) {
+    return String(str == null ? "" : str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
+const NOTE_COLOR_BG = {
+    default: "#ffffff",
+    yellow: "#fdf6dd",
+    green: "#e8f4ea",
+    blue: "#e6f0fa",
+    pink: "#fde8e8",
+    purple: "#f0ecf9",
+    gray: "#f2f3f5"
+};
+
+async function loadAdminNotes() {
+    try {
+        const data = await authorizedFetch("/api/admin/notes");
+        adminNotes = data.notes || [];
+        renderNotesGrid();
+    } catch (error) {
+        console.error("Load admin notes error:", error);
+    }
+}
+
+function filterAdminNotes(query) {
+    noteSearchQuery = String(query || "").trim().toLowerCase();
+    renderNotesGrid();
+}
+
+function renderNotesGrid() {
+    const grid = document.getElementById("notes-grid");
+    if (!grid) return;
+
+    const rows = noteSearchQuery
+        ? adminNotes.filter(n =>
+            (n.title || "").toLowerCase().includes(noteSearchQuery) ||
+            (n.body || "").toLowerCase().includes(noteSearchQuery))
+        : adminNotes;
+
+    if (rows.length === 0) {
+        grid.innerHTML = `<p style="padding:18px; color:#6b7280">
+            ${adminNotes.length === 0
+                ? "No notes yet. Use &ldquo;+ New Note&rdquo; to add your first one."
+                : "No notes match that search."}</p>`;
+        return;
+    }
+
+    grid.innerHTML = rows.map(n => {
+        const bg = NOTE_COLOR_BG[n.color] || NOTE_COLOR_BG.default;
+        const updated = n.updatedAt ? new Date(n.updatedAt).toLocaleString() : "";
+        const byWhom = n.updatedByName || n.createdByName || "";
+        return `<div class="note-card" style="background:${bg}">
+            <div class="note-card-head">
+                ${n.pinned ? '<span class="note-pin-badge" title="Pinned">&#128204;</span>' : ""}
+                <h4 class="note-card-title">${noteEsc(n.title) || "<em>Untitled</em>"}</h4>
+            </div>
+            <div class="note-card-body">${noteEsc(n.body)}</div>
+            <div class="note-card-meta">${updated}${byWhom ? " &middot; " + noteEsc(byWhom) : ""}</div>
+            <div class="note-card-actions">
+                <button onclick="openNoteForm(${n.id})">Edit</button>
+                <button onclick="toggleNotePin(${n.id}, ${!n.pinned})">${n.pinned ? "Unpin" : "Pin"}</button>
+                <button onclick="deleteAdminNote(${n.id})">Delete</button>
+            </div>
+        </div>`;
+    }).join("");
+}
+
+function setNoteColor(color) {
+    noteColorSelected = color;
+    document.querySelectorAll("#note-color-row .note-color-swatch").forEach(sw => {
+        sw.classList.toggle("selected", sw.dataset.color === color);
+    });
+}
+
+function openNoteForm(id) {
+    document.getElementById("note-form-error").textContent = "";
+    document.getElementById("note-form-container").classList.remove("hidden");
+
+    if (id) {
+        const note = adminNotes.find(n => n.id === id);
+        if (!note) return;
+        document.getElementById("note-form-title").textContent = "Edit Note";
+        document.getElementById("note-id").value = note.id;
+        document.getElementById("note-title-input").value = note.title || "";
+        document.getElementById("note-body-input").value = note.body || "";
+        document.getElementById("note-pinned-input").checked = !!note.pinned;
+        setNoteColor(note.color || "default");
+    } else {
+        document.getElementById("note-form-title").textContent = "New Note";
+        document.getElementById("note-id").value = "";
+        document.getElementById("note-title-input").value = "";
+        document.getElementById("note-body-input").value = "";
+        document.getElementById("note-pinned-input").checked = false;
+        setNoteColor("default");
+    }
+}
+
+function closeNoteForm() {
+    document.getElementById("note-form-container").classList.add("hidden");
+}
+
+async function saveNote() {
+    const errorEl = document.getElementById("note-form-error");
+    errorEl.textContent = "";
+
+    const id = document.getElementById("note-id").value;
+    const title = document.getElementById("note-title-input").value.trim();
+    const body = document.getElementById("note-body-input").value;
+
+    if (!title && !body.trim()) {
+        errorEl.textContent = "A note needs a title or some text.";
+        return;
+    }
+
+    const payload = {
+        title,
+        body,
+        color: noteColorSelected,
+        pinned: document.getElementById("note-pinned-input").checked
+    };
+
+    try {
+        await authorizedFetch(id ? `/api/admin/notes/${id}` : "/api/admin/notes", {
+            method: id ? "PUT" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        closeNoteForm();
+        await loadAdminNotes();
+    } catch (error) {
+        console.error("Save note error:", error);
+        errorEl.textContent = error.message || "Save failed.";
+    }
+}
+
+async function toggleNotePin(id, pinned) {
+    try {
+        await authorizedFetch(`/api/admin/notes/${id}/pin`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pinned })
+        });
+        await loadAdminNotes();
+    } catch (error) {
+        console.error("Toggle note pin error:", error);
+        alert("Could not update note.");
+    }
+}
+
+async function deleteAdminNote(id) {
+    if (!confirm("Delete this note permanently?")) return;
+    try {
+        await authorizedFetch(`/api/admin/notes/${id}`, { method: "DELETE" });
+        await loadAdminNotes();
+    } catch (error) {
+        console.error("Delete note error:", error);
         alert("Could not delete.");
     }
 }
