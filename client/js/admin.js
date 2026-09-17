@@ -2458,10 +2458,32 @@ function setupTabs() {
                 loadApprovedVendorPromotions();
                 loadVendorMessagesAdmin();
                 loadVendorKycAdmin();
-                loadProductTiers();
+            }
+
+            if (button.dataset.tab === "consignments-admin") {
                 loadConsignmentsAdmin();
+            }
+
+            if (button.dataset.tab === "ad-campaigns-admin") {
                 loadAdCampaignsAdmin();
                 loadAdSettings();
+            }
+
+            if (button.dataset.tab === "product-tiers-admin") {
+                loadProductTiers();
+            }
+
+            if (button.dataset.tab === "prohibited-items-admin") {
+                loadProhibitedItemsAdmin();
+                loadCategoriesForProhibited();
+            }
+
+            if (button.dataset.tab === "payment-instruments-admin") {
+                loadPaymentInstrumentsAdmin();
+            }
+
+            if (button.dataset.tab === "brand-authorizations-admin") {
+                loadBrandAuthorizationsAdmin();
             }
 
             if (button.dataset.tab === "team-messages") {
@@ -5347,7 +5369,7 @@ function renderFlashSalesTable() {
     if (!tbody) return;
 
     if (adminFlashSales.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="padding:18px; color:#6b7280">
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:18px; color:#6b7280">
             No flash sales yet.</td></tr>`;
         return;
     }
@@ -5359,12 +5381,19 @@ function renderFlashSalesTable() {
         const toggle = s.is_active
             ? `<button onclick="setFlashSaleActive(${s.id}, false)">Disable</button>`
             : `<button onclick="setFlashSaleActive(${s.id}, true)">Enable</button>`;
+        const recurs = s.recurs_every_hours ? `Every ${s.recurs_every_hours}h` : "—";
+        const shareUrl = s.share_token ? flashSaleShareUrl(s.share_token) : "";
+        const shareCell = shareUrl
+            ? `<button type="button" onclick="copyTextToClipboard('${shareUrl}', this)">Copy link</button>`
+            : "—";
 
         return `<tr>
             <td data-label="Title">${adminEsc(s.title)}</td>
             <td data-label="Ends">${s.ends_at ? new Date(s.ends_at).toLocaleString() : "—"}</td>
+            <td data-label="Recurs">${recurs}</td>
             <td data-label="Items">${s.item_count}</td>
             <td data-label="Status">${status}</td>
+            <td data-label="Share Link">${shareCell}</td>
             <td data-label="Actions">
                 <button onclick="editFlashSale(${s.id})">Edit</button>
                 ${toggle}
@@ -5374,12 +5403,59 @@ function renderFlashSalesTable() {
     }).join("");
 }
 
+// Shareable customer-facing link for a campaign - resolved by the public
+// GET /api/flash-sales/share/:token regardless of whether it's "the"
+// currently-featured homepage sale.
+function flashSaleShareUrl(token) {
+    return `${window.location.origin}/products.html?flash=1&share=${encodeURIComponent(token)}`;
+}
+
+async function copyTextToClipboard(text, buttonEl) {
+    try {
+        await navigator.clipboard.writeText(text);
+        if (buttonEl) {
+            const original = buttonEl.textContent;
+            buttonEl.textContent = "Copied!";
+            setTimeout(() => { buttonEl.textContent = original; }, 1500);
+        }
+    } catch (error) {
+        console.error("Copy to clipboard failed:", error);
+        window.prompt("Copy this link:", text);
+    }
+}
+
+function copyFlashSaleShareLink() {
+    const link = document.getElementById("flash-sale-share-link");
+    if (!link || !link.href) return;
+    copyTextToClipboard(link.href, document.getElementById("flash-sale-copy-share-btn"));
+}
+
 function renderFlashItemProductSelect() {
     const select = document.getElementById("flash-item-product");
     if (!select) return;
     select.innerHTML = adminProducts.map(p =>
         `<option value="${p.id}" data-price="${p.price}">${adminEsc(p.name)} — ${fmtUgx(p.price)}</option>`
     ).join("");
+}
+
+// Discount % is a convenience only - it just fills in Sale Price from the
+// selected product's price, and the admin can still type over the result.
+// Nothing enforces the 20%-max rule client-side beyond the input's max="20";
+// the server doesn't cap it either, since sale_price is a plain price field,
+// not a percentage - keeping campaigns at or under 20% off is an operating
+// convention, not something the schema encodes.
+function applyFlashItemDiscountPct() {
+    const select = document.getElementById("flash-item-product");
+    const pctInput = document.getElementById("flash-item-discount-pct");
+    const priceInput = document.getElementById("flash-item-price");
+    if (!select || !pctInput || !priceInput) return;
+
+    const pct = Number(pctInput.value);
+    const option = select.options[select.selectedIndex];
+    const original = option ? Number(option.dataset.price) : NaN;
+    if (!Number.isFinite(pct) || pct < 0 || !Number.isFinite(original)) return;
+
+    priceInput.value = (original * (1 - pct / 100)).toFixed(2);
 }
 
 function renderFlashSaleItemsTable() {
@@ -5430,6 +5506,8 @@ function addFlashSaleItem() {
         sale_price: salePrice
     });
     priceInput.value = "";
+    const pctInput = document.getElementById("flash-item-discount-pct");
+    if (pctInput) pctInput.value = "";
     renderFlashSaleItemsTable();
 }
 
@@ -5445,7 +5523,9 @@ function openFlashSaleForm() {
     document.getElementById("flash-sale-subtitle").value = "";
     document.getElementById("flash-sale-starts").value = "";
     document.getElementById("flash-sale-ends").value = "";
+    document.getElementById("flash-sale-recurs").value = "";
     document.getElementById("flash-sale-form-error").textContent = "";
+    document.getElementById("flash-sale-share-link-row").classList.add("hidden");
     flashFormItems = [];
     renderFlashItemProductSelect();
     renderFlashSaleItemsTable();
@@ -5462,6 +5542,17 @@ async function editFlashSale(id) {
         document.getElementById("flash-sale-subtitle").value = sale.subtitle || "";
         document.getElementById("flash-sale-starts").value = toDatetimeLocal(sale.starts_at);
         document.getElementById("flash-sale-ends").value = toDatetimeLocal(sale.ends_at);
+        document.getElementById("flash-sale-recurs").value = sale.recurs_every_hours || "";
+        const shareRow = document.getElementById("flash-sale-share-link-row");
+        const shareLink = document.getElementById("flash-sale-share-link");
+        if (sale.share_token) {
+            const url = flashSaleShareUrl(sale.share_token);
+            shareLink.href = url;
+            shareLink.textContent = url;
+            shareRow.classList.remove("hidden");
+        } else {
+            shareRow.classList.add("hidden");
+        }
         flashFormItems = (sale.items || []).map(item => ({
             product_id: item.product_id,
             name: item.name,
@@ -5502,22 +5593,39 @@ async function saveFlashSale() {
         return;
     }
 
+    const recursRaw = document.getElementById("flash-sale-recurs").value.trim();
+
     const body = {
         title,
         subtitle: document.getElementById("flash-sale-subtitle").value.trim(),
         starts_at: toIsoOrNull(document.getElementById("flash-sale-starts").value),
         ends_at: endsAt,
+        recurs_every_hours: recursRaw === "" ? null : recursRaw,
         items: flashFormItems.map(item => ({ product_id: item.product_id, sale_price: item.sale_price }))
     };
 
     try {
-        await authorizedFetch(id ? `/api/admin/flash-sales/${id}` : "/api/admin/flash-sales", {
+        const saved = await authorizedFetch(id ? `/api/admin/flash-sales/${id}` : "/api/admin/flash-sales", {
             method: id ? "PUT" : "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body)
         });
-        closeFlashSaleForm();
         await loadAdminFlashSales();
+        // A brand-new campaign gets a share token immediately - keep the
+        // form open and show the link right away rather than closing it and
+        // making the admin reopen Edit just to copy it.
+        if (!id && saved && saved.share_token) {
+            document.getElementById("flash-sale-id").value = saved.id;
+            document.getElementById("flash-sale-form-title").textContent = "Edit Flash Sale";
+            const shareRow = document.getElementById("flash-sale-share-link-row");
+            const shareLink = document.getElementById("flash-sale-share-link");
+            const url = flashSaleShareUrl(saved.share_token);
+            shareLink.href = url;
+            shareLink.textContent = url;
+            shareRow.classList.remove("hidden");
+        } else {
+            closeFlashSaleForm();
+        }
     } catch (error) {
         console.error("Save flash sale error:", error);
         errorEl.textContent = error.message || "Save failed.";
@@ -8778,6 +8886,7 @@ function renderDocumentsSection(detail, vendorId) {
                 </div>
                 ${reason ? `<div style="font-size:12px; color:#666; margin-bottom:6px;"><em>${reason}</em></div>` : ""}
                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <button onclick="viewVendorKycDocument(${vendorId}, '${d.document_type}')" style="background:#16264f; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">View</button>
                     <button onclick="reviewDocument(${vendorId}, '${d.document_type}', 'accepted')" style="background:#059669; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Accept</button>
                     <button onclick="reviewDocument(${vendorId}, '${d.document_type}', 'action_required')" style="background:#d97706; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Needs better</button>
                     <button onclick="reviewDocument(${vendorId}, '${d.document_type}', 'rejected')" style="background:#dc2626; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Reject</button>
@@ -8792,6 +8901,20 @@ function renderDocumentsSection(detail, vendorId) {
             ${rows}
         </div>
     `;
+}
+
+async function viewVendorKycDocument(vendorId, documentType) {
+    try {
+        const data = await authorizedFetch(`/api/admin/vendors/${vendorId}/kyc/documents/url?document_type=${encodeURIComponent(documentType)}`);
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        window.open(data.url, "_blank", "noopener");
+    } catch (error) {
+        console.error("View vendor KYC document error:", error);
+        alert("Could not open this document.");
+    }
 }
 
 async function reviewDocument(vendorId, documentType, decision) {
@@ -8886,4 +9009,453 @@ async function saveVendorUrsbCheck(vendorId, ursbVerified) {
         console.error("Save URSB check error:", error);
         alert("Something went wrong.");
     }
+}
+
+// =============================================================
+// Admin panel wiring: Prohibited Items / Payment Instruments /
+// Brand Authorizations  (the 3 sections that had no admin UI yet).
+// =============================================================
+
+// --- Prohibited Items ---------------------------------------------------
+
+let adminProhibitedItemsCache = [];
+
+async function loadProhibitedItemsAdmin() {
+    const container = document.getElementById("prohibited-items-list");
+    if (!container) return;
+    try {
+        const items = await authorizedFetch("/api/admin/prohibited-items");
+        if (!Array.isArray(items)) { container.innerHTML = '<p class="no-data">Could not load prohibited items.</p>'; return; }
+        adminProhibitedItemsCache = items;
+        renderProhibitedItemsList(items);
+    } catch (error) {
+        console.error("loadProhibitedItemsAdmin error:", error);
+        container.innerHTML = '<p class="no-data">Could not load prohibited items.</p>';
+    }
+}
+
+function renderProhibitedItemsList(items) {
+    const container = document.getElementById("prohibited-items-list");
+    if (!container) return;
+    if (items.length === 0) {
+        container.innerHTML = '<p class="no-data">No rules yet.</p>';
+        return;
+    }
+    container.innerHTML = `
+        <table>
+            <thead><tr><th>Keyword</th><th>Category</th><th>Reason</th><th>Active</th><th></th></tr></thead>
+            <tbody>
+                ${items.map(i => `
+                    <tr>
+                        <td data-label="Keyword">${i.keyword ? escapeHtml(i.keyword) : "—"}</td>
+                        <td data-label="Category">${i.category_name ? escapeHtml(i.category_name) : "—"}</td>
+                        <td data-label="Reason">${escapeHtml(i.reason || "")}</td>
+                        <td data-label="Active">${i.is_active ? "✅" : "❌"}</td>
+                        <td data-label="">
+                            <button onclick="toggleProhibitedItem(${i.id}, ${!i.is_active})" style="background:#fff; border:1px solid #ddd; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">${i.is_active ? "Disable" : "Enable"}</button>
+                            <button onclick="deleteProhibitedItem(${i.id})" style="background:#fff; border:1px solid #DC2626; color:#DC2626; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Delete</button>
+                        </td>
+                    </tr>
+                `).join("")}
+            </tbody>
+        </table>
+    `;
+}
+
+async function loadCategoriesForProhibited() {
+    const sel = document.getElementById("prohibited-category");
+    if (!sel || sel.dataset.loaded) return;
+    try {
+        const cats = await authorizedFetch("/api/products/categories");
+        if (!Array.isArray(cats)) return;
+        sel.innerHTML = '<option value="">— None —</option>' + cats.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+        sel.dataset.loaded = "1";
+    } catch (e) { /* silent */ }
+}
+
+async function addProhibitedItem() {
+    const keyword = document.getElementById("prohibited-keyword").value.trim();
+    const categoryId = document.getElementById("prohibited-category").value;
+    const reason = document.getElementById("prohibited-reason").value.trim();
+    const statusEl = document.getElementById("prohibited-add-status");
+    statusEl.textContent = "";
+    if (!keyword && !categoryId) { statusEl.textContent = "Enter a keyword and/or a category."; return; }
+    if (!reason) { statusEl.textContent = "Reason is required."; return; }
+    try {
+        const result = await authorizedFetch("/api/admin/prohibited-items", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ keyword: keyword || null, category_id: categoryId ? Number(categoryId) : null, reason })
+        });
+        if (result.error) { statusEl.textContent = result.error; return; }
+        document.getElementById("prohibited-keyword").value = "";
+        document.getElementById("prohibited-category").value = "";
+        document.getElementById("prohibited-reason").value = "";
+        loadProhibitedItemsAdmin();
+    } catch (error) {
+        console.error("addProhibitedItem error:", error);
+        statusEl.textContent = "Could not add.";
+    }
+}
+
+async function toggleProhibitedItem(id, newActive) {
+    try {
+        const result = await authorizedFetch(`/api/admin/prohibited-items/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ is_active: newActive })
+        });
+        if (result.error) { alert(result.error); return; }
+        loadProhibitedItemsAdmin();
+    } catch (e) { alert("Could not update."); }
+}
+
+async function deleteProhibitedItem(id) {
+    if (!confirm("Delete this rule?")) return;
+    try {
+        const result = await authorizedFetch(`/api/admin/prohibited-items/${id}`, { method: "DELETE" });
+        if (result.error) { alert(result.error); return; }
+        loadProhibitedItemsAdmin();
+    } catch (e) { alert("Could not delete."); }
+}
+
+// --- Payment Instruments ------------------------------------------------
+
+const PAYMENT_INSTRUMENTS_ADMIN_VIEWS = [
+    { status: "pending", label: "Pending" },
+    { status: "approved", label: "Approved" },
+    { status: "rejected", label: "Rejected" },
+    { status: "", label: "All" }
+];
+
+let paymentInstrumentsAdminFilter = "pending";
+
+// Loose match: case/whitespace-insensitive substring check either way,
+// since a legal name on file rarely matches an account holder name
+// character-for-character (middle names, ordering, etc.) - this is a
+// prompt for the admin to look closer, not an automatic pass/fail.
+function paymentInstrumentNameMatches(accountHolderName, verifiedLegalName) {
+    if (!accountHolderName || !verifiedLegalName) return null;
+    const a = accountHolderName.trim().toLowerCase();
+    const b = verifiedLegalName.trim().toLowerCase();
+    if (!a || !b) return null;
+    return a === b || a.includes(b) || b.includes(a);
+}
+
+async function loadPaymentInstrumentsAdmin(status) {
+    if (status !== undefined) paymentInstrumentsAdminFilter = status;
+
+    const filterBar = document.getElementById("payment-instruments-admin-filters");
+    if (filterBar) {
+        filterBar.innerHTML = PAYMENT_INSTRUMENTS_ADMIN_VIEWS.map(v => {
+            const active = v.status === paymentInstrumentsAdminFilter;
+            const style = active
+                ? "background:#16264f; color:#fff; border:none;"
+                : "background:#F3F4F6; color:#374151; border:1px solid #D1D5DB;";
+            return `<button onclick="loadPaymentInstrumentsAdmin('${v.status}')" style="${style} border-radius:999px; padding:6px 14px; font-size:13px; cursor:pointer; margin-right:6px;">${v.label}</button>`;
+        }).join("");
+    }
+
+    const container = document.getElementById("payment-instruments-list");
+    if (!container) return;
+    try {
+        const qs = paymentInstrumentsAdminFilter ? `?status=${paymentInstrumentsAdminFilter}` : "";
+        const items = await authorizedFetch(`/api/admin/payment-instruments${qs}`);
+        if (!Array.isArray(items)) { container.innerHTML = '<p class="no-data">Could not load payment instruments.</p>'; return; }
+        if (items.length === 0) {
+            container.innerHTML = '<p class="no-data">No instruments in this status.</p>';
+            return;
+        }
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Vendor</th><th>Method</th><th>Account Holder</th><th>Verified Legal Name</th><th>Account</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                    ${items.map(p => {
+                        const match = paymentInstrumentNameMatches(p.account_holder_name, p.verified_legal_name);
+                        const matchNote = match === null ? "" : match
+                            ? `<div style="font-size:11px; color:#16A34A; margin-top:2px;">Matches</div>`
+                            : `<div style="font-size:11px; color:#DC2626; margin-top:2px;">Does not match</div>`;
+                        const statusCls = p.status === "approved" ? "status-paid" : p.status === "rejected" ? "status-cancelled" : "status-pending";
+                        return `
+                        <tr>
+                            <td data-label="Vendor">${escapeHtml(p.business_name || "")}</td>
+                            <td data-label="Method">${escapeHtml(p.method || "")}</td>
+                            <td data-label="Account Holder">${escapeHtml(p.account_holder_name || "")}</td>
+                            <td data-label="Verified Legal Name">${escapeHtml(p.verified_legal_name || "-")}${matchNote}</td>
+                            <td data-label="Account">${escapeHtml(p.method === "momo" ? (p.momo_number || "") : (p.bank_name || "") + " · " + (p.account_number || ""))}</td>
+                            <td data-label="Status"><span class="status-badge ${statusCls}">${escapeHtml(p.status || "")}</span></td>
+                            <td data-label="">
+                                ${p.status === "pending" ? `
+                                    <button onclick="reviewPaymentInstrumentAdmin(${p.id}, 'approved')" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Approve</button>
+                                    <button onclick="reviewPaymentInstrumentAdmin(${p.id}, 'rejected')" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Reject</button>
+                                ` : (p.rejection_reason ? `<span style="font-size:12px; color:#888;">${escapeHtml(p.rejection_reason)}</span>` : "")}
+                            </td>
+                        </tr>
+                    `; }).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("loadPaymentInstrumentsAdmin error:", error);
+        container.innerHTML = '<p class="no-data">Could not load.</p>';
+    }
+}
+
+async function reviewPaymentInstrumentAdmin(id, decision) {
+    let reason = null;
+    if (decision === "rejected") {
+        reason = prompt("Reason for rejection:");
+        if (!reason || !reason.trim()) return;
+    }
+    try {
+        const result = await authorizedFetch(`/api/admin/payment-instruments/${id}/review`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ decision, reason })
+        });
+        if (result.error) { alert(result.error); return; }
+        loadPaymentInstrumentsAdmin();
+    } catch (e) { alert("Could not review."); }
+}
+
+// --- Brand Authorizations -----------------------------------------------
+
+const BRAND_AUTH_ADMIN_BADGE = {
+    not_started:     { cls: "status-forfeited",  label: "Not started" },
+    submitted:        { cls: "status-new",        label: "Submitted" },
+    under_review:     { cls: "status-processing", label: "Under review" },
+    action_required:  { cls: "status-pending",    label: "Action required" },
+    verified:         { cls: "status-paid",       label: "Verified" },
+    rejected:         { cls: "status-cancelled",  label: "Rejected" },
+    suspended:        { cls: "status-cancelled",  label: "Suspended" }
+};
+
+const BRAND_AUTH_ADMIN_TRANSITIONS = {
+    not_started: [],
+    submitted: ["under_review", "verified", "rejected", "action_required"],
+    under_review: ["verified", "rejected", "action_required"],
+    action_required: ["under_review", "verified", "rejected"],
+    verified: ["suspended"],
+    rejected: ["under_review"],
+    suspended: ["verified", "rejected"]
+};
+
+const BRAND_AUTH_DOC_LABELS_ADMIN = {
+    authorization_letter: "Authorization Letter",
+    distributor_agreement: "Distributor Agreement",
+    manufacturer_authorization: "Manufacturer Authorization",
+    business_registration: "Business Registration",
+    tax_documentation: "Tax Documentation",
+    relationship_proof: "Proof of Relationship",
+    warranty_information: "Warranty Information",
+    sourcing_proof: "Proof of Authorized Sourcing"
+};
+
+async function loadBrandAuthorizationsAdmin() {
+    const container = document.getElementById("brand-authorizations-list");
+    if (!container) return;
+    try {
+        const items = await authorizedFetch("/api/admin/brand-authorizations");
+        if (!Array.isArray(items)) { container.innerHTML = '<p class="no-data">Could not load brand authorizations.</p>'; return; }
+        if (items.length === 0) {
+            container.innerHTML = '<p class="no-data">No brand authorization requests.</p>';
+            return;
+        }
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Vendor</th><th>Brand</th><th>Tier</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                    ${items.map(b => {
+                        const info = BRAND_AUTH_ADMIN_BADGE[b.status] || BRAND_AUTH_ADMIN_BADGE.not_started;
+                        return `
+                        <tr>
+                            <td data-label="Vendor">${escapeHtml(b.business_name || "")}</td>
+                            <td data-label="Brand">${escapeHtml(b.brand_name || "")}</td>
+                            <td data-label="Tier">${escapeHtml((b.tier || "").replace(/_/g, " "))}</td>
+                            <td data-label="Status"><span class="status-badge ${info.cls}">${info.label}</span></td>
+                            <td data-label="">
+                                <button onclick="openBrandAuthReviewModal(${b.id})" style="background:#16264f; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Review</button>
+                            </td>
+                        </tr>
+                    `; }).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("loadBrandAuthorizationsAdmin error:", error);
+        container.innerHTML = '<p class="no-data">Could not load.</p>';
+    }
+}
+
+function renderBrandAuthDocumentsSection(detail) {
+    const id = detail.id;
+    const uploaded = new Map((detail.documents || []).map(d => [d.document_type, d]));
+    const docTypes = detail.required_documents && detail.required_documents.length > 0
+        ? detail.required_documents
+        : Array.from(uploaded.keys());
+
+    if (docTypes.length === 0) return "";
+
+    const rows = docTypes.map(dt => {
+        const d = uploaded.get(dt);
+        const label = BRAND_AUTH_DOC_LABELS_ADMIN[dt] || dt.replace(/_/g, " ");
+        if (!d) {
+            return `
+                <div style="border:1px solid #e5e7eb; border-radius:6px; padding:10px; margin-bottom:8px;">
+                    <div style="font-size:13px;"><strong>${escapeHtml(label)}</strong> <span style="color:#DC2626; font-size:12px; margin-left:8px;">Not uploaded</span></div>
+                </div>
+            `;
+        }
+        const status = d.review_status || "pending";
+        const statusInfo = {
+            pending: { cls: "status-pending", label: "Pending" },
+            accepted: { cls: "status-paid", label: "Accepted" },
+            rejected: { cls: "status-cancelled", label: "Rejected" },
+            action_required: { cls: "status-pending", label: "Needs better" }
+        }[status] || { cls: "status-pending", label: status };
+        const reason = d.rejection_reason || d.action_required_reason || "";
+        return `
+            <div style="border:1px solid #e5e7eb; border-radius:6px; padding:10px; margin-bottom:8px;">
+                <div style="font-size:13px; margin-bottom:6px;">
+                    <strong>${escapeHtml(label)}</strong>
+                    <span class="status-badge ${statusInfo.cls}" style="margin-left:8px;">${statusInfo.label}</span>
+                    <span style="color:#888; font-size:12px; margin-left:8px;">${escapeHtml(d.original_filename || "")}</span>
+                </div>
+                ${reason ? `<div style="font-size:12px; color:#666; margin-bottom:6px;"><em>${escapeHtml(reason)}</em></div>` : ""}
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <button onclick="viewBrandAuthDocument(${id}, '${dt}')" style="background:#16264f; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">View</button>
+                    <button onclick="reviewBrandAuthDocument(${id}, '${dt}', 'accepted')" style="background:#059669; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Accept</button>
+                    <button onclick="reviewBrandAuthDocument(${id}, '${dt}', 'action_required')" style="background:#d97706; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Needs better</button>
+                    <button onclick="reviewBrandAuthDocument(${id}, '${dt}', 'rejected')" style="background:#dc2626; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Reject</button>
+                </div>
+            </div>
+        `;
+    }).join("");
+
+    return `
+        <div style="margin-bottom:14px;">
+            <h3 style="font-size:14px; margin:0 0 8px 0;">Documents</h3>
+            ${rows}
+        </div>
+    `;
+}
+
+async function openBrandAuthReviewModal(id) {
+    try {
+        const detail = await authorizedFetch(`/api/admin/brand-authorizations/${id}`);
+        if (detail.error) { alert(detail.error); return; }
+
+        const info = BRAND_AUTH_ADMIN_BADGE[detail.status] || BRAND_AUTH_ADMIN_BADGE.not_started;
+        const transitionButtons = BRAND_AUTH_ADMIN_TRANSITIONS[detail.status] || [];
+
+        const auditHtml = (detail.audit_log || []).map(a => `
+            <div style="font-size:12px; color:#666; padding:6px 0; border-bottom:1px solid #eee;">
+                <strong>${escapeHtml(a.from_status || "(none)")} &rarr; ${escapeHtml(a.to_status)}</strong>
+                ${a.changed_by_name ? ` by ${escapeHtml(a.changed_by_name)}` : " by vendor"}
+                &middot; ${new Date(a.created_at).toLocaleString()}
+                ${a.note ? `<br>${escapeHtml(a.note)}` : ""}
+            </div>
+        `).join("") || `<p style="font-size:12px; color:#999;">No history yet.</p>`;
+
+        const bodyHtml = `
+            <div style="margin-bottom:12px;">
+                <span class="status-badge ${info.cls}">${info.label}</span>
+            </div>
+            <table style="margin-bottom:14px;">
+                <tbody>
+                    <tr><td style="font-weight:600; padding:4px 12px 4px 0;">Vendor</td><td>${escapeHtml(detail.business_name || "-")}</td></tr>
+                    <tr><td style="font-weight:600; padding:4px 12px 4px 0;">Owner</td><td>${escapeHtml(detail.owner_name || "-")} &middot; ${escapeHtml(detail.owner_email || "-")}</td></tr>
+                    <tr><td style="font-weight:600; padding:4px 12px 4px 0;">Brand</td><td>${escapeHtml(detail.brand_name || "-")}</td></tr>
+                    <tr><td style="font-weight:600; padding:4px 12px 4px 0;">Tier</td><td>${escapeHtml(detail.tier_label || detail.tier || "-")}</td></tr>
+                </tbody>
+            </table>
+            ${renderBrandAuthDocumentsSection(detail)}
+            ${transitionButtons.length > 0 ? `
+                <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Move to:</label>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                    ${transitionButtons.map(t => `<button onclick="reviewBrandAuthAdmin(${id}, '${t}')" style="background:#16264f; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;">${(BRAND_AUTH_ADMIN_BADGE[t] || {}).label || t}</button>`).join("")}
+                </div>
+                <textarea id="brand-auth-review-note-input" placeholder="Note (shown to the vendor for Action Required/Rejected)" style="width:100%; min-height:60px; padding:8px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box; margin-bottom:10px;"></textarea>
+            ` : ""}
+            <h3 style="font-size:14px; margin:14px 0 6px;">History</h3>
+            ${auditHtml}
+        `;
+
+        openGenericModal(`Brand Authorization Review — ${escapeHtml(detail.brand_name || "")}`, bodyHtml);
+    } catch (error) {
+        console.error("openBrandAuthReviewModal error:", error);
+        alert("Could not load brand authorization details.");
+    }
+}
+
+async function reviewBrandAuthAdmin(id, newStatus) {
+    const noteEl = document.getElementById("brand-auth-review-note-input");
+    const note = noteEl ? noteEl.value.trim() : "";
+
+    if ((newStatus === "action_required" || newStatus === "rejected") && !note) {
+        alert("Please add a note explaining what's needed or why this was rejected.");
+        return;
+    }
+
+    try {
+        const result = await authorizedFetch(`/api/admin/brand-authorizations/${id}/review`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: newStatus, note: note || null })
+        });
+        if (result.error) {
+            alert(result.message || result.error);
+            return;
+        }
+        closeGenericModal();
+        loadBrandAuthorizationsAdmin();
+    } catch (error) {
+        console.error("reviewBrandAuthAdmin error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function reviewBrandAuthDocument(id, documentType, decision) {
+    let reason = "";
+    if (decision === "rejected" || decision === "action_required") {
+        reason = prompt("Reason (shown to the vendor):");
+        if (!reason || !reason.trim()) return;
+    }
+    try {
+        const result = await authorizedFetch(`/api/admin/brand-authorizations/${id}/documents/${documentType}/review`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ decision, reason: reason || null })
+        });
+        if (result.error) {
+            alert(result.message || result.error);
+            return;
+        }
+        closeGenericModal();
+        loadBrandAuthorizationsAdmin();
+    } catch (error) {
+        console.error("reviewBrandAuthDocument error:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function viewBrandAuthDocument(id, documentType) {
+    try {
+        const data = await authorizedFetch(`/api/admin/brand-authorizations/${id}/documents/${documentType}/url`);
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        window.open(data.url, "_blank", "noopener");
+    } catch (error) {
+        console.error("viewBrandAuthDocument error:", error);
+        alert("Could not open this document.");
+    }
+}
+
+// Helper: escapeHtml (uses the same helper already defined elsewhere; skip if duplicate)
+if (typeof escapeHtml !== "function") {
+    window.escapeHtml = function(v) {
+        return String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    };
 }

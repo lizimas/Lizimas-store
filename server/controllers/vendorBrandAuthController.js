@@ -59,9 +59,14 @@ exports.getMyBrandAuthorizations = async (req, res) => {
     }
 };
 
-// Vendor requests (or resubmits) authorization for one brand. Creating a
-// new row is allowed any time (a vendor can always ask about a new
-// brand); resubmitting an existing row is only allowed while it's in an
+// Vendor starts (or updates the tier of) a brand authorization request.
+// This ONLY creates/updates the not_started draft row - it deliberately
+// does not require documents to already be uploaded, because documents
+// upload to a specific brand_authorization_id (migration 102) that has to
+// exist first. Call submitBrandAuthorizationFinal once the required
+// documents for the tier are all uploaded to actually send it for review.
+// Creating a new row is allowed any time (a vendor can always ask about a
+// new brand); updating an existing one is only allowed while it's in an
 // editable state, same rule as vendor KYC.
 exports.submitBrandAuthorization = async (req, res) => {
     try {
@@ -82,7 +87,6 @@ exports.submitBrandAuthorization = async (req, res) => {
         );
 
         let authorizationId;
-        let fromStatus;
 
         if (existing.rows.length > 0) {
             const current = existing.rows[0];
@@ -92,53 +96,96 @@ exports.submitBrandAuthorization = async (req, res) => {
                 });
             }
             authorizationId = current.id;
-            fromStatus = current.status;
-        }
-
-        const uploadedDocs = await pool.query(
-            existing.rows.length > 0
-                ? "SELECT document_type FROM vendor_brand_authorization_documents WHERE brand_authorization_id = $1"
-                : "SELECT document_type FROM vendor_brand_authorization_documents WHERE brand_authorization_id = -1",
-            existing.rows.length > 0 ? [authorizationId] : []
-        );
-        if (!hasRequiredDocuments(tier, uploadedDocs.rows.map((d) => d.document_type))) {
-            return res.status(400).json({
-                error: "missing_documents",
-                message: `Upload all required documents for ${BRAND_AUTH_TIER_LABELS[tier]} before submitting.`,
-                required_documents: requiredDocumentsForTier(tier)
-            });
-        }
-
-        if (authorizationId) {
             await pool.query(
-                `UPDATE vendor_brand_authorizations
-                 SET tier = $1, status = 'submitted', review_note = NULL,
-                     reviewed_by = NULL, reviewed_at = NULL, updated_at = now()
-                 WHERE id = $2`,
+                "UPDATE vendor_brand_authorizations SET tier = $1, updated_at = now() WHERE id = $2",
                 [tier, authorizationId]
             );
         } else {
             const inserted = await pool.query(
                 `INSERT INTO vendor_brand_authorizations (vendor_id, brand_name, tier, status)
-                 VALUES ($1, $2, $3, 'submitted')
+                 VALUES ($1, $2, $3, 'not_started')
                  RETURNING id`,
                 [vendorId, brandName, tier]
             );
             authorizationId = inserted.rows[0].id;
-            fromStatus = "not_started";
         }
 
-        await pool.query(
-            `INSERT INTO vendor_brand_authorization_audit_log (brand_authorization_id, from_status, to_status, changed_by, note)
-             VALUES ($1, $2, 'submitted', NULL, 'Vendor submitted brand authorization request.')`,
-            [authorizationId, fromStatus]
+        const uploadedDocs = await pool.query(
+            "SELECT document_type FROM vendor_brand_authorization_documents WHERE brand_authorization_id = $1",
+            [authorizationId]
         );
+        const uploadedTypes = uploadedDocs.rows.map((d) => d.document_type);
+        const required = requiredDocumentsForTier(tier);
+        const missing = required.filter((dt) => !uploadedTypes.includes(dt));
 
-        res.json({ message: "Submitted for review.", authorization_id: authorizationId, status: "submitted" });
+        res.status(201).json({
+            message: missing.length > 0
+                ? `Request started for ${brandName}. Upload the required documents, then submit for review.`
+                : `Request started for ${brandName}. All required documents are already on file - submit for review.`,
+            authorization_id: authorizationId,
+            status: "not_started",
+            required_documents: required,
+            missing_documents: missing
+        });
     } catch (error) {
         if (error.code === "23505") {
             return res.status(409).json({ error: "You already have an authorization request on file for this brand." });
         }
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Vendor sends an already-drafted (not_started/action_required/rejected)
+// brand authorization request for admin review, once all of the tier's
+// required documents are uploaded (migration 102, uploadMyBrandAuthDocument
+// below). Separate endpoint from submitBrandAuthorization above so the
+// document-upload step always has an authorization_id to attach to.
+exports.submitBrandAuthorizationFinal = async (req, res) => {
+    try {
+        const vendorId = req.vendorId;
+        if (!vendorId) return res.status(404).json({ error: "No vendor profile found for this account." });
+
+        const { authorizationId } = req.params;
+        const existing = await pool.query(
+            "SELECT id, brand_name, tier, status FROM vendor_brand_authorizations WHERE id = $1 AND vendor_id = $2",
+            [authorizationId, vendorId]
+        );
+        if (existing.rows.length === 0) return res.status(404).json({ error: "Brand authorization request not found." });
+        const current = existing.rows[0];
+
+        if (!canVendorEditBrandAuth(current.status)) {
+            return res.status(409).json({
+                error: `This request can't be submitted while it's ${current.status.replace(/_/g, " ")}.`
+            });
+        }
+
+        const uploadedDocs = await pool.query(
+            "SELECT document_type FROM vendor_brand_authorization_documents WHERE brand_authorization_id = $1",
+            [authorizationId]
+        );
+        if (!hasRequiredDocuments(current.tier, uploadedDocs.rows.map((d) => d.document_type))) {
+            return res.status(400).json({
+                error: "missing_documents",
+                message: `Upload all required documents for ${BRAND_AUTH_TIER_LABELS[current.tier]} before submitting.`,
+                required_documents: requiredDocumentsForTier(current.tier)
+            });
+        }
+
+        await pool.query(
+            `UPDATE vendor_brand_authorizations
+             SET status = 'submitted', review_note = NULL, reviewed_by = NULL, reviewed_at = NULL, updated_at = now()
+             WHERE id = $1`,
+            [authorizationId]
+        );
+
+        await pool.query(
+            `INSERT INTO vendor_brand_authorization_audit_log (brand_authorization_id, from_status, to_status, changed_by, note)
+             VALUES ($1, $2, 'submitted', NULL, 'Vendor submitted brand authorization request.')`,
+            [authorizationId, current.status]
+        );
+
+        res.json({ message: "Submitted for review.", authorization_id: Number(authorizationId), status: "submitted" });
+    } catch (error) {
         res.status(500).json({ error: error.message });
     }
 };

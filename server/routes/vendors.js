@@ -41,7 +41,7 @@ const {
     getMyProductTierStatus,
     getMyStockRecommendations
 } = require("../controllers/vendorController");
-const { getMyKyc, updateMyKyc } = require("../controllers/vendorKycController");
+const { getMyKyc, updateMyKyc, uploadMyKycDocument, getMyKycDocumentUrl } = require("../controllers/vendorKycController");
 const {
     listVendorStaff,
     createVendorStaffUser,
@@ -52,6 +52,7 @@ const {
 const {
     getMyBrandAuthorizations,
     submitBrandAuthorization,
+    submitBrandAuthorizationFinal,
     uploadMyBrandAuthDocument,
     getMyBrandAuthDocumentUrl
 } = require("../controllers/vendorBrandAuthController");
@@ -153,6 +154,8 @@ router.patch("/me/holiday-mode", requireVendorPermission("vc_shop_manager"), upd
 // verification, separate from the profile above (Ryan, Sept 2026).
 router.get("/me/kyc", getMyKyc);
 router.patch("/me/kyc", updateMyKyc);
+router.post("/me/kyc/documents", upload.kycDocument.single("document"), uploadMyKycDocument);
+router.get("/me/kyc/documents/url", getMyKycDocumentUrl);
 
 // Users/Roles (Settings > Users, matching Jumia Vendor Center) - owner-only,
 // see vendorStaffController.js's header for why.
@@ -164,6 +167,7 @@ router.delete("/me/staff/:id", deleteVendorStaffUser);
 
 router.get("/me/brand-authorizations", getMyBrandAuthorizations);
 router.post("/me/brand-authorizations", submitBrandAuthorization);
+router.post("/me/brand-authorizations/:authorizationId/submit", submitBrandAuthorizationFinal);
 router.post("/me/brand-authorizations/:authorizationId/documents", upload.kycDocument.single("document"), uploadMyBrandAuthDocument);
 router.get("/me/brand-authorizations/:authorizationId/documents/url", getMyBrandAuthDocumentUrl);
 

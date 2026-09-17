@@ -864,6 +864,7 @@
                         <div id="vendor-seller-score-container" class="seller-panel" style="border:none; padding:0; margin:0;">Loading...</div>
                     </div>
 
+
                     <div class="panel" id="vendor-kyc-panel">
                         <h2>Identity &amp; Business Verification</h2>
                         <p class="admin-page-subtitle">Verifying your ID or business registration lets Lizimas Store confirm you're a real, trustworthy seller.</p>
@@ -873,6 +874,11 @@
                         </div>
 
                         <p id="vendor-kyc-review-note" class="hidden" style="background:#FEF3C7; color:#92400E; padding:10px 12px; border-radius:8px; font-size:13px; margin:0 0 12px 0;"></p>
+
+                        <div id="vendor-kyc-documents" style="margin-bottom:14px;">
+                            <h3 style="margin:0 0 8px; font-size:13.5px; color:#333;">Supporting Document</h3>
+                            <div id="vendor-kyc-document-row">Loading...</div>
+                        </div>
 
                         <div id="vendor-kyc-form" class="hidden" style="display:flex; flex-direction:column; gap:12px; max-width:420px;">
                             <div class="hidden" id="vendor-kyc-regnum-group">
@@ -1471,6 +1477,67 @@
                             </div>
                         </div>
                         <p id="profile-save-status" style="font-size:13px; color:#666; margin-top:8px;"></p>
+                    </div>
+
+
+                    <div class="panel">
+                        <h2>Payment Information</h2>
+                        <p class="admin-page-subtitle">Reviewed payout accounts. A pending or approved instrument can't be edited directly - only a rejected one can be corrected and resubmitted.</p>
+                        <div id="vendor-payment-instruments-list">Loading...</div>
+                        <div style="margin-top:14px; padding-top:14px; border-top:1px solid #eee;">
+                            <h3 style="margin:0 0 10px;">Add Payment Instrument</h3>
+                            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                                <div>
+                                    <label style="font-size:12px; font-weight:600; display:block;">Method</label>
+                                    <select id="vpi-method" onchange="vdTogglePaymentInstrumentFields()" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
+                                        <option value="momo">Mobile Money</option>
+                                        <option value="bank">Bank</option>
+                                    </select>
+                                </div>
+                                <div id="vpi-momo-group">
+                                    <label style="font-size:12px; font-weight:600; display:block;">MoMo Number</label>
+                                    <input type="tel" id="vpi-momo-number" placeholder="e.g. 0700123456" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:160px;">
+                                </div>
+                                <div id="vpi-bank-group" class="hidden">
+                                    <label style="font-size:12px; font-weight:600; display:block;">Bank Name</label>
+                                    <input type="text" id="vpi-bank-name" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:180px;">
+                                </div>
+                                <div id="vpi-account-number-group" class="hidden">
+                                    <label style="font-size:12px; font-weight:600; display:block;">Account Number</label>
+                                    <input type="text" id="vpi-account-number" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:180px;">
+                                </div>
+                                <div>
+                                    <label style="font-size:12px; font-weight:600; display:block;">Account Holder Name</label>
+                                    <input type="text" id="vpi-account-holder-name" placeholder="Must match your verified legal name" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:220px;">
+                                </div>
+                                <button onclick="vdAddPaymentInstrument()" style="background:#16264f; color:#fff; border:none; border-radius:8px; padding:9px 16px; cursor:pointer;">Submit</button>
+                            </div>
+                            <p id="vpi-add-status" style="font-size:12.5px; margin:8px 0 0 0;"></p>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <h2>Brand Authorization</h2>
+                        <p class="admin-page-subtitle">Request authorization to sell as (Official Brand Store) or for (Authorized Distributor) a specific brand. Verified authorizations show as a storefront badge. Starting a request below creates it, then lets you upload that brand's required documents and submit for review.</p>
+                        <div id="vendor-brand-auth-list">Loading...</div>
+                        <div style="margin-top:14px; padding-top:14px; border-top:1px solid #eee;">
+                            <h3 style="margin:0 0 10px;">Start a New Brand Request</h3>
+                            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                                <div>
+                                    <label style="font-size:12px; font-weight:600; display:block;">Brand Name</label>
+                                    <input type="text" id="vba-brand-name" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:180px;">
+                                </div>
+                                <div>
+                                    <label style="font-size:12px; font-weight:600; display:block;">Tier</label>
+                                    <select id="vba-tier" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
+                                        <option value="authorized_distributor">Authorized Distributor</option>
+                                        <option value="official_store">Official Brand Store</option>
+                                    </select>
+                                </div>
+                                <button onclick="vdStartBrandAuthRequest()" style="background:#16264f; color:#fff; border:none; border-radius:8px; padding:9px 16px; cursor:pointer;">Start Request</button>
+                            </div>
+                            <p id="vba-submit-status" style="font-size:12.5px; margin:8px 0 0 0;"></p>
+                        </div>
                     </div>
 
                     <!-- Shop ID (Jumia Vendor Center comparison, Sept 2026) -

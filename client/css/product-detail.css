@@ -1,4 +1,10 @@
 body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70px; }
+
+/* The full site header (added to match the rest of the storefront) is
+   desktop-only on this page - on mobile the compact back/cart bar below
+   stays, same as before this page had the full header at all. */
+.ls-header { display: none; }
+
 .pd-topbar { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: #fff; z-index: 10; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
 .pd-back-btn { background: none; border: none; font-size: 22px; cursor: pointer; }
 .pd-cart-btn { text-decoration: none; color: #000; font-size: 16px; }
@@ -58,25 +64,31 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 @media (min-width: 900px) {
     body { padding-bottom: 0; background: #fff; }
 
+    /* The full site header (added to this page to match the rest of the
+       storefront) already provides a home link and a cart icon, so the
+       mobile-style back/cart bar is redundant once there's room for the
+       real header. It stays for mobile below this breakpoint. */
     .pd-topbar {
-        box-shadow: none;
-        border-bottom: 1px solid #eee;
-        padding: 14px 40px;
+        display: none;
+    }
+
+    .ls-header {
+        display: block;
     }
 
     .pd-layout {
         display: grid;
         grid-template-columns: minmax(0, 1fr) 440px;
         gap: 48px;
-        max-width: 1280px;
+        max-width: 1800px;
         margin: 0 auto;
-        padding: 32px 40px 60px;
+        padding: 32px 48px 60px;
         align-items: start;
     }
 
     .pd-gallery {
         position: sticky;
-        top: 90px;
+        top: 132px;
         border: 1px solid #f0f0f0;
         border-radius: 12px;
         overflow: hidden;
@@ -116,6 +128,12 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
     .pd-layout { grid-template-columns: minmax(0, 1fr) 480px; }
 }
 
+@media (min-width: 1600px) {
+    .pd-layout { grid-template-columns: minmax(0, 1fr) 560px; gap: 64px; }
+    .pd-gallery-scroll img { max-height: 680px; }
+    .pd-thumbs { max-height: 680px; }
+}
+
 /* Breadcrumbs and thumbnail rail: desktop only. On a phone the swipe gallery
    and the back button already do this job. */
 .pd-breadcrumbs { display: none; }
@@ -127,9 +145,9 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
         flex-wrap: wrap;
         align-items: center;
         gap: 8px;
-        max-width: 1280px;
+        max-width: 1800px;
         margin: 0 auto;
-        padding: 20px 40px 0;
+        padding: 20px 48px 0;
         font-size: 13.5px;
         color: #6b7280;
     }

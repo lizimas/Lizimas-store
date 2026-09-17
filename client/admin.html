@@ -93,6 +93,24 @@
                     <button class="tab-btn" data-tab="vendors">
                         <span class="sidebar-icon">&#127970;</span> Vendors
                     </button>
+                    <button class="tab-btn" data-tab="consignments-admin">
+                        <span class="sidebar-icon">&#128230;</span> Consignments
+                    </button>
+                    <button class="tab-btn" data-tab="ad-campaigns-admin">
+                        <span class="sidebar-icon">&#128227;</span> Ad Campaigns
+                    </button>
+                    <button class="tab-btn" data-tab="product-tiers-admin">
+                        <span class="sidebar-icon">&#127942;</span> Product Tiers
+                    </button>
+                    <button class="tab-btn" data-tab="prohibited-items-admin">
+                        <span class="sidebar-icon">&#128683;</span> Prohibited Items
+                    </button>
+                    <button class="tab-btn" data-tab="payment-instruments-admin">
+                        <span class="sidebar-icon">&#128179;</span> Payment Instruments
+                    </button>
+                    <button class="tab-btn" data-tab="brand-authorizations-admin">
+                        <span class="sidebar-icon">&#127991;</span> Brand Authorizations
+                    </button>
                     <button class="tab-btn" data-tab="security">
                         <span class="sidebar-icon">&#128274;</span> Security
                     </button>
@@ -889,10 +907,23 @@
                             <label>Starts (optional)<br><input type="datetime-local" id="flash-sale-starts"></label>
                             <label>Ends &mdash; drives the countdown<br><input type="datetime-local" id="flash-sale-ends"></label>
                         </div>
+                        <div class="field-row">
+                            <label>Auto-rerun every ___ hours (optional)<br>
+                                <input type="number" id="flash-sale-recurs" min="1" step="1"
+                                       placeholder="e.g. 72 = restarts itself every 72h">
+                            </label>
+                        </div>
+                        <p id="flash-sale-share-link-row" class="hidden" style="margin:4px 0 0;font-size:13px;">
+                            Share link: <a id="flash-sale-share-link" href="#" target="_blank" rel="noopener"></a>
+                            <button type="button" id="flash-sale-copy-share-btn" onclick="copyFlashSaleShareLink()">Copy</button>
+                        </p>
 
                         <h4>Products</h4>
                         <div class="field-row">
-                            <select id="flash-item-product"></select>
+                            <select id="flash-item-product" onchange="applyFlashItemDiscountPct()"></select>
+                            <input type="number" id="flash-item-discount-pct" min="0" max="20" step="1"
+                                   placeholder="Discount %, max 20" title="Fills in Sale price for you - still editable"
+                                   oninput="applyFlashItemDiscountPct()">
                             <input type="number" id="flash-item-price" min="0" step="0.01"
                                    placeholder="Sale price (UGX)">
                             <button type="button" onclick="addFlashSaleItem()">Add Product</button>
@@ -924,8 +955,10 @@
                                 <tr>
                                     <th>Title</th>
                                     <th>Ends</th>
+                                    <th>Recurs</th>
                                     <th>Items</th>
                                     <th>Status</th>
+                                    <th>Share Link</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -1195,67 +1228,6 @@
                     </div>
 
                     <div class="panel">
-                        <h2>Product-Count Limit Tiers</h2>
-                        <p style="font-size:13px; color:#666; margin:0 0 12px;">
-                            Caps how many listings a vendor can carry, rising with their trailing 90-day delivered
-                            GMV (Jumia Vendor Center comparison). A vendor's tier is computed automatically from
-                            this ladder unless manually overridden below.
-                        </p>
-                        <div id="product-tiers-list">Loading...</div>
-                    </div>
-
-                    <div class="panel">
-                        <h2>Vendor Tier Override</h2>
-                        <p style="font-size:13px; color:#666; margin:0 0 12px;">
-                            Manually place one vendor on a specific tier - fast-tracking a promising new seller,
-                            or capping someone early. Leave blank to use the GMV ladder above normally.
-                        </p>
-                        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
-                            <div>
-                                <label style="font-size:12px; font-weight:600; display:block;">Vendor ID</label>
-                                <input type="number" id="tier-override-vendor-id" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:120px;">
-                            </div>
-                            <button onclick="lookupVendorTierStatus()" style="background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; padding:9px 14px; cursor:pointer;">Look Up</button>
-                        </div>
-                        <div id="vendor-tier-override-status" style="font-size:13px; color:#444; margin-bottom:10px;"></div>
-                    </div>
-
-                    <div class="panel">
-                        <h2>Fulfillment by Lizimas &mdash; Consignments</h2>
-                        <p style="font-size:13px; color:#666; margin:0 0 12px;">
-                            Stock vendors have shipped (or requested to ship) to a central hub for Lizimas to
-                            pick and pack. Counting a shipment in updates that product's consigned stock and
-                            flips its fulfillment type automatically.
-                        </p>
-                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-                            <button class="consignment-status-filter-btn active" data-status="" onclick="setAdminConsignmentFilter('')" style="padding:6px 12px; border-radius:999px; border:1px solid #1a1a2e; background:#1a1a2e; color:#fff; font-size:12px; cursor:pointer;">All</button>
-                            <button class="consignment-status-filter-btn" data-status="requested" onclick="setAdminConsignmentFilter('requested')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">Requested</button>
-                            <button class="consignment-status-filter-btn" data-status="in_transit" onclick="setAdminConsignmentFilter('in_transit')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">In Transit</button>
-                            <button class="consignment-status-filter-btn" data-status="received" onclick="setAdminConsignmentFilter('received')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">Received</button>
-                            <button class="consignment-status-filter-btn" data-status="rejected" onclick="setAdminConsignmentFilter('rejected')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">Rejected</button>
-                        </div>
-                        <div id="admin-consignments-list">Loading...</div>
-                    </div>
-
-                    <div id="admin-consignment-review-overlay" hidden style="position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center;">
-                        <div style="background:#fff; border-radius:14px; padding:24px; width:600px; max-width:94vw; max-height:86vh; overflow-y:auto;">
-                            <h3 style="margin:0 0 4px; font-size:16px; color:#1a1a2e;">Review Consignment <span id="admin-consignment-review-id"></span></h3>
-                            <div id="admin-consignment-review-meta" style="font-size:12.5px; color:#666; margin-bottom:14px;"></div>
-                            <div id="admin-consignment-review-error" style="color:#DC2626; font-size:12.5px; margin-bottom:10px;"></div>
-                            <div id="admin-consignment-review-lines" style="margin-bottom:14px;"></div>
-                            <label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:4px;">Admin notes (optional)</label>
-                            <textarea id="admin-consignment-review-notes" rows="2" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:8px; margin-bottom:16px; font-size:13px;"></textarea>
-                            <div style="display:flex; justify-content:space-between; gap:8px;">
-                                <button onclick="rejectConsignmentAdmin()" style="background:#fff; border:1px solid #DC2626; color:#DC2626; border-radius:8px; padding:9px 16px; font-size:13px; font-weight:600; cursor:pointer;">Reject</button>
-                                <div style="display:flex; gap:8px;">
-                                    <button onclick="closeAdminConsignmentReview()" style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:9px 16px; font-size:13px; cursor:pointer;">Cancel</button>
-                                    <button onclick="receiveConsignmentAdmin()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:9px 18px; font-size:13px; font-weight:600; cursor:pointer;">Save &amp; Count In</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="panel">
                         <h2>Manage Pickers &mdash; Lookup</h2>
                         <p style="font-size:13px; color:#666; margin:0 0 12px;">
                             For the hub desk: search by name or phone to verify someone claiming to hand over a
@@ -1272,35 +1244,64 @@
                         <div id="picker-search-results" style="font-size:13px; color:#444;"></div>
                     </div>
 
+                </section>
+
+                <section id="tab-consignments-admin" class="tab-content hidden">
+                    <h2 class="admin-page-title">Fulfillment by Lizimas &mdash; Consignments</h2>
+                    <p class="admin-page-subtitle">Vendor shipments of stock to a Lizimas hub (Fulfillment-by-Lizimas). Review, count in, reject, or mark received.</p>
                     <div class="panel">
-                        <h2>Advertise Your Products &mdash; Settings</h2>
-                        <p style="font-size:13px; color:#666; margin:0 0 12px;">
-                            Platform-wide defaults for vendor ad campaigns. A change here only affects new
-                            submissions - a running campaign keeps the CPC rate it was approved at.
-                        </p>
-                        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                            <button class="consignment-status-filter-btn active" data-status="" onclick="setAdminConsignmentFilter('')" style="padding:6px 12px; border-radius:999px; border:1px solid #1a1a2e; background:#1a1a2e; color:#fff; font-size:12px; cursor:pointer;">All</button>
+                            <button class="consignment-status-filter-btn" data-status="requested" onclick="setAdminConsignmentFilter('requested')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">Requested</button>
+                            <button class="consignment-status-filter-btn" data-status="in_transit" onclick="setAdminConsignmentFilter('in_transit')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">In Transit</button>
+                            <button class="consignment-status-filter-btn" data-status="received" onclick="setAdminConsignmentFilter('received')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">Received</button>
+                            <button class="consignment-status-filter-btn" data-status="rejected" onclick="setAdminConsignmentFilter('rejected')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">Rejected</button>
+                        </div>
+                        <div id="admin-consignments-list">Loading...</div>
+                    </div>
+                    <div id="admin-consignment-review-overlay" hidden style="position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center;">
+                        <div style="background:#fff; border-radius:14px; padding:24px; width:560px; max-width:94vw; max-height:86vh; overflow-y:auto;">
+                            <h3 style="margin:0 0 4px; font-size:16px; color:#1a1a2e;">Review Consignment <span id="admin-consignment-review-id"></span></h3>
+                            <div id="admin-consignment-review-meta" style="font-size:12.5px; color:#666; margin-bottom:14px;"></div>
+                            <div id="admin-consignment-review-lines" style="margin-bottom:14px;"></div>
+                            <div id="admin-consignment-review-error" style="color:#DC2626; font-size:12.5px; margin-bottom:10px;"></div>
+                            <label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:4px;">Admin notes (optional)</label>
+                            <textarea id="admin-consignment-review-notes" rows="2" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:8px; margin-bottom:16px; font-size:13px;"></textarea>
+                            <div style="display:flex; justify-content:space-between; gap:8px;">
+                                <button onclick="rejectConsignmentAdmin()" style="background:#fff; border:1px solid #DC2626; color:#DC2626; border-radius:8px; padding:9px 16px; font-size:13px; font-weight:600; cursor:pointer;">Reject</button>
+                                <div style="display:flex; gap:8px;">
+                                    <button onclick="closeAdminConsignmentReview()" style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:9px 16px; font-size:13px; cursor:pointer;">Cancel</button>
+                                    <button onclick="receiveConsignmentAdmin()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:9px 18px; font-size:13px; font-weight:600; cursor:pointer;">Save &amp; Count In</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-ad-campaigns-admin" class="tab-content hidden">
+                    <h2 class="admin-page-title">Ad Campaigns</h2>
+                    <p class="admin-page-subtitle">Vendor-funded cost-per-click ad campaigns. Approve, reject, or review running campaigns.</p>
+                    <div class="panel">
+                        <h3 style="margin:0 0 10px;">Platform Ad Settings</h3>
+                        <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px;">
                             <div>
-                                <label style="font-size:12px; font-weight:600; display:block;">Default CPC Rate (UGX)</label>
-                                <input type="number" id="ad-settings-cpc" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:140px;">
+                                <label style="font-size:12px; font-weight:600; display:block;">Default CPC (UGX)</label>
+                                <input type="number" id="ad-settings-cpc" min="0" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:140px;">
                             </div>
                             <div>
-                                <label style="font-size:12px; font-weight:600; display:block;">Min Daily Budget (UGX)</label>
-                                <input type="number" id="ad-settings-min-budget" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:140px;">
+                                <label style="font-size:12px; font-weight:600; display:block;">Min daily budget</label>
+                                <input type="number" id="ad-settings-min-budget" min="0" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:140px;">
                             </div>
                             <div>
-                                <label style="font-size:12px; font-weight:600; display:block;">Max Daily Budget (UGX)</label>
-                                <input type="number" id="ad-settings-max-budget" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:140px;">
+                                <label style="font-size:12px; font-weight:600; display:block;">Max daily budget</label>
+                                <input type="number" id="ad-settings-max-budget" min="0" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:140px;">
                             </div>
-                            <button onclick="saveAdSettings()" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:9px 16px; cursor:pointer;">Save</button>
+                            <button onclick="saveAdSettings()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:9px 16px; cursor:pointer;">Save</button>
                         </div>
                         <div id="ad-settings-status" style="font-size:12.5px; color:#666;"></div>
                     </div>
-
                     <div class="panel">
-                        <h2>Advertise Your Products &mdash; Campaigns</h2>
-                        <p style="font-size:13px; color:#666; margin:0 0 12px;">
-                            Vendor-funded cost-per-click campaigns. Review each submission before it goes live.
-                        </p>
+                        <h3 style="margin:0 0 10px;">Campaigns</h3>
                         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
                             <button class="ad-campaign-status-filter-btn active" data-status="" onclick="setAdminAdCampaignFilter('')" style="padding:6px 12px; border-radius:999px; border:1px solid #1a1a2e; background:#1a1a2e; color:#fff; font-size:12px; cursor:pointer;">All</button>
                             <button class="ad-campaign-status-filter-btn" data-status="pending_review" onclick="setAdminAdCampaignFilter('pending_review')" style="padding:6px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; color:#333; font-size:12px; cursor:pointer;">Pending Review</button>
@@ -1310,7 +1311,6 @@
                         </div>
                         <div id="admin-ad-campaigns-list">Loading...</div>
                     </div>
-
                     <div id="admin-ad-campaign-review-overlay" hidden style="position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center;">
                         <div style="background:#fff; border-radius:14px; padding:24px; width:560px; max-width:94vw; max-height:86vh; overflow-y:auto;">
                             <h3 style="margin:0 0 4px; font-size:16px; color:#1a1a2e;" id="admin-ad-campaign-review-title"></h3>
@@ -1326,6 +1326,70 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </section>
+
+                <section id="tab-product-tiers-admin" class="tab-content hidden">
+                    <h2 class="admin-page-title">Product Tiers</h2>
+                    <p class="admin-page-subtitle">GMV-based ladder capping how many active listings each vendor may carry. Override a specific vendor's tier here too.</p>
+                    <div class="panel">
+                        <div id="product-tiers-list">Loading...</div>
+                    </div>
+                    <div class="panel">
+                        <h3 style="margin:0 0 10px;">Vendor Tier Lookup / Override</h3>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                            <div>
+                                <label style="font-size:12px; font-weight:600; display:block;">Vendor ID</label>
+                                <input type="number" id="tier-override-vendor-id" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:130px;">
+                            </div>
+                            <button onclick="lookupVendorTierStatus()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:9px 16px; cursor:pointer;">Look Up</button>
+                        </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-prohibited-items-admin" class="tab-content hidden">
+                    <h2 class="admin-page-title">Prohibited Items</h2>
+                    <p class="admin-page-subtitle">Keywords and categories blocked at product upload. Enforced in productController.addProduct and updateProduct.</p>
+                    <div class="panel">
+                        <h3 style="margin:0 0 10px;">Add Rule</h3>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                            <div>
+                                <label style="font-size:12px; font-weight:600; display:block;">Keyword (or leave blank if banning a category)</label>
+                                <input type="text" id="prohibited-keyword" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:220px;">
+                            </div>
+                            <div>
+                                <label style="font-size:12px; font-weight:600; display:block;">Category (or leave blank)</label>
+                                <select id="prohibited-category" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:200px;"></select>
+                            </div>
+                            <div>
+                                <label style="font-size:12px; font-weight:600; display:block;">Reason</label>
+                                <input type="text" id="prohibited-reason" style="padding:8px; border:1px solid #ccc; border-radius:6px; width:220px;">
+                            </div>
+                            <button onclick="addProhibitedItem()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:9px 16px; cursor:pointer;">Add</button>
+                        </div>
+                        <div id="prohibited-add-status" style="font-size:12.5px; color:#666; margin-top:10px;"></div>
+                    </div>
+                    <div class="panel">
+                        <h3 style="margin:0 0 10px;">Active Rules</h3>
+                        <div id="prohibited-items-list">Loading...</div>
+                    </div>
+                </section>
+
+                <section id="tab-payment-instruments-admin" class="tab-content hidden">
+                    <h2 class="admin-page-title">Payment Instruments</h2>
+                    <p class="admin-page-subtitle">Vendor MoMo/bank payout accounts awaiting review. Pending instruments block payouts on that vendor's statements.</p>
+                    <div id="payment-instruments-admin-filters" style="margin-bottom:12px;"></div>
+                    <div class="panel">
+                        <div id="payment-instruments-list">Loading...</div>
+                    </div>
+                </section>
+
+                <section id="tab-brand-authorizations-admin" class="tab-content hidden">
+                    <h2 class="admin-page-title">Brand Authorizations</h2>
+                    <p class="admin-page-subtitle">Vendors requesting official_store or authorized_distributor status for a brand. Verified records show as storefront badges.</p>
+                    <div class="panel">
+                        <div id="brand-authorizations-list">Loading...</div>
                     </div>
                 </section>
 
@@ -1470,7 +1534,7 @@
 <script src="js/description-block-editor.js?v=13"></script>
 <script src="js/category-select.js?v=2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
-<script src="js/admin.js?v=65"></script>
+<script src="js/admin.js?v=66"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

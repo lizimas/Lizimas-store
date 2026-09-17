@@ -71,7 +71,7 @@ function setupVendorTabs() {
             if (button.dataset.tab === "reviews") loadVendorReviews();
             if (button.dataset.tab === "promotions") loadVendorPromotionsTab();
             if (button.dataset.tab === "ads") vdLoadAdCampaigns();
-            if (button.dataset.tab === "account") { loadVendorComplianceNotices(); vdLoadJumia(); vdLoadShopStatus(); vdLoadStaff(); vdLoadPickers(); }
+            if (button.dataset.tab === "account") { loadVendorComplianceNotices(); vdLoadJumia(); vdLoadShopStatus(); vdLoadStaff(); vdLoadPickers(); vdLoadPaymentInstruments(); vdLoadBrandAuth(); }
             if (button.dataset.tab === "reports") loadVendorReports();
             if (button.dataset.tab === "storefront") loadVendorStorefront();
             if (button.dataset.tab === "messages") loadVendorMessages();
@@ -236,6 +236,8 @@ async function loadVendorKyc() {
             noteEl.classList.add("hidden");
         }
 
+        renderVendorKycDocumentSection(k);
+
         const formEl = document.getElementById("vendor-kyc-form");
         const lockedEl = document.getElementById("vendor-kyc-locked-view");
 
@@ -304,6 +306,360 @@ async function submitVendorKyc() {
         console.error("Submit vendor KYC error:", error);
         statusEl.style.color = "#DC2626";
         statusEl.textContent = "Could not submit. Please try again.";
+    }
+}
+
+const KYC_DOCUMENT_LABELS = {
+    national_id: "National ID",
+    business_registration: "Business Registration"
+};
+
+function renderVendorKycDocumentSection(k) {
+    const container = document.getElementById("vendor-kyc-document-row");
+    if (!container) return;
+
+    const requiredType = k.account_type === "company" ? "business_registration" : "national_id";
+    const label = KYC_DOCUMENT_LABELS[requiredType] || requiredType;
+    const doc = (k.documents || []).find(d => d.document_type === requiredType);
+    const canEdit = k.editable;
+
+    if (doc) {
+        const docBadge = doc.review_status === "accepted" ? "status-paid"
+            : doc.review_status === "rejected" ? "status-cancelled"
+            : doc.review_status === "action_required" ? "status-pending"
+            : "status-new";
+        const reasonText = doc.review_status === "rejected" ? doc.rejection_reason
+            : doc.review_status === "action_required" ? doc.action_required_reason
+            : "";
+        container.innerHTML = `
+            <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; flex-wrap:wrap;">
+                <span style="min-width:170px;">${label}</span>
+                <span class="status-badge ${docBadge}">${(doc.review_status || "pending").replace(/_/g, " ")}</span>
+                <span style="color:#888;">${doc.original_filename || ""}</span>
+                ${canEdit ? `<label style="margin-left:auto; color:#16264f; cursor:pointer; font-size:12px;">Replace<input type="file" class="hidden" onchange="vdUploadKycDocument('${requiredType}', this)"></label>` : ""}
+            </div>
+            ${reasonText ? `<p style="background:#FEF3C7; color:#92400E; padding:8px 10px; border-radius:8px; font-size:12px; margin:8px 0 0;">${reasonText}</p>` : ""}
+        `;
+    } else {
+        container.innerHTML = canEdit ? `
+            <div style="display:flex; align-items:center; gap:8px; font-size:12.5px;">
+                <span style="min-width:170px;">${label}</span>
+                <span style="color:#DC2626;">Not uploaded</span>
+                <input type="file" style="margin-left:auto; font-size:12px;" onchange="vdUploadKycDocument('${requiredType}', this)">
+            </div>
+        ` : `
+            <div style="display:flex; align-items:center; gap:8px; font-size:12.5px;">
+                <span style="min-width:170px;">${label}</span>
+                <span style="color:#DC2626;">Not uploaded</span>
+            </div>
+        `;
+    }
+}
+
+async function vdUploadKycDocument(documentType, inputEl) {
+    const file = inputEl.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("document", file);
+    formData.append("document_type", documentType);
+
+    try {
+        const token = getVendorToken();
+        const response = await fetch(`${API_URL}/api/vendors/me/kyc/documents`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${token}` },
+            body: formData
+        });
+        const result = await response.json();
+        if (result.error) { alert(result.error); return; }
+        loadVendorKyc();
+    } catch (error) {
+        console.error("vdUploadKycDocument error:", error);
+        alert("Could not upload this document. Please try again.");
+    }
+}
+
+// --- Payment Instruments (Account > Payment Information) ------------------
+// Reviewed payout accounts - modelled on Jumia's Vendor Center payout-
+// account verification, see server/controllers/vendorPaymentInstrumentsController.js.
+// A pending/approved instrument is locked; only a rejected one can be
+// edited and resubmitted (same shape as vendor KYC above).
+
+const PAYMENT_INSTRUMENT_BADGE = {
+    pending:  { cls: "status-pending",   label: "Pending review" },
+    approved: { cls: "status-paid",      label: "Approved" },
+    rejected: { cls: "status-cancelled", label: "Rejected" }
+};
+
+function vdTogglePaymentInstrumentFields() {
+    const method = document.getElementById("vpi-method").value;
+    document.getElementById("vpi-momo-group").classList.toggle("hidden", method !== "momo");
+    document.getElementById("vpi-bank-group").classList.toggle("hidden", method !== "bank");
+    document.getElementById("vpi-account-number-group").classList.toggle("hidden", method !== "bank");
+}
+
+async function vdLoadPaymentInstruments() {
+    const container = document.getElementById("vendor-payment-instruments-list");
+    if (!container) return;
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/me/payment-instruments");
+        const instruments = data.instruments || [];
+        if (instruments.length === 0) {
+            container.innerHTML = `<p class="no-data">No payment instruments yet - add one below.</p>`;
+            return;
+        }
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>Method</th><th>Details</th><th>Account Holder</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                    ${instruments.map(i => {
+                        const badge = PAYMENT_INSTRUMENT_BADGE[i.status] || PAYMENT_INSTRUMENT_BADGE.pending;
+                        const details = i.method === "bank" ? `${i.bank_name || "-"} &middot; ${i.account_number || "-"}` : (i.momo_number || "-");
+                        const preferredTag = i.is_preferred ? ` <span style="font-size:11px; color:#16264f; font-weight:600;">(Preferred)</span>` : "";
+                        let actions = "";
+                        if (i.status === "approved" && !i.is_preferred) {
+                            actions += `<button onclick="vdSetPreferredPaymentInstrument(${i.id})" style="background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; padding:5px 10px; font-size:12px; cursor:pointer;">Set Preferred</button>`;
+                        }
+                        if (i.status === "rejected") {
+                            actions += `<span style="font-size:11.5px; color:#DC2626;">${i.rejection_reason || "Rejected"}</span>`;
+                        }
+                        return `
+                            <tr>
+                                <td data-label="Method">${i.method === "bank" ? "Bank" : "Mobile Money"}</td>
+                                <td data-label="Details">${details}</td>
+                                <td data-label="Account Holder">${i.account_holder_name || "-"}${preferredTag}</td>
+                                <td data-label="Status"><span class="status-badge ${badge.cls}">${badge.label}</span></td>
+                                <td data-label="">${actions}</td>
+                            </tr>
+                        `;
+                    }).join("")}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error("vdLoadPaymentInstruments error:", error);
+        container.innerHTML = `<p class="no-data">Could not load payment instruments.</p>`;
+    }
+}
+
+async function vdAddPaymentInstrument() {
+    const statusEl = document.getElementById("vpi-add-status");
+    const method = document.getElementById("vpi-method").value;
+    const account_holder_name = document.getElementById("vpi-account-holder-name").value.trim();
+    const momo_number = document.getElementById("vpi-momo-number").value.trim();
+    const bank_name = document.getElementById("vpi-bank-name").value.trim();
+    const account_number = document.getElementById("vpi-account-number").value.trim();
+
+    if (!account_holder_name || (method === "momo" && !momo_number) || (method === "bank" && (!bank_name || !account_number))) {
+        statusEl.style.color = "#DC2626";
+        statusEl.textContent = "Please fill in all required fields for this method.";
+        return;
+    }
+
+    statusEl.style.color = "#555";
+    statusEl.textContent = "Submitting...";
+
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/payment-instruments", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ method, momo_number, bank_name, account_number, account_holder_name })
+        });
+        if (result.error && !result.message) {
+            statusEl.style.color = "#DC2626";
+            statusEl.textContent = result.error;
+            return;
+        }
+        statusEl.style.color = result.status === "rejected" ? "#DC2626" : "#067647";
+        statusEl.textContent = result.message || "Submitted.";
+        document.getElementById("vpi-account-holder-name").value = "";
+        document.getElementById("vpi-momo-number").value = "";
+        document.getElementById("vpi-bank-name").value = "";
+        document.getElementById("vpi-account-number").value = "";
+        vdLoadPaymentInstruments();
+    } catch (error) {
+        console.error("vdAddPaymentInstrument error:", error);
+        statusEl.style.color = "#DC2626";
+        statusEl.textContent = "Could not submit. Please try again.";
+    }
+}
+
+async function vdSetPreferredPaymentInstrument(instrumentId) {
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/payment-instruments/preferred", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ instrument_id: instrumentId })
+        });
+        if (result.error) { alert(result.error); return; }
+        vdLoadPaymentInstruments();
+    } catch (error) {
+        console.error("vdSetPreferredPaymentInstrument error:", error);
+        alert("Could not update your preferred payment instrument.");
+    }
+}
+
+// --- Brand Authorization (Account > Brand Authorization) -------------------
+// Modelled on Jumia's brand authorization tiers - see
+// server/controllers/vendorBrandAuthController.js. Starting a request
+// creates a not_started row so documents have somewhere to attach to;
+// submitting again once all required documents are uploaded flips it to
+// submitted for admin review.
+
+const BRAND_AUTH_DOC_LABELS = {
+    authorization_letter: "Authorization Letter",
+    distributor_agreement: "Distributor Agreement",
+    manufacturer_authorization: "Manufacturer Authorization",
+    business_registration: "Business Registration",
+    tax_documentation: "Tax Documentation",
+    relationship_proof: "Proof of Relationship",
+    warranty_information: "Warranty Information",
+    sourcing_proof: "Proof of Authorized Sourcing"
+};
+
+async function vdLoadBrandAuth() {
+    const container = document.getElementById("vendor-brand-auth-list");
+    if (!container) return;
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/me/brand-authorizations");
+        const authorizations = data.authorizations || [];
+        if (authorizations.length === 0) {
+            container.innerHTML = `<p class="no-data">No brand authorization requests yet - start one below.</p>`;
+            return;
+        }
+        container.innerHTML = authorizations.map(a => {
+            const badge = VENDOR_KYC_BADGE[a.status] || VENDOR_KYC_BADGE.not_started;
+            const uploadedTypes = new Set((a.documents || []).map(d => d.document_type));
+            const missing = (a.required_documents || []).filter(dt => !uploadedTypes.has(dt));
+            const canEdit = a.editable;
+
+            const docRows = (a.required_documents || []).map(dt => {
+                const doc = (a.documents || []).find(d => d.document_type === dt);
+                const label = BRAND_AUTH_DOC_LABELS[dt] || dt;
+                if (doc) {
+                    const docBadge = doc.review_status === "accepted" ? "status-paid" : doc.review_status === "rejected" ? "status-cancelled" : "status-pending";
+                    return `
+                        <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; padding:4px 0;">
+                            <span style="min-width:190px;">${label}</span>
+                            <span class="status-badge ${docBadge}">${doc.review_status}</span>
+                            <span style="color:#888;">${doc.original_filename || ""}</span>
+                            ${canEdit ? `<label style="margin-left:auto; color:#16264f; cursor:pointer; font-size:12px;">Replace<input type="file" class="hidden" onchange="vdUploadBrandAuthDoc(${a.id}, '${dt}', this)"></label>` : ""}
+                        </div>
+                    `;
+                }
+                return canEdit ? `
+                    <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; padding:4px 0;">
+                        <span style="min-width:190px;">${label}</span>
+                        <span style="color:#DC2626;">Not uploaded</span>
+                        <input type="file" style="margin-left:auto; font-size:12px;" onchange="vdUploadBrandAuthDoc(${a.id}, '${dt}', this)">
+                    </div>
+                ` : `
+                    <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; padding:4px 0;">
+                        <span style="min-width:190px;">${label}</span>
+                        <span style="color:#DC2626;">Not uploaded</span>
+                    </div>
+                `;
+            }).join("");
+
+            return `
+                <div class="panel" style="border:1px solid #eee; margin-bottom:10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                        <div>
+                            <strong>${a.brand_name}</strong>
+                            <span style="font-size:12px; color:#888; margin-left:8px;">${a.tier_label}</span>
+                        </div>
+                        <span class="status-badge ${badge.cls}">${badge.label}</span>
+                    </div>
+                    ${a.review_note && (a.status === "action_required" || a.status === "rejected") ? `<p style="background:#FEF3C7; color:#92400E; padding:8px 10px; border-radius:8px; font-size:12.5px; margin:10px 0 0;">${a.review_note}</p>` : ""}
+                    <div style="margin-top:10px;">${docRows}</div>
+                    ${canEdit ? `
+                        <button onclick="vdSubmitBrandAuthFinal(${a.id}, ${missing.length > 0})" style="margin-top:8px; background:#16264f; color:#fff; border:none; border-radius:8px; padding:7px 14px; font-size:12.5px; cursor:pointer;">Submit for Review</button>
+                        ${missing.length > 0 ? `<span style="font-size:11.5px; color:#888; margin-left:8px;">Upload all documents first</span>` : ""}
+                    ` : ""}
+                </div>
+            `;
+        }).join("");
+    } catch (error) {
+        console.error("vdLoadBrandAuth error:", error);
+        container.innerHTML = `<p class="no-data">Could not load brand authorization requests.</p>`;
+    }
+}
+
+async function vdStartBrandAuthRequest() {
+    const statusEl = document.getElementById("vba-submit-status");
+    const brand_name = document.getElementById("vba-brand-name").value.trim();
+    const tier = document.getElementById("vba-tier").value;
+
+    if (!brand_name) {
+        statusEl.style.color = "#DC2626";
+        statusEl.textContent = "Please enter a brand name.";
+        return;
+    }
+
+    statusEl.style.color = "#555";
+    statusEl.textContent = "Starting request...";
+
+    try {
+        const result = await vendorAuthorizedFetch("/api/vendors/me/brand-authorizations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ brand_name, tier })
+        });
+        if (result.error) {
+            statusEl.style.color = "#DC2626";
+            statusEl.textContent = result.error;
+            return;
+        }
+        statusEl.style.color = "#067647";
+        statusEl.textContent = result.message || "Request started.";
+        document.getElementById("vba-brand-name").value = "";
+        vdLoadBrandAuth();
+    } catch (error) {
+        console.error("vdStartBrandAuthRequest error:", error);
+        statusEl.style.color = "#DC2626";
+        statusEl.textContent = "Could not start this request. Please try again.";
+    }
+}
+
+async function vdUploadBrandAuthDoc(authorizationId, documentType, inputEl) {
+    const file = inputEl.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("document", file);
+    formData.append("document_type", documentType);
+
+    try {
+        const token = getVendorToken();
+        const response = await fetch(`${API_URL}/api/vendors/me/brand-authorizations/${authorizationId}/documents`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${token}` },
+            body: formData
+        });
+        const result = await response.json();
+        if (result.error) { alert(result.error); return; }
+        vdLoadBrandAuth();
+    } catch (error) {
+        console.error("vdUploadBrandAuthDoc error:", error);
+        alert("Could not upload this document. Please try again.");
+    }
+}
+
+async function vdSubmitBrandAuthFinal(authorizationId, stillMissingDocs) {
+    if (stillMissingDocs) {
+        alert("Upload all required documents before submitting for review.");
+        return;
+    }
+    try {
+        const result = await vendorAuthorizedFetch(`/api/vendors/me/brand-authorizations/${authorizationId}/submit`, {
+            method: "POST"
+        });
+        if (result.error) { alert(result.error); return; }
+        vdLoadBrandAuth();
+    } catch (error) {
+        console.error("vdSubmitBrandAuthFinal error:", error);
+        alert("Could not submit for review. Please try again.");
     }
 }
 

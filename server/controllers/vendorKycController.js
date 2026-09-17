@@ -45,7 +45,7 @@ exports.getMyKyc = async (req, res) => {
         );
 
         const docRows = await pool.query(
-            `SELECT document_type, original_filename, uploaded_at
+            `SELECT document_type, original_filename, uploaded_at, review_status, rejection_reason, action_required_reason
              FROM vendor_kyc_documents WHERE vendor_id = $1`,
             [vendor.id]
         );

@@ -44,10 +44,18 @@ async function loadProducts() {
         // category/brand/search views below use.
         const requestedFlash = new URLSearchParams(window.location.search).get("flash");
         if (requestedFlash) {
+            // A shared link (?flash=1&share=<token>) points at ONE specific
+            // campaign, not just whichever one the homepage currently shows -
+            // this is what keeps a link a customer shared still working even
+            // if Ryan later starts a second, different flash sale, and what
+            // makes a recurring campaign's link survive every 72-hour rerun.
+            const shareToken = new URLSearchParams(window.location.search).get("share");
             let saleItems = [];
             let saleMeta = null;
             try {
-                const r = await fetch(`${API_URL}/api/flash-sales/active`);
+                const r = await fetch(shareToken
+                    ? `${API_URL}/api/flash-sales/share/${encodeURIComponent(shareToken)}`
+                    : `${API_URL}/api/flash-sales/active`);
                 if (r.ok) {
                     const sale = await r.json();
                     if (sale && sale.items) {
@@ -1880,11 +1888,57 @@ async function loadFlashSale() {
         sale.items.forEach(item => scroll.appendChild(flashSaleProductCard(item)));
 
         startFlashCountdown(sale.ends_at);
+        wireFlashShareButton(sale);
         section.hidden = false;
     } catch (error) {
         console.error("Load flash sale error:", error);
         section.hidden = true;
     }
+}
+
+// "Share this promo with friends" (Sept 2026): the homepage countdown card's
+// Share button, driven by the share_token GET /api/flash-sales/active
+// already returns on the active sale. navigator.share() gives the native
+// share sheet on phones (WhatsApp/SMS/etc. picker); on desktop browsers
+// without it, falls back to copying the link, with a WhatsApp web-intent
+// link as a one-tap alternative since that's the most common way a Lizimas
+// customer shares things in Uganda.
+function wireFlashShareButton(sale) {
+    const btn = document.getElementById("ls-flash-share-btn");
+    if (!btn) return;
+
+    if (!sale || !sale.share_token) {
+        btn.hidden = true;
+        return;
+    }
+    btn.hidden = false;
+
+    const shareUrl = `${window.location.origin}/products.html?flash=1&share=${encodeURIComponent(sale.share_token)}`;
+    const shareText = `${sale.title || "Grab Or Gone!"} — check out this deal on Lizimas:`;
+
+    btn.onclick = async () => {
+        if (navigator.share) {
+            try {
+                await navigator.share({ title: sale.title || "Lizimas Flash Sale", text: shareText, url: shareUrl });
+                return;
+            } catch (error) {
+                // AbortError just means the user dismissed the share sheet -
+                // not a failure worth falling back from.
+                if (error && error.name === "AbortError") return;
+                console.error("Native share failed:", error);
+            }
+        }
+
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            const original = btn.textContent;
+            btn.textContent = "Link copied!";
+            setTimeout(() => { btn.textContent = original; }, 1800);
+        } catch (error) {
+            console.error("Clipboard copy failed:", error);
+            window.open(`https://wa.me/?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}`, "_blank", "noopener");
+        }
+    };
 }
 
 document.addEventListener("DOMContentLoaded", loadFlashSale);

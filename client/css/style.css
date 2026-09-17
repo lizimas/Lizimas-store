@@ -3058,7 +3058,7 @@ body.sheet-open {
     align-items: center;
     gap: 14px;
     padding: 8px 18px;
-    max-width: 1400px;
+    max-width: 1800px;
     margin: 0 auto;
 }
 
@@ -3163,7 +3163,7 @@ body.sheet-open {
     align-items: stretch;
     gap: 6px;
     padding: 0 34px 10px 18px;
-    max-width: 1400px;
+    max-width: 1800px;
     margin: 0 auto;
     overflow-x: auto;
     scrollbar-width: none;
@@ -3356,7 +3356,7 @@ body.sheet-open {
    Swap the contents for promotional images when those exist. */
 /* Promotional slots. Product images for now, promo artwork later. */
 .ls-promos {
-    max-width: 1400px;
+    max-width: 1800px;
     margin: 0 auto;
     padding: 16px 18px 0;
     display: flex;
@@ -3458,7 +3458,7 @@ body.sheet-open {
    side scrolls and cannot be tapped, the right side is tappable and does not
    move. Chasing a moving link with a thumb is the thing we are avoiding. */
 .ls-strip {
-    max-width: 1400px;
+    max-width: 1800px;
     margin: 0 auto;
     padding: 14px 18px 0;
     display: flex;
@@ -3644,7 +3644,7 @@ body.sheet-open {
 /* Explore Categories: level-2 tiles in two rows, paged horizontally.
    Columns per page: 10 desktop, 6 phone. Two rows means 20 or 12 per page. */
 .ls-explore {
-    max-width: 1400px;
+    max-width: 1800px;
     margin: 0 auto;
     padding: 28px 18px;
     background: #f7f1e1;
@@ -3839,7 +3839,7 @@ body.sheet-open {
 
 /* Product rows: one horizontal carousel per level-2 category */
 .ls-row {
-    max-width: 1400px;
+    max-width: 1800px;
     margin: 0 auto;
     padding: 26px 18px 6px;
 }
@@ -3994,7 +3994,7 @@ body.sheet-open {
    arrows straddling the card's edges. */
 
 .ls-flash {
-    max-width: 1400px;
+    max-width: 1800px;
     margin: 0 auto;
     padding: 22px 20px 22px;
     background: #a72d1e;
@@ -4082,6 +4082,21 @@ body.sheet-open {
 
 .ls-flash-viewall:hover { color: #F5C518; }
 
+.ls-flash-share {
+    font-size: 13px;
+    font-weight: 700;
+    color: #a72d1e;
+    background: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: 6px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.ls-flash-share:hover { background: #F5C518; }
+.ls-flash-share[hidden] { display: none; }
+
 .ls-flash-viewport { position: relative; }
 
 .ls-flash-arrow {
@@ -4112,6 +4127,7 @@ body.sheet-open {
     .ls-flash-num { font-size: 15px; }
     .ls-flash-ends { font-size: 11px; }
     .ls-flash-viewall { font-size: 12px; }
+    .ls-flash-share { font-size: 11px; padding: 5px 10px; }
     .ls-flash-arrow { width: 30px; height: 30px; font-size: 16px; }
     .ls-flash-arrow--prev { left: -10px; }
     .ls-flash-arrow--next { right: -10px; }
@@ -4120,7 +4136,7 @@ body.sheet-open {
 /* ---------- Curated category grids (promotions slots 5 & 6) ---------- */
 
 .ls-cat-grid {
-    max-width: 1400px;
+    max-width: 1800px;
     margin: 0 auto;
     padding: 26px 18px 6px;
 }
@@ -4231,7 +4247,7 @@ body.sheet-open {
    partial batch (fewer than five tiles configured) drops the asymmetric
    template and wraps evenly instead, so it never leaves empty grid cells. */
 .ls-explore-block {
-    max-width: 1400px;
+    max-width: 1800px;
     margin: 0 auto;
     padding: 10px 18px 28px;
 }
