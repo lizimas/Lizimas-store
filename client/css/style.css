@@ -3883,8 +3883,12 @@ body.sheet-open {
 .ls-row-scroll::-webkit-scrollbar { display: none; }
 
 .ls-row-scroll > * {
-    flex: 0 0 190px;
-    max-width: 190px;
+    /* Sized so exactly 6 cards fill the row at its 1800px max width
+       (matching the LuLu Hypermarket reference), same as the split
+       layout below. Still just a flex-basis, so it scrolls normally
+       on narrower windows instead of cramming more cards in. */
+    flex: 0 0 282px;
+    max-width: 282px;
 }
 
 @media (max-width: 720px) {
@@ -3910,7 +3914,7 @@ body.sheet-open {
     display: grid;
     grid-auto-flow: column;
     grid-template-rows: repeat(2, auto);
-    grid-auto-columns: 190px;
+    grid-auto-columns: 282px;
     align-items: stretch;
 }
 
