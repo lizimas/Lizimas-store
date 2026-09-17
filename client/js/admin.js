@@ -5220,6 +5220,37 @@ function filterAdminNotes(query) {
     renderNotesGrid();
 }
 
+// WhatsApp-style quick reactions - a small fixed set of "stickers", not a
+// full emoji keyboard. Kept in sync with ALLOWED_REACTIONS in
+// adminNotesController.js.
+const NOTE_REACTIONS = ["\ud83d\udc4d", "\u2764\ufe0f", "\ud83d\ude02", "\ud83d\ude2e",
+    "\ud83d\ude22", "\ud83d\ude4f", "\ud83c\udf89", "\u2b50"];
+
+// Which note card currently has its reaction picker open (null = none). A
+// plain module-level id rather than per-card DOM state, since the whole
+// grid re-renders from adminNotes on every change anyway.
+let noteReactionPickerOpenId = null;
+
+function toggleNoteReactionPicker(id) {
+    noteReactionPickerOpenId = (noteReactionPickerOpenId === id) ? null : id;
+    renderNotesGrid();
+}
+
+async function chooseNoteReaction(id, emoji) {
+    noteReactionPickerOpenId = null;
+    try {
+        await authorizedFetch(`/api/admin/notes/${id}/reaction`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reaction: emoji })
+        });
+        await loadAdminNotes();
+    } catch (error) {
+        console.error("Set note reaction error:", error);
+        alert("Could not set reaction.");
+    }
+}
+
 function renderNotesGrid() {
     const grid = document.getElementById("notes-grid");
     if (!grid) return;
@@ -5242,7 +5273,35 @@ function renderNotesGrid() {
         const bg = NOTE_COLOR_BG[n.color] || NOTE_COLOR_BG.default;
         const updated = n.updatedAt ? new Date(n.updatedAt).toLocaleString() : "";
         const byWhom = n.updatedByName || n.createdByName || "";
+
+        // The reaction "sticker" overlaps the TOP edge of the card, like a
+        // WhatsApp reaction bubble sitting on top of a message - never at
+        // the bottom, and separate from the pin badge (which stays inline
+        // next to the title).
+        const reactionBadge = n.reaction
+            ? `<button type="button" class="note-reaction-badge"
+                       onclick="toggleNoteReactionPicker(${n.id})"
+                       title="Change reaction">${n.reaction}</button>`
+            : `<button type="button" class="note-reaction-add"
+                       onclick="toggleNoteReactionPicker(${n.id})"
+                       title="Add a reaction">&#128578;+</button>`;
+
+        const pickerOpen = noteReactionPickerOpenId === n.id;
+        const picker = pickerOpen
+            ? `<div class="note-reaction-picker">
+                    ${NOTE_REACTIONS.map(e =>
+                        `<button type="button" onclick="chooseNoteReaction(${n.id}, '${e}')">${e}</button>`
+                    ).join("")}
+                    ${n.reaction
+                        ? `<button type="button" class="note-reaction-clear"
+                                   onclick="chooseNoteReaction(${n.id}, null)" title="Remove reaction">&times;</button>`
+                        : ""}
+               </div>`
+            : "";
+
         return `<div class="note-card" style="background:${bg}">
+            ${reactionBadge}
+            ${picker}
             <div class="note-card-head">
                 ${n.pinned ? '<span class="note-pin-badge" title="Pinned">&#128204;</span>' : ""}
                 <h4 class="note-card-title">${noteEsc(n.title) || "<em>Untitled</em>"}</h4>

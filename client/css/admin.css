@@ -1865,6 +1865,7 @@ table.lz-dr-cal td {
 
 #note-body-input {
     width: 100%;
+    min-height: 380px;
     box-sizing: border-box;
     padding: 12px;
     border: 1px solid #dcdfe6;
@@ -1879,9 +1880,13 @@ table.lz-dr-cal td {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 16px;
+    /* Extra top padding so a reaction badge overlapping the top of the
+       first row of cards doesn't get clipped by the grid edge. */
+    padding-top: 16px;
 }
 
 .note-card {
+    position: relative;
     border: 1px solid rgba(0,0,0,0.08);
     border-radius: 12px;
     padding: 14px 16px;
@@ -1889,6 +1894,80 @@ table.lz-dr-cal td {
     display: flex;
     flex-direction: column;
     min-height: 140px;
+    /* Room for the reaction badge, which overlaps the top edge rather than
+       sitting flush with it. */
+    margin-top: 14px;
+}
+
+/* WhatsApp-style reaction "sticker" - a small round badge overlapping the
+   TOP-right corner of the card (never the bottom), matching how a reaction
+   sits on top of a WhatsApp message bubble. */
+.note-reaction-badge,
+.note-reaction-add {
+    position: absolute;
+    top: -14px;
+    right: 14px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.1);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    z-index: 2;
+}
+
+.note-reaction-add {
+    font-size: 12px;
+    color: #6b7280;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.note-card:hover .note-reaction-add {
+    opacity: 1;
+}
+
+.note-reaction-picker {
+    position: absolute;
+    top: -52px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 20px;
+    padding: 5px 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 3;
+}
+
+.note-reaction-picker button {
+    background: none;
+    border: none;
+    font-size: 17px;
+    line-height: 1;
+    padding: 3px;
+    cursor: pointer;
+    border-radius: 6px;
+}
+
+.note-reaction-picker button:hover {
+    background: #f0f1f6;
+}
+
+.note-reaction-picker .note-reaction-clear {
+    color: #9ca3af;
+    font-size: 15px;
+    font-weight: 700;
+    margin-left: 2px;
 }
 
 .note-card-head {

@@ -185,6 +185,7 @@ const {
     createNote,
     updateNote,
     setNotePinned,
+    setNoteReaction,
     deleteNote
 } = require("../controllers/adminNotesController");
 
@@ -214,6 +215,7 @@ router.get("/notes", listNotes);
 router.post("/notes", createNote);
 router.put("/notes/:id", updateNote);
 router.patch("/notes/:id/pin", setNotePinned);
+router.patch("/notes/:id/reaction", setNoteReaction);
 router.delete("/notes/:id", deleteNote);
 
 // Product-count limit tiers (Jumia Vendor Center comparison, Sept 2026) -

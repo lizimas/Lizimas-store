@@ -24,6 +24,7 @@ function serializeNote(row) {
         body: row.body,
         color: row.color,
         pinned: row.pinned,
+        reaction: row.reaction || null,
         createdBy: row.created_by,
         createdByName: row.created_by_name || null,
         updatedBy: row.updated_by,
@@ -156,6 +157,46 @@ exports.setNotePinned = async (req, res) => {
     } catch (error) {
         console.error("setNotePinned error:", error);
         res.status(500).json({ error: "Failed to update note." });
+    }
+};
+
+// A small fixed set, mirroring WhatsApp's quick-reaction bar rather than
+// a full emoji keyboard - this is a "sticker" on a note, not free text.
+const ALLOWED_REACTIONS = new Set([
+    "\ud83d\udc4d", "\u2764\ufe0f", "\ud83d\ude02", "\ud83d\ude2e",
+    "\ud83d\ude22", "\ud83d\ude4f", "\ud83c\udf89", "\u2b50"
+]);
+
+// PATCH /api/admin/notes/:id/reaction - set or clear the note's single emoji
+// sticker. { reaction: "\ud83d\udc4d" } sets it, { reaction: null } (or
+// omitted) clears it. Kept separate from the full update so tapping a
+// reaction doesn't need the whole editor form, same idea as setNotePinned.
+exports.setNoteReaction = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const raw = req.body.reaction;
+        const reaction = raw && ALLOWED_REACTIONS.has(raw) ? raw : null;
+
+        if (raw && !reaction) {
+            return res.status(400).json({ error: "Unsupported reaction." });
+        }
+
+        const result = await pool.query(
+            `UPDATE public.admin_notes
+             SET reaction = $1, updated_at = now()
+             WHERE id = $2
+             RETURNING *`,
+            [reaction, id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Note not found." });
+        }
+
+        res.json({ note: serializeNote(result.rows[0]) });
+    } catch (error) {
+        console.error("setNoteReaction error:", error);
+        res.status(500).json({ error: "Failed to update reaction." });
     }
 };
 
