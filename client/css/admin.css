@@ -824,8 +824,21 @@ select.status-select {
    noticeably smaller than the rest of the admin panel). !important is used
    deliberately to win over those inline styles without having to touch
    every one of them individually. */
+#product-form-title {
+    font-size: 22px;
+    margin: 0 0 4px;
+}
+
 #product-form-container label {
     font-size: 15px !important;
+}
+
+/* The category picker button replaces a plain <select> (Task: same
+   Jumia-style searchable modal the vendor form already has) - it isn't
+   covered by the input/select rule below since it's a <button>, so its
+   text size is set to match explicitly. */
+#product-category-btn {
+    font-size: 16px !important;
 }
 
 #product-form-container .product-form-section p {

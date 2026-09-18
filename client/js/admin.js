@@ -1242,6 +1242,42 @@ function renderCategorySelect(selectedId) {
     const select = document.getElementById("product-category");
     if (!select || !allCategories) return;
     select.innerHTML = buildGroupedCategoryOptions(allCategories, selectedId);
+    if (selectedId != null) select.value = selectedId;
+    syncAdminProductCategoryButtonLabel();
+}
+
+// Jumia-style searchable category picker (Task: swap the plain long
+// <select> in the Add Product form for the same full-screen search +
+// drill-down modal the vendor Add Product form already uses -
+// client/js/category-picker.js, shared unchanged). The underlying
+// <select id="product-category"> stays in the DOM (hidden) so every
+// existing read of it - submitProductForm()'s category_id, editProduct()'s
+// renderCategorySelect(product.category_id) - keeps working unchanged;
+// this just puts a nicer picker button in front of it and keeps the
+// button's label in sync with whatever the hidden select's value is.
+function syncAdminProductCategoryButtonLabel() {
+    const select = document.getElementById("product-category");
+    const label = document.getElementById("product-category-btn-label");
+    if (!select || !label) return;
+    const opt = select.options[select.selectedIndex];
+    if (opt && opt.value) {
+        label.textContent = opt.textContent;
+        label.style.color = "#333";
+    } else {
+        label.textContent = "Choose a category...";
+        label.style.color = "#999";
+    }
+}
+
+function openAdminProductCategoryPicker() {
+    if (!window.CategoryPicker) return;
+    const select = document.getElementById("product-category");
+    if (!select) return;
+    CategoryPicker.open(allCategories, select.value || null, (cat) => {
+        if (!cat) return;
+        select.value = cat.id;
+        syncAdminProductCategoryButtonLabel();
+    });
 }
 
 let adminProducts = [];

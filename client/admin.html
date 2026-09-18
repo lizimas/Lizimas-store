@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Admin Dashboard</title>
-<link rel="stylesheet" href="css/admin.css?v=28">
+<link rel="stylesheet" href="css/admin.css?v=29">
 </head>
 <body>
 
@@ -456,7 +456,11 @@
                                 <h4>Basic Information</h4>
                                 <div class="field-row">
                                     <input type="text" id="product-name" placeholder="Product name">
-                                    <select id="product-category"></select>
+                                    <button type="button" id="product-category-btn" onclick="openAdminProductCategoryPicker()" style="width:100%; box-sizing:border-box; padding:12px 14px; border:1px solid #ccc; border-radius:8px; background:#fff; text-align:left; font-size:16px; color:#333; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+                                        <span id="product-category-btn-label" style="color:#999;">Choose a category...</span>
+                                        <span style="color:#f4b400; font-size:15px;">&#128269;</span>
+                                    </button>
+                                    <select id="product-category" style="display:none;"></select>
                                     <textarea id="product-description" placeholder="Description"></textarea>
                                     <div id="desc-blocks-editor"></div>
                                 </div>
@@ -1600,8 +1604,9 @@
 <script src="js/prepare-picked-file.js?v=10"></script>
 <script src="js/description-block-editor.js?v=18"></script>
 <script src="js/category-select.js?v=2"></script>
+<script src="js/category-picker.js?v=1"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
-<script src="js/admin.js?v=76"></script>
+<script src="js/admin.js?v=77"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>
