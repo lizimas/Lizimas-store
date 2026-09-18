@@ -800,7 +800,10 @@ async function createStaffAccount(req, res) {
             JWT_SECRET,
             { expiresIn: "15m" }
         );
-        const setupLink = `${req.protocol}://${req.get("host")}/reset-password.html?token=${inviteToken}`;
+        // Same fix as forcePasswordReset below: this is a brand-new staff
+        // account, so the setup link needs to land on the staff-branded reset
+        // page, not the customer storefront's reset-password.html.
+        const setupLink = `${req.protocol}://${req.get("host")}/staff-reset-password.html?token=${inviteToken}`;
         const inviteSent = await sendStaffInviteEmail(invited.email, invited.name, setupLink, 15);
 
         res.status(201).json({
@@ -1293,7 +1296,12 @@ async function forcePasswordReset(req, res) {
             { expiresIn: "30m" }
         );
 
-        const resetLink = `${req.protocol}://${req.get("host")}/reset-password.html?token=${resetToken}`;
+        // This route (/staff/:id/force-reset) is only ever called on staff/admin
+        // accounts, so the link must land on the staff-branded reset page, not
+        // the customer storefront's reset-password.html - sending a staff member
+        // there showed them the customer nav and dropped them at customer login
+        // afterward.
+        const resetLink = `${req.protocol}://${req.get("host")}/staff-reset-password.html?token=${resetToken}`;
         const emailSent = await sendPasswordResetEmail(target.email, resetLink, 30);
 
         res.json({

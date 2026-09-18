@@ -21,7 +21,8 @@
         "#login-btn",
         "#login-2fa-btn",
         "#login-reset-btn",
-        "#login-setup-btn"
+        "#login-setup-btn",
+        "#reset-btn"
     ].join(", ");
 
     function visibleSubmit() {
