@@ -17,6 +17,7 @@ function uploadProfilePhotoToCloudinary(fileBuffer) {
     });
 }
 const { sendStaffInviteEmail, sendAdminLoginAlert, sendPasswordResetEmail, sendStaffActivationEmail, sendAccountBlockedEmail, sendAdminBlockAlert, sendTwoFactorCodeEmail, sendVendorApplicationReceivedEmail } = require("../utils/mailer");
+const { logActivity } = require("../utils/activityLog");
 const { isValidEmail, isStrongPassword } = require("../utils/verificationChannels");
 
 const { issueDeviceCookie } = require("../utils/deviceTrust");
@@ -1318,6 +1319,40 @@ async function forcePasswordReset(req, res) {
     }
 }
 
+// Admin-triggered: clears the login rate limit (5 failed attempts / 15
+// minutes, keyed by IP + email - see middleware/rateLimiter.js's
+// loginLimiter) for one account, so someone locked out by a run of typos
+// doesn't have to sit out the full window. Deletes every IP the limiter has
+// counted against this email, not just whichever one is currently blocking
+// them, since they may retry from a different network (e.g. wifi to data).
+async function clearLoginLockout(req, res) {
+    try {
+        const { id } = req.params;
+
+        const target = await pool.query("SELECT id, name, email FROM users WHERE id = $1", [id]);
+        if (target.rows.length === 0) {
+            return res.status(404).json({ error: "Account not found." });
+        }
+
+        const email = String(target.rows[0].email || "").trim().toLowerCase();
+        const result = await pool.query(
+            "DELETE FROM rate_limit_hits WHERE key LIKE $1",
+            [`login:%:${email}`]
+        );
+
+        logActivity(req.user.userId, "cleared_login_lockout", "user", Number(id), `Cleared login lockout for "${target.rows[0].name}"`);
+        res.json({
+            message: result.rowCount > 0
+                ? `Login lockout cleared. ${target.rows[0].name} can try logging in again right away.`
+                : `${target.rows[0].name} isn't currently rate-limited - nothing to clear.`
+        });
+
+    } catch (error) {
+        console.error("Clear login lockout error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+}
+
 // Completes a forced password reset using the short-lived pendingToken issued at login
 async function completeForcedPasswordReset(req, res) {
     try {
@@ -1646,6 +1681,7 @@ module.exports = {
     forgotPassword,
     resetPassword,
     forcePasswordReset,
+    clearLoginLockout,
     completeForcedPasswordReset,
     logoutAllDevices,
     resetStaff2FA,

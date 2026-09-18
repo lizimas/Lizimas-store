@@ -52,7 +52,7 @@ const {
     unrestrictVendorProduct
 } = require("../controllers/productController");
 
-const { createStaffAccount, activateStaffAccount, blockStaffAccount, forcePasswordReset, logoutAllDevices, resetStaff2FA, getLoginHistory } = require("../controllers/authController");
+const { createStaffAccount, activateStaffAccount, blockStaffAccount, forcePasswordReset, clearLoginLockout, logoutAllDevices, resetStaff2FA, getLoginHistory } = require("../controllers/authController");
 
 const {
     listProductTiers,
@@ -281,6 +281,7 @@ router.post("/staff", createStaffAccount);
 router.patch("/staff/:id/activate", activateStaffAccount);
 router.patch("/staff/:id/block", blockStaffAccount);
 router.patch("/staff/:id/force-reset", forcePasswordReset);
+router.post("/staff/:id/clear-login-lockout", clearLoginLockout);
 router.post("/staff/:id/logout-all", logoutAllDevices);
 router.post("/staff/:id/reset-2fa", resetStaff2FA);
 router.get("/staff/:id/login-history", getLoginHistory);

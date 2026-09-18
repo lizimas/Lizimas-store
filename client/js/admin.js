@@ -3577,6 +3577,7 @@ function buildStaffMenuItems(s) {
         menuItems += `<div class="staff-menu-item" onclick="closeStaffMenus(); blockStaff(${s.id}, '${safeName}')">🚫 Block</div>`;
     }
     menuItems += `<div class="staff-menu-item" onclick="closeStaffMenus(); forceResetStaff(${s.id}, '${safeName}')">🔑 Force Reset</div>`;
+    menuItems += `<div class="staff-menu-item" onclick="closeStaffMenus(); clearStaffLoginLockout(${s.id}, '${safeName}')">⏱️ Clear Login Lockout</div>`;
     menuItems += `<div class="staff-menu-item" onclick="closeStaffMenus(); logoutAllStaffDevices(${s.id}, '${safeName}')">🚪 Logout All</div>`;
     menuItems += `<div class="staff-menu-item" onclick="closeStaffMenus(); resetStaff2FA(${s.id}, '${safeName}')">🛡️ Reset 2FA</div>`;
     menuItems += `<div class="staff-menu-item" onclick="closeStaffMenus(); viewStaffLoginHistory(${s.id}, '${safeName}')">📜 Login History</div>`;
@@ -3877,6 +3878,25 @@ function openGenericModal(title, bodyHtml) {
 
 function closeGenericModal() {
     document.getElementById("generic-modal").classList.add("hidden");
+}
+
+async function clearStaffLoginLockout(id, name) {
+    try {
+        const token = getToken();
+        const response = await fetch(`${API_URL}/api/admin/staff/${id}/clear-login-lockout`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.error || "Could not clear the login lockout.");
+            return;
+        }
+        showToast(data.message || `${name}'s login lockout has been cleared.`);
+    } catch (error) {
+        console.error("Clear login lockout error:", error);
+        alert("Something went wrong.");
+    }
 }
 
 async function forceResetStaff(id, name) {
