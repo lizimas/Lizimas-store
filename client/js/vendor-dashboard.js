@@ -710,7 +710,35 @@ function vendorQualityScoreBadge(p) {
     }
     const score = p.quality_score;
     const color = score >= 80 ? "#16A34A" : (score >= 50 ? "#B45309" : "#DC2626");
-    return `<button type="button" onclick="vendorShowQualityTips(${p.id})" style="background:none; border:none; padding:0; cursor:pointer; font-weight:700; font-size:13px; color:${color};">${score}%</button>`;
+    return `
+        <button type="button" onclick="vendorShowQualityTips(${p.id})" style="background:none; border:none; padding:0; cursor:pointer; font-weight:700; font-size:13px; color:${color};">${score}%</button>
+        ${vendorQualityMissingInline(p)}
+    `;
+}
+
+// Short, always-visible reason for a score under 100%, so a vendor sees
+// what's missing right in the table instead of having to click the score
+// first - clicking still opens the full list (vendorShowQualityTips below),
+// this just surfaces the 1-2 biggest gaps inline, same convention this
+// table already uses for the "possible duplicate" and rejection-reason
+// notes under other cells.
+function vendorQualityMissingInline(p) {
+    if (!p.quality_score_breakdown) return "";
+    let breakdown;
+    try {
+        breakdown = typeof p.quality_score_breakdown === "string"
+            ? JSON.parse(p.quality_score_breakdown)
+            : p.quality_score_breakdown;
+    } catch (error) {
+        return "";
+    }
+    const tips = breakdown.tips || [];
+    if (tips.length === 0) return "";
+    // Already sorted worst-missed-first by computeQualityScore, so the first
+    // couple are whatever will move the score the most.
+    const shown = tips.slice(0, 2).map(t => t.label);
+    const rest = tips.length - shown.length;
+    return `<div style="font-size:11px; color:#B45309; margin-top:3px; max-width:220px; line-height:1.4;">Missing: ${shown.join("; ")}${rest > 0 ? ` (+${rest} more)` : ""}</div>`;
 }
 
 function vendorShowQualityTips(productId) {
