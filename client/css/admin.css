@@ -1229,6 +1229,10 @@ select.status-select {
 .lzbe-row textarea, .lzbe-row input[type="text"] { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
 .lzbe-thumb { max-width: 120px; height: auto; display: block; margin-bottom: 6px; border-radius: 4px; }
 .lzbe-dim { font-size: 0.75rem; color: #888; margin-top: 4px; }
+.lzbe-video-preview { margin: 6px 0; }
+.lzbe-video-preview iframe, .lzbe-video-preview video { max-width: 100%; border-radius: 4px; background: #000; }
+.lzbe-fullwidth-toggle { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 0.82rem; color: #444; cursor: pointer; }
+.lzbe-fullwidth-toggle input { margin: 0; }
 .lzbe-empty { color: #888; font-size: 0.88rem; margin: 4px 0; }
 
 

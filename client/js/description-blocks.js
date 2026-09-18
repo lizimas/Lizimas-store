@@ -22,8 +22,12 @@
     }
 
     function imageEl(b) {
+        let payload = b.payload || {};
+        if (typeof payload === "string") {
+            try { payload = JSON.parse(payload); } catch (e) { payload = {}; }
+        }
         const wrap = document.createElement("div");
-        wrap.className = "pdb-img";
+        wrap.className = payload.full_width ? "pdb-img pdb-img-full" : "pdb-img";
         // Reserve the space before load so the page doesn't jump.
         if (b.image_width && b.image_height) {
             wrap.style.aspectRatio = `${b.image_width} / ${b.image_height}`;
@@ -39,6 +43,57 @@
         img.sizes = "(max-width: 700px) 100vw, 700px";
         wrap.appendChild(img);
         return wrap;
+    }
+
+    // Same YouTube/Vimeo URL -> embeddable iframe src logic the editor
+    // uses (client/js/description-block-editor.js's lzbeVideoEmbedUrl) -
+    // duplicated rather than shared since this file loads standalone on
+    // the public product page, with no editor script alongside it.
+    function videoEmbedUrl(url) {
+        const u = String(url || "").trim();
+        let m = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]{6,})/i.exec(u);
+        if (m) return `https://www.youtube.com/embed/${m[1]}`;
+        m = /vimeo\.com\/(?:video\/)?(\d+)/i.exec(u);
+        if (m) return `https://player.vimeo.com/video/${m[1]}`;
+        return null;
+    }
+
+    function videoEl(b) {
+        const wrap = document.createElement("div");
+        wrap.className = "pdb-video";
+        const embed = videoEmbedUrl(b.image_url);
+        if (embed) {
+            // 16:9 responsive embed - the aspect-ratio box keeps the layout
+            // stable before the iframe itself loads, same idea as imageEl()
+            // reserving space via image_width/image_height.
+            wrap.style.aspectRatio = "16 / 9";
+            const iframe = document.createElement("iframe");
+            iframe.src = embed;
+            iframe.loading = "lazy";
+            iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+            iframe.allowFullscreen = true;
+            iframe.style.width = "100%";
+            iframe.style.height = "100%";
+            iframe.style.border = "0";
+            wrap.appendChild(iframe);
+        } else {
+            const video = document.createElement("video");
+            video.src = b.image_url;
+            video.controls = true;
+            video.style.width = "100%";
+            wrap.appendChild(video);
+        }
+        return wrap;
+    }
+
+    function linkEl(b) {
+        const a = document.createElement("a");
+        a.className = "pdb-link";
+        a.href = b.image_url;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer nofollow";
+        a.textContent = pdbDecode(b.body || b.image_url);
+        return a;
     }
 
     const PDB_TAGS = ["P","BR","STRONG","B","EM","I","U","UL","OL","LI","SPAN"];
@@ -162,6 +217,16 @@
                 frag.appendChild(h);
             } else if (b.type === "grid") {
                 frag.appendChild(gridEl(b));
+            } else if (b.type === "video") {
+                frag.appendChild(videoEl(b));
+                if (b.body && String(b.body).trim()) {
+                    const cap = document.createElement("div");
+                    cap.className = "pdb-caption";
+                    cap.textContent = pdbDecode(b.body);
+                    frag.appendChild(cap);
+                }
+            } else if (b.type === "link") {
+                frag.appendChild(linkEl(b));
             } else if (/<(p|ul|ol|li|br|strong|em|b|i|u)\b/i.test(b.body || "") ||
                        /&(amp|lt|gt|quot|apos|nbsp|#\d+);/i.test(b.body || "")) {
                 const d = document.createElement("div");

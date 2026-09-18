@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Vendor Dashboard</title>
-<link rel="stylesheet" href="../css/admin.css?v=22">
+<link rel="stylesheet" href="../css/admin.css?v=24">
 <link rel="stylesheet" href="../css/vendor-desktop.css?v=1">
 <link rel="stylesheet" href="../css/vendor-mobile.css?v=1">
 </head>
@@ -445,7 +445,11 @@
             </div>
             <div class="vm-field">
                 <label class="vm-field-label">Category</label>
-                <select id="vm-product-category" class="vm-field-input" onchange="vmSchedulePricingPreview()"><option value="">Loading...</option></select>
+                <button type="button" id="vm-product-category-btn" class="vm-field-input" onclick="openVmProductCategoryPicker()" style="text-align:left; background:#fff; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+                    <span id="vm-product-category-btn-label" style="color:#999;">Select a category</span>
+                    <span style="color:#F5C518;">&#128269;</span>
+                </button>
+                <select id="vm-product-category" style="display:none;" onchange="vmSchedulePricingPreview()"><option value="">Loading...</option></select>
             </div>
             <div class="vm-field">
                 <label class="vm-field-label">Description</label>
@@ -1044,7 +1048,11 @@
                                     </div>
                                     <div>
                                         <label style="font-size:13px; font-weight:600; color:#333;">Category</label>
-                                        <select id="product-category" onchange="scheduleVendorPricingPreview()" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%;"></select>
+                                        <button type="button" id="product-category-btn" onclick="openProductCategoryPicker()" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; background:#fff; text-align:left; font-size:14px; color:#333; display:flex; align-items:center; justify-content:space-between; cursor:pointer; box-sizing:border-box;">
+                                            <span id="product-category-btn-label" style="color:#999;">Select a category</span>
+                                            <span style="color:#F5C518;">&#128269;</span>
+                                        </button>
+                                        <select id="product-category" onchange="scheduleVendorPricingPreview()" style="display:none;"></select>
                                     </div>
                                     <div>
                                         <label style="font-size:13px; font-weight:600; color:#333;">Description</label>
@@ -1831,12 +1839,13 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
     <script src="../js/category-select.js?v=1"></script>
+    <script src="../js/category-picker.js?v=1"></script>
     <script src="../js/seller-panel.js?v=1"></script>
     <script src="../js/photo-crop.js?v=1"></script>
     <script src="../js/prepare-picked-file.js?v=10"></script>
-    <script src="../js/description-block-editor.js?v=1"></script>
-    <script src="../js/vendor-dashboard.js?v=21"></script>
+    <script src="../js/description-block-editor.js?v=4"></script>
+    <script src="../js/vendor-dashboard.js?v=22"></script>
     <script src="../js/vendor-statements.js?v=2"></script>
-<script src="../js/vendor-mobile.js?v=3"></script>
+<script src="../js/vendor-mobile.js?v=4"></script>
 </body>
 </html>

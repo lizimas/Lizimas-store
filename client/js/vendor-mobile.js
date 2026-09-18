@@ -1637,12 +1637,43 @@ async function vmLoadAddProduct() {
     }
     const select = document.getElementById("vm-product-category");
     if (select && staffCategories) select.innerHTML = buildGroupedCategoryOptions(staffCategories);
+    syncVmProductCategoryButtonLabel();
     document.getElementById("vm-product-form-status").textContent = "";
     const specsList = document.getElementById("vm-specs-list");
     if (specsList) specsList.innerHTML = "";
     const specsPasteBox = document.getElementById("vm-specs-paste-box");
     if (specsPasteBox) specsPasteBox.value = "";
     vmSpecRowCounter = 0;
+}
+
+// Mobile counterpart to desktop's syncProductCategoryButtonLabel()/
+// openProductCategoryPicker() in vendor-dashboard.js - same CategoryPicker
+// component, same hidden-<select>-behind-a-button trick, just against the
+// vm- prefixed quick-add fields instead.
+function syncVmProductCategoryButtonLabel() {
+    const select = document.getElementById("vm-product-category");
+    const label = document.getElementById("vm-product-category-btn-label");
+    if (!select || !label) return;
+    const opt = select.options[select.selectedIndex];
+    if (opt && opt.value) {
+        label.textContent = opt.textContent;
+        label.style.color = "#333";
+    } else {
+        label.textContent = "Select a category";
+        label.style.color = "#999";
+    }
+}
+
+function openVmProductCategoryPicker() {
+    if (!window.CategoryPicker) return;
+    const select = document.getElementById("vm-product-category");
+    if (!select) return;
+    CategoryPicker.open(staffCategories, select.value || null, (cat) => {
+        if (!cat) return;
+        select.value = cat.id;
+        select.dispatchEvent(new Event("change"));
+        syncVmProductCategoryButtonLabel();
+    });
 }
 
 // Same key/value structure as desktop's Specifications section (and

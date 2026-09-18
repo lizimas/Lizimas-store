@@ -15,6 +15,19 @@
         return localStorage.getItem(tokenKey) || "";
     }
 
+    // Turns a YouTube/Vimeo watch URL into its embeddable iframe src, for
+    // the small live preview under a Video block's URL field. Returns null
+    // for anything else (e.g. a direct .mp4 URL), which gets a <video>
+    // preview instead - see render()'s "video" branch.
+    function lzbeVideoEmbedUrl(url) {
+        const u = String(url || "").trim();
+        let m = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]{6,})/i.exec(u);
+        if (m) return `https://www.youtube.com/embed/${m[1]}`;
+        m = /vimeo\.com\/(?:video\/)?(\d+)/i.exec(u);
+        if (m) return `https://player.vimeo.com/video/${m[1]}`;
+        return null;
+    }
+
     function setBusy(delta) {
         busy += delta;
         const btn = document.getElementById("lzbe-save");
@@ -468,6 +481,24 @@
                 dim.className = "lzbe-dim";
                 dim.textContent = `${b.image_width} × ${b.image_height}`;
                 row.appendChild(dim);
+
+                // Full-width (edge-to-edge) display, Lulu-style - stretches
+                // the photo to the edges of the screen on the product page
+                // instead of sitting inside the description column's normal
+                // width. Stored in the block's payload (image_url/alt_text/
+                // caption are unaffected either way).
+                const fullWidthLabel = document.createElement("label");
+                fullWidthLabel.className = "lzbe-fullwidth-toggle";
+                const fullWidthCheckbox = document.createElement("input");
+                fullWidthCheckbox.type = "checkbox";
+                fullWidthCheckbox.checked = !!(b.payload && b.payload.full_width);
+                fullWidthCheckbox.addEventListener("change", (e) => {
+                    blocks[i].payload = blocks[i].payload || {};
+                    blocks[i].payload.full_width = e.target.checked;
+                });
+                fullWidthLabel.appendChild(fullWidthCheckbox);
+                fullWidthLabel.appendChild(document.createTextNode(" Full width (edge-to-edge, no side margins)"));
+                row.appendChild(fullWidthLabel);
             } else if (b.type === "heading") {
                 const ta = document.createElement("textarea");
                 ta.rows = 1;
@@ -475,6 +506,66 @@
                 ta.value = b.body || "";
                 ta.addEventListener("input", (e) => { blocks[i].body = e.target.value; });
                 row.appendChild(ta);
+            } else if (b.type === "video") {
+                const urlInput = document.createElement("input");
+                urlInput.type = "text";
+                urlInput.placeholder = "YouTube or Vimeo link, or a direct video URL (.mp4/.webm/.mov)";
+                urlInput.value = b.image_url || "";
+
+                const previewWrap = document.createElement("div");
+                previewWrap.className = "lzbe-video-preview";
+
+                const renderVideoPreview = () => {
+                    previewWrap.innerHTML = "";
+                    const url = blocks[i].image_url || "";
+                    const embed = lzbeVideoEmbedUrl(url);
+                    if (embed) {
+                        const iframe = document.createElement("iframe");
+                        iframe.src = embed;
+                        iframe.width = "240";
+                        iframe.height = "135";
+                        iframe.frameBorder = "0";
+                        iframe.allowFullscreen = true;
+                        previewWrap.appendChild(iframe);
+                    } else if (/\.(mp4|webm|mov)(\?|$)/i.test(url)) {
+                        const video = document.createElement("video");
+                        video.src = url;
+                        video.controls = true;
+                        video.style.width = "240px";
+                        previewWrap.appendChild(video);
+                    }
+                };
+                renderVideoPreview();
+
+                urlInput.addEventListener("input", (e) => {
+                    blocks[i].image_url = e.target.value.trim();
+                    renderVideoPreview();
+                });
+                row.appendChild(urlInput);
+                row.appendChild(previewWrap);
+
+                const caption = document.createElement("input");
+                caption.type = "text";
+                caption.maxLength = 300;
+                caption.placeholder = "Caption shown under the video (optional)";
+                caption.value = b.body || "";
+                caption.addEventListener("input", (e) => { blocks[i].body = e.target.value; });
+                row.appendChild(caption);
+            } else if (b.type === "link") {
+                const urlInput = document.createElement("input");
+                urlInput.type = "text";
+                urlInput.placeholder = "https://...";
+                urlInput.value = b.image_url || "";
+                urlInput.addEventListener("input", (e) => { blocks[i].image_url = e.target.value.trim(); });
+                row.appendChild(urlInput);
+
+                const labelInput = document.createElement("input");
+                labelInput.type = "text";
+                labelInput.maxLength = 100;
+                labelInput.placeholder = 'Link text shown to customers (e.g. "See sizing guide")';
+                labelInput.value = b.body || "";
+                labelInput.addEventListener("input", (e) => { blocks[i].body = e.target.value; });
+                row.appendChild(labelInput);
             } else if (b.type === "grid") {
                 const payload = b.payload || (b.payload = { heading: "", columns: 3, items: [] });
                 if (!Array.isArray(payload.items)) payload.items = [];
@@ -627,6 +718,8 @@
                         <button type="button" data-add="heading">+ Heading</button>
                         <button type="button" data-add="text">+ Text</button>
                         <button type="button" data-add="image">+ Image</button>
+                        <button type="button" data-add="video">+ Video</button>
+                        <button type="button" data-add="link">+ Link</button>
                         <button type="button" data-add="grid">+ Grid</button>
                     </span>
                 </div>
@@ -664,7 +757,15 @@
 
         if (productId) {
             try {
-                const res = await fetch(`${apiBase}/${productId}/description-blocks`);
+                // The vendor API (apiBase "/api/vendors/products") gates this
+                // GET behind requireAuth+requireVendor - unlike the admin/staff
+                // one ("/api/products"), which is public. This request went out
+                // with no Authorization header at all, so it silently 401'd for
+                // every vendor and the editor just rendered empty - the request
+                // never even threw, since !res.ok only skips the render below.
+                const res = await fetch(`${apiBase}/${productId}/description-blocks`, {
+                    headers: token() ? { Authorization: `Bearer ${token()}` } : {}
+                });
                 if (res.ok) {
                     const rows = await res.json();
                     blocks = rows.map((r) => ({
@@ -691,6 +792,23 @@
 
         for (const [i, b] of blocks.entries()) {
             if (b.type === "text") b.body = trimBreaks(sanitizeHtml(b.body || ""));
+
+            if (b.type === "video") {
+                if (!String(b.image_url || "").trim()) {
+                    return { ok: false, message: `Block ${i + 1} (video) needs a video URL` };
+                }
+                continue;
+            }
+
+            if (b.type === "link") {
+                if (!String(b.image_url || "").trim()) {
+                    return { ok: false, message: `Block ${i + 1} (link) needs a URL` };
+                }
+                if (!String(b.body || "").trim()) {
+                    return { ok: false, message: `Block ${i + 1} (link) needs label text` };
+                }
+                continue;
+            }
 
             if (b.type === "grid") {
                 const items = (b.payload && Array.isArray(b.payload.items)) ? b.payload.items : [];

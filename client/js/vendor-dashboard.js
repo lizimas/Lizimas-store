@@ -675,9 +675,45 @@ async function loadVendorCategories() {
         staffCategoriesLoaded = true;
         const select = document.getElementById("product-category");
         if (select) select.innerHTML = buildGroupedCategoryOptions(staffCategories);
+        syncProductCategoryButtonLabel();
     } catch (error) {
         console.error("Load categories error:", error);
     }
+}
+
+// Jumia-style searchable category picker (Ryan, Sept 2026): swaps the
+// plain long <select> a vendor had to scroll through for a full-screen
+// search + drill-down modal (client/js/category-picker.js). The
+// underlying <select id="product-category"> stays in the DOM (hidden) so
+// every existing read of it - scheduleVendorPricingPreview(),
+// submitVendorProductForm(), editVendorProduct()'s
+// buildGroupedCategoryOptions() call - keeps working unchanged; this just
+// puts a nicer picker button in front of it and keeps the button's label
+// in sync with whatever the hidden select's value actually is.
+function syncProductCategoryButtonLabel() {
+    const select = document.getElementById("product-category");
+    const label = document.getElementById("product-category-btn-label");
+    if (!select || !label) return;
+    const opt = select.options[select.selectedIndex];
+    if (opt && opt.value) {
+        label.textContent = opt.textContent;
+        label.style.color = "#333";
+    } else {
+        label.textContent = "Select a category";
+        label.style.color = "#999";
+    }
+}
+
+function openProductCategoryPicker() {
+    if (!window.CategoryPicker) return;
+    const select = document.getElementById("product-category");
+    if (!select) return;
+    CategoryPicker.open(staffCategories, select.value || null, (cat) => {
+        if (!cat) return;
+        select.value = cat.id;
+        select.dispatchEvent(new Event("change"));
+        syncProductCategoryButtonLabel();
+    });
 }
 
 // Clearer status filtering (Task #60): combines the admin approval status
@@ -1128,6 +1164,9 @@ function resetVendorProductForm() {
     document.getElementById("product-id").value = "";
     document.getElementById("product-name").value = "";
     document.getElementById("product-sku").value = "";
+    const categorySelect = document.getElementById("product-category");
+    if (categorySelect) categorySelect.value = "";
+    syncProductCategoryButtonLabel();
     document.getElementById("product-description").value = "";
     document.getElementById("product-payout").value = "";
     document.getElementById("product-stock").value = "";
@@ -1895,6 +1934,7 @@ async function editVendorProduct(id) {
     document.getElementById("product-authenticity-confirm").checked = false;
     const categorySelect = document.getElementById("product-category");
     if (categorySelect) categorySelect.innerHTML = buildGroupedCategoryOptions(staffCategories, product.category_id);
+    syncProductCategoryButtonLabel();
     document.getElementById("product-submit-btn").textContent = "Save Changes";
     document.getElementById("product-form-status").textContent = "Editing an approved product returns it to pending review.";
     scheduleVendorPricingPreview();

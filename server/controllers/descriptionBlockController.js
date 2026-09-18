@@ -63,19 +63,47 @@ const saveDescriptionBlocks = async (req, res) => {
         return res.status(400).json({ message: "blocks must be an array" });
     }
 
+    // Recognized hosts for a "video" block's URL - kept narrow (YouTube,
+    // Vimeo, or a direct video file) rather than accepting any URL, since
+    // the renderer has to know how to embed each one (iframe vs <video>).
+    const VIDEO_URL_RE = /^https?:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|vimeo\.com\/|player\.vimeo\.com\/video\/)|\.(mp4|webm|mov)(\?|$)/i;
+    const LINK_URL_RE = /^https?:\/\//i;
+
     for (const [i, b] of blocks.entries()) {
-        if (!["image", "text", "heading", "grid"].includes(b.type)) {
+        if (!["image", "text", "heading", "grid", "video", "link"].includes(b.type)) {
             return res.status(400).json({ message: `Block ${i}: bad type` });
         }
         if (b.type === "image" && !b.image_url) {
             return res.status(400).json({ message: `Block ${i}: image needs image_url` });
         }
+        if (b.type === "video") {
+            if (!b.image_url || !VIDEO_URL_RE.test(String(b.image_url).trim())) {
+                return res.status(400).json({
+                    message: `Block ${i}: video needs a YouTube, Vimeo, or direct .mp4/.webm/.mov URL`
+                });
+            }
+            b.image_url = String(b.image_url).trim();
+        }
+        if (b.type === "link") {
+            if (!b.image_url || !LINK_URL_RE.test(String(b.image_url).trim())) {
+                return res.status(400).json({ message: `Block ${i}: link needs a valid http(s) URL` });
+            }
+            b.image_url = String(b.image_url).trim();
+            b.body = stripTags(b.body || "").trim();
+            if (!b.body) {
+                return res.status(400).json({ message: `Block ${i}: link needs label text` });
+            }
+        }
         if (b.type === "text") b.body = sanitizeBlockHtml(b.body || "");
         if (b.type === "heading") b.body = stripTags(b.body || "").trim();
-        // Image blocks reuse the same "body" column for an optional caption
-        // shown under the photo on the storefront (unlike alt_text, which
-        // never renders) - plain text only, same treatment as a heading.
-        if (b.type === "image") b.body = stripTags(b.body || "").trim() || null;
+        // Image and video blocks reuse the same "body" column for an
+        // optional caption shown under the photo/player on the storefront
+        // (unlike alt_text, which never renders) - plain text only, same
+        // treatment as a heading.
+        if (b.type === "image" || b.type === "video") b.body = stripTags(b.body || "").trim() || null;
+        // Full-width (edge-to-edge) display toggle, Lulu-style - reuses the
+        // payload column grid blocks already use rather than adding one.
+        if (b.type === "image") b.payload = { full_width: !!(b.payload && b.payload.full_width) };
 
         if (b.type === "grid") {
             // Mirrors the DB's pdb_grid_needs_items check constraint, so a
@@ -96,7 +124,7 @@ const saveDescriptionBlocks = async (req, res) => {
                     return res.status(400).json({ message: `Block ${i}, column ${j}: empty` });
                 }
             }
-        } else if (b.type !== "image" && !stripTags(b.body || "").trim()) {
+        } else if (!["image", "video", "link"].includes(b.type) && !stripTags(b.body || "").trim()) {
             return res.status(400).json({ message: `Block ${i}: ${b.type} needs body` });
         }
 
@@ -107,9 +135,15 @@ const saveDescriptionBlocks = async (req, res) => {
             });
         }
 
-        if (b.type === "image" && b.body && String(b.body).length > 300) {
+        if ((b.type === "image" || b.type === "video") && b.body && String(b.body).length > 300) {
             return res.status(400).json({
                 message: `Block ${i}: caption is ${String(b.body).length} characters, limit is 300.`
+            });
+        }
+
+        if (b.type === "link" && String(b.body).length > 100) {
+            return res.status(400).json({
+                message: `Block ${i}: link label is ${String(b.body).length} characters, limit is 100.`
             });
         }
     }
@@ -147,7 +181,7 @@ const saveDescriptionBlocks = async (req, res) => {
                     b.image_width || null,
                     b.image_height || null,
                     b.alt_text || null,
-                    b.type === "grid" ? JSON.stringify(b.payload || {}) : null
+                    ["grid", "image"].includes(b.type) ? JSON.stringify(b.payload || {}) : null
                 ]
             );
         }

@@ -1,4 +1,4 @@
-body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70px; }
+body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70px; overflow-x: hidden; }
 
 /* The full site header (added to match the rest of the storefront) is
    desktop-only on this page - on mobile the compact back/cart bar below
@@ -261,6 +261,62 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
     width: 100%;
     height: 100%;
     object-fit: contain;
+}
+
+/* Video block - same width/rounding treatment as .pdb-img, just with a
+   16:9 box reserved up front (set inline via style.aspectRatio) so the
+   iframe/video doesn't jump the layout on load. */
+.pd-desc-blocks .pdb-video {
+    width: 100%;
+    margin: 0 0 14px;
+    background: #000;
+    overflow: hidden;
+    border-radius: 6px;
+}
+
+/* Link block - a bordered pill/button rather than plain underlined text,
+   so it reads as a tappable action inside the rich content rather than
+   stray blue text. */
+.pd-desc-blocks .pdb-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 14px;
+    padding: 10px 18px;
+    border: 1px solid #0d1b3e;
+    border-radius: 8px;
+    color: #0d1b3e;
+    font-size: 13.5px;
+    font-weight: 600;
+    text-decoration: none;
+}
+.pd-desc-blocks .pdb-link::after {
+    content: "\2192";
+}
+.pd-desc-blocks .pdb-link:hover {
+    background: #0d1b3e;
+    color: #fff;
+}
+
+/* Full-width (edge-to-edge) Image block, Lulu-style: breaks out of
+   .pd-desc-blocks' max-width and of any padding on its ancestors (the
+   desktop .pd-layout grid included) to span the full viewport width -
+   the standard "100vw + negative margin" breakout, which works regardless
+   of how deeply the block is nested. body's overflow-x:hidden above is
+   there so a scrollbar's few extra pixels of vw never cause a sideways
+   scroll on desktop. */
+.pd-desc-blocks .pdb-img-full {
+    width: 100vw;
+    max-width: 100vw;
+    position: relative;
+    left: 50%;
+    right: 50%;
+    margin-left: -50vw;
+    margin-right: -50vw;
+    border-radius: 0;
+}
+.pd-desc-blocks .pdb-img-full img {
+    border-radius: 0;
 }
 
 
