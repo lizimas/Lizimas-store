@@ -72,11 +72,14 @@ exports.addProduct = async (req, res) => {
     try {
         const { name, category_id, description, stock, package_size,
                 material, color, sleeve, style, length, fit, pattern, care_instructions, occasion,
-                warranty_months, brand, gtin, mpn, desired_payout, sku } = req.body;
+                warranty_months, brand, gtin, mpn, desired_payout, sku,
+                product_weight_kg, highlights } = req.body;
         let { price } = req.body;
 
         const packageSize = safePackageSize(package_size);
         const warrantyMonths = warranty_months ? Number(warranty_months) : null;
+        const weightKg = product_weight_kg !== undefined && product_weight_kg !== null && product_weight_kg !== ""
+            ? Number(product_weight_kg) : null;
 
         // Phase 8: prohibited items. Checked first, before any image
         // upload or pricing work, so a blocked listing never even reaches
@@ -145,15 +148,17 @@ exports.addProduct = async (req, res) => {
             `INSERT INTO products (name,category_id,description,price,stock,image,status,created_by,
                 material,color,sleeve,style,length,fit,pattern,care_instructions,occasion,package_size,warranty_months,
               brand,gtin,mpn,vendor_id,
-                vendor_desired_payout,commission_rate_applied,fixed_fee_applied,commission_rule_id,sku)
-             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28) RETURNING *`,
+                vendor_desired_payout,commission_rate_applied,fixed_fee_applied,commission_rule_id,sku,
+                product_weight_kg,highlights)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30) RETURNING *`,
             [name, category_id, description, price, stock, mainImage, status, req.user.userId,
                 material || null, color || null, sleeve || null, style || null, length || null,
                 fit || null, pattern || null, care_instructions || null, occasion || null,
                 packageSize, warrantyMonths,
                 brand || null, gtin || null, mpn || null, vendorId,
                 pricingSnapshot.vendor_desired_payout, pricingSnapshot.commission_rate_applied,
-                pricingSnapshot.fixed_fee_applied, pricingSnapshot.commission_rule_id, sku || generateSku(brand, vendorId)]
+                pricingSnapshot.fixed_fee_applied, pricingSnapshot.commission_rule_id, sku || generateSku(brand, vendorId),
+                weightKg, highlights || null]
         );
 
         const newProduct = product.rows[0];
@@ -714,7 +719,15 @@ exports.updateVariantStock = async (req, res) => {
                     error: "Each update needs an integer variant_id and a stock value of 0 or more."
                 });
             }
-            clean.push({ variantId, stock });
+            // sku/barcode are new (vendor wizard Step 2) - the admin panel's
+            // own saveVariantStock() only ever sends {variant_id, stock}, so
+            // these must stay untouched (not nulled out) whenever the key is
+            // simply absent from an update, vs. explicitly cleared with "".
+            const hasSku = Object.prototype.hasOwnProperty.call(u, "sku");
+            const hasBarcode = Object.prototype.hasOwnProperty.call(u, "barcode");
+            const sku = hasSku && u.sku !== null && String(u.sku).trim() !== "" ? String(u.sku).trim() : null;
+            const barcode = hasBarcode && u.barcode !== null && String(u.barcode).trim() !== "" ? String(u.barcode).trim() : null;
+            clean.push({ variantId, stock, hasSku, sku, hasBarcode, barcode });
         }
 
         await client.query("BEGIN");
@@ -737,8 +750,12 @@ exports.updateVariantStock = async (req, res) => {
 
         for (const u of clean) {
             await client.query(
-                `UPDATE product_variants SET stock = $1 WHERE id = $2 AND product_id = $3`,
-                [u.stock, u.variantId, id]
+                `UPDATE product_variants
+                 SET stock = $1,
+                     sku = CASE WHEN $2::boolean THEN $3 ELSE sku END,
+                     barcode = CASE WHEN $4::boolean THEN $5 ELSE barcode END
+                 WHERE id = $6 AND product_id = $7`,
+                [u.stock, u.hasSku, u.sku, u.hasBarcode, u.barcode, u.variantId, id]
             );
         }
 
@@ -841,7 +858,7 @@ exports.getProductOptions = async (req, res) => {
         );
 
         const variants = await pool.query(
-            `SELECT id, variant_name, color_id, size_id, price, stock FROM product_variants WHERE product_id = $1`,
+            `SELECT id, variant_name, color_id, size_id, price, stock, sku, barcode FROM product_variants WHERE product_id = $1`,
             [id]
         );
 
@@ -923,11 +940,14 @@ exports.updateProduct = async (req, res) => {
 
         const { name, category_id, description, stock, package_size,
                 material, color, sleeve, style, length, fit, pattern, care_instructions, occasion,
-                warranty_months, brand, gtin, mpn, desired_payout, sku } = req.body;
+                warranty_months, brand, gtin, mpn, desired_payout, sku,
+                product_weight_kg, highlights } = req.body;
         let { price } = req.body;
 
         const packageSize = safePackageSize(package_size);
         const warrantyMonths = warranty_months ? Number(warranty_months) : null;
+        const weightKg = product_weight_kg !== undefined && product_weight_kg !== null && product_weight_kg !== ""
+            ? Number(product_weight_kg) : null;
 
         // Phase 8: prohibited items - a vendor editing a listing into
         // something prohibited is blocked exactly like a new listing would be.
@@ -981,6 +1001,14 @@ exports.updateProduct = async (req, res) => {
         const skuParam = params.length + 1;
         updateQuery += `, sku=$${skuParam}`;
         params.push(sku || null);
+
+        const weightParam = params.length + 1;
+        updateQuery += `, product_weight_kg=$${weightParam}`;
+        params.push(weightKg);
+
+        const highlightsParam = params.length + 1;
+        updateQuery += `, highlights=$${highlightsParam}`;
+        params.push(highlights || null);
 
         const nextParam = params.length + 1;
         if (newImagePaths.length > 0) {

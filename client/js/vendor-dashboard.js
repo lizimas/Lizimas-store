@@ -63,6 +63,7 @@ function setupVendorTabs() {
                 if (blockHost && window.LzBlockEditor) {
                     LzBlockEditor.mount(blockHost, null, { tokenKey: "vendorToken", apiBase: "/api/vendors/products" });
                 }
+                vpzGoToStep(1);
             }
             if (button.dataset.tab === "orders") loadVendorOrders();
             if (button.dataset.tab === "returns") loadVendorReturns();
@@ -1160,6 +1161,58 @@ function vdSearchProducts() {
     else renderVendorProductsTable();
 }
 
+// --- Add Product wizard step navigation (Jumia-style 3-step flow: Product
+// Information -> Variants -> Product Specification). All three step panels
+// stay in the DOM at all times; this just toggles .hidden and the stepper's
+// active/done classes, mirroring the .vpz-* CSS in admin.css. ---------------
+
+let vpzCurrentStep = 1;
+const VPZ_TOTAL_STEPS = 3;
+
+function vpzGoToStep(step) {
+    if (step < 1) step = 1;
+    if (step > VPZ_TOTAL_STEPS) step = VPZ_TOTAL_STEPS;
+
+    // Gate leaving Step 1 until the basics are filled in, same as Jumia's
+    // own wizard blocking Next until name + category are set.
+    if (step > vpzCurrentStep && vpzCurrentStep === 1) {
+        const name = document.getElementById("product-name").value.trim();
+        const categoryId = document.getElementById("product-category").value;
+        if (!name || !categoryId) {
+            const statusEl = document.getElementById("product-form-status");
+            if (statusEl) statusEl.textContent = "Enter a product name and choose a category before continuing.";
+            return;
+        }
+    }
+
+    vpzCurrentStep = step;
+
+    for (let i = 1; i <= VPZ_TOTAL_STEPS; i++) {
+        const panel = document.getElementById(`vpz-panel-${i}`);
+        if (panel) panel.classList.toggle("hidden", i !== step);
+
+        const stepBtn = document.getElementById(`vpz-step-btn-${i}`);
+        if (stepBtn) {
+            stepBtn.classList.remove("vpz-step-active", "vpz-step-done");
+            if (i === step) stepBtn.classList.add("vpz-step-active");
+            else if (i < step) stepBtn.classList.add("vpz-step-done");
+        }
+    }
+
+    const backBtn = document.getElementById("vpz-back-btn");
+    const nextBtn = document.getElementById("vpz-next-btn");
+    if (backBtn) backBtn.classList.toggle("vpz-hidden", step === 1);
+    if (nextBtn) nextBtn.classList.toggle("vpz-hidden", step === VPZ_TOTAL_STEPS);
+
+    const statusEl = document.getElementById("product-form-status");
+    if (statusEl && statusEl.textContent === "Enter a product name and choose a category before continuing.") {
+        statusEl.textContent = "";
+    }
+
+    const wizard = document.querySelector(".vpz-wizard");
+    if (wizard) wizard.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function resetVendorProductForm() {
     document.getElementById("product-id").value = "";
     document.getElementById("product-name").value = "";
@@ -1176,6 +1229,9 @@ function resetVendorProductForm() {
     document.getElementById("product-brand").value = "";
     document.getElementById("product-gtin").value = "";
     document.getElementById("product-mpn").value = "";
+    document.getElementById("product-color").value = "";
+    document.getElementById("product-weight").value = "";
+    document.getElementById("product-highlights").value = "";
     document.getElementById("product-images").value = "";
     document.getElementById("product-authenticity-confirm").checked = false;
     vdPickedFiles = [];
@@ -1194,6 +1250,7 @@ function resetVendorProductForm() {
     if (blockHost && window.LzBlockEditor) {
         LzBlockEditor.mount(blockHost, null, { tokenKey: "vendorToken", apiBase: "/api/vendors/products" });
     }
+    vpzGoToStep(1);
 }
 // --- Photo upload with drag/drop + explicit ordering (Ryan: vendor's photo
 // picker was a bare <input multiple> with no way to choose which photo
@@ -1731,13 +1788,15 @@ function renderVendorVariantStockArea(colors, sizes, variants) {
     area.innerHTML = `
         <p style="font-size:13px; margin:0 0 10px;">Mode: ${mode}</p>
         <table style="width:100%; margin-bottom:12px;">
-            <thead><tr><th>Colour</th><th>Size</th><th>Stock</th></tr></thead>
+            <thead><tr><th>Colour</th><th>Size</th><th>Stock</th><th>Seller SKU</th><th>Barcode (GTIN)</th></tr></thead>
             <tbody>
                 ${variants.map(v => `
                     <tr>
                         <td data-label="Colour">${colorName[v.color_id] || "—"}</td>
                         <td data-label="Size">${sizeName[v.size_id] || "—"}</td>
                         <td data-label="Stock"><input type="number" min="0" step="1" data-variant-id="${v.id}" value="${Number(v.stock) || 0}" class="vendor-variant-stock-input" style="width:80px; padding:6px; border:1px solid #ccc; border-radius:6px;"></td>
+                        <td data-label="Seller SKU"><input type="text" data-variant-id="${v.id}" value="${v.sku ? v.sku.replace(/"/g, "&quot;") : ""}" class="vendor-variant-sku-input" style="width:110px; padding:6px; border:1px solid #ccc; border-radius:6px;"></td>
+                        <td data-label="Barcode"><input type="text" data-variant-id="${v.id}" value="${v.barcode ? v.barcode.replace(/"/g, "&quot;") : ""}" class="vendor-variant-barcode-input" style="width:110px; padding:6px; border:1px solid #ccc; border-radius:6px;"></td>
                     </tr>
                 `).join("")}
             </tbody>
@@ -1796,9 +1855,20 @@ async function generateVendorVariants() {
 
 async function saveVendorVariantStock() {
     if (!vendorVariantProductId) return;
+    const skuByVariant = {};
+    document.querySelectorAll(".vendor-variant-sku-input").forEach(el => {
+        skuByVariant[el.dataset.variantId] = el.value.trim();
+    });
+    const barcodeByVariant = {};
+    document.querySelectorAll(".vendor-variant-barcode-input").forEach(el => {
+        barcodeByVariant[el.dataset.variantId] = el.value.trim();
+    });
+
     const updates = Array.from(document.querySelectorAll(".vendor-variant-stock-input")).map(el => ({
         variant_id: Number(el.dataset.variantId),
-        stock: Number(el.value)
+        stock: Number(el.value),
+        sku: skuByVariant[el.dataset.variantId] || null,
+        barcode: barcodeByVariant[el.dataset.variantId] || null
     }));
 
     if (updates.some(u => !Number.isInteger(u.stock) || u.stock < 0)) {
@@ -1931,6 +2001,9 @@ async function editVendorProduct(id) {
     document.getElementById("product-brand").value = product.brand || "";
     document.getElementById("product-gtin").value = product.gtin || "";
     document.getElementById("product-mpn").value = product.mpn || "";
+    document.getElementById("product-color").value = product.color || "";
+    document.getElementById("product-weight").value = product.product_weight_kg != null ? product.product_weight_kg : "";
+    document.getElementById("product-highlights").value = product.highlights || "";
     document.getElementById("product-authenticity-confirm").checked = false;
     const categorySelect = document.getElementById("product-category");
     if (categorySelect) categorySelect.innerHTML = buildGroupedCategoryOptions(staffCategories, product.category_id);
@@ -1945,6 +2018,7 @@ async function editVendorProduct(id) {
     if (blockHost && window.LzBlockEditor) {
         LzBlockEditor.mount(blockHost, product.id, { tokenKey: "vendorToken", apiBase: "/api/vendors/products" });
     }
+    vpzGoToStep(1);
 }
 
 async function deleteVendorProduct(id) {
@@ -1980,6 +2054,9 @@ async function submitVendorProductForm() {
     const brand = document.getElementById("product-brand").value.trim();
     const gtin = document.getElementById("product-gtin").value.trim();
     const mpn = document.getElementById("product-mpn").value.trim();
+    const color = document.getElementById("product-color").value.trim();
+    const productWeightKg = document.getElementById("product-weight").value.trim();
+    const highlights = document.getElementById("product-highlights").value.trim();
     const statusEl = document.getElementById("product-form-status");
     const submitBtn = document.getElementById("product-submit-btn");
 
@@ -2008,6 +2085,9 @@ async function submitVendorProductForm() {
     formData.append("brand", brand);
     formData.append("gtin", gtin);
     formData.append("mpn", mpn);
+    formData.append("color", color);
+    formData.append("product_weight_kg", productWeightKg);
+    formData.append("highlights", highlights);
     // Ordered by vdPickedFiles (drag/drop + reorder UI), not the raw file
     // input, so whichever photo the vendor put first actually uploads first.
     for (const file of vdPickedFiles) {
@@ -5072,6 +5152,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
     }
     setupVendorTabs();
+    vpzGoToStep(1);
     loadVendorStatus();
     loadVendorKyc();
     loadVendorDashboardSummary();

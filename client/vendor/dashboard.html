@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Vendor Dashboard</title>
-<link rel="stylesheet" href="../css/admin.css?v=24">
+<link rel="stylesheet" href="../css/admin.css?v=25">
 <link rel="stylesheet" href="../css/vendor-desktop.css?v=1">
 <link rel="stylesheet" href="../css/vendor-mobile.css?v=1">
 </head>
@@ -1031,9 +1031,42 @@
                         calculates the customer price for you), and at least three clear photos that show the actual item. New listings are reviewed before they go live.
                     </p>
 
-                    <div class="panel">
+                    <div class="panel vpz-wizard">
                         <input type="hidden" id="product-id">
-                        <div class="product-form-sections">
+
+                        <div class="vpz-stepper">
+                            <button type="button" class="vpz-step" id="vpz-step-btn-1" data-step="1" onclick="vpzGoToStep(1)">
+                                <span class="vpz-step-circle">1</span>
+                                <span class="vpz-step-label">Product Information</span>
+                            </button>
+                            <div class="vpz-step-line"></div>
+                            <button type="button" class="vpz-step" id="vpz-step-btn-2" data-step="2" onclick="vpzGoToStep(2)">
+                                <span class="vpz-step-circle">2</span>
+                                <span class="vpz-step-label">Variants</span>
+                            </button>
+                            <div class="vpz-step-line"></div>
+                            <button type="button" class="vpz-step" id="vpz-step-btn-3" data-step="3" onclick="vpzGoToStep(3)">
+                                <span class="vpz-step-circle">3</span>
+                                <span class="vpz-step-label">Product Specification</span>
+                            </button>
+                        </div>
+
+                        <!-- STEP 1: Product Information -->
+                        <div class="vpz-step-panel" id="vpz-panel-1">
+
+                            <div class="product-form-section">
+                                <h4>Images</h4>
+                                <div class="field-row">
+                                    <div>
+                                        <label style="font-size:13px; font-weight:600; color:#333;">Photos <span style="font-weight:400; color:#888;">(at least 3 recommended — clear, well lit, no watermarks)</span></label>
+                                        <div class="drag-drop-zone" id="product-image-dropzone">
+                                            Drag &amp; drop images here, or click to browse
+                                        </div>
+                                        <input type="file" id="product-images" accept="image/*" multiple class="hidden">
+                                        <div class="drag-drop-preview-grid" id="product-image-preview"></div>
+                                    </div>
+                                </div>
+                            </div>
 
                             <div class="product-form-section">
                                 <h4>Basic Information</h4>
@@ -1055,18 +1088,42 @@
                                         <select id="product-category" onchange="scheduleVendorPricingPreview()" style="display:none;"></select>
                                     </div>
                                     <div>
-                                        <label style="font-size:13px; font-weight:600; color:#333;">Description</label>
-                                        <textarea id="product-description" rows="4" placeholder="Features, condition, intended use, and everything included in the box" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;"></textarea>
+                                        <label style="font-size:13px; font-weight:600; color:#333;">Brand <span style="font-weight:400; color:#888;">(if applicable)</span></label>
+                                        <input type="text" id="product-brand" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                    </div>
+                                </div>
+                                <div class="field-row" style="margin-top:14px;">
+                                    <div>
+                                        <label style="font-size:13px; font-weight:600; color:#333;">Color <span style="font-weight:400; color:#888;">(main colour, optional)</span></label>
+                                        <input type="text" id="product-color" placeholder="e.g. Black" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                    </div>
+                                    <div>
+                                        <label style="font-size:13px; font-weight:600; color:#333;">Weight (kg) <span style="font-weight:400; color:#888;">(for shipping, optional)</span></label>
+                                        <input type="number" id="product-weight" min="0" step="0.01" placeholder="e.g. 1.2" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                                     </div>
                                 </div>
                                 <div style="margin-top:14px;">
-                                    <label style="font-size:13px; font-weight:600; color:#333; display:block; margin-bottom:4px;">Rich Content <span style="font-weight:400; color:#888;">(optional &mdash; add photo/text blocks below the short description above, same as staff listings)</span></label>
+                                    <label style="font-size:13px; font-weight:600; color:#333;">Description</label>
+                                    <textarea id="product-description" rows="4" placeholder="Features, condition, intended use, and everything included in the box" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;"></textarea>
+                                </div>
+                                <div style="margin-top:14px;">
+                                    <label style="font-size:13px; font-weight:600; color:#333; display:block; margin-bottom:4px;">Rich Content <span style="font-weight:400; color:#888;">(optional &mdash; add photo/video/link/text blocks below the short description above)</span></label>
                                     <div id="desc-blocks-editor"></div>
+                                </div>
+                                <div style="margin-top:14px;">
+                                    <label style="font-size:13px; font-weight:600; color:#333;">Highlights <span style="font-weight:400; color:#888;">(key features, one per line — optional)</span></label>
+                                    <textarea id="product-highlights" rows="4" placeholder="Lightweight design&#10;20-hour battery life&#10;Wireless connectivity" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;"></textarea>
                                 </div>
                             </div>
 
+                        </div>
+
+                        <!-- STEP 2: Variants -->
+                        <div class="vpz-step-panel hidden" id="vpz-panel-2">
+
                             <div class="product-form-section">
                                 <h4>Pricing &amp; Inventory</h4>
+                                <p style="font-size:12px; color:#666; margin-top:-6px;">This is your product's default price and stock. If you add colours/sizes below and generate variants, each variant gets its own stock, SKU and barcode — the total variant stock is what customers see instead.</p>
                                 <div class="field-row">
                                     <div style="display:flex; gap:12px;">
                                         <div style="flex:1;">
@@ -1092,47 +1149,50 @@
                                             <option value="Extra Large">Extra Large — pickup or truck, two people</option>
                                         </select>
                                     </div>
-                                    <div style="display:flex; gap:12px;">
-                                        <div style="flex:1;">
-                                            <label style="font-size:13px; font-weight:600; color:#333;">Brand <span style="font-weight:400; color:#888;">(if applicable)</span></label>
-                                            <input type="text" id="product-brand" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
-                                        <div style="flex:1;">
-                                            <label style="font-size:13px; font-weight:600; color:#333;">Warranty (months)</label>
-                                            <input type="number" id="product-warranty-months" min="0" placeholder="Leave blank if none" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
-                                    </div>
-                                    <div style="display:flex; gap:12px;">
-                                        <div style="flex:1;">
-                                            <label style="font-size:13px; font-weight:600; color:#333;">GTIN <span style="font-weight:400; color:#888;">(barcode, optional)</span></label>
-                                            <input type="text" id="product-gtin" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
-                                        <div style="flex:1;">
-                                            <label style="font-size:13px; font-weight:600; color:#333;">MPN <span style="font-weight:400; color:#888;">(manufacturer part no., optional)</span></label>
-                                            <input type="text" id="product-mpn" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
 
+                            <div id="vendor-variants-panel" class="product-form-section" hidden>
+                                <h4>Variants <span style="font-weight:400; color:#888; font-size:13px;">(optional — colours/sizes with their own stock, SKU and barcode)</span></h4>
+                                <p style="font-size:12px; color:#666; margin-top:-6px;">Save your colours and sizes, generate one row per combination, then enter stock/SKU/barcode for each. Turning on variant stock replaces the single Stock field above for this product.</p>
+                                <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+                                    <div style="flex:1; min-width:200px;">
+                                        <label style="font-size:13px; font-weight:600; color:#333;">Colours <span style="font-weight:400; color:#888;">(comma-separated)</span></label>
+                                        <input type="text" id="vendor-variant-colors" placeholder="e.g. Red, Blue, Black" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                    </div>
+                                    <div style="flex:1; min-width:200px;">
+                                        <label style="font-size:13px; font-weight:600; color:#333;">Sizes <span style="font-weight:400; color:#888;">(comma-separated)</span></label>
+                                        <input type="text" id="vendor-variant-sizes" placeholder="e.g. S, M, L, XL" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                    </div>
+                                </div>
+                                <button onclick="saveVendorProductOptions()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; margin-right:8px;">Save Colours/Sizes</button>
+                                <p id="vendor-variant-options-status" style="font-size:13px; color:#666; margin-top:8px;"></p>
+                                <div id="vendor-variant-stock-area" style="margin-top:16px;"></div>
+                            </div>
+
+                        </div>
+
+                        <!-- STEP 3: Product Specification -->
+                        <div class="vpz-step-panel hidden" id="vpz-panel-3">
+
                             <div class="product-form-section">
-                                <h4>Images</h4>
+                                <h4>Product Specification</h4>
                                 <div class="field-row">
-                                    <div>
-                                        <label style="font-size:13px; font-weight:600; color:#333;">Photos <span style="font-weight:400; color:#888;">(at least 3 recommended — clear, well lit, no watermarks)</span></label>
-                                        <div class="drag-drop-zone" id="product-image-dropzone">
-                                            Drag &amp; drop images here, or click to browse
-                                        </div>
-                                        <input type="file" id="product-images" accept="image/*" multiple class="hidden">
-                                        <div class="drag-drop-preview-grid" id="product-image-preview"></div>
+                                    <div style="flex:1;">
+                                        <label style="font-size:13px; font-weight:600; color:#333;">Warranty (months)</label>
+                                        <input type="number" id="product-warranty-months" min="0" placeholder="Leave blank if none" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                    </div>
+                                    <div style="flex:1;">
+                                        <label style="font-size:13px; font-weight:600; color:#333;">GTIN <span style="font-weight:400; color:#888;">(barcode, optional)</span></label>
+                                        <input type="text" id="product-gtin" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                    </div>
+                                    <div style="flex:1;">
+                                        <label style="font-size:13px; font-weight:600; color:#333;">MPN <span style="font-weight:400; color:#888;">(manufacturer part no., optional)</span></label>
+                                        <input type="text" id="product-mpn" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                                     </div>
                                 </div>
-                            </div>
-
-                            <div class="product-form-section">
-                                <h4>Specifications</h4>
-                                <p style="font-size:12px; color:#666; margin-top:-6px;">Optional key/value facts shown on the product page (e.g. Material: Cotton, Battery Life: 10 hours) &mdash; the same structure staff and admin listings use, so your products read consistently on the storefront.</p>
-                                <div id="specs-list" style="display:flex; flex-direction:column; gap:6px;"></div>
+                                <p style="font-size:12px; color:#666; margin:14px 0 0;">Other specs (Material, Model, Certifications, and anything else you want shown) — key/value facts shown on the product page, the same structure staff and admin listings use.</p>
+                                <div id="specs-list" style="display:flex; flex-direction:column; gap:6px; margin-top:6px;"></div>
                                 <button type="button" onclick="addVendorSpecRow()" style="margin-top:8px; padding:8px 12px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer;">+ Add Specification</button>
 
                                 <div style="margin-top:14px; border-top:1px dashed #ddd; padding-top:12px;">
@@ -1143,35 +1203,22 @@
                                 </div>
                             </div>
 
+                            <label style="font-size:13px; display:flex; gap:8px; align-items:flex-start; background:#FFF8E1; padding:10px; border-radius:8px; margin-top:20px;">
+                                <input type="checkbox" id="product-authenticity-confirm" style="margin-top:3px;">
+                                <span>I confirm this product is authentic, accurately described, and that I can provide invoices/supplier documentation if Lizimas Store requests proof of authenticity (<a href="../vendor-policies.html#anti-counterfeit" target="_blank">Anti-Counterfeit Policy</a>).</span>
+                            </label>
+
+                            <button id="product-submit-btn" onclick="submitVendorProductForm()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:12px; cursor:pointer; font-weight:600; margin-top:12px; width:100%;">Submit for Approval</button>
+                            <p id="product-form-status" style="font-size:13px; color:#666;"></p>
                         </div>
 
-                        <label style="font-size:13px; display:flex; gap:8px; align-items:flex-start; background:#FFF8E1; padding:10px; border-radius:8px; margin-top:20px;">
-                            <input type="checkbox" id="product-authenticity-confirm" style="margin-top:3px;">
-                            <span>I confirm this product is authentic, accurately described, and that I can provide invoices/supplier documentation if Lizimas Store requests proof of authenticity (<a href="../vendor-policies.html#anti-counterfeit" target="_blank">Anti-Counterfeit Policy</a>).</span>
-                        </label>
-
-                        <button id="product-submit-btn" onclick="submitVendorProductForm()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:12px; cursor:pointer; font-weight:600; margin-top:12px; width:100%;">Submit for Approval</button>
-                        <p id="product-form-status" style="font-size:13px; color:#666;"></p>
-                    </div>
-
-                    <div id="vendor-variants-panel" class="panel" hidden>
-                        <h2>Variants <span style="font-weight:400; color:#888; font-size:13px;">(optional — colours/sizes with their own stock counts)</span></h2>
-                        <p class="admin-page-subtitle">Save your colours and sizes, generate one row per combination, then enter stock for each. Turning on variant stock replaces the single Stock field above for this product.</p>
-                        <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
-                            <div style="flex:1; min-width:200px;">
-                                <label style="font-size:13px; font-weight:600; color:#333;">Colours <span style="font-weight:400; color:#888;">(comma-separated)</span></label>
-                                <input type="text" id="vendor-variant-colors" placeholder="e.g. Red, Blue, Black" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                            </div>
-                            <div style="flex:1; min-width:200px;">
-                                <label style="font-size:13px; font-weight:600; color:#333;">Sizes <span style="font-weight:400; color:#888;">(comma-separated)</span></label>
-                                <input type="text" id="vendor-variant-sizes" placeholder="e.g. S, M, L, XL" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                            </div>
+                        <div class="vpz-footer">
+                            <button type="button" id="vpz-back-btn" onclick="vpzGoToStep(vpzCurrentStep - 1)">&lsaquo; Back</button>
+                            <button type="button" id="vpz-next-btn" onclick="vpzGoToStep(vpzCurrentStep + 1)">Next &rsaquo;</button>
                         </div>
-                        <button onclick="saveVendorProductOptions()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; margin-right:8px;">Save Colours/Sizes</button>
-                        <p id="vendor-variant-options-status" style="font-size:13px; color:#666; margin-top:8px;"></p>
-                        <div id="vendor-variant-stock-area" style="margin-top:16px;"></div>
                     </div>
                 </section>
+
 
                 <section id="tab-inventory" class="tab-content hidden">
                     <h2 class="admin-page-title">Inventory</h2>
@@ -1844,7 +1891,7 @@
     <script src="../js/photo-crop.js?v=1"></script>
     <script src="../js/prepare-picked-file.js?v=10"></script>
     <script src="../js/description-block-editor.js?v=4"></script>
-    <script src="../js/vendor-dashboard.js?v=22"></script>
+    <script src="../js/vendor-dashboard.js?v=23"></script>
     <script src="../js/vendor-statements.js?v=2"></script>
 <script src="../js/vendor-mobile.js?v=4"></script>
 </body>
