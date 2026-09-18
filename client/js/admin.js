@@ -3172,7 +3172,7 @@ function renderPendingProductsList() {
             <tbody>
                 ${products.map(p => `
                     <tr>
-                        <td data-label="Product">${p.name}</td>
+                        <td data-label="Product"><a href="javascript:void(0)" onclick="viewPendingProduct(${p.id})" style="color:#1D4ED8; text-decoration:underline; cursor:pointer;">${p.name}</a></td>
                         <td data-label="Submitted By">
                             ${p.vendor_id
                                 ? `<span style="display:inline-block; background:#EEF2FF; color:#3730A3; border-radius:4px; padding:1px 7px; font-size:11px; font-weight:700; margin-right:6px;">VENDOR</span>${p.vendor_business_name || p.submitted_by_name || "Unknown"}`
@@ -3180,6 +3180,7 @@ function renderPendingProductsList() {
                         </td>
                         <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
                         <td data-label="Actions">
+                            <button onclick="viewPendingProduct(${p.id})" style="background:#2563EB; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">View</button>
                             <button onclick="approvePendingProduct(${p.id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Approve</button>
                             <button onclick="rejectPendingProduct(${p.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Reject</button>
                         </td>
@@ -3188,6 +3189,60 @@ function renderPendingProductsList() {
             </tbody>
         </table>
     `;
+}
+
+async function viewPendingProduct(id) {
+    const p = pendingProductsCache.find(x => x.id === id);
+    if (!p) return;
+
+    const category = (allCategories || []).find(c => c.id === p.category_id);
+    const submittedBy = p.vendor_id
+        ? (p.vendor_business_name || "Vendor")
+        : (p.submitted_by_name || "Staff");
+
+    // Start from the three denormalized picks already on the product row so
+    // the modal has something to show immediately, then swap in the real
+    // gallery (product_images) once it loads, since a vendor may have
+    // uploaded more photos than those three fields capture.
+    let images = [...new Set([p.image, p.card_image, p.hover_image].filter(Boolean))];
+    const galleryHtml = () => images.length
+        ? images.map(src => `<img src="${escapeReportText(src)}" style="width:130px; height:130px; object-fit:cover; border-radius:8px; border:1px solid #eee;">`).join("")
+        : `<div style="width:130px; height:130px; display:flex; align-items:center; justify-content:center; background:#f3f4f6; border-radius:8px; color:#999; font-size:12px; text-align:center; padding:8px;">No image on file</div>`;
+
+    const bodyHtml = () => `
+        <div id="pending-product-gallery" style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;">${galleryHtml()}</div>
+        <div style="font-size:13px; color:#666; margin-bottom:4px;">
+            ${category ? escapeReportText(category.name) : "Uncategorized"}${p.brand ? " · " + escapeReportText(p.brand) : ""}
+        </div>
+        <div style="font-size:20px; font-weight:700; color:#111; margin-bottom:4px;">UGX ${Number(p.price).toLocaleString()}</div>
+        <div style="font-size:13px; color:#777; margin-bottom:14px;">Stock: ${p.stock ?? "-"}${p.sku ? " &nbsp;·&nbsp; SKU: " + escapeReportText(p.sku) : ""}</div>
+        <div style="font-size:14px; line-height:1.55; white-space:pre-wrap; margin-bottom:16px; color:#222;">
+            ${p.description ? escapeReportText(p.description) : '<span style="color:#999; font-style:italic;">No description provided.</span>'}
+        </div>
+        <div style="font-size:12px; color:#777; margin-bottom:16px; padding-top:10px; border-top:1px solid #eee;">
+            Submitted by: ${escapeReportText(submittedBy)}${p.vendor_id ? "" : " (staff)"}
+        </div>
+        <div style="display:flex; gap:8px;">
+            <button onclick="closeGenericModal(); approvePendingProduct(${p.id});" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:8px 16px; font-size:13px; cursor:pointer;">Approve</button>
+            <button onclick="closeGenericModal(); rejectPendingProduct(${p.id});" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:8px 16px; font-size:13px; cursor:pointer;">Reject</button>
+        </div>
+    `;
+
+    openGenericModal(p.name, bodyHtml());
+
+    try {
+        const res = await fetch(`${API_URL}/api/products/${id}/images`);
+        if (res.ok) {
+            const gallery = await res.json();
+            if (Array.isArray(gallery) && gallery.length) {
+                images = [...new Set(gallery.map(im => im.image_path).filter(Boolean))];
+                const galleryEl = document.getElementById("pending-product-gallery");
+                if (galleryEl) galleryEl.innerHTML = galleryHtml();
+            }
+        }
+    } catch (error) {
+        console.error("Load pending product images error:", error);
+    }
 }
 
 async function approvePendingProduct(id) {
