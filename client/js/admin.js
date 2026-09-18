@@ -645,7 +645,7 @@ async function loadCustomers(search) {
                             <td data-label="Role"><span class="status-badge status-${c.role === "admin" ? "delivered" : "paid"}">${c.role}</span></td>
                             <td data-label="Status">${c.deleted_at ? `<span class="status-badge status-cancelled">Deleted</span>` : `<span class="status-badge status-paid">Active</span>`}</td>
                             <td data-label="Joined">${new Date(c.created_at).toLocaleDateString()}</td>
-                            <td data-label="Action">${c.deleted_at || c.role === "admin" ? "—" : `<button onclick="deleteCustomerAccount(${c.id}, '${c.name.replace(/'/g, "\\'")}')" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Delete</button>`}</td>
+                            <td data-label="Action">${c.role === "admin" ? "—" : c.deleted_at ? `<button onclick="restoreAccount(${c.id}, '${c.name.replace(/'/g, "\\'")}')" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Restore</button><button onclick="permanentlyDeleteAccount(${c.id}, '${c.name.replace(/'/g, "\\'")}')" style="background:#7F1D1D; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Delete Forever</button>` : `<button onclick="deleteCustomerAccount(${c.id}, '${c.name.replace(/'/g, "\\'")}')" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Delete</button>`}</td>
                         </tr>
                     `).join("")}
                 </tbody>
@@ -695,6 +695,68 @@ async function deleteCustomerAccount(id, name) {
     } catch (error) {
         console.error("Delete customer error:", error);
         alert("Something went wrong while deleting the account.");
+    }
+}
+
+async function restoreAccount(id, name) {
+    try {
+        const token = getToken();
+        const response = await fetch(`${API_URL}/api/admin/customers/${id}/restore`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.error || "Could not restore this account.");
+            return;
+        }
+
+        showToast(`${name}'s account has been restored.`);
+
+        const searchValue = document.getElementById("customer-search-input").value.trim();
+        loadCustomers(searchValue);
+        loadStats();
+
+        const staffContainer = document.getElementById("staff-accounts-list");
+        if (staffContainer) loadStaffAccounts();
+
+    } catch (error) {
+        console.error("Restore account error:", error);
+        alert("Something went wrong while restoring the account.");
+    }
+}
+
+async function permanentlyDeleteAccount(id, name) {
+    if (!confirm(`Permanently delete the account for "${name}"? This CANNOT be undone - it will be gone for good.`)) {
+        return;
+    }
+
+    try {
+        const token = getToken();
+        const response = await fetch(`${API_URL}/api/admin/customers/${id}/permanent`, {
+            method: "DELETE",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.error || "Could not permanently delete this account.");
+            return;
+        }
+
+        showToast(`${name}'s account has been permanently deleted.`);
+
+        const searchValue = document.getElementById("customer-search-input").value.trim();
+        loadCustomers(searchValue);
+        loadStats();
+
+        const staffContainer = document.getElementById("staff-accounts-list");
+        if (staffContainer) loadStaffAccounts();
+
+    } catch (error) {
+        console.error("Permanent delete account error:", error);
+        alert("Something went wrong while permanently deleting the account.");
     }
 }
 
@@ -3209,15 +3271,51 @@ async function viewPendingProduct(id) {
         ? images.map(src => `<img src="${escapeReportText(src)}" style="width:130px; height:130px; object-fit:cover; border-radius:8px; border:1px solid #eee;">`).join("")
         : `<div style="width:130px; height:130px; display:flex; align-items:center; justify-content:center; background:#f3f4f6; border-radius:8px; color:#999; font-size:12px; text-align:center; padding:8px;">No image on file</div>`;
 
+    // Attribute columns the vendor may have filled in directly on the
+    // product, beyond what's already shown above (category/brand/price/
+    // stock/sku) - previously silently dropped from this view.
+    const extraFields = [
+        ["Package Size", p.package_size],
+        ["Warranty", p.warranty_months ? `${p.warranty_months} months` : null],
+        ["Barcode / GTIN", p.gtin],
+        ["Manufacturer Part No.", p.mpn],
+    ].filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== "");
+    const extraFieldsHtml = extraFields.length
+        ? `<div style="display:flex; flex-wrap:wrap; gap:14px; font-size:12.5px; color:#444; margin-bottom:14px;">
+            ${extraFields.map(([label, v]) => `<div><span style="color:#888;">${escapeReportText(label)}:</span> ${escapeReportText(String(v))}</div>`).join("")}
+           </div>`
+        : "";
+
+    const specsHtml = (specs) => specs && specs.length
+        ? `<table style="width:100%; border-collapse:collapse; font-size:13px;">
+            ${specs.map(s => `<tr><td style="padding:4px 8px 4px 0; color:#666; white-space:nowrap; vertical-align:top;">${escapeReportText(s.label)}</td><td style="padding:4px 0; color:#222;">${escapeReportText(s.value)}</td></tr>`).join("")}
+           </table>`
+        : `<span style="color:#999; font-style:italic; font-size:13px;">No specifications added.</span>`;
+
+    const optionsHtml = (colors, sizes) => {
+        if (!(colors && colors.length) && !(sizes && sizes.length)) return "";
+        const chip = (name) => `<span style="display:inline-block; background:#f3f4f6; border-radius:999px; padding:3px 10px; font-size:12px; margin:2px;">${escapeReportText(name)}</span>`;
+        return `
+            ${colors && colors.length ? `<div style="margin-bottom:6px;"><span style="font-size:12px; color:#888;">Colors: </span>${colors.map(c => chip(c.name)).join("")}</div>` : ""}
+            ${sizes && sizes.length ? `<div><span style="font-size:12px; color:#888;">Sizes: </span>${sizes.map(s => chip(s.name)).join("")}</div>` : ""}
+        `;
+    };
+
     const bodyHtml = () => `
         <div id="pending-product-gallery" style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;">${galleryHtml()}</div>
         <div style="font-size:13px; color:#666; margin-bottom:4px;">
             ${category ? escapeReportText(category.name) : "Uncategorized"}${p.brand ? " · " + escapeReportText(p.brand) : ""}
         </div>
         <div style="font-size:20px; font-weight:700; color:#111; margin-bottom:4px;">UGX ${Number(p.price).toLocaleString()}</div>
-        <div style="font-size:13px; color:#777; margin-bottom:14px;">Stock: ${p.stock ?? "-"}${p.sku ? " &nbsp;·&nbsp; SKU: " + escapeReportText(p.sku) : ""}</div>
+        <div style="font-size:13px; color:#777; margin-bottom:10px;">Stock: ${p.stock ?? "-"}${p.sku ? " &nbsp;·&nbsp; SKU: " + escapeReportText(p.sku) : ""}</div>
+        ${extraFieldsHtml}
         <div style="font-size:14px; line-height:1.55; white-space:pre-wrap; margin-bottom:16px; color:#222;">
             ${p.description ? escapeReportText(p.description) : '<span style="color:#999; font-style:italic;">No description provided.</span>'}
+        </div>
+        <div id="pending-product-options" style="margin-bottom:16px;"></div>
+        <div style="border-top:1px solid #eee; padding-top:12px; margin-bottom:16px;">
+            <div style="font-size:12px; color:#888; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:8px;">Specifications</div>
+            <div id="pending-product-specs">Loading&hellip;</div>
         </div>
         <div style="font-size:12px; color:#777; margin-bottom:16px; padding-top:10px; border-top:1px solid #eee;">
             Submitted by: ${escapeReportText(submittedBy)}${p.vendor_id ? "" : " (staff)"}
@@ -3230,6 +3328,8 @@ async function viewPendingProduct(id) {
 
     openGenericModal(p.name, bodyHtml());
 
+    // Fill in the real gallery once it loads (best-effort - falls back to
+    // the three fields already rendered above if this request fails).
     try {
         const res = await fetch(`${API_URL}/api/products/${id}/images`);
         if (res.ok) {
@@ -3242,6 +3342,28 @@ async function viewPendingProduct(id) {
         }
     } catch (error) {
         console.error("Load pending product images error:", error);
+    }
+
+    // Specs, sizes and colors the vendor set on this listing - kept in their
+    // own tables so they're fetched the same way as the gallery above
+    // (public, unauthenticated /options endpoint, safe to call for a
+    // pending product too since it applies no status filter).
+    try {
+        const res = await fetch(`${API_URL}/api/products/${id}/options`);
+        const specsEl = document.getElementById("pending-product-specs");
+        const optionsEl = document.getElementById("pending-product-options");
+        if (res.ok) {
+            const options = await res.json();
+            const specs = (options.specs || []).filter(s => String(s.label || "").trim().toLowerCase() !== "brand");
+            if (specsEl) specsEl.innerHTML = specsHtml(specs);
+            if (optionsEl) optionsEl.innerHTML = optionsHtml(options.colors, options.sizes);
+        } else if (specsEl) {
+            specsEl.textContent = "Couldn't load specifications.";
+        }
+    } catch (error) {
+        console.error("Load pending product options error:", error);
+        const specsEl = document.getElementById("pending-product-specs");
+        if (specsEl) specsEl.textContent = "Couldn't load specifications.";
     }
 }
 
@@ -3543,7 +3665,7 @@ async function loadStaffAccounts() {
                         if (!s.deleted_at) {
                             actions = `<button class="staff-menu-btn" onclick="toggleStaffMenu(event, ${s.id})" style="background:#374151; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:16px; line-height:1; cursor:pointer;">⋮</button>`;
                         } else {
-                            actions = "—";
+                            actions = `<button onclick="restoreAccount(${s.id}, '${s.name.replace(/'/g, "\\'")}')" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Restore</button><button onclick="permanentlyDeleteAccount(${s.id}, '${s.name.replace(/'/g, "\\'")}')" style="background:#7F1D1D; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Delete Forever</button>`;
                         }
 
                         return `

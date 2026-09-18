@@ -5,6 +5,7 @@ const { sendOrderStatusEmail } = require("../utils/mailer");
 const XLSX = require("xlsx");
 const { parse } = require("csv-parse/sync");
 const { safePackageSize } = require("./productController");
+const { logActivity } = require("../utils/activityLog");
 
 // Base URL for links that leave the app (emails, receipts). Hardcoding the
 // production domain makes locally generated links unusable, since they resolve
@@ -584,6 +585,90 @@ exports.deleteCustomer = async (req, res) => {
 
     } catch (error) {
         console.error("Delete customer error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+};
+
+
+// DELETE /api/admin/customers/:id/permanent - hard delete. Works for both
+// customers and staff (same `users` table, same role-agnostic pattern as
+// deleteCustomer above). Only available once the account is already
+// soft-deleted - mirrors the product Trash -> "Delete Forever" flow.
+exports.permanentlyDeleteCustomer = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const target = await pool.query(
+            "SELECT id, name, role, deleted_at FROM users WHERE id = $1",
+            [id]
+        );
+        if (target.rows.length === 0) {
+            return res.status(404).json({ error: "Account not found." });
+        }
+        if (target.rows[0].role === "admin") {
+            return res.status(403).json({ error: "Admin accounts can't be deleted here." });
+        }
+        if (!target.rows[0].deleted_at) {
+            return res.status(409).json({ error: "This account needs to be deleted first before it can be permanently removed." });
+        }
+
+        // Application-level guard: never let a hard delete take order/financial
+        // history down with it, regardless of what the DB constraint does.
+        const orderCount = await pool.query(
+            "SELECT COUNT(*) FROM orders WHERE user_id = $1",
+            [id]
+        );
+        if (Number(orderCount.rows[0].count) > 0) {
+            return res.status(409).json({
+                error: "This account has order history and can't be permanently deleted - it stays on file for order and financial records."
+            });
+        }
+
+        const result = await pool.query(
+            "DELETE FROM users WHERE id = $1 AND deleted_at IS NOT NULL RETURNING id",
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Account not found or not in a deleted state." });
+        }
+
+        logActivity(req.user.userId, "permanently_deleted_user", "user", Number(id), `Permanently deleted "${target.rows[0].name}"`);
+        res.json({ message: "Account permanently deleted." });
+
+    } catch (error) {
+        if (error.code === "23503") {
+            return res.status(409).json({
+                error: "This account can't be permanently deleted - it's still linked to other records (approvals, statements, reviews, etc.)."
+            });
+        }
+        console.error("Permanent delete user error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+};
+
+
+// PATCH /api/admin/customers/:id/restore - undo a soft delete. The recycle-
+// bin half of the delete flow: a deleted account sits here, reachable again,
+// until someone chooses Restore or Delete Forever. Works for both customers
+// and staff, same role-agnostic pattern as the rest of this delete flow.
+exports.restoreCustomer = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query(
+            "UPDATE users SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL RETURNING id, name",
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Account not found or not currently deleted." });
+        }
+
+        logActivity(req.user.userId, "restored_user", "user", Number(id), `Restored "${result.rows[0].name}"`);
+        res.json({ message: "Account restored." });
+
+    } catch (error) {
+        console.error("Restore customer error:", error);
         res.status(500).json({ error: "Something went wrong." });
     }
 };

@@ -742,6 +742,31 @@ select.status-select {
     gap: 10px;
 }
 
+/* Bigger, easier-to-read text and input boxes on the Add/Edit Product form
+   (labels, help text and inputs in here were set inline at 11.5-13px,
+   noticeably smaller than the rest of the admin panel). !important is used
+   deliberately to win over those inline styles without having to touch
+   every one of them individually. */
+#product-form-container label {
+    font-size: 15px !important;
+}
+
+#product-form-container .product-form-section p {
+    font-size: 14px !important;
+}
+
+#product-form-container input[type="text"],
+#product-form-container input[type="number"],
+#product-form-container select,
+#product-form-container textarea {
+    font-size: 16px !important;
+    padding: 12px 14px !important;
+}
+
+#product-form-container textarea {
+    min-height: 70px;
+}
+
 .drag-drop-zone {
     border: 2px dashed #ccc;
     border-radius: 12px;

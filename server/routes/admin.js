@@ -10,6 +10,8 @@ const {
     updateOrderStatus,
     getVisitorStats,
     deleteCustomer,
+    permanentlyDeleteCustomer,
+    restoreCustomer,
     getActivityLog,
     getStaffSessions
 } = require("../controllers/adminController");
@@ -271,6 +273,8 @@ router.get("/orders/:id/items", getOrderItems);
 router.get("/orders/:id/receipt-link", getReceiptLink);
 router.get("/customers", getAllCustomers);
 router.delete("/customers/:id", deleteCustomer);
+router.delete("/customers/:id/permanent", permanentlyDeleteCustomer);
+router.patch("/customers/:id/restore", restoreCustomer);
 
 // Staff account creation
 router.post("/staff", createStaffAccount);
