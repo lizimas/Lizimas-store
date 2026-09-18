@@ -105,6 +105,28 @@ body {
     color: #1a1a2e;
 }
 
+/* Primary "+ Add X" action button, reused across every tab (Products,
+   Categories, Promotions, Discount Codes, Flash Sales, Notes) plus the
+   Products tab's Import/Export and Jumia toggles (which layer their own
+   inline background/color/border on top of this for an outline look).
+   Never had a base size/style before - was rendering as a bare default
+   button, hence "increase the size of these" reading small everywhere. */
+.add-btn {
+    background: #f4b400;
+    color: #1a1a2e;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.add-btn:hover {
+    background: #e0a600;
+}
+
 .admin-tabs {
     display: flex;
     background: white;
