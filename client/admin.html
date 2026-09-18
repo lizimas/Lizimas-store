@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Admin Dashboard</title>
-<link rel="stylesheet" href="css/admin.css?v=30">
+<link rel="stylesheet" href="css/admin.css?v=31">
 </head>
 <body>
 
@@ -527,11 +527,13 @@
 
                                 <div style="margin-top:14px; border-top:1px dashed #ddd; padding-top:12px;">
                                     <label style="font-size:12.5px; font-weight:600; color:#333; display:block; margin-bottom:4px;">Paste from Excel</label>
-                                    <p style="font-size:11.5px; color:#888; margin:0 0 6px;">Insert a table sized to your data (type the numbers or scroll over them), click a cell, then paste your copied Excel columns &mdash; it fills in starting from that cell.</p>
-                                    <div class="specs-table-size-picker">
-                                        <label>Rows <input type="number" id="admin-specs-table-rows" min="1" max="50" value="4"></label>
-                                        <label>Columns <input type="number" id="admin-specs-table-cols" min="1" max="6" value="2"></label>
-                                        <button type="button" onclick="insertAdminSpecsTable()">Insert Table</button>
+                                    <p style="font-size:11.5px; color:#888; margin:0 0 6px;">Hover to pick a table size, click to insert it, then paste your copied Excel columns into a cell &mdash; it fills in starting from there.</p>
+                                    <div class="specs-table-grid-wrap">
+                                        <button type="button" class="specs-table-grid-trigger" onclick="toggleAdminSpecsGridPicker()">&#9639; Insert Table</button>
+                                        <div class="specs-table-grid-popover hidden" id="admin-specs-grid-popover">
+                                            <div class="specs-table-grid" id="admin-specs-grid"></div>
+                                            <div class="specs-table-grid-label" id="admin-specs-grid-label">Select size</div>
+                                        </div>
                                     </div>
                                     <div id="admin-specs-table-wrap"></div>
                                 </div>
@@ -1606,7 +1608,7 @@
 <script src="js/category-select.js?v=2"></script>
 <script src="js/category-picker.js?v=1"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
-<script src="js/admin.js?v=77"></script>
+<script src="js/admin.js?v=78"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

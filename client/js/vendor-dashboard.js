@@ -1536,21 +1536,74 @@ function vendorParseSpecLine(line) {
     return { label: line.trim(), value: "" };
 }
 
-// --- Insert-table paste tool (Task: replace the free-text "paste from
-// Excel" box with a real table sized to the data - rows/columns are typed
-// or scrolled like Word's insert-table dialog. Click a cell and paste; the
-// pasted range fills the grid starting at that cell, adding rows if the
-// paste has more than the table currently holds. "Add to Specifications"
-// then turns column 1/2 of each row with a label into a spec row. ---
+// --- Insert-table paste tool (Task: Word/Jumia-style hover grid - click
+// the trigger, hover to pick a size (the grid highlights and shows
+// "cols x rows" as you move), click to insert a real table that size.
+// Click a cell and paste; the pasted range fills the grid starting at
+// that cell, adding rows if the paste has more than the table currently
+// holds. "Add to Specifications" then turns column 1/2 of each row with
+// a label into a spec row. ---
 
-function insertVendorSpecsTable() {
-    const rowsInput = document.getElementById("vendor-specs-table-rows");
-    const colsInput = document.getElementById("vendor-specs-table-cols");
+const VENDOR_SPECS_GRID_ROWS = 8;
+const VENDOR_SPECS_GRID_COLS = 10;
+
+function toggleVendorSpecsGridPicker() {
+    const popover = document.getElementById("vendor-specs-grid-popover");
+    if (!popover) return;
+    const opening = popover.classList.contains("hidden");
+    document.querySelectorAll(".specs-table-grid-popover").forEach(p => p.classList.add("hidden"));
+    if (!opening) return;
+
+    const grid = document.getElementById("vendor-specs-grid");
+    if (grid && !grid.children.length) {
+        let html = "";
+        for (let r = 0; r < VENDOR_SPECS_GRID_ROWS; r++) {
+            for (let c = 0; c < VENDOR_SPECS_GRID_COLS; c++) {
+                html += `<span class="specs-grid-cell" data-row="${r}" data-col="${c}"></span>`;
+            }
+        }
+        grid.innerHTML = html;
+        grid.addEventListener("mouseover", vendorSpecsGridHover);
+        grid.addEventListener("click", vendorSpecsGridPick);
+    }
+    popover.classList.remove("hidden");
+}
+
+function vendorSpecsGridHover(e) {
+    const cell = e.target.closest(".specs-grid-cell");
+    if (!cell) return;
+    const row = parseInt(cell.dataset.row, 10);
+    const col = parseInt(cell.dataset.col, 10);
+    const grid = document.getElementById("vendor-specs-grid");
+    grid.querySelectorAll(".specs-grid-cell").forEach((c) => {
+        const active = parseInt(c.dataset.row, 10) <= row && parseInt(c.dataset.col, 10) <= col;
+        c.classList.toggle("specs-grid-cell-active", active);
+    });
+    const label = document.getElementById("vendor-specs-grid-label");
+    if (label) label.textContent = `${col + 1} x ${row + 1}`;
+}
+
+function vendorSpecsGridPick(e) {
+    const cell = e.target.closest(".specs-grid-cell");
+    if (!cell) return;
+    const rows = parseInt(cell.dataset.row, 10) + 1;
+    const cols = parseInt(cell.dataset.col, 10) + 1;
+    document.getElementById("vendor-specs-grid-popover").classList.add("hidden");
+    insertVendorSpecsTable(rows, cols);
+}
+
+document.addEventListener("click", (e) => {
+    const popover = document.getElementById("vendor-specs-grid-popover");
+    if (!popover || popover.classList.contains("hidden")) return;
+    if (e.target.closest(".specs-table-grid-wrap")) return;
+    popover.classList.add("hidden");
+});
+
+function insertVendorSpecsTable(rows, cols) {
     const wrap = document.getElementById("vendor-specs-table-wrap");
-    if (!rowsInput || !colsInput || !wrap) return;
-
-    const rows = Math.min(Math.max(parseInt(rowsInput.value, 10) || 1, 1), 50);
-    const cols = Math.min(Math.max(parseInt(colsInput.value, 10) || 1, 1), 6);
+    if (!wrap) return;
+    rows = Math.min(Math.max(rows || VENDOR_SPECS_GRID_ROWS, 1), 50);
+    cols = Math.min(Math.max(cols || 2, 1), VENDOR_SPECS_GRID_COLS);
 
     let html = '<table class="specs-paste-table"><tbody>';
     for (let r = 0; r < rows; r++) {

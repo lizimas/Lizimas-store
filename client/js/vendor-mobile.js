@@ -1760,21 +1760,75 @@ function vmParseSpecLine(line) {
     return { label: line.trim(), value: "" };
 }
 
-// --- Insert-table paste tool (Task: replace the free-text "paste from
-// Excel" box with a real table sized to the data - rows/columns are typed
-// or scrolled like Word's insert-table dialog. Tap a cell and paste; the
-// pasted range fills the grid starting at that cell, adding rows if the
-// paste has more than the table currently holds. "Add to Specifications"
-// then turns column 1/2 of each row with a label into a spec row. ---
+// --- Insert-table paste tool (Task: Word/Jumia-style grid picker - tap
+// the trigger, tap a cell to insert a table that size (row/col from the
+// cell's position; a mouseover preview also runs for any hybrid
+// touch+trackpad device, same as the desktop version). Tap a cell and
+// paste; the pasted range fills the grid starting at that cell, adding
+// rows if the paste has more than the table currently holds. "Add to
+// Specifications" then turns column 1/2 of each row with a label into a
+// spec row. ---
 
-function insertVmSpecsTable() {
-    const rowsInput = document.getElementById("vm-specs-table-rows");
-    const colsInput = document.getElementById("vm-specs-table-cols");
+const VM_SPECS_GRID_ROWS = 8;
+const VM_SPECS_GRID_COLS = 10;
+
+function toggleVmSpecsGridPicker() {
+    const popover = document.getElementById("vm-specs-grid-popover");
+    if (!popover) return;
+    const opening = popover.classList.contains("hidden");
+    document.querySelectorAll(".vm-specs-table-grid-popover").forEach(p => p.classList.add("hidden"));
+    if (!opening) return;
+
+    const grid = document.getElementById("vm-specs-grid");
+    if (grid && !grid.children.length) {
+        let html = "";
+        for (let r = 0; r < VM_SPECS_GRID_ROWS; r++) {
+            for (let c = 0; c < VM_SPECS_GRID_COLS; c++) {
+                html += `<span class="vm-specs-grid-cell" data-row="${r}" data-col="${c}"></span>`;
+            }
+        }
+        grid.innerHTML = html;
+        grid.addEventListener("mouseover", vmSpecsGridHover);
+        grid.addEventListener("click", vmSpecsGridPick);
+    }
+    popover.classList.remove("hidden");
+}
+
+function vmSpecsGridHover(e) {
+    const cell = e.target.closest(".vm-specs-grid-cell");
+    if (!cell) return;
+    const row = parseInt(cell.dataset.row, 10);
+    const col = parseInt(cell.dataset.col, 10);
+    const grid = document.getElementById("vm-specs-grid");
+    grid.querySelectorAll(".vm-specs-grid-cell").forEach((c) => {
+        const active = parseInt(c.dataset.row, 10) <= row && parseInt(c.dataset.col, 10) <= col;
+        c.classList.toggle("vm-specs-grid-cell-active", active);
+    });
+    const label = document.getElementById("vm-specs-grid-label");
+    if (label) label.textContent = `${col + 1} x ${row + 1}`;
+}
+
+function vmSpecsGridPick(e) {
+    const cell = e.target.closest(".vm-specs-grid-cell");
+    if (!cell) return;
+    const rows = parseInt(cell.dataset.row, 10) + 1;
+    const cols = parseInt(cell.dataset.col, 10) + 1;
+    document.getElementById("vm-specs-grid-popover").classList.add("hidden");
+    insertVmSpecsTable(rows, cols);
+}
+
+document.addEventListener("click", (e) => {
+    const popover = document.getElementById("vm-specs-grid-popover");
+    if (!popover || popover.classList.contains("hidden")) return;
+    if (e.target.closest(".vm-specs-table-grid-wrap")) return;
+    popover.classList.add("hidden");
+});
+
+function insertVmSpecsTable(rows, cols) {
     const wrap = document.getElementById("vm-specs-table-wrap");
-    if (!rowsInput || !colsInput || !wrap) return;
-
-    const rows = Math.min(Math.max(parseInt(rowsInput.value, 10) || 1, 1), 50);
-    const cols = Math.min(Math.max(parseInt(colsInput.value, 10) || 1, 1), 6);
+    if (!wrap) return;
+    rows = Math.min(Math.max(rows || VM_SPECS_GRID_ROWS, 1), 50);
+    cols = Math.min(Math.max(cols || 2, 1), VM_SPECS_GRID_COLS);
 
     let html = '<table class="vm-specs-paste-table"><tbody>';
     for (let r = 0; r < rows; r++) {

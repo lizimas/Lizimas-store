@@ -1544,10 +1544,18 @@ select.status-select {
 
 /* --- Specs "insert table" paste tool (Word-style: pick rows/columns, then
    paste Excel data straight into the grid) --- */
-.specs-table-size-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
-.specs-table-size-picker label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #444; }
-.specs-table-size-picker input[type="number"] { width: 56px; padding: 5px 6px; border: 1px solid #ccc; border-radius: 6px; font-size: 12.5px; }
-.specs-table-size-picker button { padding: 7px 12px; border-radius: 6px; border: 1px solid #1a1a2e; background: #1a1a2e; color: #fff; cursor: pointer; font-size: 12.5px; }
+/* Word/Jumia-style hover grid for picking a table size (replaces the
+   earlier rows/columns number-input version per Ryan's screenshot of
+   Jumia's own "insert table" picker - hover highlights a block of cells
+   and shows "cols x rows", click inserts a table that size). */
+.specs-table-grid-wrap { position: relative; display: inline-block; margin-bottom: 8px; }
+.specs-table-grid-trigger { padding: 7px 12px; border-radius: 6px; border: 1px solid #1a1a2e; background: #1a1a2e; color: #fff; cursor: pointer; font-size: 12.5px; }
+.specs-table-grid-popover { position: absolute; top: 100%; left: 0; margin-top: 4px; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); z-index: 50; }
+.specs-table-grid-popover.hidden { display: none; }
+.specs-table-grid { display: grid; grid-template-columns: repeat(10, 16px); grid-template-rows: repeat(8, 16px); gap: 2px; }
+.specs-grid-cell { width: 16px; height: 16px; border: 1px solid #d5d5d5; background: #fafafa; border-radius: 2px; }
+.specs-grid-cell.specs-grid-cell-active { background: #bfdbfe; border-color: #3b82f6; }
+.specs-table-grid-label { margin-top: 8px; font-size: 12px; color: #444; text-align: center; }
 .specs-paste-table { border-collapse: collapse; width: 100%; margin-bottom: 8px; }
 .specs-paste-table td { border: 1px solid #ddd; padding: 0; }
 .specs-paste-table .specs-paste-cell { width: 100%; box-sizing: border-box; padding: 7px 8px; border: none; font-family: monospace; font-size: 12px; background: #fff; }
