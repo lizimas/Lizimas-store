@@ -147,7 +147,7 @@
 
         const items = Array.isArray(payload.items) ? payload.items : [];
         const section = document.createElement("section");
-        section.className = "pdb-grid-section";
+        section.className = payload.full_width ? "pdb-grid-section pdb-grid-full" : "pdb-grid-section";
 
         if (payload.heading) {
             const h = document.createElement("h3");
@@ -163,12 +163,53 @@
         const cols = Math.min(Math.max(requested, 1), 8);
         grid.style.setProperty("--pdb-grid-cols", cols);
 
-        items.forEach((item) => {
-            const cell = document.createElement("div");
-            cell.className = "pdb-grid-cell";
+        // Wraps an already-built element in a clickable <a>, in place.
+        function wrapInLink(el, url) {
+            const a = document.createElement("a");
+            a.className = "pdb-grid-link";
+            a.href = url;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer nofollow";
+            el.parentNode.insertBefore(a, el);
+            a.appendChild(el);
+            return a;
+        }
 
-            if (item.image_url) {
-                cell.appendChild(
+        // Builds a grid item's image/video area. A video (if set) can
+        // replace the image, or sit above/below it, per item.video_placement.
+        function gridItemMediaEl(item) {
+            const wrap = document.createElement("div");
+            wrap.className = "pdb-grid-media";
+            const embed = item.video_url ? videoEmbedUrl(item.video_url) : null;
+            const isDirectVideo = !embed && item.video_url && /\.(mp4|webm|mov)(\?|$)/i.test(item.video_url);
+            const hasVideo = !!(embed || isDirectVideo);
+
+            function appendVideo() {
+                const vwrap = document.createElement("div");
+                vwrap.className = "pdb-grid-video";
+                if (embed) {
+                    const iframe = document.createElement("iframe");
+                    iframe.src = embed;
+                    iframe.loading = "lazy";
+                    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+                    iframe.allowFullscreen = true;
+                    iframe.style.width = "100%";
+                    iframe.style.height = "100%";
+                    iframe.style.border = "0";
+                    vwrap.appendChild(iframe);
+                } else {
+                    const video = document.createElement("video");
+                    video.src = item.video_url;
+                    video.controls = true;
+                    video.style.width = "100%";
+                    vwrap.appendChild(video);
+                }
+                wrap.appendChild(vwrap);
+            }
+
+            function appendImage() {
+                if (!item.image_url) return;
+                wrap.appendChild(
                     imageEl({
                         image_url: item.image_url,
                         image_width: item.image_width,
@@ -178,11 +219,31 @@
                 );
             }
 
+            if (hasVideo) {
+                const placement = item.video_placement || "replace";
+                if (placement === "above") { appendVideo(); appendImage(); }
+                else if (placement === "below") { appendImage(); appendVideo(); }
+                else { appendVideo(); }
+            } else {
+                appendImage();
+            }
+
+            return wrap.childNodes.length ? wrap : null;
+        }
+
+        items.forEach((item) => {
+            const cell = document.createElement("div");
+            cell.className = "pdb-grid-cell";
+
+            const mediaEl = gridItemMediaEl(item);
+            if (mediaEl) cell.appendChild(mediaEl);
+
+            let capEl = null;
             if (item.caption) {
-                const cap = document.createElement("div");
-                cap.className = "pdb-grid-caption";
-                cap.textContent = pdbDecode(item.caption);
-                cell.appendChild(cap);
+                capEl = document.createElement("div");
+                capEl.className = "pdb-grid-caption";
+                capEl.textContent = pdbDecode(item.caption);
+                cell.appendChild(capEl);
             }
 
             if (item.body) {
@@ -190,6 +251,25 @@
                 body.className = "pdb-grid-body";
                 body.innerHTML = pdbSanitize(item.body);
                 cell.appendChild(body);
+            }
+
+            // Optional link: wraps the whole tile, just the media, or just
+            // the caption, per the placement chosen in the editor.
+            if (item.link_url) {
+                const placement = item.link_placement || "whole";
+                if (placement === "media" && mediaEl) {
+                    wrapInLink(mediaEl, item.link_url);
+                } else if (placement === "caption" && capEl) {
+                    wrapInLink(capEl, item.link_url);
+                } else {
+                    const a = document.createElement("a");
+                    a.className = "pdb-grid-link pdb-grid-link-whole";
+                    a.href = item.link_url;
+                    a.target = "_blank";
+                    a.rel = "noopener noreferrer nofollow";
+                    while (cell.firstChild) a.appendChild(cell.firstChild);
+                    cell.appendChild(a);
+                }
             }
 
             grid.appendChild(cell);

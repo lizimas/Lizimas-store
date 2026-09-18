@@ -610,47 +610,90 @@ async function updateOrderStatus(orderId, newStatus) {
 
 let customerSearchDebounce = null;
 
+// --- "New customer" tracking (Task: Facebook-style red count on the
+// Customers nav item). A signup counts as new if it happened after the
+// admin last opened the Customers tab - tracked client-side, same
+// unseen-since-last-viewed idea as vd-sidebar-orders-badge in
+// vendor-dashboard.js, just keyed off a timestamp instead of order status
+// since "new" here means "arrived since I last looked", not a fixed state.
+
+function adminCustomersLastViewedAt() {
+    try {
+        const raw = localStorage.getItem("admin_customers_last_viewed_at");
+        return raw ? new Date(raw) : new Date(0);
+    } catch (e) {
+        return new Date(0);
+    }
+}
+
+function markAdminCustomersViewed() {
+    try { localStorage.setItem("admin_customers_last_viewed_at", new Date().toISOString()); } catch (e) {}
+    const badge = document.getElementById("admin-sidebar-customers-badge");
+    if (badge) { badge.hidden = true; badge.textContent = "0"; }
+}
+
+function updateAdminCustomersBadge(customers, lastViewedAt) {
+    const badge = document.getElementById("admin-sidebar-customers-badge");
+    if (!badge) return;
+    const newCount = customers.filter(c =>
+        c.role !== "admin" && !c.deleted_at && new Date(c.created_at) > lastViewedAt
+    ).length;
+    if (newCount > 0) {
+        badge.textContent = newCount > 99 ? "99+" : String(newCount);
+        badge.hidden = false;
+    } else {
+        badge.hidden = true;
+    }
+}
+
+function customerInitials(name) {
+    const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "?";
+    return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+}
+
 async function loadCustomers(search) {
     try {
         const query = search ? `?search=${encodeURIComponent(search)}` : "";
         const customers = await authorizedFetch(`/api/admin/customers${query}`);
         const customersTable = document.getElementById("customers-table");
+        const countEl = document.getElementById("customers-tile-count");
+
+        // The sidebar "new" count only reflects the full, unfiltered list -
+        // a search shouldn't make the badge flicker to a smaller number.
+        const lastViewedAt = adminCustomersLastViewedAt();
+        if (!search) updateAdminCustomersBadge(customers || [], lastViewedAt);
+        if (countEl) countEl.textContent = customers && customers.length ? `${customers.length} total` : "";
 
         if (!customers || customers.length === 0) {
             customersTable.innerHTML = `<p class="no-data">No customers found.</p>`;
             return;
         }
 
-        customersTable.innerHTML = `
-            <table>
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th>Joined</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${customers.map((c, i) => `
-                        <tr>
-                            <td data-label="#">${i + 1}</td>
-                            <td data-label="Name">${c.name}</td>
-                            <td data-label="Email">${c.email}</td>
-                            <td data-label="Phone">${c.phone || "—"}</td>
-                            <td data-label="Role"><span class="status-badge status-${c.role === "admin" ? "delivered" : "paid"}">${c.role}</span></td>
-                            <td data-label="Status">${c.deleted_at ? `<span class="status-badge status-cancelled">Deleted</span>` : `<span class="status-badge status-paid">Active</span>`}</td>
-                            <td data-label="Joined">${new Date(c.created_at).toLocaleDateString()}</td>
-                            <td data-label="Action">${c.role === "admin" ? "—" : c.deleted_at ? `<button onclick="restoreAccount(${c.id}, '${c.name.replace(/'/g, "\\'")}')" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Restore</button><button onclick="permanentlyDeleteAccount(${c.id}, '${c.name.replace(/'/g, "\\'")}')" style="background:#7F1D1D; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Delete Forever</button>` : `<button onclick="deleteCustomerAccount(${c.id}, '${c.name.replace(/'/g, "\\'")}')" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Delete</button>`}</td>
-                        </tr>
-                    `).join("")}
-                </tbody>
-            </table>
-        `;
+        customersTable.innerHTML = customers.map(c => {
+            const isNew = c.role !== "admin" && !c.deleted_at && new Date(c.created_at) > lastViewedAt;
+            const safeName = c.name.replace(/'/g, "\\'");
+            const action = c.role === "admin"
+                ? ""
+                : c.deleted_at
+                    ? `<button onclick="restoreAccount(${c.id}, '${safeName}')" class="customer-card-btn customer-card-btn-restore">Restore</button><button onclick="permanentlyDeleteAccount(${c.id}, '${safeName}')" class="customer-card-btn customer-card-btn-danger">Delete Forever</button>`
+                    : `<button onclick="deleteCustomerAccount(${c.id}, '${safeName}')" class="customer-card-btn customer-card-btn-danger">Delete</button>`;
+            return `
+                <div class="customer-card">
+                    <span class="customer-card-avatar">${customerInitials(c.name)}</span>
+                    <div class="customer-card-body">
+                        <div class="customer-card-name-row">
+                            <span class="customer-card-name">${c.name}</span>
+                            ${isNew ? `<span class="customer-new-badge">New</span>` : ""}
+                            <span class="status-badge status-${c.role === "admin" ? "delivered" : "paid"}">${c.role}</span>
+                            ${c.deleted_at ? `<span class="status-badge status-cancelled">Deleted</span>` : ""}
+                        </div>
+                        <div class="customer-card-meta">${c.email} &nbsp;&middot;&nbsp; ${c.phone || "No phone"} &nbsp;&middot;&nbsp; Joined ${new Date(c.created_at).toLocaleDateString()}</div>
+                    </div>
+                    <div class="customer-card-actions">${action}</div>
+                </div>
+            `;
+        }).join("");
 
     } catch (error) {
         console.error("Load customers error:", error);
@@ -848,15 +891,102 @@ function adminParseSpecLine(line) {
     return { label: line.trim(), value: "" };
 }
 
-function parseAndAddAdminSpecs() {
-    const box = document.getElementById("admin-specs-paste-box");
-    if (!box || !box.value.trim()) return;
-    const lines = box.value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    lines.forEach(line => {
-        const { label, value } = adminParseSpecLine(line);
+// --- Insert-table paste tool (Task: replace the free-text "paste from
+// Excel" box with a real table sized to the data - rows/columns are typed
+// or scrolled like Word's insert-table dialog. Click a cell and paste; the
+// pasted range fills the grid starting at that cell, adding rows if the
+// paste has more than the table currently holds. "Add to Specifications"
+// then turns column 1/2 of each row with a label into a spec row. ---
+
+function insertAdminSpecsTable() {
+    const rowsInput = document.getElementById("admin-specs-table-rows");
+    const colsInput = document.getElementById("admin-specs-table-cols");
+    const wrap = document.getElementById("admin-specs-table-wrap");
+    if (!rowsInput || !colsInput || !wrap) return;
+
+    const rows = Math.min(Math.max(parseInt(rowsInput.value, 10) || 1, 1), 50);
+    const cols = Math.min(Math.max(parseInt(colsInput.value, 10) || 1, 1), 6);
+
+    let html = '<table class="specs-paste-table"><tbody>';
+    for (let r = 0; r < rows; r++) {
+        html += "<tr>";
+        for (let c = 0; c < cols; c++) {
+            html += `<td><input type="text" class="specs-paste-cell" data-row="${r}" data-col="${c}"></td>`;
+        }
+        html += "</tr>";
+    }
+    html += "</tbody></table>";
+    html += '<div class="specs-paste-table-actions">' +
+        '<button type="button" onclick="commitAdminSpecsTable()">Add to Specifications</button>' +
+        '<button type="button" onclick="document.getElementById(\'admin-specs-table-wrap\').innerHTML=\'\'">Clear table</button>' +
+        "</div>";
+    wrap.innerHTML = html;
+    wrap.querySelectorAll(".specs-paste-cell").forEach((cell) => {
+        cell.addEventListener("paste", adminSpecsTableCellPaste);
+    });
+}
+
+function adminSpecsTableCellPaste(e) {
+    const text = (e.clipboardData || window.clipboardData).getData("text");
+    // A single value with no tab/newline is a normal single-cell paste -
+    // let the browser handle it so typing or pasting one value still works.
+    if (!text || (!/\t/.test(text) && !/\r?\n/.test(text.trim()))) return;
+    e.preventDefault();
+
+    const cell = e.target;
+    const table = cell.closest(".specs-paste-table");
+    if (!table) return;
+    const startRow = parseInt(cell.dataset.row, 10);
+    const startCol = parseInt(cell.dataset.col, 10);
+
+    const rawLines = text.replace(/\r/g, "").split("\n");
+    if (rawLines.length && rawLines[rawLines.length - 1] === "") rawLines.pop();
+    const grid = rawLines.map((line) => line.split("\t"));
+
+    function ensureRow(r) {
+        const tbody = table.querySelector("tbody");
+        let trs = tbody.querySelectorAll("tr");
+        while (trs.length <= r) {
+            const colCount = trs.length ? trs[0].children.length : startCol + 1;
+            const tr = document.createElement("tr");
+            for (let c = 0; c < colCount; c++) {
+                const td = document.createElement("td");
+                const input = document.createElement("input");
+                input.type = "text";
+                input.className = "specs-paste-cell";
+                input.dataset.row = trs.length;
+                input.dataset.col = c;
+                input.addEventListener("paste", adminSpecsTableCellPaste);
+                td.appendChild(input);
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+            trs = tbody.querySelectorAll("tr");
+        }
+        return trs[r];
+    }
+
+    grid.forEach((lineCells, r) => {
+        const tr = ensureRow(startRow + r);
+        lineCells.forEach((val, c) => {
+            const td = tr.children[startCol + c];
+            const input = td && td.querySelector("input");
+            if (input) input.value = val.trim();
+        });
+    });
+}
+
+function commitAdminSpecsTable() {
+    const wrap = document.getElementById("admin-specs-table-wrap");
+    const table = wrap && wrap.querySelector(".specs-paste-table");
+    if (!table) return;
+    table.querySelectorAll("tbody > tr").forEach((tr) => {
+        const cells = Array.from(tr.querySelectorAll("input"));
+        const label = (cells[0] && cells[0].value.trim()) || "";
+        const value = (cells[1] && cells[1].value.trim()) || "";
         if (label) addSpecRow(label, value);
     });
-    box.value = "";
+    wrap.innerHTML = "";
 }
 // --- Direct paste into the spec boxes themselves (Ryan: typing a single
 // spec should keep working exactly as before, but pasting a multi-line
@@ -1923,8 +2053,8 @@ function openProductForm() {
     document.getElementById("variants-section").classList.add("hidden");
     document.getElementById("variants-list").innerHTML = "";
     document.getElementById("specs-list").innerHTML = "";
-    const adminSpecsPasteBox = document.getElementById("admin-specs-paste-box");
-    if (adminSpecsPasteBox) adminSpecsPasteBox.value = "";
+    const adminSpecsTableWrap = document.getElementById("admin-specs-table-wrap");
+    if (adminSpecsTableWrap) adminSpecsTableWrap.innerHTML = "";
     pdLocalPreviews = [];
     pdAllImages = [];
     const _po = document.getElementById("pd-photo-order"); if (_po) _po.remove();
@@ -1958,8 +2088,8 @@ function editProduct(id) {
     document.getElementById("product-gtin").value = product.gtin || "";
     document.getElementById("product-mpn").value = product.mpn || "";
     document.getElementById("variants-section").classList.remove("hidden");
-    const editAdminSpecsPasteBox = document.getElementById("admin-specs-paste-box");
-    if (editAdminSpecsPasteBox) editAdminSpecsPasteBox.value = "";
+    const editAdminSpecsTableWrap = document.getElementById("admin-specs-table-wrap");
+    if (editAdminSpecsTableWrap) editAdminSpecsTableWrap.innerHTML = "";
     loadVariants(product.id);
     loadProductOptionsIntoForm(product.id);
     LzBlockEditor.mount(document.getElementById("desc-blocks-editor"), product.id, { tokenKey: "adminToken" });
@@ -2461,6 +2591,15 @@ async function setReportStatus(id, status) {
     }
 }
 
+// Sidebar accordion groups (matches the vendor dashboard's vd-nav-group
+// pattern) - collapsed by default, opens automatically when one of its own
+// tabs becomes active (see setupTabs()'s click handler).
+function toggleAdminNavGroup(key) {
+    const group = document.querySelector(`.vd-nav-group[data-group="${key}"]`);
+    if (!group) return;
+    group.classList.toggle("vd-nav-open");
+}
+
 function setupTabs() {
     const tabButtons = document.querySelectorAll(".tab-btn");
     const tabContents = document.querySelectorAll(".tab-content");
@@ -2472,6 +2611,22 @@ function setupTabs() {
 
             button.classList.add("active");
             document.getElementById(`tab-${button.dataset.tab}`).classList.remove("hidden");
+
+            // Ryan, Sept 2026: switching tabs kept whatever scroll position
+            // the previous tab was left at, so a tab opened while scrolled
+            // down elsewhere looked like it was missing its own header -
+            // reset to the top on every switch so each tab starts clean.
+            window.scrollTo(0, 0);
+
+            // Auto-expand the sidebar group a tab lives in, same pattern as
+            // the vendor dashboard, so picking a tab from search/deep-link
+            // doesn't leave its group collapsed and the tab looking orphaned.
+            const parentNavGroup = button.closest(".vd-nav-group");
+            if (parentNavGroup) parentNavGroup.classList.add("vd-nav-open");
+
+            if (button.dataset.tab === "customers") {
+                markAdminCustomersViewed();
+            }
 
             if (button.dataset.tab === "promotions") {
                 loadAdminPromos();

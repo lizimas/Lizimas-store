@@ -113,10 +113,52 @@ const saveDescriptionBlocks = async (req, res) => {
             if (!items || items.length === 0) {
                 return res.status(400).json({ message: `Block ${i}: grid needs at least one column` });
             }
+            // Full-width (edge-to-edge) toggle for the whole grid section,
+            // same idea as the standalone Image block's - coerced to a
+            // strict boolean before it rides through in the payload JSON.
+            b.payload.full_width = !!b.payload.full_width;
             for (const [j, it] of items.entries()) {
                 if (it && it.body) it.body = sanitizeBlockHtml(it.body);
+
+                // Optional per-item video - same URL rule as a standalone
+                // video block, checked per column since each one is its own
+                // media source.
+                if (it && it.video_url) {
+                    const v = String(it.video_url).trim();
+                    if (!VIDEO_URL_RE.test(v)) {
+                        return res.status(400).json({
+                            message: `Block ${i}, column ${j}: video needs a YouTube, Vimeo, or direct .mp4/.webm/.mov URL`
+                        });
+                    }
+                    it.video_url = v;
+                    it.video_placement = ["replace", "above", "below"].includes(it.video_placement)
+                        ? it.video_placement
+                        : "replace";
+                } else if (it) {
+                    delete it.video_url;
+                    delete it.video_placement;
+                }
+
+                // Optional per-item link - which part of the tile it makes
+                // clickable is stored alongside it so the renderer knows
+                // where to wrap the <a>.
+                if (it && it.link_url) {
+                    const l = String(it.link_url).trim();
+                    if (!LINK_URL_RE.test(l)) {
+                        return res.status(400).json({ message: `Block ${i}, column ${j}: link needs a valid http(s) URL` });
+                    }
+                    it.link_url = l;
+                    it.link_placement = ["whole", "media", "caption"].includes(it.link_placement)
+                        ? it.link_placement
+                        : "whole";
+                } else if (it) {
+                    delete it.link_url;
+                    delete it.link_placement;
+                }
+
                 const hasContent = it && (
                     it.image_url ||
+                    it.video_url ||
                     stripTags(it.caption || "").trim() ||
                     stripTags(it.body || "").trim()
                 );

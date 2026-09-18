@@ -1641,8 +1641,8 @@ async function vmLoadAddProduct() {
     document.getElementById("vm-product-form-status").textContent = "";
     const specsList = document.getElementById("vm-specs-list");
     if (specsList) specsList.innerHTML = "";
-    const specsPasteBox = document.getElementById("vm-specs-paste-box");
-    if (specsPasteBox) specsPasteBox.value = "";
+    const specsTableWrap = document.getElementById("vm-specs-table-wrap");
+    if (specsTableWrap) specsTableWrap.innerHTML = "";
     vmSpecRowCounter = 0;
 }
 
@@ -1760,15 +1760,100 @@ function vmParseSpecLine(line) {
     return { label: line.trim(), value: "" };
 }
 
-function vmParseAndAddSpecs() {
-    const box = document.getElementById("vm-specs-paste-box");
-    if (!box || !box.value.trim()) return;
-    const lines = box.value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    lines.forEach(line => {
-        const { label, value } = vmParseSpecLine(line);
+// --- Insert-table paste tool (Task: replace the free-text "paste from
+// Excel" box with a real table sized to the data - rows/columns are typed
+// or scrolled like Word's insert-table dialog. Tap a cell and paste; the
+// pasted range fills the grid starting at that cell, adding rows if the
+// paste has more than the table currently holds. "Add to Specifications"
+// then turns column 1/2 of each row with a label into a spec row. ---
+
+function insertVmSpecsTable() {
+    const rowsInput = document.getElementById("vm-specs-table-rows");
+    const colsInput = document.getElementById("vm-specs-table-cols");
+    const wrap = document.getElementById("vm-specs-table-wrap");
+    if (!rowsInput || !colsInput || !wrap) return;
+
+    const rows = Math.min(Math.max(parseInt(rowsInput.value, 10) || 1, 1), 50);
+    const cols = Math.min(Math.max(parseInt(colsInput.value, 10) || 1, 1), 6);
+
+    let html = '<table class="vm-specs-paste-table"><tbody>';
+    for (let r = 0; r < rows; r++) {
+        html += "<tr>";
+        for (let c = 0; c < cols; c++) {
+            html += `<td><input type="text" class="vm-specs-paste-cell" data-row="${r}" data-col="${c}"></td>`;
+        }
+        html += "</tr>";
+    }
+    html += "</tbody></table>";
+    html += '<div class="vm-specs-paste-table-actions">' +
+        '<button type="button" onclick="commitVmSpecsTable()" class="vm-btn-help" style="border:1px solid #1a1a2e; border-radius:8px; padding:8px; background:#1a1a2e; color:#fff; cursor:pointer; flex:1;">Add to Specifications</button>' +
+        '<button type="button" onclick="document.getElementById(\'vm-specs-table-wrap\').innerHTML=\'\'" class="vm-btn-help" style="border:1px solid #dfe1e8; border-radius:8px; padding:8px; background:#fff; color:#444; cursor:pointer;">Clear</button>' +
+        "</div>";
+    wrap.innerHTML = html;
+    wrap.querySelectorAll(".vm-specs-paste-cell").forEach((cell) => {
+        cell.addEventListener("paste", vmSpecsTableCellPaste);
+    });
+}
+
+function vmSpecsTableCellPaste(e) {
+    const text = (e.clipboardData || window.clipboardData).getData("text");
+    if (!text || (!/\t/.test(text) && !/\r?\n/.test(text.trim()))) return;
+    e.preventDefault();
+
+    const cell = e.target;
+    const table = cell.closest(".vm-specs-paste-table");
+    if (!table) return;
+    const startRow = parseInt(cell.dataset.row, 10);
+    const startCol = parseInt(cell.dataset.col, 10);
+
+    const rawLines = text.replace(/\r/g, "").split("\n");
+    if (rawLines.length && rawLines[rawLines.length - 1] === "") rawLines.pop();
+    const grid = rawLines.map((line) => line.split("\t"));
+
+    function ensureRow(r) {
+        const tbody = table.querySelector("tbody");
+        let trs = tbody.querySelectorAll("tr");
+        while (trs.length <= r) {
+            const colCount = trs.length ? trs[0].children.length : startCol + 1;
+            const tr = document.createElement("tr");
+            for (let c = 0; c < colCount; c++) {
+                const td = document.createElement("td");
+                const input = document.createElement("input");
+                input.type = "text";
+                input.className = "vm-specs-paste-cell";
+                input.dataset.row = trs.length;
+                input.dataset.col = c;
+                input.addEventListener("paste", vmSpecsTableCellPaste);
+                td.appendChild(input);
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+            trs = tbody.querySelectorAll("tr");
+        }
+        return trs[r];
+    }
+
+    grid.forEach((lineCells, r) => {
+        const tr = ensureRow(startRow + r);
+        lineCells.forEach((val, c) => {
+            const td = tr.children[startCol + c];
+            const input = td && td.querySelector("input");
+            if (input) input.value = val.trim();
+        });
+    });
+}
+
+function commitVmSpecsTable() {
+    const wrap = document.getElementById("vm-specs-table-wrap");
+    const table = wrap && wrap.querySelector(".vm-specs-paste-table");
+    if (!table) return;
+    table.querySelectorAll("tbody > tr").forEach((tr) => {
+        const cells = Array.from(tr.querySelectorAll("input"));
+        const label = (cells[0] && cells[0].value.trim()) || "";
+        const value = (cells[1] && cells[1].value.trim()) || "";
         if (label) vmAddSpecRow(label, value);
     });
-    box.value = "";
+    wrap.innerHTML = "";
 }
 // --- Direct paste into the spec boxes themselves (Ryan: typing a single
 // spec should keep working exactly as before, but pasting a multi-line
@@ -1973,8 +2058,8 @@ async function vmSubmitProduct() {
         document.getElementById("vm-product-images").value = "";
         document.getElementById("vm-product-authenticity-confirm").checked = false;
         document.getElementById("vm-specs-list").innerHTML = "";
-        const vmSpecsPasteBoxAfterSubmit = document.getElementById("vm-specs-paste-box");
-        if (vmSpecsPasteBoxAfterSubmit) vmSpecsPasteBoxAfterSubmit.value = "";
+        const vmSpecsTableWrapAfterSubmit = document.getElementById("vm-specs-table-wrap");
+        if (vmSpecsTableWrapAfterSubmit) vmSpecsTableWrapAfterSubmit.innerHTML = "";
         vmHidePricingPreview();
 
         vmShowScreen("products");

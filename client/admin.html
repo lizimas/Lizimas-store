@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Admin Dashboard</title>
-<link rel="stylesheet" href="css/admin.css?v=24">
+<link rel="stylesheet" href="css/admin.css?v=28">
 </head>
 <body>
 
@@ -45,84 +45,87 @@
                     <span>Lizimas Admin</span>
                 </div>
 
-                <div class="sidebar-profile-trigger" onclick="openProfilePanel()">
-                    <span class="sidebar-profile-avatar" id="sidebar-profile-avatar">A</span>
-                    My Profile
-                </div>
-
                 <nav class="sidebar-nav">
-                    <button class="tab-btn active" data-tab="overview">
-                        <span class="sidebar-icon">&#9635;</span> Dashboard
-                    </button>
-                    <button class="tab-btn" data-tab="analytics">
-                        <span class="sidebar-icon">&#128202;</span> Analytics
-                    </button>
-                    <button class="tab-btn" data-tab="performance">
-                        <span class="sidebar-icon">&#128200;</span> Performance Reports
-                    </button>
-                    <button class="tab-btn" data-tab="products">
-                        <span class="sidebar-icon">&#128230;</span> Products
-                    </button>
-                    <button class="tab-btn" data-tab="categories">
-                        Categories
-                    </button>
-                    <button class="tab-btn" data-tab="promotions">
-                        Promotions
-                    </button>
-                    <button class="tab-btn" data-tab="discounts">
-                        Discount Codes
-                    </button>
-                    <button class="tab-btn" data-tab="flash-sales">
-                        Flash Sales
-                    </button>
-                    <button class="tab-btn" data-tab="orders">
-                        <span class="sidebar-icon">&#128203;</span> Orders
-                    </button>
-                    <button class="tab-btn" data-tab="customers">
-                        <span class="sidebar-icon">&#128101;</span> Customers
-                    </button>
-                    <button class="tab-btn" data-tab="support">
-                        <span class="sidebar-icon">&#128172;</span> Live Support
-                    </button>
-                    <button class="tab-btn" data-tab="staff">
-                        <span class="sidebar-icon">&#128100;</span> Staff & Approvals
-                    </button>
-                    <button class="tab-btn" data-tab="team-messages">
-                        <span class="sidebar-icon">&#128233;</span> Team Messages
-                    </button>
-                    <button class="tab-btn" data-tab="vendors">
-                        <span class="sidebar-icon">&#127970;</span> Vendors
-                    </button>
-                    <button class="tab-btn" data-tab="consignments-admin">
-                        <span class="sidebar-icon">&#128230;</span> Consignments
-                    </button>
-                    <button class="tab-btn" data-tab="ad-campaigns-admin">
-                        <span class="sidebar-icon">&#128227;</span> Ad Campaigns
-                    </button>
-                    <button class="tab-btn" data-tab="product-tiers-admin">
-                        <span class="sidebar-icon">&#127942;</span> Product Tiers
-                    </button>
-                    <button class="tab-btn" data-tab="prohibited-items-admin">
-                        <span class="sidebar-icon">&#128683;</span> Prohibited Items
-                    </button>
-                    <button class="tab-btn" data-tab="payment-instruments-admin">
-                        <span class="sidebar-icon">&#128179;</span> Payment Instruments
-                    </button>
-                    <button class="tab-btn" data-tab="brand-authorizations-admin">
-                        <span class="sidebar-icon">&#127991;</span> Brand Authorizations
-                    </button>
-                    <button class="tab-btn" data-tab="security">
-                        <span class="sidebar-icon">&#128274;</span> Security
-                    </button>
-                    <button class="tab-btn" data-tab="account">
-                        <span class="sidebar-icon">&#9881;</span> Account
-                    </button>
-                    <button class="tab-btn" data-tab="notes">
-                        <span class="sidebar-icon">&#128221;</span> Notes
-                    </button>
-                </nav>
 
-                <button class="logout-btn" onclick="handleLogout()">Log Out</button>
+                    <div class="vd-nav-group vd-nav-open" data-group="dashboard-analytics">
+                        <button class="vd-nav-parent" onclick="toggleAdminNavGroup('dashboard-analytics')">
+                            <span class="sidebar-icon">&#128202;</span>
+                            <span class="vd-nav-label">Dashboard &amp; Analytics</span>
+                            <span class="vd-nav-chevron">&#8250;</span>
+                        </button>
+                        <div class="vd-nav-children">
+                            <button class="tab-btn active vd-sub-item" data-tab="overview">&#127968; Dashboard</button>
+                            <button class="tab-btn vd-sub-item" data-tab="analytics">&#128202; Analytics</button>
+                            <button class="tab-btn vd-sub-item" data-tab="performance">&#128200; Performance Reports</button>
+                        </div>
+                    </div>
+
+                    <div class="vd-nav-group" data-group="products-inventory">
+                        <button class="vd-nav-parent" onclick="toggleAdminNavGroup('products-inventory')">
+                            <span class="sidebar-icon">&#128230;</span>
+                            <span class="vd-nav-label">Products &amp; Inventory</span>
+                            <span class="vd-nav-chevron">&#8250;</span>
+                        </button>
+                        <div class="vd-nav-children">
+                            <button class="tab-btn vd-sub-item" data-tab="products">&#128230; Products</button>
+                            <button class="tab-btn vd-sub-item vd-sub-item-nested" data-tab="categories">&#128450; Categories</button>
+                            <button class="tab-btn vd-sub-item vd-sub-item-nested" data-tab="product-tiers-admin">&#127942; Product Tiers</button>
+                            <button class="tab-btn vd-sub-item" data-tab="promotions">&#127919; Promotions</button>
+                            <button class="tab-btn vd-sub-item" data-tab="discounts">&#127903; Discount Codes</button>
+                            <button class="tab-btn vd-sub-item" data-tab="flash-sales">&#128293; Flash Sales</button>
+                            <button class="tab-btn vd-sub-item" data-tab="brand-authorizations-admin">&#127991; Brand Authorizations</button>
+                            <button class="tab-btn vd-sub-item" data-tab="prohibited-items-admin">&#128683; Prohibited Items</button>
+                        </div>
+                    </div>
+
+                    <div class="vd-nav-group" data-group="orders-fulfillment">
+                        <button class="vd-nav-parent" onclick="toggleAdminNavGroup('orders-fulfillment')">
+                            <span class="sidebar-icon">&#128203;</span>
+                            <span class="vd-nav-label">Orders &amp; Fulfillment</span>
+                            <span class="vd-nav-chevron">&#8250;</span>
+                        </button>
+                        <div class="vd-nav-children">
+                            <button class="tab-btn vd-sub-item" data-tab="orders">&#128203; Orders</button>
+                            <button class="tab-btn vd-sub-item" data-tab="consignments-admin">&#128666; Consignments</button>
+                            <button class="tab-btn vd-sub-item" data-tab="vendors">&#129309; Vendors</button>
+                        </div>
+                    </div>
+
+                    <div class="vd-nav-group" data-group="customers-communication">
+                        <button class="vd-nav-parent" onclick="toggleAdminNavGroup('customers-communication')">
+                            <span class="sidebar-icon">&#128101;</span>
+                            <span class="vd-nav-label">Customers &amp; Communication</span>
+                            <span class="vd-nav-badge" id="admin-sidebar-customers-badge" hidden>0</span>
+                            <span class="vd-nav-chevron">&#8250;</span>
+                        </button>
+                        <div class="vd-nav-children">
+                            <button class="tab-btn vd-sub-item" data-tab="customers">&#128101; Customers</button>
+                            <button class="tab-btn vd-sub-item" data-tab="support">&#127908; Live Support</button>
+                            <button class="tab-btn vd-sub-item" data-tab="team-messages">&#128233; Team Messages</button>
+                            <button class="tab-btn vd-sub-item" data-tab="ad-campaigns-admin">&#128227; Ad Campaigns</button>
+                        </div>
+                    </div>
+
+                    <div class="vd-nav-group" data-group="admin-account">
+                        <button class="vd-nav-parent" onclick="toggleAdminNavGroup('admin-account')">
+                            <span class="sidebar-icon">&#9881;&#65039;</span>
+                            <span class="vd-nav-label">Admin &amp; Account</span>
+                            <span class="vd-nav-chevron">&#8250;</span>
+                        </button>
+                        <div class="vd-nav-children">
+                            <button class="tab-btn vd-sub-item" onclick="openProfilePanel()">
+                                <span class="sidebar-profile-avatar" id="sidebar-profile-avatar">A</span> My Profile
+                            </button>
+                            <button class="tab-btn vd-sub-item" data-tab="staff">&#9989; Staff &amp; Approvals</button>
+                            <button class="tab-btn vd-sub-item" data-tab="payment-instruments-admin">&#128179; Payment Instruments</button>
+                            <button class="tab-btn vd-sub-item" data-tab="security">&#128737; Security</button>
+                            <button class="tab-btn vd-sub-item" data-tab="account">&#9881; Account</button>
+                            <button class="tab-btn vd-sub-item" data-tab="notes">&#128221; Notes</button>
+                            <button class="tab-btn vd-sub-item vd-sub-item-logout" onclick="handleLogout()">&#128682; Log Out</button>
+                        </div>
+                    </div>
+
+                </nav>
             </aside>
 
             <main class="admin-main">
@@ -273,14 +276,18 @@
 
                 <section id="tab-customers" class="tab-content hidden">
                     <h2 class="admin-page-title">All Customers</h2>
-                    <input
-                        type="text"
-                        id="customer-search-input"
-                        placeholder="Search by name, email, or phone..."
-                        oninput="filterCustomers()"
-                        style="width:100%; box-sizing:border-box; padding:10px 14px; margin-bottom:16px; border:1px solid #ccc; border-radius:8px; font-size:14px;"
-                    >
-                    <div id="customers-table">Loading...</div>
+                    <div class="customers-tile">
+                        <div class="customers-tile-head">
+                            <input
+                                type="text"
+                                id="customer-search-input"
+                                placeholder="Search by name, email, or phone..."
+                                oninput="filterCustomers()"
+                            >
+                            <span class="customers-tile-count" id="customers-tile-count"></span>
+                        </div>
+                        <div id="customers-table">Loading...</div>
+                    </div>
                 </section>
 
                 <section id="tab-products" class="tab-content hidden">
@@ -516,9 +523,13 @@
 
                                 <div style="margin-top:14px; border-top:1px dashed #ddd; padding-top:12px;">
                                     <label style="font-size:12.5px; font-weight:600; color:#333; display:block; margin-bottom:4px;">Paste from Excel</label>
-                                    <p style="font-size:11.5px; color:#888; margin:0 0 6px;">Select your Label and Value columns in Excel, copy, and paste them below &mdash; one row per line.</p>
-                                    <textarea id="admin-specs-paste-box" rows="3" placeholder="Material&#9;Cotton&#10;Battery Life&#9;10 hours&#10;Weight&#9;250g" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid #ccc; border-radius:6px; font-family:monospace; font-size:12px;"></textarea>
-                                    <button type="button" onclick="parseAndAddAdminSpecs()" style="margin-top:6px; padding:7px 12px; border-radius:6px; border:1px solid #1a1a2e; background:#1a1a2e; color:#fff; cursor:pointer; font-size:12.5px;">Parse &amp; Add Rows</button>
+                                    <p style="font-size:11.5px; color:#888; margin:0 0 6px;">Insert a table sized to your data (type the numbers or scroll over them), click a cell, then paste your copied Excel columns &mdash; it fills in starting from that cell.</p>
+                                    <div class="specs-table-size-picker">
+                                        <label>Rows <input type="number" id="admin-specs-table-rows" min="1" max="50" value="4"></label>
+                                        <label>Columns <input type="number" id="admin-specs-table-cols" min="1" max="6" value="2"></label>
+                                        <button type="button" onclick="insertAdminSpecsTable()">Insert Table</button>
+                                    </div>
+                                    <div id="admin-specs-table-wrap"></div>
                                 </div>
                             </div>
 
@@ -1587,10 +1598,10 @@
     </div>
 
 <script src="js/prepare-picked-file.js?v=10"></script>
-<script src="js/description-block-editor.js?v=16"></script>
+<script src="js/description-block-editor.js?v=18"></script>
 <script src="js/category-select.js?v=2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
-<script src="js/admin.js?v=73"></script>
+<script src="js/admin.js?v=76"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

@@ -427,6 +427,83 @@ select.status-select {
     cursor: pointer;
 }
 
+/* --- Sidebar: expandable nav groups (accordion), matching vendor dashboard pattern --- */
+
+.admin-sidebar .vd-nav-group {
+    margin-bottom: 2px;
+}
+
+.admin-sidebar .vd-nav-parent {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    background: none;
+    color: #ccc;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.admin-sidebar .vd-nav-parent:hover {
+    background: rgba(255,255,255,.06);
+    color: #fff;
+}
+
+.admin-sidebar .vd-nav-label {
+    flex: 1;
+}
+
+.admin-sidebar .vd-nav-chevron {
+    font-size: 17px;
+    line-height: 1;
+    color: rgba(255,255,255,.4);
+    transition: transform 0.15s ease;
+    flex-shrink: 0;
+}
+
+.admin-sidebar .vd-nav-group.vd-nav-open .vd-nav-chevron {
+    transform: rotate(90deg);
+}
+
+.admin-sidebar .vd-nav-badge {
+    background: #DC2626;
+    color: #fff;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 1px 7px;
+    flex-shrink: 0;
+}
+
+.admin-sidebar .vd-nav-children {
+    display: none;
+    flex-direction: column;
+}
+
+.admin-sidebar .vd-nav-group.vd-nav-open .vd-nav-children {
+    display: flex;
+}
+
+.admin-sidebar .vd-sub-item {
+    padding-left: 30px !important;
+    font-size: 13px;
+}
+
+.admin-sidebar .vd-sub-item-nested {
+    padding-left: 46px !important;
+}
+
+.admin-sidebar .vd-sub-item-logout {
+    margin-top: 8px;
+    background: rgba(255,255,255,.08) !important;
+    color: #fff !important;
+}
+
 .admin-main {
     flex: 1;
     background: #f4f5f7;
@@ -1417,10 +1494,149 @@ select.status-select {
 .lzbe-grid-item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .lzbe-grid-item-head button { width: 24px; height: 22px; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; }
 .lzbe-grid-item .lzbe-thumb { max-width: 100%; }
-.lzbe-grid-item input, .lzbe-grid-item textarea { width: 100%; margin-top: 6px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 0.85rem; }
+.lzbe-grid-item input, .lzbe-grid-item textarea, .lzbe-grid-item select { width: 100%; margin-top: 6px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 0.85rem; }
 .lzbe-grid-item button { margin-top: 6px; padding: 4px 8px; border: 1px solid #0d1b3e; background: #fff; color: #0d1b3e; border-radius: 4px; cursor: pointer; font-size: 0.78rem; }
 .lzbe-grid-add { margin-top: 4px; padding: 6px 12px; border: 1px dashed #0d1b3e; background: #fff; color: #0d1b3e; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
 .lzbe-grid-add:hover { background: #0d1b3e; color: #fff; }
+
+/* Per-item video/link fields in a grid column - a compact labeled group,
+   distinct from the plain inputs above it so the optional-ness reads
+   clearly in a small card. */
+.lzbe-grid-media-field { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e2e2e2; }
+.lzbe-grid-media-field label { display: block; font-size: 0.75rem; color: #666; margin-bottom: 2px; }
+.lzbe-grid-media-field input, .lzbe-grid-media-field select { margin-top: 0 !important; }
+.lzbe-grid-media-field select { margin-top: 4px !important; }
+
+/* --- Specs "insert table" paste tool (Word-style: pick rows/columns, then
+   paste Excel data straight into the grid) --- */
+.specs-table-size-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
+.specs-table-size-picker label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #444; }
+.specs-table-size-picker input[type="number"] { width: 56px; padding: 5px 6px; border: 1px solid #ccc; border-radius: 6px; font-size: 12.5px; }
+.specs-table-size-picker button { padding: 7px 12px; border-radius: 6px; border: 1px solid #1a1a2e; background: #1a1a2e; color: #fff; cursor: pointer; font-size: 12.5px; }
+.specs-paste-table { border-collapse: collapse; width: 100%; margin-bottom: 8px; }
+.specs-paste-table td { border: 1px solid #ddd; padding: 0; }
+.specs-paste-table .specs-paste-cell { width: 100%; box-sizing: border-box; padding: 7px 8px; border: none; font-family: monospace; font-size: 12px; background: #fff; }
+.specs-paste-table .specs-paste-cell:focus { outline: 2px solid #1a1a2e; outline-offset: -2px; background: #fbfaf5; }
+.specs-paste-table-actions { display: flex; gap: 8px; }
+.specs-paste-table-actions button:first-child { padding: 7px 12px; border-radius: 6px; border: 1px solid #1a1a2e; background: #1a1a2e; color: #fff; cursor: pointer; font-size: 12.5px; }
+.specs-paste-table-actions button:last-child { padding: 7px 12px; border-radius: 6px; border: 1px solid #ccc; background: #fff; color: #444; cursor: pointer; font-size: 12.5px; }
+
+/* --- Customers: one tile holding the whole list (Facebook-contacts style),
+   card rows instead of a plain table --- */
+.customers-tile {
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.customers-tile-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.customers-tile-head input {
+    flex: 1;
+    box-sizing: border-box;
+    padding: 10px 14px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.customers-tile-count {
+    font-size: 12.5px;
+    color: #888;
+    white-space: nowrap;
+}
+
+.customer-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 8px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.customer-card:last-child {
+    border-bottom: none;
+}
+
+.customer-card-avatar {
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #1a1a2e;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.customer-card-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.customer-card-name-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.customer-card-name {
+    font-weight: 700;
+    font-size: 14.5px;
+    color: #1a1a2e;
+}
+
+.customer-new-badge {
+    background: #DC2626;
+    color: #fff;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 8px;
+    text-transform: uppercase;
+}
+
+.customer-card-meta {
+    font-size: 12.5px;
+    color: #888;
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.customer-card-actions {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 6px;
+}
+
+.customer-card-btn {
+    border: none;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #fff;
+}
+
+.customer-card-btn-restore { background: #16A34A; }
+.customer-card-btn-danger { background: #DC2626; }
+
+@media (max-width: 640px) {
+    .customer-card { flex-wrap: wrap; }
+    .customer-card-actions { width: 100%; justify-content: flex-end; margin-top: 6px; }
+}
 
 /* Grid column's rich-text field reuses .lzbe-rich but is shorter and a
    touch smaller, since it sits in a narrow card next to an image/caption

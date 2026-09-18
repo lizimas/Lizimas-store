@@ -591,6 +591,22 @@
                 colsLabel.appendChild(colsInput);
                 row.appendChild(colsLabel);
 
+                // Full-width (edge-to-edge) display for the whole grid
+                // section, same Lulu-style breakout as the standalone Image
+                // block's toggle - makes sense at the grid level (not per
+                // column) since columns sit side by side.
+                const gridFullWidthLabel = document.createElement("label");
+                gridFullWidthLabel.className = "lzbe-fullwidth-toggle";
+                const gridFullWidthCheckbox = document.createElement("input");
+                gridFullWidthCheckbox.type = "checkbox";
+                gridFullWidthCheckbox.checked = !!(payload && payload.full_width);
+                gridFullWidthCheckbox.addEventListener("change", (e) => {
+                    payload.full_width = e.target.checked;
+                });
+                gridFullWidthLabel.appendChild(gridFullWidthCheckbox);
+                gridFullWidthLabel.appendChild(document.createTextNode(" Full width (edge-to-edge, no side margins)"));
+                row.appendChild(gridFullWidthLabel);
+
                 const itemsWrap = document.createElement("div");
                 itemsWrap.className = "lzbe-grid-items";
 
@@ -637,6 +653,63 @@
                     captionInput.value = item.caption || "";
                     captionInput.addEventListener("input", (e) => { item.caption = e.target.value; });
                     cell.appendChild(captionInput);
+
+                    // Optional per-item video (plays inline) and link (makes
+                    // part of the tile clickable) - each has its own
+                    // placement control since a tile can carry both at once.
+                    const videoWrap = document.createElement("div");
+                    videoWrap.className = "lzbe-grid-media-field";
+                    const videoLabel = document.createElement("label");
+                    videoLabel.textContent = "Video URL (optional)";
+                    videoWrap.appendChild(videoLabel);
+                    const videoInput = document.createElement("input");
+                    videoInput.type = "text";
+                    videoInput.placeholder = "YouTube, Vimeo, or direct .mp4/.webm/.mov URL";
+                    videoInput.value = item.video_url || "";
+                    videoInput.addEventListener("input", (e) => { item.video_url = e.target.value.trim(); });
+                    videoWrap.appendChild(videoInput);
+                    const videoPlacement = document.createElement("select");
+                    [
+                        ["replace", "Replace the image"],
+                        ["above", "Above the image"],
+                        ["below", "Below the image"],
+                    ].forEach(([val, label]) => {
+                        const opt = document.createElement("option");
+                        opt.value = val;
+                        opt.textContent = label;
+                        videoPlacement.appendChild(opt);
+                    });
+                    videoPlacement.value = item.video_placement || "replace";
+                    videoPlacement.addEventListener("change", (e) => { item.video_placement = e.target.value; });
+                    videoWrap.appendChild(videoPlacement);
+                    cell.appendChild(videoWrap);
+
+                    const linkWrap = document.createElement("div");
+                    linkWrap.className = "lzbe-grid-media-field";
+                    const linkLabel = document.createElement("label");
+                    linkLabel.textContent = "Link URL (optional)";
+                    linkWrap.appendChild(linkLabel);
+                    const linkInput = document.createElement("input");
+                    linkInput.type = "text";
+                    linkInput.placeholder = "https://... (makes part of this tile clickable)";
+                    linkInput.value = item.link_url || "";
+                    linkInput.addEventListener("input", (e) => { item.link_url = e.target.value.trim(); });
+                    linkWrap.appendChild(linkInput);
+                    const linkPlacement = document.createElement("select");
+                    [
+                        ["whole", "Whole tile is clickable"],
+                        ["media", "Image/video only"],
+                        ["caption", "Caption only"],
+                    ].forEach(([val, label]) => {
+                        const opt = document.createElement("option");
+                        opt.value = val;
+                        opt.textContent = label;
+                        linkPlacement.appendChild(opt);
+                    });
+                    linkPlacement.value = item.link_placement || "whole";
+                    linkPlacement.addEventListener("change", (e) => { item.link_placement = e.target.value; });
+                    linkWrap.appendChild(linkPlacement);
+                    cell.appendChild(linkWrap);
 
                     const itemEd = document.createElement("div");
                     itemEd.className = "lzbe-rich lzbe-grid-rich";

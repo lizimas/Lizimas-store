@@ -147,6 +147,18 @@
 .vm-btn-row { margin: 0 14px 14px; }
 .vm-btn-help { font-size: 11px; color: #999; text-align: center; margin-top: 8px; }
 
+/* --- Specs "insert table" paste tool (Word-style: pick rows/columns, then
+   paste Excel data straight into the grid) --- */
+.vm-specs-table-size-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+.vm-specs-table-size-picker label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #444; }
+.vm-specs-table-size-picker input[type="number"] { width: 50px; padding: 5px 6px; border: 1px solid #dfe1e8; border-radius: 6px; font-size: 12px; }
+.vm-specs-table-size-picker button { font-size: 12px; }
+.vm-specs-paste-table { border-collapse: collapse; width: 100%; margin-bottom: 8px; }
+.vm-specs-paste-table td { border: 1px solid #dfe1e8; padding: 0; }
+.vm-specs-paste-table .vm-specs-paste-cell { width: 100%; box-sizing: border-box; padding: 8px; border: none; font-family: monospace; font-size: 12px; background: #fff; }
+.vm-specs-paste-table .vm-specs-paste-cell:focus { outline: 2px solid var(--vm-navy); outline-offset: -2px; background: #f9f9fb; }
+.vm-specs-paste-table-actions { display: flex; gap: 8px; }
+
 /* --- Stat tiles (Home KPI state) ---------------------------------------- */
 
 .vm-stat-row { display: flex; gap: 10px; margin-bottom: 10px; }

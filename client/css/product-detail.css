@@ -319,6 +319,27 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
     border-radius: 0;
 }
 
+/* Full-width (edge-to-edge) Grid section - same breakout technique as
+   .pdb-img-full, applied to the whole multi-column block (Ryan, Sept 2026:
+   grid images had no full-width option at all, which is why images placed
+   via the Grid block never covered the full screen no matter what). Side
+   padding keeps the images from touching the absolute viewport edge with
+   zero breathing room; the inter-column gap is unaffected. */
+.pdb-grid-section.pdb-grid-full {
+    width: 100vw;
+    max-width: 100vw;
+    position: relative;
+    left: 50%;
+    right: 50%;
+    margin-left: -50vw;
+    margin-right: -50vw;
+    padding: 0 16px;
+    box-sizing: border-box;
+}
+.pdb-grid-section.pdb-grid-full .pdb-grid-cell img {
+    border-radius: 4px;
+}
+
 
 /* Description blocks: pasted lists keep numbering, ticks and levels. */
 .pdb-text p { margin: 0 0 10px; }
@@ -399,6 +420,32 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 .pdb-grid-body .tick { flex: 0 0 18px; width: 18px; height: 18px; margin-top: 1px; border-radius: 50%; background: #fbeaea; color: #c0392b; font-weight: 700; font-size: 0.68rem; display: inline-flex; align-items: center; justify-content: center; }
 .pdb-grid-body p { margin: 0 0 6px; }
 .pdb-grid-body p:last-child { margin-bottom: 0; }
+
+/* Per-item video (grid block) - same 16:9 reserved box as the standalone
+   video block, sized to the column instead of the full width. */
+.pdb-grid-video {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    overflow: hidden;
+    border-radius: 10px;
+}
+
+/* Per-item link (grid block). "Whole tile" keeps the cell's vertical
+   stacking (media/caption/body) since an <a> is inline by default; "media"
+   or "caption" only wraps that one piece, so it stays inline-ish there. */
+.pdb-grid-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+}
+.pdb-grid-link-whole {
+    display: flex;
+    flex-direction: column;
+}
+.pdb-grid-link:hover .pdb-grid-caption {
+    text-decoration: underline;
+}
 
 @media (max-width: 640px) {
     .pdb-grid {

@@ -4,9 +4,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Vendor Dashboard</title>
-<link rel="stylesheet" href="../css/admin.css?v=24">
+<link rel="stylesheet" href="../css/admin.css?v=27">
 <link rel="stylesheet" href="../css/vendor-desktop.css?v=1">
-<link rel="stylesheet" href="../css/vendor-mobile.css?v=1">
+<link rel="stylesheet" href="../css/vendor-mobile.css?v=2">
 </head>
 <body>
 
@@ -488,9 +488,13 @@
 
                 <div style="margin-top:10px; border-top:1px dashed #dfe1e8; padding-top:10px;">
                     <label style="font-size:12px; font-weight:600; color:#333; display:block; margin-bottom:4px;">Paste from Excel</label>
-                    <p style="font-size:11px; color:#888; margin:0 0 6px;">Copy your Label and Value columns from Excel and paste them below, one row per line.</p>
-                    <textarea id="vm-specs-paste-box" rows="3" placeholder="Material&#9;Cotton&#10;Battery Life&#9;10 hours" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid #dfe1e8; border-radius:8px; font-family:monospace; font-size:11.5px;"></textarea>
-                    <button type="button" onclick="vmParseAndAddSpecs()" class="vm-btn-help" style="border:1px solid #1a1a2e; border-radius:8px; padding:8px; margin-top:6px; background:#1a1a2e; color:#fff; cursor:pointer; width:100%;">Parse &amp; Add Rows</button>
+                    <p style="font-size:11px; color:#888; margin:0 0 6px;">Insert a table sized to your data, tap a cell, then paste your copied Excel columns &mdash; it fills in starting from that cell.</p>
+                    <div class="vm-specs-table-size-picker">
+                        <label>Rows <input type="number" id="vm-specs-table-rows" min="1" max="50" value="4"></label>
+                        <label>Columns <input type="number" id="vm-specs-table-cols" min="1" max="6" value="2"></label>
+                        <button type="button" onclick="insertVmSpecsTable()" class="vm-btn-help" style="border:1px solid #1a1a2e; border-radius:8px; padding:8px; background:#1a1a2e; color:#fff; cursor:pointer;">Insert Table</button>
+                    </div>
+                    <div id="vm-specs-table-wrap"></div>
                 </div>
             </div>
             <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; color:#555; margin:14px 0;">
@@ -1137,9 +1141,13 @@
 
                                 <div style="margin-top:14px; border-top:1px dashed #ddd; padding-top:12px;">
                                     <label style="font-size:12.5px; font-weight:600; color:#333; display:block; margin-bottom:4px;">Paste from Excel</label>
-                                    <p style="font-size:11.5px; color:#888; margin:0 0 6px;">Select your Label and Value columns in Excel, copy, and paste them below &mdash; one row per line.</p>
-                                    <textarea id="vendor-specs-paste-box" rows="3" placeholder="Material&#9;Cotton&#10;Battery Life&#9;10 hours&#10;Weight&#9;250g" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid #ccc; border-radius:6px; font-family:monospace; font-size:12px;"></textarea>
-                                    <button type="button" onclick="parseAndAddVendorSpecs()" style="margin-top:6px; padding:7px 12px; border-radius:6px; border:1px solid #1a1a2e; background:#1a1a2e; color:#fff; cursor:pointer; font-size:12.5px;">Parse &amp; Add Rows</button>
+                                    <p style="font-size:11.5px; color:#888; margin:0 0 6px;">Insert a table sized to your data (type the numbers or scroll over them), click a cell, then paste your copied Excel columns &mdash; it fills in starting from that cell.</p>
+                                    <div class="specs-table-size-picker">
+                                        <label>Rows <input type="number" id="vendor-specs-table-rows" min="1" max="50" value="4"></label>
+                                        <label>Columns <input type="number" id="vendor-specs-table-cols" min="1" max="6" value="2"></label>
+                                        <button type="button" onclick="insertVendorSpecsTable()">Insert Table</button>
+                                    </div>
+                                    <div id="vendor-specs-table-wrap"></div>
                                 </div>
                             </div>
 
@@ -1843,9 +1851,9 @@
     <script src="../js/seller-panel.js?v=1"></script>
     <script src="../js/photo-crop.js?v=1"></script>
     <script src="../js/prepare-picked-file.js?v=10"></script>
-    <script src="../js/description-block-editor.js?v=4"></script>
-    <script src="../js/vendor-dashboard.js?v=22"></script>
+    <script src="../js/description-block-editor.js?v=6"></script>
+    <script src="../js/vendor-dashboard.js?v=23"></script>
     <script src="../js/vendor-statements.js?v=2"></script>
-<script src="../js/vendor-mobile.js?v=4"></script>
+<script src="../js/vendor-mobile.js?v=5"></script>
 </body>
 </html>
