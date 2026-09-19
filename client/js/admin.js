@@ -17,38 +17,59 @@ function lzShowDeviceWait(data, onApproved) {
 
     say("We have emailed you to confirm this sign-in. Approve it from that email — this page will continue on its own.");
 
-    var timer = setInterval(function () {
-        if (stopped) return;
+    var checking = false;
+
+    function stop() {
+        stopped = true;
+        clearInterval(timer);
+        document.removeEventListener("visibilitychange", onVisible);
+        window.removeEventListener("pageshow", onVisible);
+    }
+
+    function checkStatus() {
+        if (stopped || checking) return;
 
         if (Date.now() > deadline) {
-            clearInterval(timer);
+            stop();
             say("This sign-in request expired. Please log in again.");
             setTimeout(function () { location.reload(); }, 4000);
             return;
         }
 
+        checking = true;
         fetch("/api/auth/device-request/" + encodeURIComponent(data.ref) + "/status")
             .then(function (r) { return r.json(); })
             .then(function (s) {
+                checking = false;
                 if (stopped) return;
 
                 if (s.status === "approved") {
-                    stopped = true;
-                    clearInterval(timer);
+                    stop();
                     onApproved();
                 } else if (s.status === "denied") {
-                    stopped = true;
-                    clearInterval(timer);
+                    stop();
                     say("This sign-in was refused. The account has been locked.");
                 } else if (s.status === "expired") {
-                    stopped = true;
-                    clearInterval(timer);
+                    stop();
                     say("This sign-in request expired. Please log in again.");
                     setTimeout(function () { location.reload(); }, 4000);
                 }
             })
-            .catch(function () { /* transient - the next tick retries */ });
-    }, 3000);
+            .catch(function () { checking = false; /* transient - the next tick retries */ });
+    }
+
+    // Mobile browsers throttle/pause setInterval while the tab is backgrounded
+    // (e.g. while the user is in their email app approving the sign-in). Force
+    // an immediate re-check the moment the tab is visible/foregrounded again,
+    // instead of waiting for the next interval tick.
+    function onVisible() {
+        if (document.visibilityState === "visible") checkStatus();
+    }
+
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onVisible);
+
+    var timer = setInterval(checkStatus, 3000);
 }
 
 const API_URL = "";
