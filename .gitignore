@@ -37,3 +37,5 @@ fix_*.py
 # temporary refactor scratch files
 .refactor_scratch/
 
+.DS_Store
+**/.DS_Store

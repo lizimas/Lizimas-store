@@ -527,15 +527,12 @@
 
                                 <div style="margin-top:14px; border-top:1px dashed #ddd; padding-top:12px;">
                                     <label style="font-size:12.5px; font-weight:600; color:#333; display:block; margin-bottom:4px;">Paste from Excel</label>
-                                    <p style="font-size:11.5px; color:#888; margin:0 0 6px;">Hover to pick a table size, click to insert it, then paste your copied Excel columns into a cell &mdash; it fills in starting from there.</p>
-                                    <div class="specs-table-grid-wrap">
-                                        <button type="button" class="specs-table-grid-trigger" onclick="toggleAdminSpecsGridPicker()">&#9639; Insert Table</button>
-                                        <div class="specs-table-grid-popover hidden" id="admin-specs-grid-popover">
-                                            <div class="specs-table-grid" id="admin-specs-grid"></div>
-                                            <div class="specs-table-grid-label" id="admin-specs-grid-label">Select size</div>
-                                        </div>
-                                    </div>
-                                    <div id="admin-specs-table-wrap"></div>
+                                    <p style="font-size:11.5px; color:#888; margin:0 0 6px;">Paste rows below from Excel &mdash; one spec per line, tab between label and value. Then click Add to Specifications.</p>
+                                    <textarea id="admin-specs-bulk-paste" rows="6" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid #ccc; border-radius:6px; font-family: Menlo, Consolas, monospace; font-size:12.5px; resize:vertical;"></textarea>
+<div style="margin-top:8px; display:flex; gap:8px;">
+    <button type="button" onclick="adminCommitBulkPaste()">Add to Specifications</button>
+    <button type="button" onclick="document.getElementById('admin-specs-bulk-paste').value=''">Clear</button>
+</div>
                                 </div>
                             </div>
 
@@ -1608,7 +1605,7 @@
 <script src="js/category-select.js?v=2"></script>
 <script src="js/category-picker.js?v=1"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
-<script src="js/admin.js?v=drag2"></script>
+<script src="js/admin.js?v=bulk2"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

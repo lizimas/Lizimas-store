@@ -10157,7 +10157,23 @@ function adminSpecsTableCellPaste(e) {
 
     const rawLines = text.replace(/\r/g, "").split("\n");
     if (rawLines.length && rawLines[rawLines.length - 1] === "") rawLines.pop();
-    const grid = rawLines.map(function (line) { return line.split("\t"); });
+    let grid = rawLines.map(function (line) { return line.split("\t"); });
+
+    // No tab anywhere in the whole paste - a flat list, one value per
+    // line (e.g. copied from a rendered web page where each spec label
+    // and value lands on its own line rather than tab-joined together).
+    // Pair consecutive lines alternately into two columns instead of
+    // stacking every value down a single column - same rule the direct
+    // "paste into a spec box" path already uses.
+    const anyTabs = grid.some(function (cells) { return cells.length > 1; });
+    if (!anyTabs && grid.length > 1) {
+        const flatValues = grid.map(function (cells) { return cells[0]; });
+        const paired = [];
+        for (let i = 0; i < flatValues.length; i += 2) {
+            paired.push(flatValues.slice(i, i + 2));
+        }
+        grid = paired;
+    }
 
     const requiredRows = startRow + grid.length;
     const requiredCols = startCol + Math.max.apply(null, grid.map(function (r) { return r.length; }));
@@ -10215,4 +10231,59 @@ function commitAdminSpecsTable() {
         if (label) addSpecRow(label, value);
     });
     wrap.innerHTML = "";
+}
+
+// --- Bulk-paste specs from Excel (replaces the Insert Table widget) ---
+
+function adminCommitBulkPaste() {
+    const ta = document.getElementById("admin-specs-bulk-paste");
+    if (!ta) return;
+    const raw = ta.value;
+    if (!raw || !raw.trim()) {
+        alert("Paste some rows first (label<TAB>value per line).");
+        return;
+    }
+
+    const lines = raw.replace(/\r/g, "").split("\n");
+    let added = 0;
+
+    lines.forEach(function (line) {
+        if (!line.trim()) return;
+
+        let label = "";
+        let value = "";
+
+        if (line.indexOf("\t") !== -1) {
+            // Standard Excel copy: first tab-separated cell is label,
+            // second is value; any remaining columns join into the value.
+            const parts = line.split("\t");
+            label = (parts[0] || "").trim();
+            value = parts.slice(1).map(function (p) { return p.trim(); }).filter(Boolean).join(" ");
+        } else if (/^(.+?)\s{2,}(.+)$/.test(line)) {
+            // Two-or-more spaces as separator (Word often collapses tabs to spaces).
+            const m = line.match(/^(.+?)\s{2,}(.+)$/);
+            label = m[1].trim();
+            value = m[2].trim();
+        } else if (/^([^:]+):\s*(.+)$/.test(line)) {
+            // Colon separator (e.g. "Brand: Apple").
+            const m = line.match(/^([^:]+):\s*(.+)$/);
+            label = m[1].trim();
+            value = m[2].trim();
+        } else {
+            // Single column — treat the whole line as a label with no value.
+            label = line.trim();
+            value = "";
+        }
+
+        if (label) {
+            addSpecRow(label, value);
+            added++;
+        }
+    });
+
+    if (added > 0) {
+        ta.value = "";
+    } else {
+        alert("Nothing to add — no valid label/value rows found.");
+    }
 }
