@@ -2313,3 +2313,74 @@ table.lz-dr-cal td {
     background: #fff;
     border-color: #b8bfcc;
 }
+
+/* --- Specs paste table layout --- */
+.specs-paste-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 10px;
+    table-layout: fixed;
+}
+
+.specs-paste-table td {
+    border: 1px solid #ccc;
+    padding: 0;
+    vertical-align: top;
+    background: #fff;
+}
+
+.specs-paste-table input.specs-paste-cell {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    border: none;
+    padding: 6px 8px;
+    font-size: 13px;
+    font-family: inherit;
+    background: transparent;
+    outline: none;
+    min-height: 26px;
+}
+
+.specs-paste-table input.specs-paste-cell:focus {
+    background: #f0f7ff;
+    box-shadow: inset 0 0 0 2px #007bff;
+}
+
+.specs-paste-table-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+}
+
+.specs-paste-table-actions button {
+    padding: 6px 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 12.5px;
+}
+
+/* --- Specs paste table drag-select --- */
+.specs-paste-table td.specs-paste-cell {
+    border: 1px solid #ccc;
+    padding: 6px 8px;
+    font-size: 13px;
+    min-width: 40px;
+    min-height: 24px;
+    cursor: cell;
+    user-select: none;
+    outline: none;
+    background: #fff;
+}
+
+.specs-paste-table td.specs-paste-cell:focus {
+    box-shadow: inset 0 0 0 2px #007bff;
+    background: #f0f7ff;
+}
+
+.specs-paste-table td.specs-paste-cell.specs-selected {
+    background: #cfe6ff;
+    box-shadow: inset 0 0 0 1px #007bff;
+}
