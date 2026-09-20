@@ -976,156 +976,7 @@ document.addEventListener("click", (e) => {
     popover.classList.add("hidden");
 });
 
-function insertAdminSpecsTable(rows, cols) {
-    const wrap = document.getElementById("admin-specs-table-wrap");
-    if (!wrap) return;
-    rows = Math.min(Math.max(rows || ADMIN_SPECS_GRID_ROWS, 1), 50);
-    cols = Math.min(Math.max(cols || 2, 1), ADMIN_SPECS_GRID_COLS);
-
-    let html = '<table class="specs-paste-table"><tbody>';
-    for (let r = 0; r < rows; r++) {
-        html += "<tr>";
-        for (let c = 0; c < cols; c++) {
-            html += `<td><input type="text" class="specs-paste-cell" data-row="${r}" data-col="${c}"></td>`;
-        }
-        html += "</tr>";
-    }
-    html += "</tbody></table>";
-    html += '<div class="specs-paste-table-actions">' +
-        '<button type="button" onclick="commitAdminSpecsTable()">Add to Specifications</button>' +
-        '<button type="button" onclick="document.getElementById(\'admin-specs-table-wrap\').innerHTML=\'\'">Clear table</button>' +
-        "</div>";
-    wrap.innerHTML = html;
-    wrap.querySelectorAll(".specs-paste-cell").forEach((cell) => {
-        cell.addEventListener("paste", adminSpecsTableCellPaste);
-    });
-}
-
-function adminSpecsTableCellPaste(e) {
-    const text = (e.clipboardData || window.clipboardData).getData("text");
-    // A single value with no tab/newline is a normal single-cell paste -
-    // let the browser handle it so typing or pasting one value still works.
-    if (!text || (!/\t/.test(text) && !/\r?\n/.test(text.trim()))) return;
-    e.preventDefault();
-
-    const cell = e.target;
-    const table = cell.closest(".specs-paste-table");
-    if (!table) return;
-    const startRow = parseInt(cell.dataset.row, 10);
-    const startCol = parseInt(cell.dataset.col, 10);
-
-    const rawLines = text.replace(/\r/g, "").split("\n");
-    if (rawLines.length && rawLines[rawLines.length - 1] === "") rawLines.pop();
-    const grid = rawLines.map((line) => line.split("\t"));
-
-    function ensureRow(r) {
-        const tbody = table.querySelector("tbody");
-        let trs = tbody.querySelectorAll("tr");
-        while (trs.length <= r) {
-            const colCount = trs.length ? trs[0].children.length : startCol + 1;
-            const tr = document.createElement("tr");
-            for (let c = 0; c < colCount; c++) {
-                const td = document.createElement("td");
-                const input = document.createElement("input");
-                input.type = "text";
-                input.className = "specs-paste-cell";
-                input.dataset.row = trs.length;
-                input.dataset.col = c;
-                input.addEventListener("paste", adminSpecsTableCellPaste);
-                td.appendChild(input);
-                tr.appendChild(td);
-            }
-            tbody.appendChild(tr);
-            trs = tbody.querySelectorAll("tr");
-        }
-        return trs[r];
-    }
-
-    grid.forEach((lineCells, r) => {
-        const tr = ensureRow(startRow + r);
-        lineCells.forEach((val, c) => {
-            const td = tr.children[startCol + c];
-            const input = td && td.querySelector("input");
-            if (input) input.value = val.trim();
-        });
-    });
-}
-
-function commitAdminSpecsTable() {
-    const wrap = document.getElementById("admin-specs-table-wrap");
-    const table = wrap && wrap.querySelector(".specs-paste-table");
-    if (!table) return;
-    table.querySelectorAll("tbody > tr").forEach((tr) => {
-        const cells = Array.from(tr.querySelectorAll("input"));
-        const label = (cells[0] && cells[0].value.trim()) || "";
-        const value = (cells[1] && cells[1].value.trim()) || "";
-        if (label) addSpecRow(label, value);
-    });
-    wrap.innerHTML = "";
-}
-// --- Direct paste into the spec boxes themselves (Ryan: typing a single
-// spec should keep working exactly as before, but pasting a multi-line
-// block straight into a Label or Value box - not just via the separate
-// "Paste from Excel" staging box above - should fan out across rows,
-// spreadsheet-style, adding new rows as needed). ---
-
-function adminDistributeSpecPaste(startRowIndex, startCol, text) {
-    const rawLines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    if (rawLines.length === 0) return;
-
-    function ensureRow(idx) {
-        let rows = document.querySelectorAll("#specs-list > div");
-        while (rows.length <= idx) {
-            addSpecRow();
-            rows = document.querySelectorAll("#specs-list > div");
-        }
-        return rows[idx];
-    }
-
-    function setCell(idx, col, val) {
-        const row = ensureRow(idx);
-        const input = row.querySelector(col === "label" ? ".spec-label-input" : ".spec-value-input");
-        if (input) input.value = val;
-    }
-
-    // Every line has a tab - a normal two-column Excel copy. One full
-    // label+value pair per line, regardless of which box was pasted into.
-    if (rawLines.every(l => l.includes("\t"))) {
-        rawLines.forEach((line, i) => {
-            const [label, ...rest] = line.split("\t");
-            setCell(startRowIndex + i, "label", label.trim());
-            setCell(startRowIndex + i, "value", rest.join(" ").trim());
-        });
-        return;
-    }
-
-    // Every line independently parses via a colon or 2+ spaces - one pair
-    // per line, same rule the "Paste from Excel" box above already uses.
-    if (rawLines.every(l => /:|  +/.test(l))) {
-        rawLines.forEach((line, i) => {
-            const { label, value } = adminParseSpecLine(line);
-            setCell(startRowIndex + i, "label", label);
-            setCell(startRowIndex + i, "value", value);
-        });
-        return;
-    }
-
-    // Flat list with no reliable per-line separator - e.g. a spec table
-    // copied from a web page where each cell lands on its own line rather
-    // than tab-joined with its neighbour. Pair consecutive lines alternately
-    // as label/value, starting at whichever column was actually pasted into.
-    let row = startRowIndex;
-    let col = startCol;
-    rawLines.forEach((line) => {
-        setCell(row, col, line);
-        if (col === "label") {
-            col = "value";
-        } else {
-            col = "label";
-            row += 1;
-        }
-    });
-}
+// (old handler removed - replaced below)
 
 function setupAdminSpecsPasteHandler() {
     const list = document.getElementById("specs-list");
@@ -10159,4 +10010,209 @@ if (typeof escapeHtml !== "function") {
     window.escapeHtml = function(v) {
         return String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
     };
+}
+
+// --- Custom Table Size Picker (admin) ---
+document.addEventListener('click', function (e) {
+    if (e.target && e.target.id === 'insert-custom-table-btn') {
+        const rowsInput = document.getElementById('custom-table-rows');
+        const colsInput = document.getElementById('custom-table-cols');
+
+        let rows = parseInt(rowsInput.value, 10);
+        let cols = parseInt(colsInput.value, 10);
+
+        if (isNaN(rows) || rows < 1) rows = 1;
+        if (isNaN(cols) || cols < 1) cols = 1;
+        if (rows > 50) rows = 50;
+        if (cols > 50) cols = 50;
+
+        if (typeof insertAdminSpecsTable === 'function') {
+            insertAdminSpecsTable(rows, cols);
+            rowsInput.value = '';
+            colsInput.value = '';
+            const popover = document.getElementById("admin-specs-grid-popover");
+            if (popover) popover.classList.add("hidden");
+        } else {
+            console.error('insertAdminSpecsTable function not found.');
+        }
+    }
+});
+
+
+// --- Specs paste table: contenteditable cells with drag-select ---
+
+function insertAdminSpecsTable(rows, cols) {
+    const wrap = document.getElementById("admin-specs-table-wrap");
+    if (!wrap) return;
+    rows = Math.min(Math.max(rows || 3, 1), 50);
+    cols = Math.min(Math.max(cols || 2, 1), 50);
+
+    let html = '<table class="specs-paste-table"><tbody>';
+    for (let r = 0; r < rows; r++) {
+        html += "<tr>";
+        for (let c = 0; c < cols; c++) {
+            html += '<td class="specs-paste-cell" contenteditable="true" data-row="' + r + '" data-col="' + c + '"></td>';
+        }
+        html += "</tr>";
+    }
+    html += "</tbody></table>";
+    html += '<div class="specs-paste-table-actions">' +
+        '<button type="button" onclick="commitAdminSpecsTable()">Add to Specifications</button>' +
+        '<button type="button" onclick="document.getElementById(\'admin-specs-table-wrap\').innerHTML=\'\'">Clear table</button>' +
+        "</div>";
+    wrap.innerHTML = html;
+    setupAdminSpecsTableSelection();
+}
+
+function setupAdminSpecsTableSelection() {
+    const table = document.querySelector(".specs-paste-table");
+    if (!table) return;
+
+    let isDragging = false;
+    let startCell = null;
+    let endCell = null;
+
+    function clearHighlight() {
+        table.querySelectorAll(".specs-paste-cell").forEach(function (c) {
+            c.classList.remove("specs-selected");
+        });
+    }
+
+    function paintSelection() {
+        if (!startCell || !endCell) return;
+        const r1 = Math.min(+startCell.dataset.row, +endCell.dataset.row);
+        const r2 = Math.max(+startCell.dataset.row, +endCell.dataset.row);
+        const c1 = Math.min(+startCell.dataset.col, +endCell.dataset.col);
+        const c2 = Math.max(+startCell.dataset.col, +endCell.dataset.col);
+        table.querySelectorAll(".specs-paste-cell").forEach(function (cell) {
+            const r = +cell.dataset.row, c = +cell.dataset.col;
+            if (r >= r1 && r <= r2 && c >= c1 && c <= c2) {
+                cell.classList.add("specs-selected");
+            } else {
+                cell.classList.remove("specs-selected");
+            }
+        });
+    }
+
+    table.addEventListener("mousedown", function (e) {
+        const cell = e.target.closest(".specs-paste-cell");
+        if (!cell) return;
+        isDragging = true;
+        startCell = cell;
+        endCell = cell;
+        clearHighlight();
+        cell.classList.add("specs-selected");
+        e.preventDefault();
+    });
+
+    table.addEventListener("mouseover", function (e) {
+        if (!isDragging) return;
+        const cell = e.target.closest(".specs-paste-cell");
+        if (!cell) return;
+        endCell = cell;
+        paintSelection();
+    });
+
+    document.addEventListener("mouseup", function () {
+        if (!isDragging) return;
+        isDragging = false;
+        // Focus the anchor cell whether this was a single click or a
+        // multi-cell drag - without a focused editable target the browser
+        // has nothing to paste into, so after highlighting more than one
+        // cell, Cmd+V and right-click Paste had no effect (or no Paste
+        // option at all). adminSpecsTableCellPaste already reads
+        // .specs-selected to work out the paste's start row/col, so it
+        // doesn't matter which cell in the selection holds focus.
+        if (startCell) {
+            startCell.focus();
+        }
+    });
+
+    table.addEventListener("paste", function (e) {
+        adminSpecsTableCellPaste(e);
+    });
+}
+
+function adminSpecsTableCellPaste(e) {
+    const text = (e.clipboardData || window.clipboardData).getData("text");
+    if (!text) return;
+    const hasTabs = /\t/.test(text);
+    const hasNewlines = /\r?\n/.test(text.trim());
+    if (!hasTabs && !hasNewlines) return;
+    e.preventDefault();
+
+    const cell = e.target.closest(".specs-paste-cell");
+    const table = cell ? cell.closest(".specs-paste-table") : null;
+    if (!table) return;
+
+    const selected = table.querySelectorAll(".specs-selected");
+    let startRow, startCol;
+    if (selected.length > 0) {
+        startRow = Math.min.apply(null, Array.from(selected).map(function (s) { return +s.dataset.row; }));
+        startCol = Math.min.apply(null, Array.from(selected).map(function (s) { return +s.dataset.col; }));
+    } else {
+        startRow = +cell.dataset.row;
+        startCol = +cell.dataset.col;
+    }
+
+    const rawLines = text.replace(/\r/g, "").split("\n");
+    if (rawLines.length && rawLines[rawLines.length - 1] === "") rawLines.pop();
+    const grid = rawLines.map(function (line) { return line.split("\t"); });
+
+    const requiredRows = startRow + grid.length;
+    const requiredCols = startCol + Math.max.apply(null, grid.map(function (r) { return r.length; }));
+
+    let tbody = table.querySelector("tbody");
+    let trs = tbody.querySelectorAll("tr");
+    const currentCols = trs[0].children.length;
+
+    while (trs.length < requiredRows) {
+        const tr = document.createElement("tr");
+        for (let c = 0; c < currentCols; c++) {
+            const td = document.createElement("td");
+            td.className = "specs-paste-cell";
+            td.contentEditable = "true";
+            td.dataset.row = trs.length;
+            td.dataset.col = c;
+            tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+        trs = tbody.querySelectorAll("tr");
+    }
+
+    if (requiredCols > currentCols) {
+        for (let i = 0; i < trs.length; i++) {
+            const row = trs[i];
+            for (let c = currentCols; c < requiredCols; c++) {
+                const td = document.createElement("td");
+                td.className = "specs-paste-cell";
+                td.contentEditable = "true";
+                td.dataset.row = i;
+                td.dataset.col = c;
+                row.appendChild(td);
+            }
+        }
+    }
+
+    grid.forEach(function (lineCells, r) {
+        const tr = trs[startRow + r];
+        if (!tr) return;
+        lineCells.forEach(function (val, c) {
+            const td = tr.children[startCol + c];
+            if (td) td.textContent = val.trim();
+        });
+    });
+}
+
+function commitAdminSpecsTable() {
+    const wrap = document.getElementById("admin-specs-table-wrap");
+    const table = wrap && wrap.querySelector(".specs-paste-table");
+    if (!table) return;
+    table.querySelectorAll("tbody > tr").forEach(function (tr) {
+        const cells = Array.from(tr.querySelectorAll(".specs-paste-cell"));
+        const label = (cells[0] && cells[0].textContent.trim()) || "";
+        const value = (cells[1] && cells[1].textContent.trim()) || "";
+        if (label) addSpecRow(label, value);
+    });
+    wrap.innerHTML = "";
 }
