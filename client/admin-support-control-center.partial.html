@@ -1,21 +1,28 @@
 <!--
-  Support Control Center — admin panel partial.
+  Support Control Center — admin panel tab.
 
-  This is written to be pasted in as its own section of admin.html, next to
-  your existing Security tab / KYC review panel, following the same
-  "one <section>, own <style>, own <script>" pattern those already use.
-  Wire a nav item to show #support-control-center the same way you already
-  toggle between your other admin sections, then bump admin.html's
-  cache-buster version per your usual convention.
+  Paste this <section> in among your other tab-content sections in
+  admin.html (right after </section> for tab-support, say). It follows your
+  existing convention exactly: id="tab-X" + class="tab-content hidden",
+  toggled automatically by your existing setupTabs() — no separate show/hide
+  logic needed here.
+
+  Add a nav button next to it, e.g.:
+    <button class="tab-btn vd-sub-item" data-tab="support-team">🧑‍💼 Support Team</button>
+
+  Uses your existing getToken()/API_URL globals for auth — same pattern as
+  loadSupportQueue()/loadSupportOverview() in admin.js. Force-close/reassign
+  call your existing PATCH /api/chat/conversations/:id directly rather than
+  a separate endpoint, so they get the same row-locking, reopened_count
+  tracking, and chat_events logging your real chat system already does.
 
   Styled to match the navy/gold theme from your auth-page redesign
-  (--ls-navy, --ls-gold below) — adjust the two variables at the top of the
-  <style> block if your real theme tokens live elsewhere already, to avoid
-  double-defining them.
+  (--ls-navy, --ls-gold below) — adjust the two variables if your real
+  theme tokens live elsewhere already, to avoid double-defining them.
 -->
-<section id="support-control-center" class="ls-admin-section" hidden>
+<section id="tab-support-team" class="tab-content hidden">
   <style>
-    #support-control-center {
+    #tab-support-team {
       --ls-navy: #0b1d3a;
       --ls-gold: #c9a227;
       --ls-bg: #f6f7fb;
@@ -23,7 +30,7 @@
       color: #1c2333;
       font-family: inherit;
     }
-    #support-control-center .scc-header {
+    #tab-support-team .scc-header {
       background: var(--ls-navy);
       color: #fff;
       padding: 18px 22px;
@@ -34,8 +41,8 @@
       flex-wrap: wrap;
       gap: 12px;
     }
-    #support-control-center .scc-header h2 { margin: 0; font-size: 1.25rem; }
-    #support-control-center .scc-tabs {
+    #tab-support-team .scc-header h2 { margin: 0; font-size: 1.25rem; }
+    #tab-support-team .scc-tabs {
       display: flex;
       gap: 4px;
       background: #fff;
@@ -44,7 +51,7 @@
       padding: 8px 12px 0;
       flex-wrap: wrap;
     }
-    #support-control-center .scc-tab {
+    #tab-support-team .scc-tab {
       background: none;
       border: none;
       padding: 10px 14px;
@@ -53,8 +60,8 @@
       color: #5b6478;
       border-bottom: 3px solid transparent;
     }
-    #support-control-center .scc-tab.active { color: var(--ls-navy); border-bottom-color: var(--ls-gold); }
-    #support-control-center .scc-panel {
+    #tab-support-team .scc-tab.active { color: var(--ls-navy); border-bottom-color: var(--ls-gold); }
+    #tab-support-team .scc-panel {
       display: none;
       background: #fff;
       border: 1px solid var(--ls-border);
@@ -62,39 +69,39 @@
       padding: 18px 22px 26px;
       border-radius: 0 0 10px 10px;
     }
-    #support-control-center .scc-panel.active { display: block; }
-    #support-control-center table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
-    #support-control-center th, #support-control-center td {
+    #tab-support-team .scc-panel.active { display: block; }
+    #tab-support-team table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    #tab-support-team th, #tab-support-team td {
       text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--ls-border);
     }
-    #support-control-center th { color: #5b6478; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: .03em; }
-    #support-control-center .scc-badge {
+    #tab-support-team th { color: #5b6478; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: .03em; }
+    #tab-support-team .scc-badge {
       display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 700;
     }
-    #support-control-center .scc-badge.online { background: #e3f8ea; color: #1a7f4e; }
-    #support-control-center .scc-badge.away { background: #fff3d6; color: #92680a; }
-    #support-control-center .scc-badge.busy { background: #ffe6e6; color: #b3261e; }
-    #support-control-center .scc-badge.offline { background: #eceef4; color: #5b6478; }
-    #support-control-center .scc-badge.breach { background: #ffe6e6; color: #b3261e; }
-    #support-control-center button.scc-btn {
+    #tab-support-team .scc-badge.online { background: #e3f8ea; color: #1a7f4e; }
+    #tab-support-team .scc-badge.away { background: #fff3d6; color: #92680a; }
+    #tab-support-team .scc-badge.busy { background: #ffe6e6; color: #b3261e; }
+    #tab-support-team .scc-badge.offline { background: #eceef4; color: #5b6478; }
+    #tab-support-team .scc-badge.breach { background: #ffe6e6; color: #b3261e; }
+    #tab-support-team button.scc-btn {
       background: var(--ls-navy); color: #fff; border: none; padding: 8px 14px; border-radius: 6px;
       font-weight: 600; cursor: pointer;
     }
-    #support-control-center button.scc-btn.gold { background: var(--ls-gold); color: #1c2333; }
-    #support-control-center button.scc-btn.ghost { background: none; color: var(--ls-navy); border: 1px solid var(--ls-border); }
-    #support-control-center .scc-stat-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
-    #support-control-center .scc-stat {
+    #tab-support-team button.scc-btn.gold { background: var(--ls-gold); color: #1c2333; }
+    #tab-support-team button.scc-btn.ghost { background: none; color: var(--ls-navy); border: 1px solid var(--ls-border); }
+    #tab-support-team .scc-stat-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+    #tab-support-team .scc-stat {
       background: var(--ls-bg); border: 1px solid var(--ls-border); border-radius: 8px; padding: 12px 16px; min-width: 120px;
     }
-    #support-control-center .scc-stat .n { font-size: 1.5rem; font-weight: 800; color: var(--ls-navy); }
-    #support-control-center .scc-stat .l { font-size: 0.76rem; color: #5b6478; text-transform: uppercase; }
-    #support-control-center form.scc-form { display: grid; gap: 10px; max-width: 480px; }
-    #support-control-center form.scc-form label { font-size: 0.85rem; font-weight: 600; color: #3a4257; display: block; margin-bottom: 3px; }
-    #support-control-center form.scc-form input, #support-control-center form.scc-form select, #support-control-center form.scc-form textarea {
+    #tab-support-team .scc-stat .n { font-size: 1.5rem; font-weight: 800; color: var(--ls-navy); }
+    #tab-support-team .scc-stat .l { font-size: 0.76rem; color: #5b6478; text-transform: uppercase; }
+    #tab-support-team form.scc-form { display: grid; gap: 10px; max-width: 480px; }
+    #tab-support-team form.scc-form label { font-size: 0.85rem; font-weight: 600; color: #3a4257; display: block; margin-bottom: 3px; }
+    #tab-support-team form.scc-form input, #tab-support-team form.scc-form select, #tab-support-team form.scc-form textarea {
       width: 100%; padding: 7px 9px; border: 1px solid var(--ls-border); border-radius: 6px; font-size: 0.9rem;
     }
-    #support-control-center .scc-empty { color: #8892a6; font-style: italic; padding: 20px 0; }
-    #support-control-center .scc-error { color: #b3261e; font-size: 0.85rem; margin-top: 4px; }
+    #tab-support-team .scc-empty { color: #8892a6; font-style: italic; padding: 20px 0; }
+    #tab-support-team .scc-error { color: #b3261e; font-size: 0.85rem; margin-top: 4px; }
   </style>
 
   <div class="scc-header">
@@ -173,18 +180,32 @@
 
   <script>
   (function () {
-    const API = '/api/admin/support';
-    const root = document.getElementById('support-control-center');
+    const API = (typeof API_URL !== 'undefined' ? API_URL : '') + '/api/admin/support';
+    const CHAT_API = (typeof API_URL !== 'undefined' ? API_URL : '') + '/api/chat';
+    const root = document.getElementById('tab-support-team');
     if (!root) return;
 
     async function api(path, opts) {
       const res = await fetch(API + path, {
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
         ...opts,
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw Object.assign(new Error(data.error || 'Request failed'), { data });
+      return data;
+    }
+    // Reassign/force-close go through your real chat endpoint, not a
+    // support-panel-specific one, so they get the same row locking,
+    // reopened_count tracking, and chat_events logging the rest of your
+    // chat system relies on.
+    async function updateConversation(chatId, patch) {
+      const res = await fetch(`${CHAT_API}/conversations/${chatId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+        body: JSON.stringify(patch),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw Object.assign(new Error(data.message || data.error || 'Request failed'), { data });
       return data;
     }
     function fmtSeconds(s) {
@@ -234,6 +255,9 @@
 
       const chats = [...data.queued, ...data.active, ...data.pending];
       const breachByChat = Object.fromEntries(data.slaBreaches.map((b) => [b.chatId, b]));
+      const agentOptions = data.agents
+        .map((a) => `<option value="${a.staff_id}">${a.staff_name || 'Agent #' + a.staff_id}</option>`)
+        .join('');
       document.getElementById('scc-live-chats').innerHTML = chats.length
         ? chats.map((c) => `
           <tr>
@@ -242,15 +266,34 @@
             <td>${c.assigned_staff_id ? '#' + c.assigned_staff_id : '—'}</td>
             <td>${timeAgo(c.escalated_at || c.created_at)}</td>
             <td>${breachByChat[c.id] ? `<span class="scc-badge breach">${breachByChat[c.id].type.replace('_',' ')}</span>` : '—'}</td>
-            <td><button class="scc-btn ghost" data-force-close="${c.id}">Force close</button></td>
+            <td style="display:flex; gap:6px;">
+              <select data-reassign="${c.id}" style="padding:4px;"><option value="">Reassign to…</option>${agentOptions}</select>
+              <button class="scc-btn ghost" data-force-close="${c.id}">Force close</button>
+            </td>
           </tr>`).join('')
         : '<tr><td colspan="6" class="scc-empty">Nothing in the queue right now.</td></tr>';
 
       root.querySelectorAll('[data-force-close]').forEach((btn) => {
         btn.addEventListener('click', async () => {
           if (!confirm('Force-close this conversation?')) return;
-          await api(`/chats/${btn.dataset.forceClose}/force-close`, { method: 'PATCH', body: JSON.stringify({}) });
-          loadLive();
+          try {
+            await updateConversation(btn.dataset.forceClose, { status: 'closed' });
+            loadLive();
+          } catch (err) {
+            alert(err.message);
+          }
+        });
+      });
+      root.querySelectorAll('[data-reassign]').forEach((sel) => {
+        sel.addEventListener('change', async () => {
+          if (!sel.value) return;
+          try {
+            await updateConversation(sel.dataset.reassign, { assigned_staff_id: Number(sel.value) });
+            loadLive();
+          } catch (err) {
+            alert(err.message);
+            sel.value = '';
+          }
         });
       });
     }
@@ -452,13 +495,14 @@
 
     const loaders = { live: loadLive, agents: loadAgents, queue: loadQueueRules, canned: loadCanned, sla: loadSla, audit: loadAudit };
 
-    // Expose an init hook so admin.html can call this only once the section
-    // is actually shown, instead of loading seven panels' worth of data on
-    // every page load.
-    window.initSupportControlCenter = function () {
-      root.hidden = false;
-      loadLive();
-    };
+    // Self-contained: no changes needed inside setupTabs() in admin.js.
+    // The nav button for this tab (data-tab="support-team") already gets
+    // "active"/hidden handled by your existing tab-btn click listener —
+    // this just also loads the Live monitor data the first time it's
+    // clicked, same effect as the `if (button.dataset.tab === "security")`
+    // blocks in admin.js, without needing to add one there.
+    const navButton = document.querySelector('.tab-btn[data-tab="support-team"]');
+    if (navButton) navButton.addEventListener('click', () => loadLive());
   })();
   </script>
 </section>
