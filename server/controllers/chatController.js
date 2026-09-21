@@ -49,6 +49,17 @@ const {
 exports.startConversation = async (req, res) => {
     const { name, phone, email, subject, message } = req.body;
 
+    // Phase 1 routing: optional department chosen by the customer's category
+    // picker. Omitted or invalid -> NULL, which keeps the conversation on
+    // the original department-agnostic routing path in chatRouting.js --
+    // an older/not-yet-updated client keeps working exactly as before.
+    // (require() kept inline rather than moved to the top imports, since I
+    // haven't seen this file's existing import block -- move it up if you'd
+    // rather keep requires together.)
+    const department = require("../lib/departments").isValidDepartment(req.body.department)
+        ? req.body.department
+        : null;
+
     // The widget's FAQ tier runs client-side, so everything the customer was
     // already shown is lost at handoff unless it travels with the escalation.
     // Without it the agent's first move is to repeat an answer the customer
@@ -79,9 +90,9 @@ exports.startConversation = async (req, res) => {
             `INSERT INTO chat_conversations
                  (customer_id, guest_token, guest_name, guest_phone, guest_email,
                   subject, status, staff_unread, last_message_at,
-                  escalated_at, escalation_reason, last_customer_message_at)
+                  escalated_at, escalation_reason, last_customer_message_at, department)
              VALUES ($1, $2, $3, $4, $5, $6, 'waiting', 1, CURRENT_TIMESTAMP,
-                     CURRENT_TIMESTAMP, $7, CURRENT_TIMESTAMP)
+                     CURRENT_TIMESTAMP, $7, CURRENT_TIMESTAMP, $8)
              RETURNING id, status, created_at`,
             [
                 req.user ? currentUserId(req) : null,
@@ -90,7 +101,8 @@ exports.startConversation = async (req, res) => {
                 isGuest && phone ? String(phone).trim() : null,
                 isGuest && email ? String(email).trim().slice(0, 255) : null,
                 subject ? String(subject).trim().slice(0, 160) : null,
-                reason
+                reason,
+                department
             ]
         );
 

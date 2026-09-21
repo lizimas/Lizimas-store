@@ -54,6 +54,7 @@
   var TOPICS = [
     {
       label: "Delivery",
+      department: "delivery",
       answer:
         "We deliver between 08:00 and 18:00.\n\n" +
         "Kampala: same day or next day.\n" +
@@ -62,6 +63,7 @@
     },
     {
       label: "Returns",
+      department: "returns_refunds",
       answer:
         "You have 7 days from delivery to return an item.\n\n" +
         "It should be unused and in its original packaging. Tell us the order " +
@@ -69,18 +71,33 @@
     },
     {
       label: "Payments",
+      department: "orders_payments",
       answer:
         "We accept MTN Mobile Money and cash on delivery.\n\n" +
         "You choose your payment method at checkout."
     },
     {
       label: "Track order",
+      department: "orders_payments",
       answer:
         "Sign in and open My Orders to see the current status of anything you " +
         "have ordered.\n\n" +
         "If you checked out as a guest, send us your order number here and we " +
         "will look it up."
     }
+  ];
+
+  // Must match server/lib/departments.js exactly -- there is no shared
+  // bundle between browser and server code here, so keep these two lists
+  // in sync by hand if you ever add, rename, or remove a department.
+  var DEPARTMENTS = [
+    { key: "orders_payments", label: "Orders & Payments", emoji: "🛒" },
+    { key: "delivery", label: "Delivery", emoji: "🚚" },
+    { key: "product_info", label: "Product Information", emoji: "📦" },
+    { key: "returns_refunds", label: "Returns & Refunds", emoji: "↩️" },
+    { key: "account_login", label: "Account & Login", emoji: "🔐" },
+    { key: "technical", label: "Technical Support", emoji: "🛠️" },
+    { key: "general", label: "General Question", emoji: "💬" }
   ];
 
   var NAVY = "#0f1b3d";
@@ -460,6 +477,16 @@
   // customer closes the page mid-conversation. Email is optional because many
   // customers here do not have one to hand, and blocking on it would cost more
   // escalations than the address is worth.
+  function departmentOptionsHtml() {
+    var suggested = state.suggestedDepartment || "";
+    var html = suggested ? "" : '<option value="">Select a topic (optional)</option>';
+    html += DEPARTMENTS.map(function (d) {
+      var sel = d.key === suggested ? " selected" : "";
+      return '<option value="' + d.key + '"' + sel + '>' + d.emoji + ' ' + d.label + '</option>';
+    }).join("");
+    return html;
+  }
+
   function contactCard() {
     var card = document.createElement("div");
     card.className = "lzc-note";
@@ -467,6 +494,8 @@
       "<h4>Contact information</h4>" +
       "<p>An agent will take over from here. We need these so they can reach " +
       "you if you leave this page.</p>" +
+      '<label class="lzc-lab" for="lzc-department">What is this about?</label>' +
+      '<select id="lzc-department">' + departmentOptionsHtml() + '</select>' +
       '<label class="lzc-lab" for="lzc-name">Full name</label>' +
       '<input type="text" id="lzc-name" autocomplete="name" placeholder="Jane Nakato">' +
       '<label class="lzc-lab" for="lzc-phone">Phone number</label>' +
@@ -508,7 +537,8 @@
         return fail(email, "Enter a valid email address, or leave it blank.");
       }
 
-      return { name: n, phone: p, email: e };
+      var dept = card.querySelector("#lzc-department");
+      return { name: n, phone: p, email: e, department: dept ? dept.value : "" };
     }
 
     save.addEventListener("click", function () {
@@ -589,6 +619,11 @@
   }
 
   function answerTopic(topic) {
+    // Suggests (does not force) a department for the contact form, in case
+    // the customer reaches it later via "No" -> "Talk to an agent". They
+    // can still change it there.
+    state.suggestedDepartment = topic.department || null;
+
     // The customer's choice goes into the thread as their own message, so the
     // transcript reads as a conversation and staff can see what was asked.
     // Travels with the escalation so the agent opens the chat already
@@ -830,6 +865,7 @@
     };
     if (c.phone) body.phone = c.phone;
     if (c.email) body.email = c.email;
+    if (c.department) body.department = c.department;
 
     api("/start", { method: "POST", body: body })
       .then(function (data) {

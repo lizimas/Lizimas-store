@@ -9,7 +9,20 @@
  *
  * Takes a pool rather than importing one, so this module has no opinion about
  * where the database config lives.
+ *
+ * --- Phase 1 update (Sept 2026): department/skill/shift-aware matching ---
+ * A conversation with a department now prefers an agent enrolled in
+ * support_agents whose home department OR skills list includes it, who is
+ * also inside a configured shift (support_shifts) if they have one. If no
+ * such agent is found -- including the day-one case where support_agents is
+ * still empty -- this falls back to the ORIGINAL query below, unmodified,
+ * so nothing regresses before agents are actually enrolled with
+ * departments/skills. A conversation with no department (every conversation
+ * before the category picker ships) skips straight to that original query,
+ * byte-for-byte as it ran before this change.
  */
+
+const { isWithinShift } = require("../lib/schedule");
 
 // An agent who closed their laptop without toggling off still has
 // is_available = true. Only a recent heartbeat proves someone is watching.
@@ -49,6 +62,57 @@ async function logEvent(db, {
 }
 
 /**
+ * Finds the best department/skill/shift-matched staff_id for `department`,
+ * or null if nobody enrolled in support_agents currently qualifies (empty
+ * roster, nobody from that department online, or everyone who is online is
+ * outside their shift). Candidates are pulled in priority order (least
+ * busy, then longest-available) and the first that's also in-shift wins --
+ * agents with no shifts configured are always eligible (see lib/schedule.js).
+ *
+ * @param client a checked-out pg client (already inside the caller's transaction)
+ */
+async function findDepartmentMatchedStaffId(client, department, now = new Date()) {
+    const candidates = await client.query(
+        `SELECT sa.staff_id, sa.went_available_at, agents.id AS support_agent_id
+           FROM staff_availability sa
+           JOIN support_agents agents
+             ON agents.staff_id = sa.staff_id
+            AND agents.active = TRUE
+           LEFT JOIN chat_conversations c
+             ON c.assigned_staff_id = sa.staff_id
+            AND c.status IN ('open', 'pending')
+          WHERE sa.is_available = TRUE
+            AND sa.last_heartbeat IS NOT NULL
+            AND sa.last_heartbeat >
+                CURRENT_TIMESTAMP - INTERVAL '${HEARTBEAT_TIMEOUT_SECONDS} seconds'
+            AND (agents.department = $1 OR $1 = ANY(agents.skills))
+          GROUP BY sa.staff_id, sa.went_available_at, agents.id
+          ORDER BY COUNT(c.id) ASC, sa.went_available_at ASC NULLS FIRST
+          LIMIT 10`,
+        [department]
+    );
+
+    if (candidates.rows.length === 0) return null;
+
+    const shiftRows = await client.query(
+        `SELECT agent_id, day_of_week, start_time, end_time
+           FROM support_shifts
+          WHERE agent_id = ANY($1::int[])`,
+        [candidates.rows.map((c) => c.support_agent_id)]
+    );
+    const shiftsByAgent = {};
+    for (const s of shiftRows.rows) {
+        (shiftsByAgent[s.agent_id] = shiftsByAgent[s.agent_id] || []).push(s);
+    }
+
+    // .find(), not a re-sort: candidates are already ordered least-busy
+    // first from the query above, so the first shift-eligible one is also
+    // the best one.
+    const match = candidates.rows.find((c) => isWithinShift(shiftsByAgent[c.support_agent_id], now));
+    return match ? match.staff_id : null;
+}
+
+/**
  * Assign waiting conversations to the least-busy available agent.
  *
  * With no conversationId, drains the queue oldest-first until either no
@@ -74,13 +138,13 @@ async function assignWaiting(pool, { conversationId = null, maxAssignments = 500
                 // conversations instead of one waiting on the other.
                 const conv = conversationId
                     ? await client.query(
-                        `SELECT id FROM chat_conversations
+                        `SELECT id, department FROM chat_conversations
                          WHERE id = $1 AND status = 'waiting'
                          FOR UPDATE SKIP LOCKED`,
                         [conversationId]
                     )
                     : await client.query(
-                        `SELECT id FROM chat_conversations
+                        `SELECT id, department FROM chat_conversations
                          WHERE status = 'waiting'
                          ORDER BY escalated_at ASC NULLS FIRST, id ASC
                          LIMIT 1
@@ -92,26 +156,39 @@ async function assignWaiting(pool, { conversationId = null, maxAssignments = 500
                     break;
                 }
                 const convId = conv.rows[0].id;
+                const department = conv.rows[0].department;
 
-                // Least-busy pick. Ties broken by who has been available
-                // longest, which spreads load rather than always hitting
-                // whichever row the planner returns first.
-                const candidate = await client.query(
-                    `SELECT sa.staff_id
-                       FROM staff_availability sa
-                       LEFT JOIN chat_conversations c
-                         ON c.assigned_staff_id = sa.staff_id
-                        AND c.status IN ('open', 'pending')
-                      WHERE sa.is_available = TRUE
-                        AND sa.last_heartbeat IS NOT NULL
-                        AND sa.last_heartbeat >
-                            CURRENT_TIMESTAMP - INTERVAL '${HEARTBEAT_TIMEOUT_SECONDS} seconds'
-                      GROUP BY sa.staff_id, sa.went_available_at
-                      ORDER BY COUNT(c.id) ASC, sa.went_available_at ASC NULLS FIRST
-                      LIMIT 1`
-                );
+                let staffId = null;
+                let departmentMatched = false;
 
-                if (!candidate.rows[0]) {
+                if (department) {
+                    staffId = await findDepartmentMatchedStaffId(client, department);
+                    departmentMatched = staffId !== null;
+                }
+
+                if (!staffId) {
+                    // No department, or nobody department-matched qualifies
+                    // (including the day-one empty-roster case) -- fall back
+                    // to the original, unmodified query: least-busy pick
+                    // among ANY available agent, exactly as before this change.
+                    const candidate = await client.query(
+                        `SELECT sa.staff_id
+                           FROM staff_availability sa
+                           LEFT JOIN chat_conversations c
+                             ON c.assigned_staff_id = sa.staff_id
+                            AND c.status IN ('open', 'pending')
+                          WHERE sa.is_available = TRUE
+                            AND sa.last_heartbeat IS NOT NULL
+                            AND sa.last_heartbeat >
+                                CURRENT_TIMESTAMP - INTERVAL '${HEARTBEAT_TIMEOUT_SECONDS} seconds'
+                          GROUP BY sa.staff_id, sa.went_available_at
+                          ORDER BY COUNT(c.id) ASC, sa.went_available_at ASC NULLS FIRST
+                          LIMIT 1`
+                    );
+                    staffId = candidate.rows[0] ? candidate.rows[0].staff_id : null;
+                }
+
+                if (!staffId) {
                     // Nobody is on duty. The chat stays waiting, and the next
                     // availability toggle drains it. This is now the only way
                     // a conversation can sit in the queue, which makes queue
@@ -119,7 +196,6 @@ async function assignWaiting(pool, { conversationId = null, maxAssignments = 500
                     await client.query("ROLLBACK");
                     break;
                 }
-                const staffId = candidate.rows[0].staff_id;
 
                 await client.query(
                     `UPDATE chat_conversations
@@ -135,7 +211,11 @@ async function assignWaiting(pool, { conversationId = null, maxAssignments = 500
                     eventType: "assigned",
                     actorType: "system",
                     actorStaffId: staffId,
-                    meta: { via: conversationId ? "escalation" : "queue_drain" }
+                    meta: {
+                        via: conversationId ? "escalation" : "queue_drain",
+                        department: department || null,
+                        department_matched: departmentMatched
+                    }
                 });
 
                 await client.query("COMMIT");
@@ -158,5 +238,6 @@ module.exports = {
     assignWaiting,
     logEvent,
     ESCALATION_REASONS,
-    HEARTBEAT_TIMEOUT_SECONDS
+    HEARTBEAT_TIMEOUT_SECONDS,
+    _findDepartmentMatchedStaffId: findDepartmentMatchedStaffId // exported for tests only
 };

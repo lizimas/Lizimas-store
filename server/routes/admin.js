@@ -207,6 +207,7 @@ router.patch("/vendor-messages/:id/unescalate", requireAuth, requireSupportOrAdm
 router.get("/jumia/oauth/callback", jumiaAdmin.adminJumiaOAuthCallback);
 
 router.use(requireAuth, requireAdmin);
+router.use("/support", require("./supportAdmin"));
 
 router.get("/stats", getDashboardStats);
 

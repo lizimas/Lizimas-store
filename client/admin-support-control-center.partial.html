@@ -1,0 +1,464 @@
+<!--
+  Support Control Center — admin panel partial.
+
+  This is written to be pasted in as its own section of admin.html, next to
+  your existing Security tab / KYC review panel, following the same
+  "one <section>, own <style>, own <script>" pattern those already use.
+  Wire a nav item to show #support-control-center the same way you already
+  toggle between your other admin sections, then bump admin.html's
+  cache-buster version per your usual convention.
+
+  Styled to match the navy/gold theme from your auth-page redesign
+  (--ls-navy, --ls-gold below) — adjust the two variables at the top of the
+  <style> block if your real theme tokens live elsewhere already, to avoid
+  double-defining them.
+-->
+<section id="support-control-center" class="ls-admin-section" hidden>
+  <style>
+    #support-control-center {
+      --ls-navy: #0b1d3a;
+      --ls-gold: #c9a227;
+      --ls-bg: #f6f7fb;
+      --ls-border: #e2e5ee;
+      color: #1c2333;
+      font-family: inherit;
+    }
+    #support-control-center .scc-header {
+      background: var(--ls-navy);
+      color: #fff;
+      padding: 18px 22px;
+      border-radius: 10px 10px 0 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    #support-control-center .scc-header h2 { margin: 0; font-size: 1.25rem; }
+    #support-control-center .scc-tabs {
+      display: flex;
+      gap: 4px;
+      background: #fff;
+      border: 1px solid var(--ls-border);
+      border-top: none;
+      padding: 8px 12px 0;
+      flex-wrap: wrap;
+    }
+    #support-control-center .scc-tab {
+      background: none;
+      border: none;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 600;
+      color: #5b6478;
+      border-bottom: 3px solid transparent;
+    }
+    #support-control-center .scc-tab.active { color: var(--ls-navy); border-bottom-color: var(--ls-gold); }
+    #support-control-center .scc-panel {
+      display: none;
+      background: #fff;
+      border: 1px solid var(--ls-border);
+      border-top: none;
+      padding: 18px 22px 26px;
+      border-radius: 0 0 10px 10px;
+    }
+    #support-control-center .scc-panel.active { display: block; }
+    #support-control-center table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    #support-control-center th, #support-control-center td {
+      text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--ls-border);
+    }
+    #support-control-center th { color: #5b6478; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: .03em; }
+    #support-control-center .scc-badge {
+      display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 700;
+    }
+    #support-control-center .scc-badge.online { background: #e3f8ea; color: #1a7f4e; }
+    #support-control-center .scc-badge.away { background: #fff3d6; color: #92680a; }
+    #support-control-center .scc-badge.busy { background: #ffe6e6; color: #b3261e; }
+    #support-control-center .scc-badge.offline { background: #eceef4; color: #5b6478; }
+    #support-control-center .scc-badge.breach { background: #ffe6e6; color: #b3261e; }
+    #support-control-center button.scc-btn {
+      background: var(--ls-navy); color: #fff; border: none; padding: 8px 14px; border-radius: 6px;
+      font-weight: 600; cursor: pointer;
+    }
+    #support-control-center button.scc-btn.gold { background: var(--ls-gold); color: #1c2333; }
+    #support-control-center button.scc-btn.ghost { background: none; color: var(--ls-navy); border: 1px solid var(--ls-border); }
+    #support-control-center .scc-stat-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+    #support-control-center .scc-stat {
+      background: var(--ls-bg); border: 1px solid var(--ls-border); border-radius: 8px; padding: 12px 16px; min-width: 120px;
+    }
+    #support-control-center .scc-stat .n { font-size: 1.5rem; font-weight: 800; color: var(--ls-navy); }
+    #support-control-center .scc-stat .l { font-size: 0.76rem; color: #5b6478; text-transform: uppercase; }
+    #support-control-center form.scc-form { display: grid; gap: 10px; max-width: 480px; }
+    #support-control-center form.scc-form label { font-size: 0.85rem; font-weight: 600; color: #3a4257; display: block; margin-bottom: 3px; }
+    #support-control-center form.scc-form input, #support-control-center form.scc-form select, #support-control-center form.scc-form textarea {
+      width: 100%; padding: 7px 9px; border: 1px solid var(--ls-border); border-radius: 6px; font-size: 0.9rem;
+    }
+    #support-control-center .scc-empty { color: #8892a6; font-style: italic; padding: 20px 0; }
+    #support-control-center .scc-error { color: #b3261e; font-size: 0.85rem; margin-top: 4px; }
+  </style>
+
+  <div class="scc-header">
+    <h2>Support Control Center</h2>
+    <div id="scc-live-summary"></div>
+  </div>
+
+  <div class="scc-tabs">
+    <button class="scc-tab active" data-tab="live">Live monitor</button>
+    <button class="scc-tab" data-tab="agents">Agents</button>
+    <button class="scc-tab" data-tab="queue">Queue rules</button>
+    <button class="scc-tab" data-tab="canned">Canned responses</button>
+    <button class="scc-tab" data-tab="sla">SLA policies</button>
+    <button class="scc-tab" data-tab="performance">Performance</button>
+    <button class="scc-tab" data-tab="audit">Audit log</button>
+  </div>
+
+  <div class="scc-panel active" data-panel="live">
+    <div class="scc-stat-row" id="scc-live-stats"></div>
+    <h3>Agents right now</h3>
+    <table>
+      <thead><tr><th>Agent</th><th>Dept</th><th>Status</th><th>Load</th></tr></thead>
+      <tbody id="scc-live-agents"><tr><td colspan="4" class="scc-empty">Loading…</td></tr></tbody>
+    </table>
+    <h3 style="margin-top:20px;">Queued / active chats</h3>
+    <table>
+      <thead><tr><th>#</th><th>Dept</th><th>Status</th><th>Waiting since</th><th>SLA</th><th></th></tr></thead>
+      <tbody id="scc-live-chats"><tr><td colspan="6" class="scc-empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="scc-panel" data-panel="agents">
+    <button class="scc-btn gold" id="scc-add-agent-btn" style="margin-bottom:14px;">+ Add support agent</button>
+    <table>
+      <thead><tr><th>Name</th><th>Dept</th><th>Role</th><th>Load</th><th>Live status</th><th>Active</th><th></th></tr></thead>
+      <tbody id="scc-agents-table"><tr><td colspan="7" class="scc-empty">Loading…</td></tr></tbody>
+    </table>
+    <div id="scc-agent-form-wrap"></div>
+  </div>
+
+  <div class="scc-panel" data-panel="queue">
+    <div id="scc-queue-rules"></div>
+  </div>
+
+  <div class="scc-panel" data-panel="canned">
+    <button class="scc-btn gold" id="scc-add-canned-btn" style="margin-bottom:14px;">+ New canned response</button>
+    <table>
+      <thead><tr><th>Title</th><th>Category</th><th>Shared</th><th></th></tr></thead>
+      <tbody id="scc-canned-table"><tr><td colspan="4" class="scc-empty">Loading…</td></tr></tbody>
+    </table>
+    <div id="scc-canned-form-wrap"></div>
+  </div>
+
+  <div class="scc-panel" data-panel="sla">
+    <div id="scc-sla-policies"></div>
+  </div>
+
+  <div class="scc-panel" data-panel="performance">
+    <form class="scc-form" id="scc-perf-form" style="display:flex; flex-direction:row; gap:10px; max-width:none; align-items:end;">
+      <div><label>From</label><input type="date" id="scc-perf-start"></div>
+      <div><label>To</label><input type="date" id="scc-perf-end"></div>
+      <button class="scc-btn" type="submit">Run report</button>
+    </form>
+    <table style="margin-top:16px;">
+      <thead><tr><th>Agent</th><th>Chats</th><th>Avg 1st response</th><th>Avg resolution</th><th>Escalation rate</th><th>Avg CSAT</th></tr></thead>
+      <tbody id="scc-perf-table"><tr><td colspan="6" class="scc-empty">Pick a date range and run the report.</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="scc-panel" data-panel="audit">
+    <table>
+      <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Target</th></tr></thead>
+      <tbody id="scc-audit-table"><tr><td colspan="4" class="scc-empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <script>
+  (function () {
+    const API = '/api/admin/support';
+    const root = document.getElementById('support-control-center');
+    if (!root) return;
+
+    async function api(path, opts) {
+      const res = await fetch(API + path, {
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        ...opts,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw Object.assign(new Error(data.error || 'Request failed'), { data });
+      return data;
+    }
+    function fmtSeconds(s) {
+      if (s == null) return '—';
+      if (s < 60) return s + 's';
+      return Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+    }
+    function timeAgo(iso) {
+      const diff = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+      return fmtSeconds(diff) + ' ago';
+    }
+
+    // ---- tabs ----
+    root.querySelectorAll('.scc-tab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        root.querySelectorAll('.scc-tab').forEach((t) => t.classList.remove('active'));
+        root.querySelectorAll('.scc-panel').forEach((p) => p.classList.remove('active'));
+        tab.classList.add('active');
+        root.querySelector(`.scc-panel[data-panel="${tab.dataset.tab}"]`).classList.add('active');
+        loaders[tab.dataset.tab] && loaders[tab.dataset.tab]();
+      });
+    });
+
+    // ---- live monitor ----
+    async function loadLive() {
+      const data = await api('/live-overview');
+      document.getElementById('scc-live-summary').textContent =
+        `${data.queued.length} waiting · ${data.active.length} open · ${data.pending.length} pending`;
+
+      const statsEl = document.getElementById('scc-live-stats');
+      statsEl.innerHTML = [
+        ['Waiting', data.queued.length],
+        ['Open', data.active.length],
+        ['Pending', data.pending.length],
+        ['SLA breaches', data.slaBreaches.length],
+      ].map(([l, n]) => `<div class="scc-stat"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+
+      document.getElementById('scc-live-agents').innerHTML = data.agents.length
+        ? data.agents.map((a) => `
+          <tr>
+            <td>${a.staff_name || 'Agent #' + a.staff_id}</td>
+            <td>${a.department}</td>
+            <td><span class="scc-badge ${a.status}">${a.status}</span></td>
+            <td>${a.current_load}/${a.max_concurrent}</td>
+          </tr>`).join('')
+        : '<tr><td colspan="4" class="scc-empty">No agents yet — add one from the Agents tab.</td></tr>';
+
+      const chats = [...data.queued, ...data.active, ...data.pending];
+      const breachByChat = Object.fromEntries(data.slaBreaches.map((b) => [b.chatId, b]));
+      document.getElementById('scc-live-chats').innerHTML = chats.length
+        ? chats.map((c) => `
+          <tr>
+            <td>#${c.id}</td>
+            <td>${c.status}${c.escalation_reason ? ` · ${c.escalation_reason.replace('_',' ')}` : ''}</td>
+            <td>${c.assigned_staff_id ? '#' + c.assigned_staff_id : '—'}</td>
+            <td>${timeAgo(c.escalated_at || c.created_at)}</td>
+            <td>${breachByChat[c.id] ? `<span class="scc-badge breach">${breachByChat[c.id].type.replace('_',' ')}</span>` : '—'}</td>
+            <td><button class="scc-btn ghost" data-force-close="${c.id}">Force close</button></td>
+          </tr>`).join('')
+        : '<tr><td colspan="6" class="scc-empty">Nothing in the queue right now.</td></tr>';
+
+      root.querySelectorAll('[data-force-close]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Force-close this conversation?')) return;
+          await api(`/chats/${btn.dataset.forceClose}/force-close`, { method: 'PATCH', body: JSON.stringify({}) });
+          loadLive();
+        });
+      });
+    }
+
+    // ---- agents ----
+    async function loadAgents() {
+      const data = await api('/agents');
+      document.getElementById('scc-agents-table').innerHTML = data.agents.length
+        ? data.agents.map((a) => `
+          <tr>
+            <td>${a.staff_name || 'Staff #' + a.staff_id}</td>
+            <td>${a.department}</td>
+            <td>${a.role}</td>
+            <td>${a.current_load}/${a.max_concurrent}</td>
+            <td><span class="scc-badge ${a.is_available ? 'online' : 'offline'}">${a.is_available ? 'online' : 'offline'}</span></td>
+            <td>${a.active ? 'Yes' : 'Suspended'}</td>
+            <td><button class="scc-btn ghost" data-toggle-active="${a.id}" data-active="${a.active}">${a.active ? 'Suspend' : 'Reactivate'}</button></td>
+          </tr>`).join('')
+        : '<tr><td colspan="7" class="scc-empty">No support agents enrolled yet.</td></tr>';
+
+      root.querySelectorAll('[data-toggle-active]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const active = btn.dataset.active !== 'true';
+          await api(`/agents/${btn.dataset.toggleActive}/active`, { method: 'PATCH', body: JSON.stringify({ active }) });
+          loadAgents();
+        });
+      });
+    }
+
+    document.getElementById('scc-add-agent-btn').addEventListener('click', () => {
+      const wrap = document.getElementById('scc-agent-form-wrap');
+      wrap.innerHTML = `
+        <form class="scc-form" id="scc-agent-form" style="margin-top:16px;">
+          <div><label>Staff ID</label><input name="staff_id" type="number" required></div>
+          <div><label>Department</label><input name="department" value="general"></div>
+          <div><label>Role</label>
+            <select name="role"><option value="agent">Agent</option><option value="supervisor">Supervisor</option></select>
+          </div>
+          <p style="font-size:0.8rem; color:#8892a6; margin:0;">Max concurrent chats is set by the agent's own chat client, not here — this just enrolls them for support-panel routing.</p>
+          <div class="scc-error" id="scc-agent-error"></div>
+          <button class="scc-btn gold" type="submit">Save agent</button>
+        </form>`;
+      document.getElementById('scc-agent-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.target);
+        try {
+          await api('/agents', { method: 'POST', body: JSON.stringify({
+            staff_id: Number(f.get('staff_id')),
+            department: f.get('department'),
+            role: f.get('role'),
+          }) });
+          wrap.innerHTML = '';
+          loadAgents();
+        } catch (err) {
+          document.getElementById('scc-agent-error').textContent = err.message;
+        }
+      });
+    });
+
+    // ---- queue rules ----
+    async function loadQueueRules() {
+      const data = await api('/queue-rules');
+      document.getElementById('scc-queue-rules').innerHTML = data.rules.map((r) => `
+        <form class="scc-form scc-rule-form" data-dept="${r.department}" style="border-bottom:1px solid var(--ls-border); padding-bottom:16px; margin-bottom:16px;">
+          <h3 style="margin:0 0 6px;">${r.department}</h3>
+          <div><label>Routing mode</label>
+            <select name="routing_mode">
+              ${['round_robin','least_busy','skill_based'].map((m) => `<option value="${m}" ${r.routing_mode===m?'selected':''}>${m.replace('_',' ')}</option>`).join('')}
+            </select>
+          </div>
+          <div><label>Max queue wait (seconds)</label><input name="max_queue_wait_seconds" type="number" value="${r.max_queue_wait_seconds}"></div>
+          <div><label>Overflow action</label>
+            <select name="overflow_action">
+              ${['keep_queued','escalate','offline_message'].map((m) => `<option value="${m}" ${r.overflow_action===m?'selected':''}>${m.replace('_',' ')}</option>`).join('')}
+            </select>
+          </div>
+          <div><label><input type="checkbox" name="business_hours_enabled" ${r.business_hours_enabled?'checked':''}> Restrict to business hours</label></div>
+          <button class="scc-btn" type="submit">Save ${r.department} rules</button>
+        </form>`).join('');
+
+      root.querySelectorAll('.scc-rule-form').forEach((form) => {
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const f = new FormData(form);
+          await api(`/queue-rules/${form.dataset.dept}`, { method: 'PUT', body: JSON.stringify({
+            routing_mode: f.get('routing_mode'),
+            max_queue_wait_seconds: Number(f.get('max_queue_wait_seconds')),
+            overflow_action: f.get('overflow_action'),
+            business_hours_enabled: f.get('business_hours_enabled') === 'on',
+          }) });
+          loadQueueRules();
+        });
+      });
+    }
+
+    // ---- canned responses ----
+    async function loadCanned() {
+      const data = await api('/canned-responses');
+      document.getElementById('scc-canned-table').innerHTML = data.cannedResponses.length
+        ? data.cannedResponses.map((c) => `
+          <tr><td>${c.title}</td><td>${c.category}</td><td>${c.shared ? 'Team' : 'Personal'}</td>
+          <td><button class="scc-btn ghost" data-delete-canned="${c.id}">Delete</button></td></tr>`).join('')
+        : '<tr><td colspan="4" class="scc-empty">No canned responses yet.</td></tr>';
+
+      root.querySelectorAll('[data-delete-canned]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Delete this canned response?')) return;
+          await api(`/canned-responses/${btn.dataset.deleteCanned}`, { method: 'DELETE' });
+          loadCanned();
+        });
+      });
+    }
+
+    document.getElementById('scc-add-canned-btn').addEventListener('click', () => {
+      const wrap = document.getElementById('scc-canned-form-wrap');
+      wrap.innerHTML = `
+        <form class="scc-form" id="scc-canned-form" style="margin-top:16px;">
+          <div><label>Title</label><input name="title" required maxlength="120"></div>
+          <div><label>Category</label><input name="category" value="general"></div>
+          <div><label>Body</label><textarea name="body" rows="4" required></textarea></div>
+          <div class="scc-error" id="scc-canned-error"></div>
+          <button class="scc-btn gold" type="submit">Save response</button>
+        </form>`;
+      document.getElementById('scc-canned-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.target);
+        try {
+          await api('/canned-responses', { method: 'POST', body: JSON.stringify({
+            title: f.get('title'), category: f.get('category'), body: f.get('body'),
+          }) });
+          wrap.innerHTML = '';
+          loadCanned();
+        } catch (err) {
+          document.getElementById('scc-canned-error').textContent = err.message;
+        }
+      });
+    });
+
+    // ---- SLA policies ----
+    async function loadSla() {
+      const data = await api('/sla-policies');
+      document.getElementById('scc-sla-policies').innerHTML = data.policies.map((p) => `
+        <form class="scc-form scc-sla-form" data-dept="${p.department}" style="border-bottom:1px solid var(--ls-border); padding-bottom:16px; margin-bottom:16px;">
+          <h3 style="margin:0 0 6px;">${p.department}</h3>
+          <div><label>First-response target (seconds)</label><input name="first_response_target_seconds" type="number" value="${p.first_response_target_seconds}"></div>
+          <div><label>Resolution target (seconds)</label><input name="resolution_target_seconds" type="number" value="${p.resolution_target_seconds}"></div>
+          <div><label><input type="checkbox" name="breach_alert_enabled" ${p.breach_alert_enabled?'checked':''}> Alert on breach</label></div>
+          <div class="scc-error" data-sla-error></div>
+          <button class="scc-btn" type="submit">Save ${p.department} SLA</button>
+        </form>`).join('');
+
+      root.querySelectorAll('.scc-sla-form').forEach((form) => {
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const f = new FormData(form);
+          try {
+            await api(`/sla-policies/${form.dataset.dept}`, { method: 'PUT', body: JSON.stringify({
+              first_response_target_seconds: Number(f.get('first_response_target_seconds')),
+              resolution_target_seconds: Number(f.get('resolution_target_seconds')),
+              breach_alert_enabled: f.get('breach_alert_enabled') === 'on',
+            }) });
+            loadSla();
+          } catch (err) {
+            form.querySelector('[data-sla-error]').textContent = err.message;
+          }
+        });
+      });
+    }
+
+    // ---- performance ----
+    document.getElementById('scc-perf-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const start = document.getElementById('scc-perf-start').value;
+      const end = document.getElementById('scc-perf-end').value;
+      if (!start || !end) return;
+      const data = await api(`/performance?start=${start}&end=${end}`);
+      document.getElementById('scc-perf-table').innerHTML = data.report.length
+        ? data.report.map((r) => `
+          <tr>
+            <td>${r.agentName || 'Agent #' + r.agentId}</td>
+            <td>${r.chatsHandled}</td>
+            <td>${fmtSeconds(r.avgFirstResponseSeconds)}</td>
+            <td>${fmtSeconds(r.avgResolutionSeconds)}</td>
+            <td>${(r.escalationRate * 100).toFixed(0)}%</td>
+            <td>${r.avgCsat ?? '—'}</td>
+          </tr>`).join('')
+        : '<tr><td colspan="6" class="scc-empty">No closed chats in that range.</td></tr>';
+    });
+
+    // ---- audit log ----
+    async function loadAudit() {
+      const data = await api('/audit-log?limit=100');
+      document.getElementById('scc-audit-table').innerHTML = data.log.length
+        ? data.log.map((l) => `
+          <tr><td>${new Date(l.created_at).toLocaleString()}</td><td>${l.actor_name || '—'}</td><td>${l.action}</td>
+          <td>${l.target_type || ''} ${l.target_id ?? ''}</td></tr>`).join('')
+        : '<tr><td colspan="4" class="scc-empty">No admin actions logged yet.</td></tr>';
+    }
+
+    const loaders = { live: loadLive, agents: loadAgents, queue: loadQueueRules, canned: loadCanned, sla: loadSla, audit: loadAudit };
+
+    // Expose an init hook so admin.html can call this only once the section
+    // is actually shown, instead of loading seven panels' worth of data on
+    // every page load.
+    window.initSupportControlCenter = function () {
+      root.hidden = false;
+      loadLive();
+    };
+  })();
+  </script>
+</section>
