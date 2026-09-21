@@ -1363,14 +1363,34 @@
       wrap.innerHTML = `
         <form class="scc-form" id="scc-agent-form" style="margin-top:16px;">
           <div><label>Staff ID</label><input name="staff_id" type="number" required></div>
-          <div><label>Department</label><input name="department" value="general"></div>
+          <div><label>Department</label>
+            <select name="department">
+              <option value="orders_payments">🛒 Orders &amp; Payments</option>
+              <option value="delivery">🚚 Delivery</option>
+              <option value="product_info">📦 Product Information</option>
+              <option value="returns_refunds">↩️ Returns &amp; Refunds</option>
+              <option value="account_login">🔐 Account &amp; Login</option>
+              <option value="technical">🛠️ Technical Support</option>
+              <option value="general" selected>💬 General Question</option>
+            </select>
+          </div>
           <div><label>Role</label>
-            <select name="role"><option value="agent">Agent</option><option value="supervisor">Supervisor</option></select>
+            <select name="role">
+              <option value="agent">Agent</option>
+              <option value="senior_agent">Senior Agent</option>
+              <option value="supervisor">Supervisor</option>
+            </select>
           </div>
           <p style="font-size:0.8rem; color:#8892a6; margin:0;">Max concurrent chats is set by the agent's own chat client, not here — this just enrolls them for support-panel routing.</p>
           <div class="scc-error" id="scc-agent-error"></div>
-          <button class="scc-btn gold" type="submit">Save agent</button>
+          <div style="display:flex; gap:8px;">
+            <button class="scc-btn gold" type="submit">Save agent</button>
+            <button class="scc-btn ghost" type="button" id="scc-agent-cancel">Cancel</button>
+          </div>
         </form>`;
+      document.getElementById('scc-agent-cancel').addEventListener('click', () => {
+        wrap.innerHTML = '';
+      });
       document.getElementById('scc-agent-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const f = new FormData(e.target);
