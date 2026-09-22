@@ -1055,6 +1055,28 @@
   (--ls-navy, --ls-gold below) — adjust the two variables if your real
   theme tokens live elsewhere already, to avoid double-defining them.
 -->
+<!--
+  Support Control Center — admin panel tab.
+
+  Paste this <section> in among your other tab-content sections in
+  admin.html (right after </section> for tab-support, say). It follows your
+  existing convention exactly: id="tab-X" + class="tab-content hidden",
+  toggled automatically by your existing setupTabs() — no separate show/hide
+  logic needed here.
+
+  Add a nav button next to it, e.g.:
+    <button class="tab-btn vd-sub-item" data-tab="support-team">🧑‍💼 Support Team</button>
+
+  Uses your existing getToken()/API_URL globals for auth — same pattern as
+  loadSupportQueue()/loadSupportOverview() in admin.js. Force-close/reassign
+  call your existing PATCH /api/chat/conversations/:id directly rather than
+  a separate endpoint, so they get the same row-locking, reopened_count
+  tracking, and chat_events logging your real chat system already does.
+
+  Styled to match the navy/gold theme from your auth-page redesign
+  (--ls-navy, --ls-gold below) — adjust the two variables if your real
+  theme tokens live elsewhere already, to avoid double-defining them.
+-->
 <section id="tab-support-team" class="tab-content hidden">
   <style>
     #tab-support-team {
@@ -1184,8 +1206,8 @@
   <div class="scc-panel" data-panel="canned">
     <button class="scc-btn gold" id="scc-add-canned-btn" style="margin-bottom:14px;">+ New canned response</button>
     <table>
-      <thead><tr><th>Title</th><th>Category</th><th>Shared</th><th></th></tr></thead>
-      <tbody id="scc-canned-table"><tr><td colspan="4" class="scc-empty">Loading…</td></tr></tbody>
+      <thead><tr><th>Title</th><th>Body</th><th>Category</th><th>Shared</th><th></th></tr></thead>
+      <tbody id="scc-canned-table"><tr><td colspan="5" class="scc-empty">Loading…</td></tr></tbody>
     </table>
     <div id="scc-canned-form-wrap"></div>
   </div>
@@ -1251,6 +1273,14 @@
     function timeAgo(iso) {
       const diff = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
       return fmtSeconds(diff) + ' ago';
+    }
+    // Free text admins type in (canned response titles/bodies) goes through
+    // this before landing in innerHTML -- otherwise a stray < or & breaks
+    // the row or, worse, lets typed text act as markup.
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s == null ? '' : String(s);
+      return d.innerHTML;
     }
 
     // ---- tabs ----
@@ -1335,6 +1365,15 @@
 
     // ---- agents ----
     const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const DEPARTMENTS = [
+      { key: 'orders_payments', label: '🛒 Orders & Payments' },
+      { key: 'delivery', label: '🚚 Delivery' },
+      { key: 'product_info', label: '📦 Product Information' },
+      { key: 'returns_refunds', label: '↩️ Returns & Refunds' },
+      { key: 'account_login', label: '🔐 Account & Login' },
+      { key: 'technical', label: '🛠️ Technical Support' },
+      { key: 'general', label: '💬 General Question' },
+    ];
 
     async function loadAgents() {
       const data = await api('/agents');
@@ -1349,6 +1388,7 @@
             <td>${a.active ? 'Yes' : 'Suspended'}</td>
             <td style="display:flex; gap:6px;">
               <button class="scc-btn ghost" data-toggle-active="${a.id}" data-active="${a.active}">${a.active ? 'Suspend' : 'Reactivate'}</button>
+              <button class="scc-btn ghost" data-edit-agent="${a.id}">Edit</button>
               <button class="scc-btn ghost" data-edit-shifts="${a.id}">Shifts</button>
             </td>
           </tr>`).join('')
@@ -1363,6 +1403,12 @@
       });
       root.querySelectorAll('[data-edit-shifts]').forEach((btn) => {
         btn.addEventListener('click', () => openShiftsEditor(btn.dataset.editShifts));
+      });
+      root.querySelectorAll('[data-edit-agent]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const a = data.agents.find((x) => String(x.id) === btn.dataset.editAgent);
+          if (a) openAgentForm(a);
+        });
       });
     }
 
@@ -1428,33 +1474,43 @@
       });
     }
 
-    document.getElementById('scc-add-agent-btn').addEventListener('click', () => {
+    // Shared by "+ Add support agent" (existing = null) and "Edit"
+    // (existing = the full row). staff_id is create-only -- the backend
+    // never accepts changing who an agent row refers to, only their
+    // role/department/skills, so it's shown read-only when editing.
+    function openAgentForm(existing) {
       const wrap = document.getElementById('scc-agent-form-wrap');
+      const skillSet = new Set((existing && existing.skills) || []);
       wrap.innerHTML = `
         <form class="scc-form" id="scc-agent-form" style="margin-top:16px;">
-          <div><label>Staff ID</label><input name="staff_id" type="number" required></div>
-          <div><label>Department</label>
+          <h3 style="margin:0;">${existing ? 'Edit ' + (existing.staff_name || 'agent') : 'Add support agent'}</h3>
+          ${existing
+            ? `<div><label>Staff ID</label><input value="${existing.staff_id}" disabled></div>`
+            : `<div><label>Staff ID</label><input name="staff_id" type="number" required></div>`}
+          <div><label>Home department</label>
             <select name="department">
-              <option value="orders_payments">🛒 Orders &amp; Payments</option>
-              <option value="delivery">🚚 Delivery</option>
-              <option value="product_info">📦 Product Information</option>
-              <option value="returns_refunds">↩️ Returns &amp; Refunds</option>
-              <option value="account_login">🔐 Account &amp; Login</option>
-              <option value="technical">🛠️ Technical Support</option>
-              <option value="general" selected>💬 General Question</option>
+              ${DEPARTMENTS.map((d) => `<option value="${d.key}" ${existing && existing.department === d.key ? 'selected' : ''}>${d.label}</option>`).join('')}
             </select>
           </div>
           <div><label>Role</label>
             <select name="role">
-              <option value="agent">Agent</option>
-              <option value="senior_agent">Senior Agent</option>
-              <option value="supervisor">Supervisor</option>
+              <option value="agent" ${existing && existing.role === 'agent' ? 'selected' : ''}>Agent</option>
+              <option value="senior_agent" ${existing && existing.role === 'senior_agent' ? 'selected' : ''}>Senior Agent</option>
+              <option value="supervisor" ${existing && existing.role === 'supervisor' ? 'selected' : ''}>Supervisor</option>
             </select>
+          </div>
+          <div>
+            <label>Also route them chats from</label>
+            <p style="font-size:0.8rem; color:#8892a6; margin:2px 0 6px;">Beyond their home department above -- e.g. a General agent who also covers Orders &amp; Payments.</p>
+            ${DEPARTMENTS.map((d) => `
+              <label style="display:inline-flex; align-items:center; gap:4px; margin:0 12px 6px 0; font-weight:400;">
+                <input type="checkbox" name="skills" value="${d.key}" ${skillSet.has(d.key) ? 'checked' : ''}> ${d.label}
+              </label>`).join('')}
           </div>
           <p style="font-size:0.8rem; color:#8892a6; margin:0;">Max concurrent chats is set by the agent's own chat client, not here — this just enrolls them for support-panel routing.</p>
           <div class="scc-error" id="scc-agent-error"></div>
           <div style="display:flex; gap:8px;">
-            <button class="scc-btn gold" type="submit">Save agent</button>
+            <button class="scc-btn gold" type="submit">${existing ? 'Save changes' : 'Save agent'}</button>
             <button class="scc-btn ghost" type="button" id="scc-agent-cancel">Cancel</button>
           </div>
         </form>`;
@@ -1464,19 +1520,31 @@
       document.getElementById('scc-agent-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const f = new FormData(e.target);
+        const skills = f.getAll('skills');
         try {
-          await api('/agents', { method: 'POST', body: JSON.stringify({
-            staff_id: Number(f.get('staff_id')),
-            department: f.get('department'),
-            role: f.get('role'),
-          }) });
+          if (existing) {
+            await api(`/agents/${existing.id}`, { method: 'PATCH', body: JSON.stringify({
+              department: f.get('department'),
+              role: f.get('role'),
+              skills,
+            }) });
+          } else {
+            await api('/agents', { method: 'POST', body: JSON.stringify({
+              staff_id: Number(f.get('staff_id')),
+              department: f.get('department'),
+              role: f.get('role'),
+              skills,
+            }) });
+          }
           wrap.innerHTML = '';
           loadAgents();
         } catch (err) {
           document.getElementById('scc-agent-error').textContent = err.message;
         }
       });
-    });
+    }
+
+    document.getElementById('scc-add-agent-btn').addEventListener('click', () => openAgentForm(null));
 
     // ---- queue rules ----
     async function loadQueueRules() {
@@ -1495,11 +1563,24 @@
               ${['keep_queued','escalate','offline_message'].map((m) => `<option value="${m}" ${r.overflow_action===m?'selected':''}>${m.replace('_',' ')}</option>`).join('')}
             </select>
           </div>
-          <div><label><input type="checkbox" name="business_hours_enabled" ${r.business_hours_enabled?'checked':''}> Restrict to business hours</label></div>
+          <div><label>Offline message</label><textarea name="offline_message" rows="2">${esc(r.offline_message)}</textarea></div>
+          <div>
+            <label><input type="checkbox" class="scc-bh-toggle" name="business_hours_enabled" ${r.business_hours_enabled?'checked':''}> Restrict to business hours</label>
+            <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+              <input type="time" name="business_hours_start" value="${(r.business_hours_start || '08:00:00').slice(0,5)}" ${r.business_hours_enabled ? '' : 'disabled'} style="width:auto;">
+              <span>to</span>
+              <input type="time" name="business_hours_end" value="${(r.business_hours_end || '20:00:00').slice(0,5)}" ${r.business_hours_enabled ? '' : 'disabled'} style="width:auto;">
+            </div>
+          </div>
           <button class="scc-btn" type="submit">Save ${r.department} rules</button>
         </form>`).join('');
 
       root.querySelectorAll('.scc-rule-form').forEach((form) => {
+        const toggle = form.querySelector('.scc-bh-toggle');
+        toggle.addEventListener('change', () => {
+          form.querySelector('[name="business_hours_start"]').disabled = !toggle.checked;
+          form.querySelector('[name="business_hours_end"]').disabled = !toggle.checked;
+        });
         form.addEventListener('submit', async (e) => {
           e.preventDefault();
           const f = new FormData(form);
@@ -1507,7 +1588,10 @@
             routing_mode: f.get('routing_mode'),
             max_queue_wait_seconds: Number(f.get('max_queue_wait_seconds')),
             overflow_action: f.get('overflow_action'),
+            offline_message: f.get('offline_message'),
             business_hours_enabled: f.get('business_hours_enabled') === 'on',
+            business_hours_start: f.get('business_hours_start'),
+            business_hours_end: f.get('business_hours_end'),
           }) });
           loadQueueRules();
         });
@@ -1519,9 +1603,17 @@
       const data = await api('/canned-responses');
       document.getElementById('scc-canned-table').innerHTML = data.cannedResponses.length
         ? data.cannedResponses.map((c) => `
-          <tr><td>${c.title}</td><td>${c.category}</td><td>${c.shared ? 'Team' : 'Personal'}</td>
-          <td><button class="scc-btn ghost" data-delete-canned="${c.id}">Delete</button></td></tr>`).join('')
-        : '<tr><td colspan="4" class="scc-empty">No canned responses yet.</td></tr>';
+          <tr>
+            <td>${esc(c.title)}</td>
+            <td style="max-width:320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${esc(c.body)}">${esc(c.body)}</td>
+            <td>${esc(c.category)}</td>
+            <td>${c.shared ? 'Team' : 'Personal'}</td>
+            <td style="display:flex; gap:6px;">
+              <button class="scc-btn ghost" data-edit-canned="${c.id}">Edit</button>
+              <button class="scc-btn ghost" data-delete-canned="${c.id}">Delete</button>
+            </td>
+          </tr>`).join('')
+        : '<tr><td colspan="5" class="scc-empty">No canned responses yet.</td></tr>';
 
       root.querySelectorAll('[data-delete-canned]').forEach((btn) => {
         btn.addEventListener('click', async () => {
@@ -1530,32 +1622,50 @@
           loadCanned();
         });
       });
+      root.querySelectorAll('[data-edit-canned]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const c = data.cannedResponses.find((x) => String(x.id) === btn.dataset.editCanned);
+          if (c) openCannedForm(c);
+        });
+      });
     }
 
-    document.getElementById('scc-add-canned-btn').addEventListener('click', () => {
+    // Shared by "+ New canned response" (existing = null) and "Edit"
+    // (existing = the full row) -- same form either way, POST vs PATCH.
+    function openCannedForm(existing) {
       const wrap = document.getElementById('scc-canned-form-wrap');
       wrap.innerHTML = `
         <form class="scc-form" id="scc-canned-form" style="margin-top:16px;">
-          <div><label>Title</label><input name="title" required maxlength="120"></div>
-          <div><label>Category</label><input name="category" value="general"></div>
-          <div><label>Body</label><textarea name="body" rows="4" required></textarea></div>
+          <h3 style="margin:0;">${existing ? 'Edit response' : 'New response'}</h3>
+          <div><label>Title</label><input name="title" required maxlength="120" value="${existing ? esc(existing.title) : ''}"></div>
+          <div><label>Category</label><input name="category" value="${existing ? esc(existing.category) : 'general'}"></div>
+          <div><label>Body</label><textarea name="body" rows="4" required>${existing ? esc(existing.body) : ''}</textarea></div>
           <div class="scc-error" id="scc-canned-error"></div>
-          <button class="scc-btn gold" type="submit">Save response</button>
+          <div style="display:flex; gap:8px;">
+            <button class="scc-btn gold" type="submit">${existing ? 'Save changes' : 'Save response'}</button>
+            <button class="scc-btn ghost" type="button" id="scc-canned-cancel">Cancel</button>
+          </div>
         </form>`;
+      document.getElementById('scc-canned-cancel').addEventListener('click', () => { wrap.innerHTML = ''; });
       document.getElementById('scc-canned-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const f = new FormData(e.target);
+        const payload = { title: f.get('title'), category: f.get('category'), body: f.get('body') };
         try {
-          await api('/canned-responses', { method: 'POST', body: JSON.stringify({
-            title: f.get('title'), category: f.get('category'), body: f.get('body'),
-          }) });
+          if (existing) {
+            await api(`/canned-responses/${existing.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+          } else {
+            await api('/canned-responses', { method: 'POST', body: JSON.stringify(payload) });
+          }
           wrap.innerHTML = '';
           loadCanned();
         } catch (err) {
           document.getElementById('scc-canned-error').textContent = err.message;
         }
       });
-    });
+    }
+
+    document.getElementById('scc-add-canned-btn').addEventListener('click', () => openCannedForm(null));
 
     // ---- SLA policies ----
     async function loadSla() {
@@ -1631,6 +1741,7 @@
   })();
   </script>
 </section>
+
 
                 <section id="tab-staff" class="tab-content hidden">
                     <h2 class="admin-page-title">Staff & Approvals</h2>
