@@ -83,15 +83,19 @@ function uploadPrivateDocument(fileBuffer, originalName, folder = "lizimas-store
     });
 }
 
-// Mint a short-lived signed URL for viewing a private KYC document. Callers
-// must fetch a fresh URL on every view rather than storing this anywhere -
-// it expires ~5 minutes after it's generated.
-function privateDocumentViewUrl(publicId, resourceType, format) {
+// Mint a short-lived signed URL for viewing (or, with attachment=true,
+// downloading - Ryan, record-keeping requirement) a private KYC document.
+// Callers must fetch a fresh URL on every view rather than storing this
+// anywhere - it expires ~5 minutes after it's generated. attachment=true
+// makes Cloudinary itself send Content-Disposition: attachment, which is
+// the only reliable way to force a download for a cross-origin URL like
+// this one - a plain HTML download attribute is silently ignored here.
+function privateDocumentViewUrl(publicId, resourceType, format, attachment = false) {
     const expiresAt = Math.floor(Date.now() / 1000) + 5 * 60;
     return cloudinary.utils.private_download_url(publicId, format, {
         resource_type: resourceType || "image",
         type: "private",
-        attachment: false,
+        attachment,
         expires_at: expiresAt
     });
 }

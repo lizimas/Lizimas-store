@@ -260,6 +260,7 @@ exports.getMyPaymentInstrumentEvidenceUrl = async (req, res) => {
         if (!vendor) return res.status(404).json({ error: "No vendor profile found for this account." });
 
         const { id } = req.params;
+        const { download } = req.query;
         const docRow = await pool.query(
             "SELECT evidence_cloudinary_public_id, evidence_resource_type, evidence_format FROM vendor_payment_instruments WHERE id = $1 AND vendor_id = $2",
             [id, vendor.id]
@@ -269,7 +270,7 @@ exports.getMyPaymentInstrumentEvidenceUrl = async (req, res) => {
         }
 
         const doc = docRow.rows[0];
-        const url = privateDocumentViewUrl(doc.evidence_cloudinary_public_id, doc.evidence_resource_type, doc.evidence_format);
+        const url = privateDocumentViewUrl(doc.evidence_cloudinary_public_id, doc.evidence_resource_type, doc.evidence_format, download === "true");
         res.json({ url });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -413,6 +414,7 @@ exports.reviewPaymentInstrumentAdmin = async (req, res) => {
 exports.getPaymentInstrumentEvidenceUrlAdmin = async (req, res) => {
     try {
         const { id } = req.params;
+        const { download } = req.query;
         const docRow = await pool.query(
             "SELECT evidence_cloudinary_public_id, evidence_resource_type, evidence_format FROM vendor_payment_instruments WHERE id = $1",
             [id]
@@ -422,7 +424,7 @@ exports.getPaymentInstrumentEvidenceUrlAdmin = async (req, res) => {
         }
 
         const doc = docRow.rows[0];
-        const url = privateDocumentViewUrl(doc.evidence_cloudinary_public_id, doc.evidence_resource_type, doc.evidence_format);
+        const url = privateDocumentViewUrl(doc.evidence_cloudinary_public_id, doc.evidence_resource_type, doc.evidence_format, download === "true");
         res.json({ url });
     } catch (error) {
         res.status(500).json({ error: error.message });

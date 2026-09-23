@@ -341,7 +341,7 @@ exports.uploadMyKycDocument = async (req, res) => {
 // on every view rather than storing it anywhere.
 exports.getMyKycDocumentUrl = async (req, res) => {
     try {
-        const { document_type } = req.query;
+        const { document_type, download } = req.query;
         const vendorId = req.vendorId;
         if (!vendorId) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
@@ -355,7 +355,7 @@ exports.getMyKycDocumentUrl = async (req, res) => {
         }
 
         const doc = docRow.rows[0];
-        const url = privateDocumentViewUrl(doc.cloudinary_public_id, doc.resource_type, doc.format);
+        const url = privateDocumentViewUrl(doc.cloudinary_public_id, doc.resource_type, doc.format, download === "true");
         res.json({ url });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -555,7 +555,7 @@ exports.reviewVendorKycAdmin = async (req, res) => {
 exports.getVendorKycDocumentAdmin = async (req, res) => {
     try {
         const { id } = req.params;
-        const { document_type } = req.query;
+        const { document_type, download } = req.query;
 
         const docRow = await pool.query(
             "SELECT cloudinary_public_id, resource_type, format FROM vendor_kyc_documents WHERE vendor_id = $1 AND document_type = $2",
@@ -566,7 +566,7 @@ exports.getVendorKycDocumentAdmin = async (req, res) => {
         }
 
         const doc = docRow.rows[0];
-        const url = privateDocumentViewUrl(doc.cloudinary_public_id, doc.resource_type, doc.format);
+        const url = privateDocumentViewUrl(doc.cloudinary_public_id, doc.resource_type, doc.format, download === "true");
         res.json({ url });
     } catch (error) {
         res.status(500).json({ error: error.message });

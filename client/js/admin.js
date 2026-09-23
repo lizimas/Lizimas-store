@@ -9444,6 +9444,7 @@ function renderDocumentsSection(detail, vendorId) {
                 ${reason ? `<div style="font-size:12px; color:#666; margin-bottom:6px;"><em>${reason}</em></div>` : ""}
                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
                     <button onclick="viewVendorKycDocument(${vendorId}, '${d.document_type}')" style="background:#16264f; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">View</button>
+                    <button onclick="downloadVendorKycDocument(${vendorId}, '${d.document_type}')" style="background:#fff; color:#16264f; border:1px solid #16264f; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Download</button>
                     <button onclick="reviewDocument(${vendorId}, '${d.document_type}', 'accepted')" style="background:#059669; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Accept</button>
                     <button onclick="reviewDocument(${vendorId}, '${d.document_type}', 'action_required')" style="background:#d97706; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Needs better</button>
                     <button onclick="reviewDocument(${vendorId}, '${d.document_type}', 'rejected')" style="background:#dc2626; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Reject</button>
@@ -9471,6 +9472,23 @@ async function viewVendorKycDocument(vendorId, documentType) {
     } catch (error) {
         console.error("View vendor KYC document error:", error);
         alert("Could not open this document.");
+    }
+}
+
+// Same as viewVendorKycDocument but with download=true, which makes
+// Cloudinary send Content-Disposition: attachment - for Lizimas's own
+// compliance record-keeping (Ryan).
+async function downloadVendorKycDocument(vendorId, documentType) {
+    try {
+        const data = await authorizedFetch(`/api/admin/vendors/${vendorId}/kyc/documents/url?document_type=${encodeURIComponent(documentType)}&download=true`);
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        window.open(data.url, "_blank", "noopener");
+    } catch (error) {
+        console.error("Download vendor KYC document error:", error);
+        alert("Could not download this document.");
     }
 }
 
@@ -9734,7 +9752,7 @@ async function loadPaymentInstrumentsAdmin(status) {
                             : `<div style="font-size:11px; color:#DC2626; margin-top:2px;">Does not match</div>`;
                         const statusCls = p.status === "approved" ? "status-paid" : p.status === "rejected" ? "status-cancelled" : "status-pending";
                         const evidenceCell = p.has_evidence
-                            ? `<a href="#" onclick="viewPaymentInstrumentEvidenceAdmin(${p.id}); return false;" style="font-size:12px;">View</a>`
+                            ? `<a href="#" onclick="viewPaymentInstrumentEvidenceAdmin(${p.id}); return false;" style="font-size:12px;">View</a> &middot; <a href="#" onclick="downloadPaymentInstrumentEvidenceAdmin(${p.id}); return false;" style="font-size:12px;">Download</a>`
                             : `<span style="font-size:12px; color:#DC2626;">None</span>`;
                         const approveDisabled = !p.can_approve;
                         const approveBtnStyle = approveDisabled
@@ -9775,6 +9793,19 @@ async function viewPaymentInstrumentEvidenceAdmin(instrumentId) {
     } catch (error) {
         console.error("viewPaymentInstrumentEvidenceAdmin error:", error);
         alert("Could not open this document.");
+    }
+}
+
+// Same as viewPaymentInstrumentEvidenceAdmin but with download=true, for
+// Lizimas's own compliance record-keeping (Ryan).
+async function downloadPaymentInstrumentEvidenceAdmin(instrumentId) {
+    try {
+        const data = await authorizedFetch(`/api/admin/payment-instruments/${instrumentId}/evidence/url?download=true`);
+        if (data.error) { alert(data.error); return; }
+        window.open(data.url, "_blank", "noopener");
+    } catch (error) {
+        console.error("downloadPaymentInstrumentEvidenceAdmin error:", error);
+        alert("Could not download this document.");
     }
 }
 
