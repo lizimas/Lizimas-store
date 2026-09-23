@@ -80,6 +80,30 @@ function missingFieldsForMethod(method, fields) {
     return missing;
 }
 
+// --- Evidence document extension (Ryan, Sept 2026, Jumia-parity) -----------
+// migration 122 adds evidence_cloudinary_public_id (+ resource_type/format/
+// filename/bytes/uploaded_at) directly on vendor_payment_instruments - one
+// document per INSTRUMENT, not per vendor, since a vendor can hold several
+// instruments (a MoMo account and a bank account) each needing its own
+// specific proof. An instrument only needs a name-match to be CREATED
+// (existing behavior, unchanged) but now also needs evidence on file
+// before admin can approve it - enforced here, not by making evidence
+// mandatory at creation, since the instrument has to exist first to
+// attach a document to it.
+
+function hasEvidence(instrument) {
+    return Boolean(instrument && instrument.evidence_cloudinary_public_id);
+}
+
+// The gate reviewPaymentInstrumentAdmin checks before allowing 'approved'.
+// Rejecting never requires evidence - an admin can reject an instrument
+// with no evidence uploaded at all.
+function canApprovePaymentInstrument(instrument) {
+    return instrument
+        && instrument.status === "pending"
+        && hasEvidence(instrument);
+}
+
 module.exports = {
     METHODS,
     isValidMethod,
@@ -90,5 +114,7 @@ module.exports = {
     normalizeName,
     namesMatch,
     NAME_MISMATCH_REASON,
-    missingFieldsForMethod
+    missingFieldsForMethod,
+    hasEvidence,
+    canApprovePaymentInstrument
 };
