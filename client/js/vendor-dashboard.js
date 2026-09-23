@@ -208,6 +208,11 @@ async function saveVendorMomoNumber() {
 // Identity/business-registration verification - separate from the plain
 // business profile above. See server/utils/vendorKyc.js for the status
 // values and server/controllers/vendorKycController.js for the API.
+//
+// Jumia-parity extension (migration 122): TIN/VAT fields, a work-permit
+// declaration, and a document section that now shows EVERY required
+// document (not just one) - required_documents comes straight from the
+// backend's getMyKyc response.
 
 const VENDOR_KYC_BADGE = {
     not_started:     { cls: "status-forfeited",  label: "Not started" },
@@ -236,8 +241,6 @@ async function loadVendorKyc() {
             noteEl.classList.add("hidden");
         }
 
-        renderVendorKycDocumentSection(k);
-
         const formEl = document.getElementById("vendor-kyc-form");
         const lockedEl = document.getElementById("vendor-kyc-locked-view");
 
@@ -247,9 +250,14 @@ async function loadVendorKyc() {
             const needsRegNum = k.account_type === "company";
             const needsNatId = k.account_type === "individual";
             document.getElementById("vendor-kyc-regnum-group").classList.toggle("hidden", !needsRegNum);
+            document.getElementById("vendor-kyc-tin-group").classList.toggle("hidden", !needsRegNum);
+            document.getElementById("vendor-kyc-vat-group").classList.toggle("hidden", !needsRegNum);
             document.getElementById("vendor-kyc-natid-group").classList.toggle("hidden", !needsNatId);
             document.getElementById("vendor-kyc-regnum").value = k.registration_number || "";
+            document.getElementById("vendor-kyc-tin").value = k.tin_number || "";
+            document.getElementById("vendor-kyc-vat").value = k.vat_number || "";
             document.getElementById("vendor-kyc-natid").value = k.national_id_number || "";
+            document.getElementById("vendor-kyc-work-permit-checkbox").checked = Boolean(k.requires_work_permit);
         } else {
             formEl.classList.add("hidden");
             lockedEl.classList.remove("hidden");
@@ -260,6 +268,8 @@ async function loadVendorKyc() {
                 lockedText.textContent = "Your information is with Lizimas Store for review - we'll let you know once it's checked.";
             }
         }
+
+        renderVendorKycDocumentRows(k);
     } catch (error) {
         console.error("Load vendor KYC error:", error);
     }
@@ -275,7 +285,19 @@ async function submitVendorKyc() {
             statusEl.textContent = "Please enter your URSB registration number.";
             return;
         }
+        const tin_number = document.getElementById("vendor-kyc-tin").value.trim();
+        if (!tin_number) {
+            statusEl.textContent = "Please enter your TIN (tax identification number).";
+            return;
+        }
+        const vat_number = document.getElementById("vendor-kyc-vat").value.trim();
+        if (!vat_number) {
+            statusEl.textContent = "Please enter your VAT number.";
+            return;
+        }
         body.registration_number = registration_number;
+        body.tin_number = tin_number;
+        body.vat_number = vat_number;
     } else if (vendorAccountType === "individual") {
         const national_id_number = document.getElementById("vendor-kyc-natid").value.trim();
         if (!national_id_number) {
@@ -284,6 +306,9 @@ async function submitVendorKyc() {
         }
         body.national_id_number = national_id_number;
     }
+
+    const workPermitCheckbox = document.getElementById("vendor-kyc-work-permit-checkbox");
+    body.requires_work_permit = workPermitCheckbox ? workPermitCheckbox.checked : false;
 
     statusEl.style.color = "#DC2626";
     statusEl.textContent = "Submitting...";
@@ -311,49 +336,76 @@ async function submitVendorKyc() {
 
 const KYC_DOCUMENT_LABELS = {
     national_id: "National ID",
-    business_registration: "Business Registration"
+    business_registration: "Business Registration",
+    bank_certificate: "Bank Certificate",
+    tax_certificate: "Tax Certificate (TIN)",
+    vat_certificate: "VAT Certificate",
+    momo_statement: "Mobile Money Statement",
+    certificate_of_incorporation: "Certificate of Incorporation",
+    form_20: "Form 20 (Particulars of Directors)",
+    work_permit: "Work Permit"
 };
 
-function renderVendorKycDocumentSection(k) {
-    const container = document.getElementById("vendor-kyc-document-row");
+// Mirrors server/utils/vendorKyc.js's requiredDocumentTypesForKyc (same
+// duplication pattern already used elsewhere in this file, e.g. the
+// admin-side VENDOR_KYC_ADMIN_TRANSITIONS mirroring the backend's
+// ADMIN_TRANSITIONS) - kept here so the vendor sees required documents
+// update live as they check/uncheck the work-permit box, before saving.
+function vdRequiredDocumentTypes(accountType, requiresWorkPermit) {
+    const required = accountType === "company"
+        ? ["business_registration", "tax_certificate", "vat_certificate", "form_20"]
+        : ["national_id"];
+    if (requiresWorkPermit) required.push("work_permit");
+    return required;
+}
+
+// Re-renders the document rows against the checkbox's current (unsaved)
+// state, so checking "I need a work permit" immediately shows that row
+// as required - no page reload, no round trip.
+function vdToggleWorkPermitField() {
+    if (window.vendorKycLastLoaded) renderVendorKycDocumentRows(window.vendorKycLastLoaded);
+}
+
+function renderVendorKycDocumentRows(k) {
+    window.vendorKycLastLoaded = k;
+    const container = document.getElementById("vendor-kyc-document-rows");
     if (!container) return;
 
-    const requiredType = k.account_type === "company" ? "business_registration" : "national_id";
-    const label = KYC_DOCUMENT_LABELS[requiredType] || requiredType;
-    const doc = (k.documents || []).find(d => d.document_type === requiredType);
+    const checkbox = document.getElementById("vendor-kyc-work-permit-checkbox");
+    const requiresWorkPermit = checkbox ? checkbox.checked : Boolean(k.requires_work_permit);
+    const requiredTypes = vdRequiredDocumentTypes(k.account_type, requiresWorkPermit);
     const canEdit = k.editable;
 
-    if (doc) {
-        const docBadge = doc.review_status === "accepted" ? "status-paid"
-            : doc.review_status === "rejected" ? "status-cancelled"
-            : doc.review_status === "action_required" ? "status-pending"
-            : "status-new";
-        const reasonText = doc.review_status === "rejected" ? doc.rejection_reason
-            : doc.review_status === "action_required" ? doc.action_required_reason
-            : "";
-        container.innerHTML = `
-            <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; flex-wrap:wrap;">
-                <span style="min-width:170px;">${label}</span>
-                <span class="status-badge ${docBadge}">${(doc.review_status || "pending").replace(/_/g, " ")}</span>
-                <span style="color:#888;">${doc.original_filename || ""}</span>
-                ${canEdit ? `<label style="margin-left:auto; color:#16264f; cursor:pointer; font-size:12px;">Replace<input type="file" class="hidden" onchange="vdUploadKycDocument('${requiredType}', this)"></label>` : ""}
-            </div>
-            ${reasonText ? `<p style="background:#FEF3C7; color:#92400E; padding:8px 10px; border-radius:8px; font-size:12px; margin:8px 0 0;">${reasonText}</p>` : ""}
-        `;
-    } else {
-        container.innerHTML = canEdit ? `
-            <div style="display:flex; align-items:center; gap:8px; font-size:12.5px;">
-                <span style="min-width:170px;">${label}</span>
-                <span style="color:#DC2626;">Not uploaded</span>
-                <input type="file" style="margin-left:auto; font-size:12px;" onchange="vdUploadKycDocument('${requiredType}', this)">
-            </div>
-        ` : `
-            <div style="display:flex; align-items:center; gap:8px; font-size:12.5px;">
+    container.innerHTML = requiredTypes.map((requiredType) => {
+        const label = KYC_DOCUMENT_LABELS[requiredType] || requiredType;
+        const doc = (k.documents || []).find(d => d.document_type === requiredType);
+
+        if (doc) {
+            const docBadge = doc.review_status === "accepted" ? "status-paid"
+                : doc.review_status === "rejected" ? "status-cancelled"
+                : doc.review_status === "action_required" ? "status-pending"
+                : "status-new";
+            const reasonText = doc.review_status === "rejected" ? doc.rejection_reason
+                : doc.review_status === "action_required" ? doc.action_required_reason
+                : "";
+            return `
+                <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; flex-wrap:wrap; padding:6px 0; border-bottom:1px solid #f0f0f0;">
+                    <span style="min-width:170px;">${label}</span>
+                    <span class="status-badge ${docBadge}">${(doc.review_status || "pending").replace(/_/g, " ")}</span>
+                    <span style="color:#888;">${doc.original_filename || ""}</span>
+                    ${canEdit ? `<label style="margin-left:auto; color:#16264f; cursor:pointer; font-size:12px;">Replace<input type="file" class="hidden" onchange="vdUploadKycDocument('${requiredType}', this)"></label>` : ""}
+                </div>
+                ${reasonText ? `<p style="background:#FEF3C7; color:#92400E; padding:8px 10px; border-radius:8px; font-size:12px; margin:4px 0 8px;">${reasonText}</p>` : ""}
+            `;
+        }
+        return `
+            <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; padding:6px 0; border-bottom:1px solid #f0f0f0;">
                 <span style="min-width:170px;">${label}</span>
                 <span style="color:#DC2626;">Not uploaded</span>
+                ${canEdit ? `<input type="file" style="margin-left:auto; font-size:12px;" onchange="vdUploadKycDocument('${requiredType}', this)">` : ""}
             </div>
         `;
-    }
+    }).join("");
 }
 
 async function vdUploadKycDocument(documentType, inputEl) {
@@ -385,6 +437,11 @@ async function vdUploadKycDocument(documentType, inputEl) {
 // account verification, see server/controllers/vendorPaymentInstrumentsController.js.
 // A pending/approved instrument is locked; only a rejected one can be
 // edited and resubmitted (same shape as vendor KYC above).
+//
+// Jumia-parity extension (migration 122): a supporting evidence document
+// (bank certificate / MoMo statement) per instrument, uploadable while
+// pending or rejected, locked once approved - same edit-lock philosophy
+// as the account details themselves.
 
 const PAYMENT_INSTRUMENT_BADGE = {
     pending:  { cls: "status-pending",   label: "Pending review" },
@@ -411,7 +468,7 @@ async function vdLoadPaymentInstruments() {
         }
         container.innerHTML = `
             <table>
-                <thead><tr><th>Method</th><th>Details</th><th>Account Holder</th><th>Status</th><th></th></tr></thead>
+                <thead><tr><th>Method</th><th>Details</th><th>Account Holder</th><th>Status</th><th>Evidence</th><th></th></tr></thead>
                 <tbody>
                     ${instruments.map(i => {
                         const badge = PAYMENT_INSTRUMENT_BADGE[i.status] || PAYMENT_INSTRUMENT_BADGE.pending;
@@ -424,12 +481,21 @@ async function vdLoadPaymentInstruments() {
                         if (i.status === "rejected") {
                             actions += `<span style="font-size:11.5px; color:#DC2626;">${i.rejection_reason || "Rejected"}</span>`;
                         }
+                        const evidenceCell = `
+                            ${i.has_evidence
+                                ? `<a href="#" onclick="vdViewPaymentInstrumentEvidence(${i.id}); return false;" style="font-size:12px;">View</a>`
+                                : `<span style="color:#DC2626; font-size:12px;">None</span>`}
+                            ${i.status !== "approved"
+                                ? `<label style="margin-left:8px; color:#16264f; cursor:pointer; font-size:12px;">${i.has_evidence ? "Replace" : "Upload"}<input type="file" class="hidden" onchange="vdUploadPaymentInstrumentEvidence(${i.id}, this)"></label>`
+                                : ""}
+                        `;
                         return `
                             <tr>
                                 <td data-label="Method">${i.method === "bank" ? "Bank" : "Mobile Money"}</td>
                                 <td data-label="Details">${details}</td>
                                 <td data-label="Account Holder">${i.account_holder_name || "-"}${preferredTag}</td>
                                 <td data-label="Status"><span class="status-badge ${badge.cls}">${badge.label}</span></td>
+                                <td data-label="Evidence">${evidenceCell}</td>
                                 <td data-label="">${actions}</td>
                             </tr>
                         `;
@@ -497,6 +563,40 @@ async function vdSetPreferredPaymentInstrument(instrumentId) {
     } catch (error) {
         console.error("vdSetPreferredPaymentInstrument error:", error);
         alert("Could not update your preferred payment instrument.");
+    }
+}
+
+async function vdViewPaymentInstrumentEvidence(instrumentId) {
+    try {
+        const data = await vendorAuthorizedFetch(`/api/vendors/me/payment-instruments/${instrumentId}/evidence/url`);
+        if (data.error) { alert(data.error); return; }
+        window.open(data.url, "_blank", "noopener");
+    } catch (error) {
+        console.error("vdViewPaymentInstrumentEvidence error:", error);
+        alert("Could not open this document.");
+    }
+}
+
+async function vdUploadPaymentInstrumentEvidence(instrumentId, inputEl) {
+    const file = inputEl.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("document", file);
+
+    try {
+        const token = getVendorToken();
+        const response = await fetch(`${API_URL}/api/vendors/me/payment-instruments/${instrumentId}/evidence`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${token}` },
+            body: formData
+        });
+        const result = await response.json();
+        if (result.error) { alert(result.error); return; }
+        vdLoadPaymentInstruments();
+    } catch (error) {
+        console.error("vdUploadPaymentInstrumentEvidence error:", error);
+        alert("Could not upload this document. Please try again.");
     }
 }
 

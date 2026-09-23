@@ -886,8 +886,8 @@
                         <p id="vendor-kyc-review-note" class="hidden" style="background:#FEF3C7; color:#92400E; padding:10px 12px; border-radius:8px; font-size:13px; margin:0 0 12px 0;"></p>
 
                         <div id="vendor-kyc-documents" style="margin-bottom:14px;">
-                            <h3 style="margin:0 0 8px; font-size:13.5px; color:#333;">Supporting Document</h3>
-                            <div id="vendor-kyc-document-row">Loading...</div>
+                            <h3 style="margin:0 0 8px; font-size:13.5px; color:#333;">Supporting Documents</h3>
+                            <div id="vendor-kyc-document-rows">Loading...</div>
                         </div>
 
                         <div id="vendor-kyc-form" class="hidden" style="display:flex; flex-direction:column; gap:12px; max-width:420px;">
@@ -896,10 +896,25 @@
                                 <input type="text" id="vendor-kyc-regnum" placeholder="Your registered business number" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                             </div>
 
+                            <div class="hidden" id="vendor-kyc-tin-group">
+                                <label style="font-size:13px; font-weight:600; color:#333;">TIN (Tax Identification Number)</label>
+                                <input type="text" id="vendor-kyc-tin" placeholder="Your TIN" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+
+                            <div class="hidden" id="vendor-kyc-vat-group">
+                                <label style="font-size:13px; font-weight:600; color:#333;">VAT Number</label>
+                                <input type="text" id="vendor-kyc-vat" placeholder="Your VAT number" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            </div>
+
                             <div class="hidden" id="vendor-kyc-natid-group">
                                 <label style="font-size:13px; font-weight:600; color:#333;">National ID Number</label>
                                 <input type="text" id="vendor-kyc-natid" placeholder="For identity verification (KYC)" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                             </div>
+
+                            <label style="font-size:13px; display:flex; align-items:center; gap:8px;">
+                                <input type="checkbox" id="vendor-kyc-work-permit-checkbox" onchange="vdToggleWorkPermitField()">
+                                I am not a Ugandan citizen and need a work permit
+                            </label>
 
                             <p id="vendor-kyc-status-msg" style="color:#DC2626; font-size:13px; margin:0;"></p>
 
@@ -1502,7 +1517,7 @@
 
                     <div class="panel">
                         <h2>Payment Information</h2>
-                        <p class="admin-page-subtitle">Reviewed payout accounts. A pending or approved instrument can't be edited directly - only a rejected one can be corrected and resubmitted.</p>
+                        <p class="admin-page-subtitle">Reviewed payout accounts. A pending or approved instrument can't be edited directly - only a rejected one can be corrected and resubmitted. Upload a bank certificate or MoMo statement as evidence before it can be approved.</p>
                         <div id="vendor-payment-instruments-list">Loading...</div>
                         <div style="margin-top:14px; padding-top:14px; border-top:1px solid #eee;">
                             <h3 style="margin:0 0 10px;">Add Payment Instrument</h3>
