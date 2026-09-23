@@ -139,7 +139,8 @@ const {
 } = require("../controllers/vendorBrandAuthController");
 const {
     listPaymentInstrumentsAdmin,
-    reviewPaymentInstrumentAdmin
+    reviewPaymentInstrumentAdmin,
+    getPaymentInstrumentEvidenceUrlAdmin
 } = require("../controllers/vendorPaymentInstrumentsController");
 const {
     listProhibitedItemsAdmin,
@@ -362,6 +363,7 @@ router.get("/brand-authorizations/:id/documents/:documentType/url", getBrandAuth
 
 router.get("/payment-instruments", listPaymentInstrumentsAdmin);
 router.patch("/payment-instruments/:id/review", reviewPaymentInstrumentAdmin);
+router.get("/payment-instruments/:id/evidence/url", getPaymentInstrumentEvidenceUrlAdmin);
 
 router.get("/prohibited-items", listProhibitedItemsAdmin);
 router.post("/prohibited-items", addProhibitedItemAdmin);

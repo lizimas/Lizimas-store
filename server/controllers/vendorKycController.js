@@ -13,10 +13,16 @@
 // in place for rollback safety but no longer read or written by the app.
 // See scripts/backfill-vendor-kyc.js for the one-time move of existing
 // values into this encrypted table.
+//
+// Jumia-parity extension (migration 122): TIN/VAT number fields, a
+// requires_work_permit flag, and Form 20/work permit document types.
+// requiredDocumentTypesForKyc() (server/utils/vendorKyc.js) is the single
+// source of truth for what's required per account_type - both the
+// submission gate below and the vendor dashboard UI read from it.
 
 const pool = require("../config/database");
 const { encryptField, decryptField, hashForLookup } = require("../utils/encryption");
-const { isValidAdminKycTransition, canVendorEditKyc } = require("../utils/vendorKyc");
+const { isValidAdminKycTransition, canVendorEditKyc, requiredDocumentTypesForKyc, KYC_DOCUMENT_LABELS } = require("../utils/vendorKyc");
 const { logActivity } = require("../utils/activityLog");
 const { uploadPrivateDocument, privateDocumentViewUrl, destroyPrivateDocument } = require("../utils/cloudinaryUpload");
 const { createVendorNotification } = require("./vendorController");
@@ -39,7 +45,8 @@ exports.getMyKyc = async (req, res) => {
 
         const kycRow = await pool.query(
             `SELECT kyc_status, identity_verified, business_verified, national_id_number_enc,
-                    registration_number_enc, review_note, reviewed_at
+                    registration_number_enc, tin_number_enc, vat_number_enc, requires_work_permit,
+                    review_note, reviewed_at
              FROM vendor_kyc WHERE vendor_id = $1`,
             [vendor.id]
         );
@@ -58,10 +65,14 @@ exports.getMyKyc = async (req, res) => {
                 account_type: vendor.account_type,
                 national_id_number: null,
                 registration_number: null,
+                tin_number: null,
+                vat_number: null,
+                requires_work_permit: false,
                 review_note: null,
                 reviewed_at: null,
                 editable: true,
-                documents: docRows.rows
+                documents: docRows.rows,
+                required_documents: requiredDocumentTypesForKyc({ accountType: vendor.account_type, requiresWorkPermit: false })
             });
         }
 
@@ -73,10 +84,14 @@ exports.getMyKyc = async (req, res) => {
             account_type: vendor.account_type,
             national_id_number: decryptField(kyc.national_id_number_enc),
             registration_number: decryptField(kyc.registration_number_enc),
+            tin_number: decryptField(kyc.tin_number_enc),
+            vat_number: decryptField(kyc.vat_number_enc),
+            requires_work_permit: kyc.requires_work_permit,
             review_note: kyc.review_note,
             reviewed_at: kyc.reviewed_at,
             editable: canVendorEditKyc(kyc.kyc_status),
-            documents: docRows.rows
+            documents: docRows.rows,
+            required_documents: requiredDocumentTypesForKyc({ accountType: vendor.account_type, requiresWorkPermit: kyc.requires_work_permit })
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -84,10 +99,11 @@ exports.getMyKyc = async (req, res) => {
 };
 
 // Vendor submits/resubmits their identity or business-registration
-// number. Only allowed while their KYC is in an editable state
-// (not_started, action_required, rejected) - a verified or in-review
-// vendor can't silently swap their ID number without going through
-// admin again.
+// number (now also TIN/VAT for company vendors, and a work-permit
+// declaration for non-Ugandans). Only allowed while their KYC is in an
+// editable state (not_started, action_required, rejected) - a verified
+// or in-review vendor can't silently swap their ID number without going
+// through admin again.
 exports.updateMyKyc = async (req, res) => {
     try {
         const vendorRow = await pool.query(
@@ -110,30 +126,42 @@ exports.updateMyKyc = async (req, res) => {
             });
         }
 
-        const { national_id_number, registration_number } = req.body;
+        const { national_id_number, registration_number, tin_number, vat_number, requires_work_permit } = req.body;
+        const requiresWorkPermit = Boolean(requires_work_permit);
 
-        if (vendor.account_type === "company" && !registration_number) {
-            return res.status(400).json({ error: "Registration number is required." });
+        if (vendor.account_type === "company") {
+            if (!registration_number) {
+                return res.status(400).json({ error: "Registration number is required." });
+            }
+            if (!tin_number) {
+                return res.status(400).json({ error: "TIN (tax identification number) is required." });
+            }
+            if (!vat_number) {
+                return res.status(400).json({ error: "VAT number is required." });
+            }
         }
         if (vendor.account_type === "individual" && !national_id_number) {
             return res.status(400).json({ error: "National ID number is required." });
         }
 
-        const requiredDocType = vendor.account_type === "company" ? "business_registration" : "national_id";
+        const requiredDocTypes = requiredDocumentTypesForKyc({ accountType: vendor.account_type, requiresWorkPermit });
         const docCheck = await pool.query(
-            "SELECT 1 FROM vendor_kyc_documents WHERE vendor_id = $1 AND document_type = $2",
-            [vendor.id, requiredDocType]
+            "SELECT document_type FROM vendor_kyc_documents WHERE vendor_id = $1 AND document_type = ANY($2)",
+            [vendor.id, requiredDocTypes]
         );
-        if (docCheck.rows.length === 0) {
+        const uploadedTypes = new Set(docCheck.rows.map((r) => r.document_type));
+        const missingDocTypes = requiredDocTypes.filter((t) => !uploadedTypes.has(t));
+        if (missingDocTypes.length > 0) {
             return res.status(400).json({
-                error: vendor.account_type === "company"
-                    ? "Upload your business registration document before submitting."
-                    : "Upload a photo of your national ID before submitting."
+                error: `Upload the following document(s) before submitting: ${missingDocTypes.map((t) => KYC_DOCUMENT_LABELS[t] || t).join(", ")}.`,
+                missing_documents: missingDocTypes
             });
         }
 
         const natIdHash = hashForLookup(national_id_number);
         const regNumHash = hashForLookup(registration_number);
+        const tinHash = hashForLookup(tin_number);
+        const vatHash = hashForLookup(vat_number);
 
         // Same one-account-per-business dedup as the old plaintext check
         // (migration 054), now against the verified-hash unique index
@@ -156,24 +184,53 @@ exports.updateMyKyc = async (req, res) => {
                 return res.status(409).json({ error: "This registration number is already associated with another verified vendor account." });
             }
         }
+        if (tinHash) {
+            const dupe = await pool.query(
+                "SELECT vendor_id FROM vendor_kyc WHERE kyc_status = 'verified' AND vendor_id != $1 AND tin_number_hash = $2",
+                [vendor.id, tinHash]
+            );
+            if (dupe.rows.length > 0) {
+                return res.status(409).json({ error: "This TIN is already associated with another verified vendor account." });
+            }
+        }
+        if (vatHash) {
+            const dupe = await pool.query(
+                "SELECT vendor_id FROM vendor_kyc WHERE kyc_status = 'verified' AND vendor_id != $1 AND vat_number_hash = $2",
+                [vendor.id, vatHash]
+            );
+            if (dupe.rows.length > 0) {
+                return res.status(409).json({ error: "This VAT number is already associated with another verified vendor account." });
+            }
+        }
 
         const natIdEnc = national_id_number ? encryptField(national_id_number) : null;
         const regNumEnc = registration_number ? encryptField(registration_number) : null;
+        const tinEnc = tin_number ? encryptField(tin_number) : null;
+        const vatEnc = vat_number ? encryptField(vat_number) : null;
 
         await pool.query(
-            `INSERT INTO vendor_kyc (vendor_id, kyc_status, national_id_number_enc, national_id_number_hash, registration_number_enc, registration_number_hash)
-             VALUES ($1, 'submitted', $2, $3, $4, $5)
+            `INSERT INTO vendor_kyc (
+                vendor_id, kyc_status, national_id_number_enc, national_id_number_hash,
+                registration_number_enc, registration_number_hash,
+                tin_number_enc, tin_number_hash, vat_number_enc, vat_number_hash, requires_work_permit
+             )
+             VALUES ($1, 'submitted', $2, $3, $4, $5, $6, $7, $8, $9, $10)
              ON CONFLICT (vendor_id) DO UPDATE SET
                 kyc_status = 'submitted',
                 national_id_number_enc = COALESCE($2, vendor_kyc.national_id_number_enc),
                 national_id_number_hash = COALESCE($3, vendor_kyc.national_id_number_hash),
                 registration_number_enc = COALESCE($4, vendor_kyc.registration_number_enc),
                 registration_number_hash = COALESCE($5, vendor_kyc.registration_number_hash),
+                tin_number_enc = COALESCE($6, vendor_kyc.tin_number_enc),
+                tin_number_hash = COALESCE($7, vendor_kyc.tin_number_hash),
+                vat_number_enc = COALESCE($8, vendor_kyc.vat_number_enc),
+                vat_number_hash = COALESCE($9, vendor_kyc.vat_number_hash),
+                requires_work_permit = $10,
                 review_note = NULL,
                 reviewed_by = NULL,
                 reviewed_at = NULL,
                 updated_at = now()`,
-            [vendor.id, natIdEnc, natIdHash, regNumEnc, regNumHash]
+            [vendor.id, natIdEnc, natIdHash, regNumEnc, regNumHash, tinEnc, tinHash, vatEnc, vatHash, requiresWorkPermit]
         );
 
         await pool.query(
@@ -185,20 +242,25 @@ exports.updateMyKyc = async (req, res) => {
         res.json({ message: "Submitted for review.", kyc_status: "submitted" });
     } catch (error) {
         if (error.code === "23505") {
-            return res.status(409).json({ error: "This ID or registration number is already associated with another verified vendor account." });
+            return res.status(409).json({ error: "This ID, registration, TIN, or VAT number is already associated with another verified vendor account." });
         }
         res.status(500).json({ error: error.message });
     }
 };
 
-// Vendor uploads (or replaces) the document backing their KYC submission.
-// document_type must match what their account_type actually requires -
-// an individual can't upload a "business_registration" document and vice
-// versa. Only allowed while KYC itself is still editable (same rule as
-// updateMyKyc), so a verified/in-review vendor can't swap their evidence
-// out from under an in-flight or completed review. Stored privately in
-// Cloudinary (see server/utils/cloudinaryUpload.js) - never publicly
-// reachable like every other upload in this codebase.
+// Vendor uploads (or replaces) a document backing their KYC submission.
+// document_type must be one accepted for their account_type -
+// individuals get national_id/work_permit, companies get
+// business_registration/tax_certificate/vat_certificate/form_20/work_permit
+// (see requiredDocumentTypesForKyc). work_permit is always accepted for
+// either account type regardless of whether requires_work_permit has
+// been declared yet - what's actually REQUIRED for submission is
+// enforced separately, in updateMyKyc's docCheck above. Only allowed
+// while KYC itself is still editable (same rule as updateMyKyc), so a
+// verified/in-review vendor can't swap their evidence out from under an
+// in-flight or completed review. Stored privately in Cloudinary (see
+// server/utils/cloudinaryUpload.js) - never publicly reachable like
+// every other upload in this codebase.
 exports.uploadMyKycDocument = async (req, res) => {
     try {
         if (!req.file) {
@@ -226,9 +288,11 @@ exports.uploadMyKycDocument = async (req, res) => {
         }
 
         const documentType = req.body.document_type;
-        const expectedType = vendor.account_type === "company" ? "business_registration" : "national_id";
-        if (documentType !== expectedType) {
-            return res.status(400).json({ error: `Expected a ${expectedType.replace("_", " ")} document for this account type.` });
+        const allowedTypes = requiredDocumentTypesForKyc({ accountType: vendor.account_type, requiresWorkPermit: true });
+        if (!allowedTypes.includes(documentType)) {
+            return res.status(400).json({
+                error: `${KYC_DOCUMENT_LABELS[documentType] || documentType} isn't a document type accepted for a ${vendor.account_type} account. Accepted: ${allowedTypes.map((t) => KYC_DOCUMENT_LABELS[t] || t).join(", ")}.`
+            });
         }
 
         const priorRow = await pool.query(
@@ -354,7 +418,8 @@ exports.getVendorKycAdminDetail = async (req, res) => {
 
         const kycRow = await pool.query(
             `SELECT kyc_status, identity_verified, business_verified, national_id_number_enc,
-                    registration_number_enc, review_note, reviewed_by, reviewed_at, created_at, updated_at,
+                    registration_number_enc, tin_number_enc, vat_number_enc, requires_work_permit,
+                    review_note, reviewed_by, reviewed_at, created_at, updated_at,
                     ursb_verified, ursb_verified_at, ursb_verified_by, ursb_evidence_url
              FROM vendor_kyc WHERE vendor_id = $1`,
             [id]
@@ -388,6 +453,9 @@ exports.getVendorKycAdminDetail = async (req, res) => {
             business_verified: kyc ? kyc.business_verified : false,
             national_id_number: kyc ? decryptField(kyc.national_id_number_enc) : null,
             registration_number: kyc ? decryptField(kyc.registration_number_enc) : null,
+            tin_number: kyc ? decryptField(kyc.tin_number_enc) : null,
+            vat_number: kyc ? decryptField(kyc.vat_number_enc) : null,
+            requires_work_permit: kyc ? kyc.requires_work_permit : false,
             review_note: kyc ? kyc.review_note : null,
             reviewed_at: kyc ? kyc.reviewed_at : null,
             ursb_verified: kyc ? kyc.ursb_verified : null,

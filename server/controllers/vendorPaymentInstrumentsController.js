@@ -2,6 +2,12 @@
 // Jumia's Vendor Center payout-account verification). See
 // server/utils/vendorPaymentInstruments.js for the name-match/edit-lock
 // rules and migrations/103_vendor_payment_instruments.sql for the schema.
+//
+// Jumia-parity extension (migration 122): evidence document columns
+// directly on vendor_payment_instruments (not vendor_kyc_documents - a
+// vendor can hold several instruments, each needing its own proof).
+// canApprovePaymentInstrument() (server/utils/vendorPaymentInstruments.js)
+// gates approval on evidence being on file.
 
 const pool = require("../config/database");
 const {
@@ -10,9 +16,12 @@ const {
     expectedLegalName,
     namesMatch,
     NAME_MISMATCH_REASON,
-    missingFieldsForMethod
+    missingFieldsForMethod,
+    hasEvidence,
+    canApprovePaymentInstrument
 } = require("../utils/vendorPaymentInstruments");
 const { logActivity } = require("../utils/activityLog");
+const { uploadPrivateDocument, privateDocumentViewUrl, destroyPrivateDocument } = require("../utils/cloudinaryUpload");
 const { createVendorNotification } = require("./vendorController");
 
 async function getVendorForUser(userId) {
@@ -34,13 +43,18 @@ exports.getMyPaymentInstruments = async (req, res) => {
 
         const { rows } = await pool.query(
             `SELECT id, method, momo_number, bank_name, account_number, account_holder_name,
-                    status, rejection_reason, is_preferred, reviewed_at, created_at
+                    status, rejection_reason, is_preferred, reviewed_at, created_at,
+                    evidence_cloudinary_public_id, evidence_original_filename
              FROM vendor_payment_instruments WHERE vendor_id = $1 ORDER BY created_at DESC`,
             [vendor.id]
         );
 
         res.json({
-            instruments: rows.map((r) => ({ ...r, editable: canVendorEditInstrument(r.status) })),
+            instruments: rows.map((r) => ({
+                ...r,
+                editable: canVendorEditInstrument(r.status),
+                has_evidence: hasEvidence(r)
+            })),
             preferred_instrument_id: vendor.preferred_instrument_id
         });
     } catch (error) {
@@ -178,6 +192,90 @@ exports.updateMyPaymentInstrument = async (req, res) => {
     }
 };
 
+// Vendor uploads (or replaces) the supporting evidence document for one
+// of their own payment instruments - a bank certificate or MoMo
+// statement proving the account is really theirs (Jumia-parity, migration
+// 122). Allowed while the instrument is pending (the normal flow: create,
+// then add evidence) or rejected (fixing/resubmitting evidence along with
+// the account details); locked once approved, same as editing the
+// account details themselves.
+exports.uploadMyPaymentInstrumentEvidence = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No file uploaded." });
+        }
+
+        const vendor = await getVendorForUser(req.user.userId);
+        if (!vendor) return res.status(404).json({ error: "No vendor profile found for this account." });
+
+        const { id } = req.params;
+        const existing = await pool.query(
+            "SELECT id, status, evidence_cloudinary_public_id, evidence_resource_type FROM vendor_payment_instruments WHERE id = $1 AND vendor_id = $2",
+            [id, vendor.id]
+        );
+        if (existing.rows.length === 0) return res.status(404).json({ error: "Payment instrument not found." });
+        const instrument = existing.rows[0];
+
+        if (instrument.status === "approved") {
+            return res.status(409).json({ error: "This instrument is already approved and locked. Contact support if something needs to change." });
+        }
+
+        const uploaded = await uploadPrivateDocument(req.file.buffer, req.file.originalname);
+
+        await pool.query(
+            `UPDATE vendor_payment_instruments SET
+                evidence_cloudinary_public_id = $1,
+                evidence_resource_type = $2,
+                evidence_format = $3,
+                evidence_original_filename = $4,
+                evidence_bytes = $5,
+                evidence_uploaded_at = now(),
+                updated_at = now()
+             WHERE id = $6`,
+            [uploaded.public_id, uploaded.resource_type, uploaded.format, req.file.originalname, uploaded.bytes, id]
+        );
+
+        // Best-effort cleanup of the replaced asset - never let a Cloudinary
+        // hiccup here block the new document from being saved (already is).
+        if (instrument.evidence_cloudinary_public_id) {
+            destroyPrivateDocument(instrument.evidence_cloudinary_public_id, instrument.evidence_resource_type)
+                .catch((err) => console.error("Failed to clean up replaced payment instrument evidence:", err.message));
+        }
+
+        res.json({ message: "Evidence uploaded." });
+    } catch (error) {
+        if (error.code === "INVALID_FILE_TYPE") {
+            return res.status(400).json({ error: error.message });
+        }
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Vendor requests a fresh signed URL to view their own already-uploaded
+// evidence document. Expires in ~5 minutes, same as every other private
+// document view in this codebase - callers fetch a new one on every view.
+exports.getMyPaymentInstrumentEvidenceUrl = async (req, res) => {
+    try {
+        const vendor = await getVendorForUser(req.user.userId);
+        if (!vendor) return res.status(404).json({ error: "No vendor profile found for this account." });
+
+        const { id } = req.params;
+        const docRow = await pool.query(
+            "SELECT evidence_cloudinary_public_id, evidence_resource_type, evidence_format FROM vendor_payment_instruments WHERE id = $1 AND vendor_id = $2",
+            [id, vendor.id]
+        );
+        if (docRow.rows.length === 0 || !docRow.rows[0].evidence_cloudinary_public_id) {
+            return res.status(404).json({ error: "No evidence document on file for this instrument." });
+        }
+
+        const doc = docRow.rows[0];
+        const url = privateDocumentViewUrl(doc.evidence_cloudinary_public_id, doc.evidence_resource_type, doc.evidence_format);
+        res.json({ url });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 // Vendor picks which APPROVED instrument receives payouts. Refuses an
 // unapproved target outright rather than letting a vendor "prefer" a
 // pending/rejected account and have payouts silently stall - see
@@ -225,7 +323,7 @@ exports.listPaymentInstrumentsAdmin = async (req, res) => {
         const { rows } = await pool.query(
             `SELECT i.id, i.vendor_id, i.method, i.momo_number, i.bank_name, i.account_number,
                     i.account_holder_name, i.status, i.rejection_reason, i.is_preferred,
-                    i.reviewed_at, i.created_at,
+                    i.reviewed_at, i.created_at, i.evidence_cloudinary_public_id, i.evidence_original_filename,
                     v.business_name, v.account_type, u.name AS owner_name
              FROM vendor_payment_instruments i
              JOIN vendors v ON v.id = i.vendor_id
@@ -241,7 +339,9 @@ exports.listPaymentInstrumentsAdmin = async (req, res) => {
                 accountType: r.account_type,
                 businessName: r.business_name,
                 ownerName: r.owner_name
-            })
+            }),
+            has_evidence: hasEvidence(r),
+            can_approve: canApprovePaymentInstrument(r)
         }));
 
         res.json(withLegalName);
@@ -251,6 +351,9 @@ exports.listPaymentInstrumentsAdmin = async (req, res) => {
 };
 
 // Approve or reject one instrument, with a reason (required on reject).
+// Approving requires evidence on file (Jumia-parity, migration 122) -
+// rejecting never does, since an admin can reject an instrument that
+// never got any evidence uploaded at all.
 exports.reviewPaymentInstrumentAdmin = async (req, res) => {
     try {
         const { id } = req.params;
@@ -264,7 +367,7 @@ exports.reviewPaymentInstrumentAdmin = async (req, res) => {
         }
 
         const existing = await pool.query(
-            "SELECT id, vendor_id, status FROM vendor_payment_instruments WHERE id = $1",
+            "SELECT id, vendor_id, status, evidence_cloudinary_public_id FROM vendor_payment_instruments WHERE id = $1",
             [id]
         );
         if (existing.rows.length === 0) return res.status(404).json({ error: "Payment instrument not found." });
@@ -272,6 +375,10 @@ exports.reviewPaymentInstrumentAdmin = async (req, res) => {
 
         if (current.status !== "pending") {
             return res.status(409).json({ error: `This instrument is already ${current.status}, not pending review.` });
+        }
+
+        if (decision === "approved" && !canApprovePaymentInstrument(current)) {
+            return res.status(409).json({ error: "Cannot approve: no supporting evidence document has been uploaded for this instrument yet." });
         }
 
         await pool.query(
@@ -296,6 +403,27 @@ exports.reviewPaymentInstrumentAdmin = async (req, res) => {
             `Instrument #${id}: ${decision}`);
 
         res.json({ message: "Reviewed.", status: decision });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Admin views a vendor's uploaded evidence document via a freshly-minted
+// signed URL - same private-document pattern as vendor KYC documents.
+exports.getPaymentInstrumentEvidenceUrlAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const docRow = await pool.query(
+            "SELECT evidence_cloudinary_public_id, evidence_resource_type, evidence_format FROM vendor_payment_instruments WHERE id = $1",
+            [id]
+        );
+        if (docRow.rows.length === 0 || !docRow.rows[0].evidence_cloudinary_public_id) {
+            return res.status(404).json({ error: "No evidence document on file for this instrument." });
+        }
+
+        const doc = docRow.rows[0];
+        const url = privateDocumentViewUrl(doc.evidence_cloudinary_public_id, doc.evidence_resource_type, doc.evidence_format);
+        res.json({ url });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

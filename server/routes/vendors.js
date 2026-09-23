@@ -60,7 +60,9 @@ const {
     getMyPaymentInstruments,
     addMyPaymentInstrument,
     updateMyPaymentInstrument,
-    setPreferredPaymentInstrument
+    setPreferredPaymentInstrument,
+    uploadMyPaymentInstrumentEvidence,
+    getMyPaymentInstrumentEvidenceUrl
 } = require("../controllers/vendorPaymentInstrumentsController");
 const {
     listVendorStatements,
@@ -175,6 +177,8 @@ router.get("/me/payment-instruments", getMyPaymentInstruments);
 router.post("/me/payment-instruments", addMyPaymentInstrument);
 router.patch("/me/payment-instruments/:id", updateMyPaymentInstrument);
 router.patch("/me/payment-instruments/preferred", setPreferredPaymentInstrument);
+router.post("/me/payment-instruments/:id/evidence", upload.kycDocument.single("document"), uploadMyPaymentInstrumentEvidence);
+router.get("/me/payment-instruments/:id/evidence/url", getMyPaymentInstrumentEvidenceUrl);
 router.get("/orders", requireVendorPermission("vc_order_manager", "vc_order_viewer"), getMyVendorOrders);
 router.patch("/order-items/:orderItemId/stage", requireVendorPermission("vc_order_manager"), advanceVendorOrderStage);
 router.get("/dashboard-summary", getVendorDashboardSummary);
