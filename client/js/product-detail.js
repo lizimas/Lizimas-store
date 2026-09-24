@@ -58,6 +58,7 @@ async function loadProductDetail() {
                 brandEl.innerHTML =
                     '<span class="pd-brand-label">Brand</span>' +
                     '<a class="pd-brand-name-link" href="' + brandUrl + '">' + pdEscape(brandName) + '</a>' +
+                    '<span class="pd-brand-sep">|</span>' +
                     '<a class="pd-brand-viewall-link" href="' + brandUrl + '">View all products from ' + pdEscape(brandName) + '</a>';
                 brandEl.hidden = false;
             } else {

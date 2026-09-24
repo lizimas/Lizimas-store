@@ -5417,6 +5417,9 @@ body.sheet-open {
 .pd-brand-label {
     color: #6b7280;
 }
+.pd-brand-sep {
+    color: #d1d5db;
+}
 .pd-brand-name-link,
 .pd-brand-viewall-link {
     color: #c0392b;
