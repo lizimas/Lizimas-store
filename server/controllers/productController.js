@@ -370,10 +370,31 @@ exports.getProductById = async (req, res) => {
         // that somehow lost its approved status still returns the product
         // itself - vendor_business_name/vendor_slug just come back null and
         // the client's "Sold by" link stays hidden.
+        //
+        // LEFT JOIN LATERAL vp: a currently-active APPROVED vendor_promotion
+        // for this product, if any - independent of homepage_featured, per
+        // migration 070's own comment ("an approved promotion still shows
+        // its sale price on the product page even when not featured").
+        // Only flash-sale-featured promotions were ever reaching a customer
+        // anywhere before this (getActiveFlashSalePublic joins through
+        // flash_sale_items, not vendor_promotions directly) - an approved
+        // but unfeatured promotion showed no discount on any page, which is
+        // the bug this closes. LIMIT 1 guards against overlapping approved
+        // windows on the same product, which the schema doesn't forbid.
         const result = await pool.query(
-            `SELECT products.*, vendors.business_name AS vendor_business_name, vendors.slug AS vendor_slug
+            `SELECT products.*, vendors.business_name AS vendor_business_name, vendors.slug AS vendor_slug,
+                    vp.proposed_sale_price AS sale_price, vp.original_price AS original_price
              FROM products
              LEFT JOIN vendors ON vendors.id = products.vendor_id AND vendors.status = 'approved'
+             LEFT JOIN LATERAL (
+                 SELECT proposed_sale_price, original_price
+                 FROM vendor_promotions
+                 WHERE vendor_promotions.product_id = products.id
+                   AND vendor_promotions.status = 'approved'
+                   AND now() BETWEEN vendor_promotions.starts_at AND vendor_promotions.ends_at
+                 ORDER BY vendor_promotions.starts_at DESC
+                 LIMIT 1
+             ) vp ON true
              WHERE products.id = $1 AND products.deleted_at IS NULL AND products.status = 'approved' AND products.is_active = true AND products.admin_restricted = false
                AND (products.vendor_id IS NULL OR (
                     vendors.shop_active = true

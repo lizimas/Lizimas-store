@@ -84,9 +84,37 @@ async function loadProductDetail() {
 
         await loadGallery(id, product);
         await loadOptions(id, product);
-        document.getElementById("pd-price").textContent = product.price
-            ? `UGX ${Number(product.price).toLocaleString()}`
-            : "";
+        // Discount display (vendor_promotions, joined in getProductById) -
+        // only applied to the base price shown on initial load. Selecting a
+        // differently-priced variant (selectVariant()) intentionally shows
+        // that variant's plain price with no discount math - promotions are
+        // proposed against the product's base price, not any one variant,
+        // and this system has no per-variant discount concept at all.
+        var pdPriceEl = document.getElementById("pd-price");
+        var pdOrigPriceEl = document.getElementById("pd-price-original");
+        var pdDiscountBadgeEl = document.getElementById("pd-discount-badge");
+        var pdSalePrice = product.sale_price ? Number(product.sale_price) : null;
+        var pdOriginalPrice = product.original_price ? Number(product.original_price) : null;
+        var pdHasDiscount = pdSalePrice && pdOriginalPrice && pdOriginalPrice > pdSalePrice;
+
+        if (pdHasDiscount) {
+            pdPriceEl.textContent = "UGX " + pdSalePrice.toLocaleString();
+            if (pdOrigPriceEl) {
+                pdOrigPriceEl.textContent = "UGX " + pdOriginalPrice.toLocaleString();
+                pdOrigPriceEl.hidden = false;
+            }
+            if (pdDiscountBadgeEl) {
+                var pdDiscountPct = Math.round((1 - pdSalePrice / pdOriginalPrice) * 100);
+                pdDiscountBadgeEl.textContent = "-" + pdDiscountPct + "%";
+                pdDiscountBadgeEl.hidden = false;
+            }
+        } else {
+            pdPriceEl.textContent = product.price
+                ? `UGX ${Number(product.price).toLocaleString()}`
+                : "";
+            if (pdOrigPriceEl) pdOrigPriceEl.hidden = true;
+            if (pdDiscountBadgeEl) pdDiscountBadgeEl.hidden = true;
+        }
         document.getElementById("pd-description").textContent = product.description || "No description available.";
 
         loadReviews(id);

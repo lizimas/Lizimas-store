@@ -5259,6 +5259,26 @@ body.sheet-open {
 
 /* Manufacturer warranty badge, shown beside the price on product-detail.html
    when a product has warranty_months set. Hidden entirely otherwise. */
+.pd-price-original {
+    color: #999;
+    font-size: 14px;
+    font-weight: 400;
+    text-decoration: line-through;
+    margin-left: 8px;
+}
+
+.pd-discount-badge {
+    display: inline-block;
+    background: #e02020;
+    color: #fff;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
 .pd-warranty {
     display: flex;
     align-items: center;
