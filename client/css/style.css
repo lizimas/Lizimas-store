@@ -5406,17 +5406,25 @@ body.sheet-open {
 /* Brand line above the product title. Grey lead-in, brand in the accent so
    it reads as the tappable part without an underline shouting for attention. */
 .pd-brand {
-    display: block;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
     margin: 0 0 6px;
     font-size: 14px;
     color: #6b7280;
-    text-decoration: none;
 }
-.pd-brand span {
+.pd-brand-label {
+    color: #6b7280;
+}
+.pd-brand-name-link,
+.pd-brand-viewall-link {
     color: #c0392b;
     font-weight: 600;
+    text-decoration: none;
 }
-.pd-brand:hover span { text-decoration: underline; }
+.pd-brand-name-link:hover,
+.pd-brand-viewall-link:hover { text-decoration: underline; }
 
 /* SKU line under the specs table - plain, muted, no interaction (unlike
    .pd-brand above, which is a link). */

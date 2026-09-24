@@ -54,9 +54,11 @@ async function loadProductDetail() {
         if (brandEl) {
             var brandName = (product.brand || "").trim();
             if (brandName) {
-                brandEl.href = "/products.html?brand=" + encodeURIComponent(brandName);
-                brandEl.innerHTML = 'View all products from <span>' +
-                    pdEscape(brandName) + '</span>';
+                var brandUrl = "/products.html?brand=" + encodeURIComponent(brandName);
+                brandEl.innerHTML =
+                    '<span class="pd-brand-label">Brand</span>' +
+                    '<a class="pd-brand-name-link" href="' + brandUrl + '">' + pdEscape(brandName) + '</a>' +
+                    '<a class="pd-brand-viewall-link" href="' + brandUrl + '">View all products from ' + pdEscape(brandName) + '</a>';
                 brandEl.hidden = false;
             } else {
                 brandEl.hidden = true;
