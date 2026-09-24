@@ -62,6 +62,21 @@ async function loadProductDetail() {
                 brandEl.hidden = true;
             }
         }
+
+        // SKU is auto-generated for every product (server/utils/sku.js),
+        // so it's shown independently of the specs section's own
+        // show/hide logic (renderSpecs hides that whole section when
+        // there are no manual specs - SKU should still show either way).
+        var skuEl = document.getElementById("pd-sku");
+        if (skuEl) {
+            var skuValue = (product.sku || "").trim();
+            if (skuValue) {
+                skuEl.textContent = "SKU: " + skuValue;
+                skuEl.hidden = false;
+            } else {
+                skuEl.hidden = true;
+            }
+        }
         loadSellerPanel(product);
 
         await loadGallery(id, product);
