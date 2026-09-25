@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Product Staff</title>
-<link rel="stylesheet" href="../css/admin.css?v=33">
+<link rel="stylesheet" href="../css/admin.css?v=34">
 <link rel="stylesheet" href="../css/staff-messages-widget.css?v=4">
 </head>
 <body>
@@ -79,6 +79,7 @@
                                 <label style="font-size:13px; font-weight:600; color:#333;">Specifications</label>
                                 <div id="specs-list" style="display:flex; flex-direction:column; gap:6px; margin-top:6px;"></div>
                                 <button type="button" onclick="addSpecRow()" style="margin-top:8px; padding:8px 12px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer;">+ Add Specification</button>
+                                <div class="lz-spec-tools" data-add="addSpecRow" data-table-id="staff-specs-table-wrap"></div>
                             </div>
 
                             <div>
@@ -134,10 +135,11 @@
 
     <script src="../js/staff-account.js?v=4"></script>
     <script src="../js/prepare-picked-file.js?v=1"></script>
-    <script src="../js/lz-table.js?v=1"></script>
+    <script src="../js/lz-table.js?v=2"></script>
+    <script src="../js/lz-spec-tools.js?v=1"></script>
     <script src="../js/description-block-editor.js?v=19"></script>
     <script src="../js/category-select.js?v=2"></script>
-    <script src="../js/staff-product.js?v=9"></script>
+    <script src="../js/staff-product.js?v=10"></script>
     <script src="../js/photo-crop.js?v=1"></script>
 <script src="../js/staff-messages-widget.js?v=4"></script>
 <script>

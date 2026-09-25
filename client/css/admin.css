@@ -2419,3 +2419,24 @@ table.lz-dr-cal td {
     .lzt-table td { display: table-cell; }
     .lzt-table td::before { content: none; }
 }
+
+/* --- Specifications: Paste from Excel / Insert Table (lz-spec-tools.js) --- */
+.lz-spec-tools { margin-top: 14px; border-top: 1px dashed #ddd; padding-top: 12px; }
+.lzs-block { margin-bottom: 4px; }
+.lzs-title { font-size: 13px; font-weight: 700; color: #1a1a2e; margin-bottom: 3px; }
+.lzs-hint { font-size: 11.5px; color: #888; margin: 0 0 8px; line-height: 1.5; }
+.lzs-text { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-family: Menlo, Consolas, monospace; font-size: 12.5px; resize: vertical; }
+.lzs-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.lzs-btn { padding: 8px 14px; border-radius: 6px; border: 1px solid #ccc; background: #fff; color: #333; font: inherit; font-size: 13px; cursor: pointer; }
+.lzs-btn-primary { background: #f4b400; border-color: #f4b400; color: #1a1a2e; font-weight: 700; }
+.lzs-btn-navy { background: #1a1a2e; border-color: #1a1a2e; color: #fff; font-weight: 600; }
+.lzs-or { display: flex; align-items: center; gap: 10px; color: #9aa1ae; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin: 16px 0 12px; }
+.lzs-or::before, .lzs-or::after { content: ""; flex: 1; height: 1px; background: #e5e7eb; }
+.lzs-picker-wrap { position: relative; display: inline-block; margin-bottom: 10px; }
+.lzs-picker { position: absolute; top: calc(100% + 4px); left: 0; z-index: 50; background: #fff; border: 1px solid #dfe1e8; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.15); padding: 10px; }
+.lzs-picker[hidden] { display: none; }
+.lzs-grid { display: grid; grid-template-columns: repeat(8, 20px); gap: 3px; }
+.lzs-grid-cell { width: 20px; height: 20px; padding: 0; border: 1px solid #dfe1e8; background: #f9f9fb; border-radius: 2px; cursor: pointer; }
+.lzs-grid-cell.lzs-on { background: #bfdbfe; border-color: #3b82f6; }
+.lzs-grid-label { margin-top: 8px; font-size: 12px; color: #444; text-align: center; }
+.lzs-status { font-size: 12.5px; color: #1e7e34; min-height: 16px; margin-top: 6px; }

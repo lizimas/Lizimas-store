@@ -841,10 +841,14 @@ function addSpecRow(label, value) {
     row.id = rowId;
     row.style.cssText = "display:flex; gap:6px;";
     row.innerHTML = `
-        <input type="text" class="spec-label-input" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Label (e.g. Material)" value="${label || ''}" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:6px;">
-        <input type="text" class="spec-value-input" placeholder="Value (e.g. Polyester)" value="${value || ''}" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:6px;">
+        <input type="text" class="spec-label-input" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Label (e.g. Material)" value="" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:6px;">
+        <input type="text" class="spec-value-input" placeholder="Value (e.g. Polyester)" value="" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:6px;">
         <button type="button" onclick="document.getElementById('${rowId}').remove()" style="padding:8px 12px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer;">&times;</button>
     `;
+    // Set via .value (not the attribute template) so quotes/<> in a spec
+    // like 6.1" or "A&B" can't break the input or inject markup.
+    row.querySelectorAll("input")[0].value = label || "";
+    row.querySelectorAll("input")[1].value = value || "";
     list.appendChild(row);
 }
 
