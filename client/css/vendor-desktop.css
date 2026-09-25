@@ -48,6 +48,9 @@
 .vendor-desktop-shell .sidebar-brand-icon {
     background: var(--vd-gold) !important;
     color: var(--vd-navy) !important;
+    /* "LV" (Lizimas Vendor) - two letters, so a touch smaller than admin's "L" */
+    font-size: 13px !important;
+    letter-spacing: .02em;
 }
 
 .vendor-desktop-shell .sidebar-nav {

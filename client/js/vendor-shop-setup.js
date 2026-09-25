@@ -181,7 +181,7 @@ function vssRender({ compact }) {
     const intro = compact
         ? `<div class="vss-card"><h2 class="vss-h2">Shop profile</h2><p class="vss-muted">Tap a section to review or update it.</p><div class="vss-tiles" id="vss-tiles">${vssTilesHtml()}</div></div>`
         : `<div class="vss-card">
-            <div class="vss-brand"><span class="vm-header-brand-badge">L</span><span class="vss-status-pill" style="background:${s.bg}; color:${s.color};">${s.text}</span></div>
+            <div class="vss-brand"><span class="vm-header-brand-badge" title="Lizimas Vendor" aria-label="Lizimas Vendor">LV</span><span class="vss-status-pill" style="background:${s.bg}; color:${s.color};">${s.text}</span></div>
             <h1 class="vss-h1">Welcome to Lizimas Store!<br>Let's take your shop live!</h1>
             <p class="vss-muted">Complete all the sections below to take your shop live.</p>
             <p class="vss-progress" id="vss-progress">${vssData.completed_count} of ${VSS_STEPS.length} sections completed</p>

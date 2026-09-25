@@ -53,7 +53,7 @@
 .vm-header.vm-header-compact { padding: 18px 18px 20px; display: flex; align-items: center; gap: 10px; }
 .vm-header-brand { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
 .vm-header-brand-badge {
-    width: 28px; height: 28px; background: var(--vm-gold); color: var(--vm-navy);
+    min-width: 28px; height: 28px; padding: 0 5px; box-sizing: border-box; letter-spacing: .02em; background: var(--vm-gold); color: var(--vm-navy);
     border-radius: 7px; display: flex; align-items: center; justify-content: center;
     font-weight: bold; font-size: 14px; flex-shrink: 0;
 }
