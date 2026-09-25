@@ -4,7 +4,7 @@ const { computeSellerScore } = require("../utils/sellerScore");
 const { deriveVendorOrderStage, STAGE_LABELS, isValidStage, canAdvanceStage } = require("../utils/vendorOrderStage");
 const { logActivity } = require("../utils/activityLog");
 const { getVendorProductLimitStatus } = require("../utils/vendorProductTier");
-const { getVendorStockRecommendations } = require("../utils/stockRecommendation");
+const { getVendorStockRecommendations, getVendorStockOverview } = require("../utils/stockRecommendation");
 const { generateShopId } = require("../utils/shopId");
 const {
     MIN_PAYOUT_UGX,
@@ -189,6 +189,19 @@ exports.getMyProductTierStatus = async (req, res) => {
         }
         const status = await getVendorProductLimitStatus(vendorId);
         res.json(status);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Jumia-style Stock Recommendation page: summary tiles + per-SKU rows
+// with status (ok / out_of_stock / low_stock / sales_issue) and the
+// suggested replenish quantity. See computeReplenishment in
+// server/utils/stockRecommendation.js.
+exports.getMyStockOverview = async (req, res) => {
+    try {
+        if (!req.vendorId) return res.status(404).json({ error: "No vendor profile found for this account." });
+        res.json(await getVendorStockOverview(req.vendorId));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -1689,10 +1702,11 @@ exports.getMyVendorPromotions = async (req, res) => {
 exports.getPendingVendorPromotions = async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT vp.*, p.name AS product_name, v.business_name AS vendor_business_name
+            `SELECT vp.*, p.name AS product_name, v.business_name AS vendor_business_name, pc.name AS campaign_name
              FROM vendor_promotions vp
              JOIN products p ON p.id = vp.product_id
              JOIN vendors v ON v.id = vp.vendor_id
+             LEFT JOIN promotion_campaigns pc ON pc.id = vp.campaign_id
              WHERE vp.status = 'pending'
              ORDER BY vp.created_at ASC`
         );

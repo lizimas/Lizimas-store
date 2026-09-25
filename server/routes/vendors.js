@@ -39,8 +39,16 @@ const {
     getMyVendorMessages, getMyVendorMessageThread, createVendorMessage, replyToVendorMessage,
     getVendorShopStatus, updateVendorShopActive, updateVendorHolidayMode,
     getMyProductTierStatus,
-    getMyStockRecommendations
+    getMyStockRecommendations,
+    getMyStockOverview
 } = require("../controllers/vendorController");
+const {
+    listMyCampaigns: listMyPromotionCampaigns,
+    getMyCampaign: getMyPromotionCampaign,
+    joinCampaign: joinPromotionCampaign,
+    withdrawCampaignEntry: withdrawPromotionCampaignEntry,
+    getPromotionsOverview
+} = require("../controllers/promotionCampaignController");
 const { getMyKyc, updateMyKyc, uploadMyKycDocument, getMyKycDocumentUrl } = require("../controllers/vendorKycController");
 const { getMyShopSetup, updateMyShopInfo, updateMyCompanyInfo, updateMyShippingInfo, updateMyAdditionalInfo } = require("../controllers/vendorShopSetupController");
 const {
@@ -194,6 +202,7 @@ router.patch("/order-items/:orderItemId/stage", requireVendorPermission("vc_orde
 router.get("/dashboard-summary", getVendorDashboardSummary);
 router.get("/me/product-tier", getMyProductTierStatus);
 router.get("/me/stock-recommendations", requireVendorPermission("vc_product_manager", "vc_product_viewer", "vc_product_update"), getMyStockRecommendations);
+router.get("/me/stock-overview", requireVendorPermission("vc_product_manager", "vc_product_viewer", "vc_product_update"), getMyStockOverview);
 
 // Vendor Wallet & Payouts (Task #61): the balance is derived on every read
 // from order_items - see server/utils/vendorWallet.js.
@@ -269,6 +278,14 @@ router.get("/compliance-notices", getMyComplianceNotices);
 // your own products.
 router.post("/promotions", requireVendorPermission("vc_promotion_manager"), proposeVendorPromotion);
 router.get("/promotions", requireVendorPermission("vc_promotion_manager"), getMyVendorPromotions);
+// Promotions Management (Jumia parity, Sept 2026) - Lizimas campaigns
+// vendors join + revenue/highlights overview. See
+// server/controllers/promotionCampaignController.js.
+router.get("/me/promotions/overview", requireVendorPermission("vc_promotion_manager"), getPromotionsOverview);
+router.get("/me/campaigns", requireVendorPermission("vc_promotion_manager"), listMyPromotionCampaigns);
+router.get("/me/campaigns/:id", requireVendorPermission("vc_promotion_manager"), getMyPromotionCampaign);
+router.post("/me/campaigns/:id/entries", requireVendorPermission("vc_promotion_manager"), joinPromotionCampaign);
+router.delete("/me/campaigns/:id/entries/:entryId", requireVendorPermission("vc_promotion_manager"), withdrawPromotionCampaignEntry);
 
 // Vendor Notifications + Reports (Task #65).
 router.get("/notifications", getMyVendorNotifications);

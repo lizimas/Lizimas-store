@@ -1,6 +1,9 @@
 const pool = require("../config/database");
 const { uploadBuffer } = require("../utils/cloudinaryUpload");
 const { canEditProduct } = require("./productController");
+// Same model/validation code the editor and storefront use - one source of
+// truth for what a valid table block is (UMD module, works in Node too).
+const LzTable = require("../../client/js/lz-table");
 
 // Public: ordered blocks for one product. Empty array is a valid answer —
 // the storefront falls back to products.description when nothing is here.
@@ -70,7 +73,7 @@ const saveDescriptionBlocks = async (req, res) => {
     const LINK_URL_RE = /^https?:\/\//i;
 
     for (const [i, b] of blocks.entries()) {
-        if (!["image", "text", "heading", "grid", "video", "link"].includes(b.type)) {
+        if (!["image", "text", "heading", "grid", "video", "link", "table"].includes(b.type)) {
             return res.status(400).json({ message: `Block ${i}: bad type` });
         }
         if (b.type === "image" && !b.image_url) {
@@ -93,6 +96,15 @@ const saveDescriptionBlocks = async (req, res) => {
             if (!b.body) {
                 return res.status(400).json({ message: `Block ${i}: link needs label text` });
             }
+        }
+        if (b.type === "table") {
+            const checked = LzTable.normalize(b.payload);
+            if (!checked.ok) return res.status(400).json({ message: `Block ${i}: ${checked.error}` });
+            if (!LzTable.hasContent(checked.model)) return res.status(400).json({ message: `Block ${i}: table is empty` });
+            b.payload = checked.model;
+            // body keeps a plain-text copy (search/fallback; the DB requires
+            // a body for every block type except image/grid/video).
+            b.body = stripTags(LzTable.plainText(checked.model)).trim().slice(0, 5000) || "table";
         }
         if (b.type === "text") b.body = sanitizeBlockHtml(b.body || "");
         if (b.type === "heading") b.body = stripTags(b.body || "").trim();
@@ -223,7 +235,7 @@ const saveDescriptionBlocks = async (req, res) => {
                     b.image_width || null,
                     b.image_height || null,
                     b.alt_text || null,
-                    ["grid", "image"].includes(b.type) ? JSON.stringify(b.payload || {}) : null
+                    ["grid", "image", "table"].includes(b.type) ? JSON.stringify(b.payload || {}) : null
                 ]
             );
         }

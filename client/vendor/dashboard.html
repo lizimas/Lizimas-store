@@ -4,9 +4,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Vendor Dashboard</title>
-<link rel="stylesheet" href="../css/admin.css?v=29">
+<link rel="stylesheet" href="../css/admin.css?v=33">
 <link rel="stylesheet" href="../css/vendor-desktop.css?v=1">
-<link rel="stylesheet" href="../css/vendor-mobile.css?v=4">
+<link rel="stylesheet" href="../css/vendor-mobile.css?v=5">
 </head>
 <body>
 
@@ -80,12 +80,7 @@
     <!-- Stock Recommendation -------------------------------------------------- -->
     <div class="vm-screen" id="vm-screen-stock-recommendation">
         <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Stock Recommendation</span></div>
-        <div class="vm-card">
-            <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:10px;">
-                Based on your trailing 30-day delivered sales for each product.
-            </div>
-            <div id="vm-stock-recommendations-list"><div class="vm-loading-state">Loading...</div></div>
-        </div>
+        <div class="vc-page" id="vm-stock-recommendations-list"><div class="vm-loading-state">Loading...</div></div>
     </div>
 
     <!-- Manage Pickers ---------------------------------------------------------- -->
@@ -223,14 +218,11 @@
     <!-- Users (Settings > Users, matching Jumia Vendor Center) --------------- -->
     <div class="vm-screen" id="vm-screen-users">
         <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Users</span></div>
-        <div class="vm-card">
-            <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:10px;">
-                Invite staff to help run your shop. Each person only sees and does what you give them permission for.
-            </div>
+        <div class="vc-page">
+            <h2 class="vc-page-title vc-page-title-grey">Manage Users</h2>
+            <label class="vc-search vc-search-block"><input type="search" placeholder="Search" oninput="vcUsersSearch(this.value)" aria-label="Search users"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span></label>
             <div id="vm-users-list"><div class="vm-loading-state">Loading...</div></div>
-        </div>
-        <div class="vm-btn-row">
-            <button class="vm-btn-primary" onclick="vmShowUsersCreate()">+ Add User</button>
+            <div class="vc-center"><button type="button" class="vc-btn vc-btn-gold vc-btn-caps vc-btn-big" onclick="vmShowUsersCreate()">Create User <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
         </div>
     </div>
 
@@ -328,21 +320,13 @@
     <!-- Applications: Jumia product linking ------------------------------- -->
     <div class="vm-screen" id="vm-screen-jumia">
         <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Applications</span></div>
-        <div class="vm-card">
-            <div class="vm-card-title">Jumia Applications</div>
-            <div style="font-size:12.5px; color:#444; line-height:1.65; margin-bottom:14px;">
-                Connect your Jumia Vendor Center account to push your Lizimas listings to Jumia, or bring your existing Jumia products into Lizimas. You can add more than one Application - whichever one is Active is used for syncing.
-            </div>
+        <div class="vc-page">
+            <h2 class="vc-page-title vc-page-title-grey">Manage Applications</h2>
             <div id="vm-jumia-applications-list"><div class="vm-loading-state">Loading...</div></div>
-        </div>
-        <div class="vm-btn-row" id="vm-jumia-create-actions">
-            <button class="vm-btn-primary" onclick="vmShowScreen('jumia-create')">+ Create Application</button>
+            <div class="vc-center" id="vm-jumia-create-actions"><button type="button" class="vc-btn vc-btn-gold vc-btn-caps vc-btn-big" onclick="vcOpenCreateAppSheet('vm')">Create Application <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
         </div>
         <div class="vm-card" id="vm-jumia-sync-card" hidden>
-            <div class="vm-card-title">Product Sync</div>
-            <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:12px;">
-                Export to push your Lizimas products to Jumia, or import your existing Jumia products here.
-            </div>
+            <div class="vm-card-title" style="margin-bottom:12px;">Product Sync</div>
             <div class="vm-btn-row" style="margin:0 0 14px;">
                 <button class="vm-btn-primary" onclick="vmShowScreen('jumia-export')">Export to Jumia</button>
                 <button class="vm-btn-primary" style="background:#fff; border:1.5px solid var(--vm-navy); color:var(--vm-navy);" onclick="vmShowScreen('jumia-import')">Import from Jumia</button>
@@ -511,6 +495,18 @@
     <!-- Promotions -------------------------------------------------------------- -->
     <div class="vm-screen" id="vm-screen-promotions">
         <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Promotions</span></div>
+        <div class="vc-page" id="vm-promo-overview"><div class="vm-loading-state">Loading...</div></div>
+    </div>
+
+    <!-- Promotions Management > View All (Lizimas campaigns) ------------------- -->
+    <div class="vm-screen" id="vm-screen-promo-campaigns">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Promotions Management</span></div>
+        <div class="vc-page" id="vm-promo-campaigns"><div class="vm-loading-state">Loading...</div></div>
+    </div>
+
+    <!-- Propose your own promotion (the original Promotions form) ----------- -->
+    <div class="vm-screen" id="vm-screen-promotions-propose">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Propose a Promotion</span></div>
         <div class="vm-card">
             <div class="vm-card-title">Propose a Promotion</div>
             <div class="vm-field">
@@ -539,7 +535,9 @@
     <!-- Advertise Your Products --------------------------------------------------- -->
     <div class="vm-screen" id="vm-screen-ads">
         <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Advertise Your Products</span></div>
+        <div class="vc-ads-hero-host"></div>
         <div class="vm-card">
+            <div class="vm-card-title">Your Campaigns</div>
             <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:10px;">
                 Pay only when a shopper clicks a sponsored product. Lizimas reviews every campaign before it goes live.
             </div>
@@ -1234,12 +1232,7 @@
 
                     <div class="panel" style="margin-top:18px;">
                         <h2 style="margin-top:0;">Stock Recommendation</h2>
-                        <p style="font-size:13px; color:#666; margin:0 0 12px;">
-                            Based on your trailing 30-day delivered sales for each product. "Reorder Now" means
-                            you're projected to run out within a week at the current pace; "Reorder Soon" means
-                            within two weeks.
-                        </p>
-                        <div id="vd-stock-recommendations-list">Loading...</div>
+                        <div class="vc-page vc-page-desktop" id="vd-stock-recommendations-list">Loading...</div>
                     </div>
                 </section>
 
@@ -1330,6 +1323,8 @@
 
                 <section id="tab-promotions" class="tab-content hidden">
                     <h2 class="admin-page-title">Promotions</h2>
+                    <div class="panel"><div class="vc-page vc-page-desktop" id="vd-promo-overview">Loading...</div></div>
+                    <div class="panel"><h3 style="margin:0 0 12px;">Lizimas Campaigns</h3><div class="vc-page vc-page-desktop" id="vd-promo-campaigns">Loading...</div></div>
                     <p class="admin-page-subtitle">
                         Propose a time-boxed sale price on one of your own products. Lizimas reviews every
                         promotion before it goes live, and decides separately whether to feature it on the
@@ -1366,6 +1361,7 @@
 
                 <section id="tab-ads" class="tab-content hidden">
                     <h2 class="admin-page-title">Advertise Your Products</h2>
+                    <div class="vc-ads-hero-host vc-ads-hero-desktop"></div>
                     <p class="admin-page-subtitle" id="vd-ads-rate-note">
                         Pay only when a shopper clicks one of your sponsored products. Set a daily and total
                         budget, pick the products to promote, and submit - Lizimas reviews every campaign
@@ -1621,10 +1617,9 @@
                     <div class="panel" id="vd-jumia-panel">
                         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:4px;">
                             <div>
-                                <h3 style="margin:0 0 4px;">Applications</h3>
-                                <p style="font-size:12.5px; color:#888; margin:0;">Connect your Jumia Vendor Center account to push Lizimas products to Jumia and import Jumia products into Lizimas. Add as many Applications as you have on Jumia - one of them is the active one used for syncing.</p>
+                                <h3 style="margin:0;">Manage Applications</h3>
                             </div>
-                            <button type="button" onclick="vdShowCreateJumiaApplication()" style="background:#E67E22; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600; font-size:13px; white-space:nowrap;">+ Create Application</button>
+                            <button type="button" class="vc-btn vc-btn-gold vc-btn-caps" onclick="vdShowCreateJumiaApplication()">Create Application +</button>
                         </div>
 
                         <div id="vd-jumia-applications-table" style="margin-top:14px; overflow-x:auto;"></div>
@@ -1743,11 +1738,11 @@
                     <div class="panel" id="vd-staff-panel" hidden>
                         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:4px;">
                             <div>
-                                <h3 style="margin:0 0 4px;">Users</h3>
-                                <p style="font-size:12.5px; color:#888; margin:0;">Invite staff to help run your shop. Each person only sees and does what you give them permission for below - matching Jumia Vendor Center's own Users screen.</p>
+                                <h3 style="margin:0;">Manage Users</h3>
                             </div>
-                            <button type="button" onclick="vdShowCreateStaffForm()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600; font-size:13px; white-space:nowrap;">+ Add User</button>
+                            <button type="button" class="vc-btn vc-btn-gold vc-btn-caps" onclick="vdShowCreateStaffForm()">Create User +</button>
                         </div>
+                        <label class="vc-search vc-search-block" style="margin-top:12px;"><input type="search" placeholder="Search" oninput="vcUsersSearch(this.value)" aria-label="Search users"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span></label>
 
                         <div id="vd-staff-table" style="margin-top:14px; overflow-x:auto;"></div>
 
@@ -1870,10 +1865,12 @@
     <script src="../js/seller-panel.js?v=1"></script>
     <script src="../js/photo-crop.js?v=1"></script>
     <script src="../js/prepare-picked-file.js?v=10"></script>
-    <script src="../js/description-block-editor.js?v=6"></script>
-    <script src="../js/vendor-dashboard.js?v=24"></script>
+    <script src="../js/lz-table.js?v=1"></script>
+    <script src="../js/description-block-editor.js?v=19"></script>
+    <script src="../js/vendor-dashboard.js?v=25"></script>
     <script src="../js/vendor-statements.js?v=2"></script>
-<script src="../js/vendor-mobile.js?v=7"></script>
+<script src="../js/vendor-mobile.js?v=8"></script>
 <script src="../js/vendor-shop-setup.js?v=1"></script>
+<script src="../js/vendor-center.js?v=1"></script>
 </body>
 </html>

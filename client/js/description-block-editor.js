@@ -58,6 +58,14 @@
             render();
             return;
         }
+        if (type === "table") {
+            // Starts as 3 x 2 with a header row; the toolbar above the table
+            // adds/removes rows and columns, merges/splits cells and toggles
+            // header row/column (see client/js/lz-table.js).
+            blocks.push({ type, body: "", payload: global.LzTable.create(3, 2, { header_row: true }) });
+            render();
+            return;
+        }
         blocks.push({ type, body: "" });
         render();
     }
@@ -435,6 +443,19 @@
             head.appendChild(ctrl);
             row.appendChild(head);
 
+            if (b.type === "table") {
+                const hint = document.createElement("div");
+                hint.className = "lzbe-table-hint";
+                hint.textContent = "Click a cell, then use the table tools above it. Paste straight from Excel to fill several cells at once. Tab moves to the next cell.";
+                row.appendChild(hint);
+                const holder = document.createElement("div");
+                row.appendChild(holder);
+                if (!b.payload || !global.LzTable.normalize(b.payload).ok) b.payload = global.LzTable.create(3, 2, { header_row: true });
+                global.LzTable.edit(holder, b.payload, (model) => { blocks[i].payload = model; });
+                list.appendChild(row);
+                return;
+            }
+
             if (b.type === "image") {
                 const img = document.createElement("img");
                 img.src = b.image_url;
@@ -794,6 +815,7 @@
                         <button type="button" data-add="video">+ Video</button>
                         <button type="button" data-add="link">+ Link</button>
                         <button type="button" data-add="grid">+ Grid</button>
+                        ${global.LzTable ? '<button type="button" data-add="table">+ Table</button>' : ""}
                     </span>
                 </div>
                 <div id="lzbe-busy" class="lzbe-busy"></div>
@@ -880,6 +902,17 @@
                 if (!String(b.body || "").trim()) {
                     return { ok: false, message: `Block ${i + 1} (link) needs label text` };
                 }
+                continue;
+            }
+
+            if (b.type === "table") {
+                const checked = global.LzTable.normalize(b.payload);
+                if (!checked.ok) return { ok: false, message: `Block ${i + 1} (table): ${checked.error}` };
+                if (!global.LzTable.hasContent(checked.model)) {
+                    return { ok: false, message: `Block ${i + 1} (table) is empty - type into at least one cell or remove the block` };
+                }
+                b.payload = checked.model;
+                b.body = global.LzTable.plainText(checked.model);
                 continue;
             }
 

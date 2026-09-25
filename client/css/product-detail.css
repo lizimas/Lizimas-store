@@ -628,3 +628,9 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
         padding-bottom: 84px;
     }
 }
+
+/* Table description block (client/js/lz-table.js toHtml) */
+.pdb-table-wrap { overflow-x: auto; margin: 14px 0; }
+.pdb-table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.pdb-table th, .pdb-table td { border: 1px solid #d5d8de; padding: 9px 12px; text-align: left; vertical-align: top; }
+.pdb-table th { background: #f4f5f7; font-weight: 700; color: #1a1a2e; }

@@ -307,6 +307,17 @@
                 }
             } else if (b.type === "link") {
                 frag.appendChild(linkEl(b));
+            } else if (b.type === "table") {
+                // Built with client/js/lz-table.js; toHtml escapes every cell.
+                if (window.LzTable && b.payload) {
+                    const checked = window.LzTable.normalize(b.payload);
+                    if (checked.ok) {
+                        const wrap = document.createElement("div");
+                        wrap.className = "pdb-table-wrap";
+                        wrap.innerHTML = window.LzTable.toHtml(checked.model, "pdb-table");
+                        frag.appendChild(wrap);
+                    }
+                }
             } else if (/<(p|ul|ol|li|br|strong|em|b|i|u)\b/i.test(b.body || "") ||
                        /&(amp|lt|gt|quot|apos|nbsp|#\d+);/i.test(b.body || "")) {
                 const d = document.createElement("div");

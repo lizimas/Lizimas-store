@@ -28,6 +28,8 @@ let vmNavStack = ["account"]; // back-target for a sub-screen reached from Accou
 const VM_NAV_FALLBACK = {
     "add-product": "products",
     "promotions": "account",
+    "promotions-propose": "account",
+    "promo-campaigns": "account",
     "wallet": "account",
     "settings": "account",
     "holiday-mode": "account",
@@ -74,7 +76,9 @@ function vmShowScreen(name, opts) {
     if (name === "jumia-export") vmLoadJumiaExport();
     if (name === "jumia-import") vmLoadJumiaImport();
     if (name === "add-product") vmLoadAddProduct();
-    if (name === "promotions") vmLoadPromotions();
+    if (name === "promotions") vcLoadPromoOverview("vm-promo-overview");
+    if (name === "promotions-propose") vmLoadPromotions();
+    if (name === "promo-campaigns") vcLoadCampaigns("vm-promo-campaigns", "cards");
     if (name === "wallet") vmLoadWallet();
     if (name === "users") vmLoadUsers();
     if (name === "consignments") vmLoadConsignments();
@@ -538,24 +542,10 @@ async function vmLoadUsers() {
     }
 }
 
-function vmRenderUsersList(staff) {
-    const host = document.getElementById("vm-users-list");
-    if (!host) return;
-    if (!staff || staff.length === 0) {
-        host.innerHTML = '<div style="font-size:12.5px; color:#888; padding:8px 0;">You haven\'t added any staff yet.</div>';
-        return;
-    }
-    host.innerHTML = staff.map(s => {
-        const roleText = (s.roles || []).map(vdRoleLabel).join(", ") || "No roles";
-        const statusColor = s.enabled ? "#16A34A" : "#999";
-        const statusText = s.enabled ? "Active" : "Disabled";
-        return `<button type="button" onclick="vmShowUsersEdit(${s.id})" style="display:block; width:100%; text-align:left; background:none; border:none; padding:10px 0; border-bottom:1px solid #eee; cursor:pointer;">
-            <div style="font-size:13px; font-weight:600; color:var(--vm-navy);">${vendorEsc(s.name)}</div>
-            <div style="font-size:11.5px; color:#999; margin-top:2px;">${vendorEsc(s.email)}</div>
-            <div style="font-size:11.5px; color:#666; margin-top:2px;">${vendorEsc(roleText)}</div>
-            <div style="font-size:11px; font-weight:600; color:${statusColor}; margin-top:4px;">${statusText}${s.must_reset_password ? " &bull; Invite pending" : ""}</div>
-        </button>`;
-    }).join("");
+function vmRenderUsersList() {
+    // Jumia-style user cards with order-report toggle, Assign Permissions
+    // shield, kebab menu and active switch - see vendor-center.js.
+    vcRenderUsersMobile();
 }
 
 function vmShowUsersCreate() {
@@ -810,34 +800,10 @@ async function vmCancelConsignment(id) {
 // Shares vdStockUrgencyBadge with the desktop shell (vendor-dashboard.js,
 // loaded first) rather than re-deriving the same urgency-label logic here.
 
-async function vmLoadStockRecommendations() {
-    const host = document.getElementById("vm-stock-recommendations-list");
-    if (!host) return;
-    try {
-        const recs = await vendorAuthorizedFetch("/api/vendors/me/stock-recommendations");
-        if (recs.error) { host.innerHTML = `<div style="font-size:12.5px; color:#DC2626;">${vendorEsc(recs.error)}</div>`; return; }
-        const actionable = (recs || []).filter(r => r.urgency === "reorder_now" || r.urgency === "reorder_soon")
-            .sort((a, b) => (a.daysOfStockRemaining ?? 999) - (b.daysOfStockRemaining ?? 999));
-
-        if (actionable.length === 0) {
-            host.innerHTML = '<div style="font-size:12.5px; color:#888; padding:8px 0;">Nothing needs reordering right now based on your recent sales.</div>';
-            return;
-        }
-
-        host.innerHTML = actionable.map(r => `
-            <div style="padding:10px 0; border-bottom:1px solid #eee;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:13px; font-weight:600; color:var(--vm-navy);">${vendorEsc(r.name)}</span>
-                    ${vdStockUrgencyBadge(r.urgency)}
-                </div>
-                <div style="font-size:11.5px; color:#666; margin-top:4px;">
-                    Stock: ${r.stock} &middot; Est. ${r.daysOfStockRemaining === null ? "—" : r.daysOfStockRemaining} days remaining &middot; Recommend reordering <strong>${r.recommendedReorderQty}</strong>
-                </div>
-            </div>`).join("");
-    } catch (error) {
-        console.error("vmLoadStockRecommendations error:", error);
-        host.innerHTML = '<div style="font-size:12.5px; color:#DC2626;">Could not load stock recommendations.</div>';
-    }
+// Jumia-style page (summary tiles, filters, table, Generate CO) - shared
+// with the desktop tab, see client/js/vendor-center.js.
+function vmLoadStockRecommendations() {
+    vcLoadStock("vm-stock-recommendations-list");
 }
 
 // --- Manage Pickers ------------------------------------------------------
@@ -1194,26 +1160,9 @@ async function vmLoadJumia() {
 const VM_JUMIA_TYPE_LABEL = { self_authorization: "Self Authorization", web_application: "Web Application" };
 
 function vmRenderJumiaApplicationsList(apps) {
-    const host = document.getElementById("vm-jumia-applications-list");
-    if (!host) return;
-    if (!apps || apps.length === 0) {
-        host.innerHTML = '<div style="font-size:12.5px; color:#888; padding:8px 0;">No Applications yet. Create one to connect to Jumia.</div>';
-        return;
-    }
-    host.innerHTML = apps.map(app => {
-        const [label, color] = VM_JUMIA_STATUS_LABEL[app.connection_status] || [app.connection_status, "#888"];
-        return `<div style="padding:10px 0; border-bottom:1px solid #eee;">
-            <div style="font-size:13px; font-weight:600; color:var(--vm-navy);">${vendorEsc(app.name)} ${app.is_active ? '<span style="font-size:10.5px; font-weight:700; color:#16A34A;">&bull; ACTIVE</span>' : ""}</div>
-            <div style="font-size:11.5px; color:#999; margin-top:2px;">${VM_JUMIA_TYPE_LABEL[app.app_type] || app.app_type} &bull; <span style="color:${color}; font-weight:600;">${label}</span></div>
-            ${app.jumia_shop_name ? `<div style="font-size:11px; color:#666; margin-top:2px;">${vendorEsc(app.jumia_shop_name)}</div>` : ""}
-            <div style="display:flex; gap:14px; margin-top:8px; flex-wrap:wrap;">
-                <button type="button" onclick="vmShowJumiaAppSetup(${app.id})" style="background:none; border:none; padding:0; color:var(--vm-navy); font-size:12px; font-weight:600; cursor:pointer;">${app.connected ? "Reconnect" : "Connect"}</button>
-                ${app.is_active ? `<button type="button" onclick="vmTestJumiaApp(${app.id})" style="background:none; border:none; padding:0; color:#16A34A; font-size:12px; font-weight:600; cursor:pointer;">Test</button>` : ""}
-                ${(app.connected && !app.is_active) ? `<button type="button" onclick="vmMakeJumiaAppActive(${app.id})" style="background:none; border:none; padding:0; color:#B45309; font-size:12px; font-weight:600; cursor:pointer;">Make Active</button>` : ""}
-                <button type="button" onclick="vmDeleteJumiaApp(${app.id})" style="background:none; border:none; padding:0; color:#DC2626; font-size:12px; font-weight:600; cursor:pointer;">Delete</button>
-            </div>
-        </div>`;
-    }).join("");
+    // Jumia-style cards (Name / Type / Client ID / Redirect URI / Created At
+    // / Actions) - see vcRenderAppCards in vendor-center.js.
+    vcRenderAppCards(document.getElementById("vm-jumia-applications-list"), apps, "vm");
 }
 
 function vmResetJumiaCreateForm() {

@@ -2633,6 +2633,7 @@ function setupTabs() {
                 loadPendingVendorPayouts();
                 loadPendingReturnRefunds();
                 loadVendorCompliancePanel();
+                loadPromotionCampaigns();
                 loadPendingVendorPromotions();
                 loadApprovedVendorPromotions();
                 loadVendorMessagesAdmin();
@@ -8339,6 +8340,89 @@ async function viewVendorComplianceHistory(vendorId) {
 // flash-sale section, independent of whether the discount is honored at
 // checkout (it always is, once approved).
 
+// --- Lizimas promotion campaigns (migration 124) -------------------------
+// Vendors join these from their Promotions Management screen; every
+// nomination arrives as a normal pending vendor promotion below.
+
+const pcEsc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const PC_STATUS_STYLE = { open: "#1e7e34", idle: "#9a6b00", ongoing: "#1d4ed8", expired: "#888", cancelled: "#c5221f" };
+
+async function loadPromotionCampaigns() {
+    const container = document.getElementById("promotion-campaigns-list");
+    if (!container) return;
+    try {
+        const rows = await authorizedFetch("/api/admin/promotion-campaigns");
+        if (!Array.isArray(rows) || rows.length === 0) {
+            container.innerHTML = `<p class="no-data">No campaigns yet.</p>`;
+            return;
+        }
+        const d = (v) => new Date(v).toLocaleString(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+        const band = (r) => `${r.min_discount_pct != null ? r.min_discount_pct + "%" : "N/A"} - ${r.max_discount_pct != null ? r.max_discount_pct + "%" : "N/A"}`;
+        container.innerHTML = `<table>
+            <thead><tr><th>Campaign</th><th>Registration Ends</th><th>Period</th><th>Discount</th><th>Status</th><th>Entries</th><th></th></tr></thead>
+            <tbody>${rows.map((r) => `<tr>
+                <td data-label="Campaign"><strong>${pcEsc(r.name)}</strong></td>
+                <td data-label="Registration Ends">${d(r.registration_ends_at)}</td>
+                <td data-label="Period">${d(r.starts_at)}<br>${d(r.ends_at)}</td>
+                <td data-label="Discount">${band(r)}</td>
+                <td data-label="Status"><span style="font-weight:700; color:${PC_STATUS_STYLE[r.status] || "#333"}; text-transform:capitalize;">${r.status}</span></td>
+                <td data-label="Entries">${r.vendors_joined} vendor(s) &middot; ${r.pending_entries} pending &middot; ${r.approved_entries} approved</td>
+                <td data-label="">${r.status !== "cancelled" && r.status !== "expired" ? `<button onclick="cancelPromotionCampaign(${Number(r.id)})" style="background:#fff; color:#DC2626; border:1px solid #DC2626; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Cancel</button>` : ""}</td>
+            </tr>`).join("")}</tbody>
+        </table>`;
+    } catch (error) {
+        console.error("Load promotion campaigns error:", error);
+        container.innerHTML = `<p class="no-data">Could not load campaigns.</p>`;
+    }
+}
+
+async function createPromotionCampaign() {
+    const status = document.getElementById("pc-status");
+    const val = (id) => document.getElementById(id).value;
+    const iso = (id) => (val(id) ? new Date(val(id)).toISOString() : "");
+    const body = {
+        name: val("pc-name").trim(),
+        description: val("pc-desc").trim() || null,
+        registration_ends_at: iso("pc-reg"),
+        starts_at: iso("pc-start"),
+        ends_at: iso("pc-end"),
+        min_discount_pct: val("pc-min") === "" ? null : Number(val("pc-min")),
+        max_discount_pct: val("pc-max") === "" ? null : Number(val("pc-max"))
+    };
+    status.style.color = "#555";
+    status.textContent = "Saving...";
+    try {
+        const result = await authorizedFetch("/api/admin/promotion-campaigns", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+        if (result.error) { status.style.color = "#DC2626"; status.textContent = result.error; return; }
+        status.style.color = "#1e7e34";
+        status.textContent = "Campaign created.";
+        ["pc-name", "pc-desc", "pc-reg", "pc-start", "pc-end", "pc-min", "pc-max"].forEach((id) => { document.getElementById(id).value = ""; });
+        loadPromotionCampaigns();
+    } catch (error) {
+        console.error("Create promotion campaign error:", error);
+        status.style.color = "#DC2626";
+        status.textContent = "Something went wrong.";
+    }
+}
+
+async function cancelPromotionCampaign(id) {
+    if (!confirm("Cancel this campaign? Pending nominations are rejected and any live campaign prices stop immediately.")) return;
+    try {
+        const result = await authorizedFetch(`/api/admin/promotion-campaigns/${id}/cancel`, { method: "PATCH" });
+        if (result.error) { alert(result.error); return; }
+        loadPromotionCampaigns();
+        loadPendingVendorPromotions();
+        loadApprovedVendorPromotions();
+    } catch (error) {
+        console.error("Cancel promotion campaign error:", error);
+        alert("Something went wrong.");
+    }
+}
+
 async function loadPendingVendorPromotions() {
     try {
         const rows = await authorizedFetch("/api/admin/vendor-promotions/pending");
@@ -8351,12 +8435,13 @@ async function loadPendingVendorPromotions() {
 
         container.innerHTML = `
             <table>
-                <thead><tr><th>Vendor</th><th>Product</th><th>Price</th><th>Window</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Vendor</th><th>Product</th><th>Campaign</th><th>Price</th><th>Window</th><th>Actions</th></tr></thead>
                 <tbody>
                     ${rows.map(r => `
                         <tr>
                             <td data-label="Vendor">${r.vendor_business_name}</td>
                             <td data-label="Product">${r.product_name}</td>
+                            <td data-label="Campaign">${r.campaign_name ? pcEsc(r.campaign_name) : '<span style="color:#aaa;">Own promotion</span>'}</td>
                             <td data-label="Price"><s style="color:#888;">${fmtUgx(r.original_price)}</s> ${fmtUgx(r.proposed_sale_price)}</td>
                             <td data-label="Window">${new Date(r.starts_at).toLocaleDateString()} - ${new Date(r.ends_at).toLocaleDateString()}</td>
                             <td data-label="Actions">

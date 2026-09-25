@@ -400,6 +400,11 @@ router.get("/vendors/:id/compliance-history", getVendorComplianceHistory);
 router.get("/vendors/:id/products", getVendorProductsAdmin);
 
 // Vendor Promotions (Task #64): admin review + homepage/sponsored control.
+// Lizimas promotion campaigns vendors join (migration 124).
+const promotionCampaigns = require("../controllers/promotionCampaignController");
+router.get("/promotion-campaigns", promotionCampaigns.listCampaignsAdmin);
+router.post("/promotion-campaigns", promotionCampaigns.createCampaignAdmin);
+router.patch("/promotion-campaigns/:id/cancel", promotionCampaigns.cancelCampaignAdmin);
 router.get("/vendor-promotions/pending", getPendingVendorPromotions);
 router.get("/vendor-promotions/approved", getApprovedVendorPromotions);
 router.patch("/vendor-promotions/:id/approve", approveVendorPromotion);

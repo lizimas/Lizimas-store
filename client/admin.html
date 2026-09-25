@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Admin Dashboard</title>
-<link rel="stylesheet" href="css/admin.css?v=32">
+<link rel="stylesheet" href="css/admin.css?v=33">
 </head>
 <body>
 
@@ -1931,6 +1931,28 @@
                     </div>
 
                     <div class="panel">
+                        <h2>Lizimas Promotion Campaigns</h2>
+                        <p style="font-size:13px; color:#666; margin:0 0 12px;">
+                            Create a campaign (e.g. "Payweek Deals") that vendors join from Promotions Management by
+                            nominating products at a discount inside the band you set. Each nomination lands in
+                            "Vendor Promotions Awaiting Review" below. Leave a discount blank for no limit (N/A);
+                            without a max, the normal 50% ceiling applies.
+                        </p>
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; align-items:end; margin-bottom:10px;">
+                            <label style="font-size:12px; font-weight:600;">Campaign name<input id="pc-name" type="text" maxlength="160" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;"></label>
+                            <label style="font-size:12px; font-weight:600;">Registration ends<input id="pc-reg" type="datetime-local" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;"></label>
+                            <label style="font-size:12px; font-weight:600;">Starts<input id="pc-start" type="datetime-local" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;"></label>
+                            <label style="font-size:12px; font-weight:600;">Ends<input id="pc-end" type="datetime-local" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;"></label>
+                            <label style="font-size:12px; font-weight:600;">Min discount %<input id="pc-min" type="number" min="1" max="99" placeholder="N/A" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;"></label>
+                            <label style="font-size:12px; font-weight:600;">Max discount %<input id="pc-max" type="number" min="1" max="99" placeholder="N/A" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;"></label>
+                        </div>
+                        <label style="font-size:12px; font-weight:600; display:block; margin-bottom:10px;">Description (optional, shown to vendors)<textarea id="pc-desc" rows="2" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;"></textarea></label>
+                        <button type="button" onclick="createPromotionCampaign()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:9px 16px; cursor:pointer;">Create Campaign</button>
+                        <span id="pc-status" style="font-size:13px; margin-left:10px;"></span>
+                        <div id="promotion-campaigns-list" style="margin-top:14px;">Loading...</div>
+                    </div>
+
+                    <div class="panel">
                         <h2>Vendor Promotions Awaiting Review</h2>
                         <p style="font-size:13px; color:#666; margin:0 0 12px;">
                             Approve or reject a vendor's proposed sale price on their own product. An approved
@@ -2332,11 +2354,12 @@
     </div>
 
 <script src="js/prepare-picked-file.js?v=10"></script>
-<script src="js/description-block-editor.js?v=18"></script>
+<script src="js/lz-table.js?v=1"></script>
+<script src="js/description-block-editor.js?v=19"></script>
 <script src="js/category-select.js?v=2"></script>
 <script src="js/category-picker.js?v=1"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
-<script src="js/admin.js?v=bulk3"></script>
+<script src="js/admin.js?v=bulk4"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

@@ -110,6 +110,19 @@ async function createApplication(vendorId, { name, appType, redirectUri }) {
         err.status = 400;
         throw err;
     }
+    // Same name twice in one shop is refused (Jumia Vendor Center parity:
+    // "The Application already exists in this MasterShop.") - compared
+    // case-insensitively with surrounding/duplicate spaces ignored.
+    const duplicate = await pool.query(
+        `SELECT 1 FROM vendor_jumia_connections
+         WHERE vendor_id = $1 AND lower(regexp_replace(trim(name), '\\s+', ' ', 'g')) = lower($2) LIMIT 1`,
+        [vendorId, cleanName.replace(/\s+/g, " ")]
+    );
+    if (duplicate.rows.length > 0) {
+        const err = new Error("The Application already exists in this shop.");
+        err.status = 409;
+        throw err;
+    }
     const existingCount = (await pool.query(
         `SELECT count(*)::int AS n FROM vendor_jumia_connections WHERE vendor_id = $1`, [vendorId]
     )).rows[0].n;

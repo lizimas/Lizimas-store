@@ -2696,39 +2696,9 @@ function vdStockUrgencyBadge(urgency) {
     return `<span style="font-weight:600; color:${color};">${label}</span>`;
 }
 
-async function vdLoadStockRecommendations() {
-    const host = document.getElementById("vd-stock-recommendations-list");
-    if (!host) return;
-    try {
-        const recs = await vendorAuthorizedFetch("/api/vendors/me/stock-recommendations");
-        if (recs.error) { host.innerHTML = `<p class="no-data">${vendorEsc(recs.error)}</p>`; return; }
-        const actionable = (recs || []).filter(r => r.urgency === "reorder_now" || r.urgency === "reorder_soon")
-            .sort((a, b) => (a.daysOfStockRemaining ?? 999) - (b.daysOfStockRemaining ?? 999));
-
-        if (actionable.length === 0) {
-            host.innerHTML = `<p class="no-data">Nothing needs reordering right now based on your recent sales.</p>`;
-            return;
-        }
-
-        host.innerHTML = `
-            <table>
-                <thead><tr><th>Product</th><th>Stock</th><th>Est. Days Remaining</th><th>Recommended Reorder Qty</th><th>Status</th></tr></thead>
-                <tbody>
-                    ${actionable.map(r => `
-                        <tr>
-                            <td data-label="Product">${vendorEsc(r.name)}${r.sku ? ` <span style="color:#999;">(${vendorEsc(r.sku)})</span>` : ""}</td>
-                            <td data-label="Stock">${r.stock}</td>
-                            <td data-label="Days Remaining">${r.daysOfStockRemaining === null ? "—" : r.daysOfStockRemaining}</td>
-                            <td data-label="Recommended Qty"><strong>${r.recommendedReorderQty}</strong></td>
-                            <td data-label="Status">${vdStockUrgencyBadge(r.urgency)}</td>
-                        </tr>`).join("")}
-                </tbody>
-            </table>
-        `;
-    } catch (error) {
-        console.error("vdLoadStockRecommendations error:", error);
-        host.innerHTML = `<p class="no-data">Could not load stock recommendations.</p>`;
-    }
+// Jumia-style page shared with the mobile shell - see vendor-center.js.
+function vdLoadStockRecommendations() {
+    vcLoadStock("vd-stock-recommendations-list");
 }
 
 async function loadVendorInventory() {
@@ -3376,6 +3346,8 @@ const VENDOR_PROMO_STATUS_CLASS = {
 };
 
 async function loadVendorPromotionsTab() {
+    vcLoadPromoOverview("vd-promo-overview");
+    vcLoadCampaigns("vd-promo-campaigns", "table");
     await Promise.all([populateVendorPromoProductSelect(), loadVendorPromotionsList()]);
 }
 
@@ -4088,92 +4060,9 @@ async function vdLoadStaff() {
 }
 
 function vdRenderStaffTable() {
-    const container = document.getElementById("vd-staff-table");
-    container.innerHTML = "";
-
-    if (vdStaffCache.length === 0) {
-        const empty = document.createElement("p");
-        empty.style.cssText = "font-size:13px; color:#888; margin:8px 0;";
-        empty.textContent = "You haven't added any staff yet.";
-        container.appendChild(empty);
-        return;
-    }
-
-    const table = document.createElement("table");
-    table.style.cssText = "width:100%; border-collapse:collapse; font-size:13px;";
-    const thead = document.createElement("thead");
-    thead.innerHTML = '<tr style="text-align:left; border-bottom:2px solid #eee; color:#888; font-size:12px;">' +
-        '<th style="padding:8px 10px;">Name</th><th style="padding:8px 10px;">Email</th>' +
-        '<th style="padding:8px 10px;">Roles</th><th style="padding:8px 10px;">Status</th>' +
-        '<th style="padding:8px 10px;"></th></tr>';
-    table.appendChild(thead);
-
-    const tbody = document.createElement("tbody");
-    vdStaffCache.forEach((s) => {
-        const tr = document.createElement("tr");
-        tr.style.borderBottom = "1px solid #f2f2f2";
-
-        const tdName = document.createElement("td");
-        tdName.style.padding = "10px";
-        tdName.textContent = s.name;
-        tr.appendChild(tdName);
-
-        const tdEmail = document.createElement("td");
-        tdEmail.style.padding = "10px";
-        tdEmail.textContent = s.email;
-        tr.appendChild(tdEmail);
-
-        const tdRoles = document.createElement("td");
-        tdRoles.style.padding = "10px";
-        tdRoles.style.maxWidth = "260px";
-        tdRoles.textContent = (s.roles || []).map(vdRoleLabel).join(", ") || "—";
-        tr.appendChild(tdRoles);
-
-        const tdStatus = document.createElement("td");
-        tdStatus.style.padding = "10px";
-        const statusSpan = document.createElement("span");
-        statusSpan.style.cssText = s.enabled
-            ? "color:var(--vd-green-text); font-weight:600;"
-            : "color:#999; font-weight:600;";
-        statusSpan.textContent = s.enabled ? "Active" : "Disabled";
-        tdStatus.appendChild(statusSpan);
-        if (s.must_reset_password) {
-            const pending = document.createElement("div");
-            pending.style.cssText = "font-size:11px; color:#888; margin-top:2px;";
-            pending.textContent = "Invite pending";
-            tdStatus.appendChild(pending);
-        }
-        tr.appendChild(tdStatus);
-
-        const tdActions = document.createElement("td");
-        tdActions.style.cssText = "padding:10px; white-space:nowrap;";
-
-        const editBtn = document.createElement("button");
-        editBtn.type = "button";
-        editBtn.textContent = "Edit Roles";
-        editBtn.style.cssText = "background:#fff; color:var(--vd-navy); border:1.5px solid var(--vd-navy); border-radius:6px; padding:6px 10px; cursor:pointer; font-size:12px; margin-right:6px;";
-        editBtn.onclick = () => vdShowEditStaffRoles(s.id);
-        tdActions.appendChild(editBtn);
-
-        const toggleBtn = document.createElement("button");
-        toggleBtn.type = "button";
-        toggleBtn.textContent = s.enabled ? "Disable" : "Enable";
-        toggleBtn.style.cssText = "background:#fff; color:#555; border:1.5px solid #ccc; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:12px; margin-right:6px;";
-        toggleBtn.onclick = () => vdToggleStaffEnabled(s.id, !s.enabled);
-        tdActions.appendChild(toggleBtn);
-
-        const removeBtn = document.createElement("button");
-        removeBtn.type = "button";
-        removeBtn.textContent = "Remove";
-        removeBtn.style.cssText = "background:#fff; color:var(--vd-red); border:1.5px solid var(--vd-red); border-radius:6px; padding:6px 10px; cursor:pointer; font-size:12px;";
-        removeBtn.onclick = () => vdDeleteStaffUser(s.id);
-        tdActions.appendChild(removeBtn);
-
-        tr.appendChild(tdActions);
-        tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    container.appendChild(table);
+    // Jumia-style Users table (order-report toggle, Assign Permissions,
+    // kebab menu, active switch) - see vcRenderUsersDesktop (vendor-center.js).
+    vcRenderUsersDesktop();
 }
 
 function vdShowCreateStaffForm() {
@@ -4900,57 +4789,15 @@ const VD_JUMIA_STATUS_PILL = {
 };
 
 function vdRenderJumiaApplicationsTable() {
-    const host = document.getElementById("vd-jumia-applications-table");
-    if (!host) return;
-    if (vdJumiaApplications.length === 0) {
-        host.innerHTML = '<p style="font-size:13px; color:#888; padding:8px 0;">No Applications yet. Create one to connect Lizimas to your Jumia Vendor Center account.</p>';
-        return;
-    }
-    const rows = vdJumiaApplications.map(app => {
-        const [statusLabel, statusColor] = VD_JUMIA_STATUS_PILL[app.connection_status] || [app.connection_status, "#888"];
-        const created = app.created_at ? new Date(app.created_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "";
-        const activeCell = app.is_active
-            ? '<span style="font-size:11.5px; font-weight:700; color:#16A34A;">&bull; ACTIVE</span>'
-            : (app.connected
-                ? `<button type="button" onclick="vdMakeJumiaAppActive(${app.id})" style="font-size:11.5px; padding:4px 8px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer;">Make Active</button>`
-                : '<span style="font-size:11.5px; color:#bbb;">&mdash;</span>');
-        return `<tr>
-            <td data-label="Name" style="font-weight:600; color:var(--vd-navy);">${vendorEsc(app.name)}</td>
-            <td data-label="Type" style="font-size:12.5px; color:#666;">${VD_JUMIA_TYPE_LABEL[app.app_type] || app.app_type}</td>
-            <td data-label="Client ID" style="font-family:monospace; font-size:12px; color:#666;">${app.client_id ? vendorEsc(app.client_id) : "&mdash;"}</td>
-            <td data-label="Status" title="${app.last_error ? vendorEsc(app.last_error) : ""}" style="font-size:12.5px; font-weight:600; color:${statusColor};">${statusLabel}${app.jumia_shop_name ? `<div style="font-size:11px; font-weight:400; color:#999;">${vendorEsc(app.jumia_shop_name)}</div>` : ""}</td>
-            <td data-label="Active">${activeCell}</td>
-            <td data-label="Created At" style="font-size:12.5px; color:#888;">${created}</td>
-            <td data-label="Actions">
-                <div style="display:flex; gap:6px;">
-                    <button type="button" title="${app.connected ? "Reconnect" : "Connect"}" onclick="vdShowJumiaAppSetup(${app.id})" style="background:none; border:1px solid #ccc; border-radius:6px; width:32px; height:32px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                    </button>
-                    ${app.is_active ? `<button type="button" title="Test Connection" onclick="vdTestJumiaApp(${app.id})" style="background:none; border:1px solid #ccc; border-radius:6px; width:32px; height:32px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                    </button>` : ""}
-                    <button type="button" title="Delete" onclick="vdDeleteJumiaApp(${app.id})" style="background:none; border:1px solid #ccc; border-radius:6px; width:32px; height:32px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                    </button>
-                </div>
-            </td>
-        </tr>`;
-    }).join("");
-    host.innerHTML = `<table class="lz-mini-table" style="width:100%; border-collapse:collapse;">
-        <thead><tr><th>Name</th><th>Type</th><th>Client ID</th><th>Status</th><th>Active</th><th>Created At</th><th>Actions</th></tr></thead>
-        <tbody>${rows}</tbody>
-    </table>`;
+    // Jumia-style Application cards - see vcRenderAppCards (vendor-center.js).
+    vcRenderAppCards(document.getElementById("vd-jumia-applications-table"), vdJumiaApplications, "vd");
 }
 
+// Create Application opens the shared dialog (vendor-center.js); the old
+// inline create form below stays in the page but is no longer shown.
 function vdShowCreateJumiaApplication() {
     vdHideJumiaAppSetup();
-    const createViewEl = document.getElementById("vd-jumia-create-application-view");
-    createViewEl.hidden = false;
-    createViewEl.style.display = "flex";
-    document.getElementById("vd-jumia-new-app-name").value = "";
-    document.getElementById("vd-jumia-new-app-error").textContent = "";
-    const selfRadio = document.querySelector('input[name="vd-jumia-new-app-type"][value="self_authorization"]');
-    if (selfRadio) selfRadio.checked = true;
+    vcOpenCreateAppSheet("vd");
 }
 
 function vdHideCreateJumiaApplication() {

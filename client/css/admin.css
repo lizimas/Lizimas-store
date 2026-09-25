@@ -2384,3 +2384,38 @@ table.lz-dr-cal td {
     background: #cfe6ff;
     box-shadow: inset 0 0 0 1px #007bff;
 }
+
+/* --- Table block editor (client/js/lz-table.js) ---------------------------
+   CKEditor/Jumia-style: a small toolbar (Column / Row / Merge menus) above
+   the table; header rows/columns render bold on a grey band. */
+.lzbe-table-hint { font-size: 12px; color: #6b7280; margin: 2px 0 8px; }
+.lzt-editor { position: relative; }
+.lzt-toolbar { position: relative; display: inline-flex; align-items: center; gap: 2px; background: #fff; border: 1px solid #d5d8de; border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,.12); padding: 3px; margin-bottom: 8px; }
+.lzt-tool { display: inline-flex; align-items: center; gap: 2px; background: none; border: none; border-radius: 3px; padding: 5px 6px; cursor: pointer; color: #333; }
+.lzt-tool:hover, .lzt-tool-open { background: #eef4fd; color: #2b6dd2; }
+.lzt-size { font-size: 11.5px; color: #8a8f99; padding: 0 8px; }
+.lzt-menu { position: absolute; top: calc(100% + 2px); z-index: 60; min-width: 230px; background: #fff; border: 1px solid #d5d8de; border-radius: 2px; box-shadow: 0 4px 14px rgba(0,0,0,.18); padding: 0; }
+.lzt-item { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; background: none; border: none; text-align: left; padding: 11px 16px; font: inherit; font-size: 14px; color: #222; cursor: pointer; }
+.lzt-item:hover:not(:disabled), .lzt-item:focus-visible { background: #f0f0f0; }
+.lzt-item:disabled { color: #a3a8b3; cursor: default; }
+.lzt-item-toggle { background: #f0f0f0; border-bottom: 1px solid #d5d8de; }
+.lzt-divider { height: 1px; background: #d5d8de; }
+.lzt-switch { position: relative; width: 36px; height: 20px; border-radius: 4px; background: #808080; flex-shrink: 0; transition: background .15s; }
+.lzt-switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 3px; background: #fff; transition: transform .15s; }
+.lzt-switch.lzt-on { background: #5d9d42; }
+.lzt-switch.lzt-on::after { transform: translateX(16px); }
+.lzt-scroll { overflow-x: auto; }
+.lzt-table { border-collapse: collapse; min-width: 100%; table-layout: auto; }
+.lzt-table td { border: 1px solid #bfbfbf; padding: 0; vertical-align: top; min-width: 90px; background: #fff; }
+.lzt-table td.lzt-head { background: #f2f2f2; }
+.lzt-table td.lzt-head .lzt-in { font-weight: 700; }
+.lzt-table td.lzt-selected { background: #e2ecfb; }
+.lzt-table td.lzt-focus { outline: 2px solid #6a9ad9; outline-offset: -2px; }
+.lzt-in { min-height: 22px; padding: 8px 10px; font-size: 14px; line-height: 1.45; outline: none; white-space: pre-wrap; word-break: break-word; }
+@media (max-width: 600px) {
+    .lzt-table, .lzt-table tbody { display: table-row-group; }
+    table.lzt-table { display: table; }
+    .lzt-table tr { display: table-row; margin: 0; border: none; padding: 0; border-radius: 0; }
+    .lzt-table td { display: table-cell; }
+    .lzt-table td::before { content: none; }
+}
