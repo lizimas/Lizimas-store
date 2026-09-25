@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 
 const {
     validateShopInfo, validateCompanyInfo, validateShippingInfo, validateAdditionalInfo,
-    computeShopSetupSteps, isValidUgPhone, paymentStepComplete, companyStepComplete
+    computeShopSetupSteps, isValidUgPhone, paymentStepComplete, companyStepComplete, additionalShopDetailsComplete
 } = require("../server/utils/vendorShopSetup");
 
 const fullShop = {
@@ -55,6 +55,29 @@ test("validateShippingInfo: return address is optional but can't be half-filled"
     const ship = { ship_address_line1: "A", ship_city: "B", ship_region: "C" };
     assert.deepEqual(validateShippingInfo(ship, { businessAddress: null }).errors, []);
     assert.ok(validateShippingInfo({ ...ship, return_address_line2: "x" }, { businessAddress: null }).errors.length > 0);
+});
+
+test("validateAdditionalInfo requires shop names + reason when vendor has an existing shop", () => {
+    const missing = validateAdditionalInfo({ has_existing_shop: "yes", seller_types: ["retailer"] });
+    assert.ok(missing.errors.some((e) => /name\(s\) of your existing shop/.test(e)));
+    assert.ok(missing.errors.some((e) => /why you're creating another shop/.test(e)));
+    const blank = validateAdditionalInfo({ has_existing_shop: true, existing_shop_names: "  ", new_shop_reason: "New brand" });
+    assert.equal(blank.errors.length, 1);
+    const ok = validateAdditionalInfo({ has_existing_shop: "yes", existing_shop_names: " Ann Shop; Liz Shop ", new_shop_reason: "Separate brand" });
+    assert.deepEqual(ok.errors, []);
+    assert.equal(ok.data.existing_shop_names, "Ann Shop; Liz Shop");
+    const no = validateAdditionalInfo({ has_existing_shop: "no", existing_shop_names: "x", new_shop_reason: "y" });
+    assert.deepEqual(no.errors, []);
+    assert.equal(no.data.existing_shop_names, null);
+    assert.equal(no.data.new_shop_reason, null);
+    assert.ok(validateAdditionalInfo({ has_existing_shop: true, existing_shop_names: "a".repeat(501), new_shop_reason: "r" }).errors.length > 0);
+});
+
+test("additional shop details incomplete until existing-shop answers are filled", () => {
+    const base = { seller_types: ["retailer"] };
+    assert.equal(additionalShopDetailsComplete({ ...base, has_existing_shop: false }), true);
+    assert.equal(additionalShopDetailsComplete({ ...base, has_existing_shop: true }), false);
+    assert.equal(additionalShopDetailsComplete({ ...base, has_existing_shop: true, existing_shop_names: "A", new_shop_reason: "B" }), true);
 });
 
 test("validateAdditionalInfo validates only the fields sent", () => {

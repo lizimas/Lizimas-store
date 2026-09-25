@@ -694,3 +694,13 @@ table.vc-table { display: table; }
 
 .vss-brand-name { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 .vss-brand-text { font-size: 13px; font-weight: 700; color: var(--vm-navy); white-space: nowrap; }
+
+/* Additional Information > Shop Details: existing-shop follow-up questions */
+.vss-subq { margin: 16px 0 0 10px; padding: 2px 0 2px 16px; border-left: 2px solid #d9dce1; }
+.vss-subq[hidden] { display: none; }
+.vss-subq-item { padding: 10px 0; }
+.vss-subq-item .vss-question-label { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.vss-info { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid #1a1a2e; color: #1a1a2e; font: 700 10px/1 Georgia, serif; font-style: italic; cursor: help; flex-shrink: 0; }
+.vss-input.vss-input-error { border-color: #d93025; box-shadow: 0 0 0 1px #d93025; }
+.vss-field-error { color: #d93025; font-size: 12.5px; margin-top: 6px; }
+.vss-field-error[hidden] { display: none; }

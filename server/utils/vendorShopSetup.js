@@ -236,6 +236,21 @@ function validateAdditionalInfo(body, { validCategoryIds } = {}) {
         data.has_existing_shop = toBool(body.has_existing_shop);
         if (data.has_existing_shop === null) errors.push("Tell us whether you have an existing shop.");
     }
+    // Follow-up questions shown only when the vendor answers Yes.
+    for (const [key, max, label] of [["existing_shop_names", 500, "Shop name(s)"], ["new_shop_reason", 1000, "Reason for creating this shop"]]) {
+        if (body[key] !== undefined && body[key] !== null) {
+            const v = String(body[key]).trim();
+            if (v.length > max) errors.push(`${label} must be ${max} characters or fewer.`);
+            data[key] = v || null;
+        }
+    }
+    if (data.has_existing_shop === true) {
+        if (!data.existing_shop_names) errors.push("Enter the name(s) of your existing shop(s).");
+        if (!data.new_shop_reason) errors.push("Tell us why you're creating another shop.");
+    } else if (data.has_existing_shop === false) {
+        data.existing_shop_names = null;
+        data.new_shop_reason = null;
+    }
     if (body.seller_types !== undefined) {
         let types = body.seller_types;
         if (typeof types === "string") types = [types];
@@ -301,6 +316,7 @@ function paymentStepComplete(instruments) {
 
 function additionalShopDetailsComplete(profile) {
     return Boolean(profile) && profile.has_existing_shop != null
+        && (profile.has_existing_shop !== true || (filled(profile.existing_shop_names) && filled(profile.new_shop_reason)))
         && Array.isArray(profile.seller_types) && profile.seller_types.length > 0;
 }
 

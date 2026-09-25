@@ -317,7 +317,7 @@ exports.updateMyShippingInfo = async (req, res) => {
 
 // Additional Information - Shop Details and Catalog Details tabs save
 // independently; only the columns actually sent are updated.
-const ADDITIONAL_COLUMNS = ["has_existing_shop", "seller_types", "primary_category_id", "sourcing_method", "sells_offline", "uses_other_channels"];
+const ADDITIONAL_COLUMNS = ["has_existing_shop", "existing_shop_names", "new_shop_reason", "seller_types", "primary_category_id", "sourcing_method", "sells_offline", "uses_other_channels"];
 
 exports.updateMyAdditionalInfo = async (req, res) => {
     try {

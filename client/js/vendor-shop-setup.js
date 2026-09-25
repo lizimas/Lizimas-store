@@ -603,7 +603,15 @@ function vssAdditionalForm() {
         const sellerType = `<details class="vss-multi" id="vss-sellertypes"><summary class="vss-input vss-select"><span data-summary data-placeholder="Select all that apply">${summary ? vssV(summary) : '<span class="vss-placeholder">Select all that apply</span>'}</span></summary>
             <div class="vss-multi-menu">${opts.map((o) => `<label class="vss-multi-opt"><input type="checkbox" value="${o.code}"${selected.has(o.code) ? " checked" : ""} onchange="vssMultiSummary('vss-sellertypes')"> ${vssV(o.label)}</label>`).join("")}</div></details>`;
         return tabs
-            + vssQuestion("Do you have an existing shop on Lizimas Store?", vssRadio("vss-existing", p.has_existing_shop, "Yes, I have an existing account on Lizimas Store", "No, it's my first time with Lizimas Store"))
+            + vssQuestion("Do you have an existing shop on Lizimas Store?", vssRadio("vss-existing", p.has_existing_shop, "Yes, I have an existing account on Lizimas Store", "No, it's my first time with Lizimas Store")
+                + `<div class="vss-subq" id="vss-existing-extra"${p.has_existing_shop === true ? "" : " hidden"}>
+                    <div class="vss-subq-item"><label class="vss-question-label" for="vss-existing-names">What's the name of your shop?</label>
+                        <input type="text" id="vss-existing-names" class="vss-input" maxlength="500" placeholder="List the name(s) of existing shop(s) separated by semi-colon" value="${vssV(p.existing_shop_names)}" oninput="vssFieldError(this, false)">
+                        <div class="vss-field-error" hidden>This field is required.</div></div>
+                    <div class="vss-subq-item"><label class="vss-question-label" for="vss-new-reason">What's the reason for creating shop? <span class="vss-info" tabindex="0" title="Tell us why you need another shop, e.g. a new brand, a separate business or a different product line." aria-label="Tell us why you need another shop, e.g. a new brand, a separate business or a different product line.">i</span></label>
+                        <input type="text" id="vss-new-reason" class="vss-input" maxlength="1000" placeholder="List the reason for creating this shop" value="${vssV(p.new_shop_reason)}" oninput="vssFieldError(this, false)">
+                        <div class="vss-field-error" hidden>This field is required.</div></div>
+                </div>`)
             + vssQuestion("What type of Seller are you?", sellerType, "(Select all that apply)")
             + `<div class="vss-actions vss-actions-split"><button type="button" class="vss-btn vss-btn-outline" onclick="vssSaveAdditional('shop', true)">Next</button><button type="button" class="vss-btn" onclick="vssSaveAdditional('shop', false)">Save</button></div><div class="vss-status" id="vss-additional-status"></div>`;
     }
@@ -621,11 +629,38 @@ function vssAdditionalForm() {
 
 function vssSetAdditionalTab(key) { vssAdditionalTab = key; vssRenderForm(); }
 
+function vssFieldError(input, on) {
+    if (!input) return;
+    input.classList.toggle("vss-input-error", on);
+    const msg = input.parentElement && input.parentElement.querySelector(".vss-field-error");
+    if (msg) msg.hidden = !on;
+}
+
+// Show the existing-shop follow-up questions only while "Yes" is picked.
+document.addEventListener("change", (e) => {
+    if (!e.target || e.target.name !== "vss-existing") return;
+    const extra = document.getElementById("vss-existing-extra");
+    if (extra) extra.hidden = e.target.value !== "yes";
+});
+
 async function vssSaveAdditional(tab, goNext) {
     let body;
     if (tab === "shop") {
         body = { has_existing_shop: vssRadioValue("vss-existing"), seller_types: vssMultiValues("vss-sellertypes") };
         if (body.has_existing_shop === undefined) { vssStatus("vss-additional-status", "Tell us whether you have an existing shop.", "error"); return; }
+        if (body.has_existing_shop) {
+            const names = document.getElementById("vss-existing-names");
+            const reason = document.getElementById("vss-new-reason");
+            body.existing_shop_names = names ? names.value.trim() : "";
+            body.new_shop_reason = reason ? reason.value.trim() : "";
+            vssFieldError(names, !body.existing_shop_names);
+            vssFieldError(reason, !body.new_shop_reason);
+            if (!body.existing_shop_names || !body.new_shop_reason) {
+                vssStatus("vss-additional-status", "Please fill in the required fields.", "error");
+                (body.existing_shop_names ? reason : names).focus();
+                return;
+            }
+        }
         if (!body.seller_types.length) { vssStatus("vss-additional-status", "Select at least one seller type.", "error"); return; }
     } else {
         body = {
