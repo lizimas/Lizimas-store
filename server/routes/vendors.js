@@ -42,6 +42,7 @@ const {
     getMyStockRecommendations
 } = require("../controllers/vendorController");
 const { getMyKyc, updateMyKyc, uploadMyKycDocument, getMyKycDocumentUrl } = require("../controllers/vendorKycController");
+const { getMyShopSetup, updateMyShopInfo, updateMyCompanyInfo, updateMyShippingInfo, updateMyAdditionalInfo } = require("../controllers/vendorShopSetupController");
 const {
     listVendorStaff,
     createVendorStaffUser,
@@ -152,6 +153,14 @@ router.get("/me/shop-status", requireVendorPermission("vc_shop_manager", "vc_sho
 router.patch("/me/shop-active", requireVendorPermission("vc_shop_manager"), updateVendorShopActive);
 router.patch("/me/holiday-mode", requireVendorPermission("vc_shop_manager"), updateVendorHolidayMode);
 
+// Mobile Home "Let's take your shop live!" onboarding (Ryan, Sept 2026) -
+// see server/controllers/vendorShopSetupController.js.
+router.get("/me/shop-setup", getMyShopSetup);
+router.patch("/me/shop-setup/shop-info", requireVendorPermission("vc_shop_manager"), updateMyShopInfo);
+router.patch("/me/shop-setup/company", requireVendorPermission("vc_shop_manager"), updateMyCompanyInfo);
+router.patch("/me/shop-setup/shipping", requireVendorPermission("vc_shop_manager"), updateMyShippingInfo);
+router.patch("/me/shop-setup/additional", requireVendorPermission("vc_shop_manager"), updateMyAdditionalInfo);
+
 // Vendor KYC & Compliance Profile - identity/business-registration
 // verification, separate from the profile above (Ryan, Sept 2026).
 router.get("/me/kyc", getMyKyc);
@@ -175,8 +184,9 @@ router.get("/me/brand-authorizations/:authorizationId/documents/url", getMyBrand
 
 router.get("/me/payment-instruments", getMyPaymentInstruments);
 router.post("/me/payment-instruments", addMyPaymentInstrument);
-router.patch("/me/payment-instruments/:id", updateMyPaymentInstrument);
+// /preferred must be registered before /:id or Express matches "preferred" as an id.
 router.patch("/me/payment-instruments/preferred", setPreferredPaymentInstrument);
+router.patch("/me/payment-instruments/:id", updateMyPaymentInstrument);
 router.post("/me/payment-instruments/:id/evidence", upload.kycDocument.single("document"), uploadMyPaymentInstrumentEvidence);
 router.get("/me/payment-instruments/:id/evidence/url", getMyPaymentInstrumentEvidenceUrl);
 router.get("/orders", requireVendorPermission("vc_order_manager", "vc_order_viewer"), getMyVendorOrders);

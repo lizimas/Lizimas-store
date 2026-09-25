@@ -102,33 +102,21 @@ function vmFmtUgx(n) {
     return "UGX " + Number(n || 0).toLocaleString();
 }
 
-// --- Home (two states: application status vs. KPI dashboard) --------------
+// --- Home ------------------------------------------------------------------
 //
-// The "not yet approved" state shows the vendor's REAL application status
-// (vendors.status/rejection_reason via GET /vendors/me) rather than a
-// fabricated multi-step progress tracker - Lizimas has no per-section
-// (shop info/business info/shipping/payment) completion tracking in the
-// database today, so a step-by-step checklist here would just be
-// decoration with no real data behind it. Once vendors.status is
-// 'approved', Home switches to the real KPI summary from
-// GET /vendors/dashboard-summary (the same endpoint the desktop Overview
-// tab uses via loadVendorDashboardSummary()).
+// Home is the Jumia-style "Let's take your shop live!" shop-setup
+// onboarding (client/js/vendor-shop-setup.js, Ryan Sept 2026): five
+// section tiles (Shop / Company / Shipping / Payment / Additional
+// Information) with the selected section's form underneath. Once every
+// section is complete AND the vendor is approved, Home shows the live KPI
+// summary (vmRenderHomeKpi below, GET /vendors/dashboard-summary) with the
+// setup tiles kept underneath for edits.
 
 async function vmLoadHome() {
     const el = document.getElementById("vm-home-body");
     el.innerHTML = '<div class="vm-loading-state">Loading...</div>';
     try {
-        const v = await vendorAuthorizedFetch("/api/vendors/me");
-        if (v.error) { el.innerHTML = `<div class="vm-loading-state">${v.error}</div>`; return; }
-
-        if (v.status !== "approved") {
-            el.innerHTML = vmRenderHomeStatus(v);
-            return;
-        }
-
-        const data = await vendorAuthorizedFetch("/api/vendors/dashboard-summary");
-        if (data.error) { el.innerHTML = `<div class="vm-loading-state">${data.error}</div>`; return; }
-        el.innerHTML = vmRenderHomeKpi(v, data);
+        await vssLoadHome(el);
     } catch (error) {
         console.error("vmLoadHome error:", error);
         el.innerHTML = '<div class="vm-loading-state">Could not load your dashboard.</div>';
@@ -140,28 +128,6 @@ function vmStatusCopy(status) {
     if (status === "rejected") return { bg: "#fce8e6", color: "#c5221f", text: "Rejected" };
     if (status === "suspended") return { bg: "#fce8e6", color: "#c5221f", text: "Suspended" };
     return { bg: "var(--vm-green-bg)", color: "var(--vm-green-text)", text: "Approved" };
-}
-
-function vmRenderHomeStatus(v) {
-    const s = vmStatusCopy(v.status);
-    let extra = "";
-    if (v.status === "pending") {
-        extra = '<div style="font-size:12.5px; color:#555; line-height:1.5; margin-top:10px;">Your application is awaiting review. You can still add products from a larger screen, but they won\'t go live until your account is approved.</div>';
-    } else if (v.status === "rejected") {
-        extra = `<div style="font-size:12.5px; color:#555; line-height:1.5; margin-top:10px;">${v.rejection_reason ? "Reason: " + v.rejection_reason : "Contact support for details."}</div>`;
-    }
-    const statusCard = `<div class="vm-card">
-        <div style="display:inline-block; padding:6px 14px; border-radius:999px; background:${s.bg}; color:${s.color}; font-weight:700; font-size:13px;">${s.text}</div>
-        ${extra}
-    </div>`;
-    const profileRows = [
-        ["Shop Name", v.business_name || "-"],
-        ["Account Type", v.account_type === "company" ? "Company" : v.account_type === "individual" ? "Individual" : "-"],
-        ["Phone", v.phone || "-"],
-        ["Location", v.physical_address || "-"]
-    ].map(([label, value]) => `<div style="display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid #f0f1f4;"><span style="font-size:12.5px; color:#888;">${label}</span><span style="font-size:13px; font-weight:600; color:var(--vm-navy); text-align:right;">${value}</span></div>`).join("");
-    const profileCard = `<div class="vm-card"><div class="vm-card-title">Your Application</div><div class="vm-card-subtitle">Once approved, Home becomes your live orders and earnings summary.</div>${profileRows}</div>`;
-    return `<div class="vm-header"><div class="vm-header-brand"><span class="vm-header-brand-badge">L</span><span class="vm-header-eyebrow">Welcome back,</span></div><div class="vm-header-title">${v.business_name || "Lizimas Store"}</div></div>` + statusCard + profileCard;
 }
 
 function vmStatTile(label, value, color) {
