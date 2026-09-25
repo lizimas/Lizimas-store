@@ -300,14 +300,53 @@
     function edit(container, model, onChange) {
         let m = clone(model);
         let focus = { r: 0, c: 0 };
-        let selected = null; // { kind: "row"|"col", index }
+        let selected = null; // { kind: "row"|"col"|"all", index }
         const root = document.createElement("div");
         root.className = "lzt-editor";
+        // Focusable so paste/copy/Delete land here while a whole row,
+        // column or the whole table is selected (no cell has the caret then).
+        root.tabIndex = -1;
         container.innerHTML = "";
         container.appendChild(root);
 
         const emit = () => { if (onChange) onChange(clone(m)); };
         const focusedAnchor = () => anchorAt(m, focus.r, focus.c) || m.cells[0];
+
+        function inSelection(a) {
+            if (!selected) return false;
+            if (selected.kind === "all") return true;
+            return selected.kind === "row"
+                ? a.r <= selected.index && selected.index < a.r + a.rs
+                : a.c <= selected.index && selected.index < a.c + a.cs;
+        }
+        // Top-left position a paste into the current selection starts from.
+        function selectionOrigin() {
+            if (!selected || selected.kind === "all") return { r: 0, c: 0 };
+            return selected.kind === "row" ? { r: selected.index, c: 0 } : { r: 0, c: selected.index };
+        }
+        // Selected region as tab-separated text (Excel/Sheets paste format).
+        function selectionTsv() {
+            const r0 = selected.kind === "row" ? selected.index : 0;
+            const r1 = selected.kind === "row" ? selected.index : m.rows - 1;
+            const c0 = selected.kind === "col" ? selected.index : 0;
+            const c1 = selected.kind === "col" ? selected.index : m.cols - 1;
+            const lines = [];
+            for (let r = r0; r <= r1; r++) {
+                const cols = [];
+                for (let c = c0; c <= c1; c++) {
+                    const a = anchorAt(m, r, c);
+                    cols.push(a && a.r === r && a.c === c ? a.text.replace(/\s*\n\s*/g, " ") : "");
+                }
+                lines.push(cols.join("\t"));
+            }
+            return lines.join("\n");
+        }
+        function select(kind, index) {
+            selected = { kind, index };
+            closeMenus();
+            draw(false);
+            root.focus();
+        }
 
         function draw(refocus) {
             const occ = occupancy(m);
@@ -318,7 +357,9 @@
                 <button type="button" class="lzt-tool" data-menu="merge" aria-haspopup="true" title="Merge cells">${ICONS.merge}${ICONS.caret}</button>
                 <span class="lzt-size">${m.rows} &times; ${m.cols}</span>
             </div>
-            <div class="lzt-scroll"><table class="lzt-table"><tbody>`;
+            <div class="lzt-frame">
+            <button type="button" class="lzt-grab${selected && selected.kind === "all" ? " lzt-grab-on" : ""}" title="Select table - then paste to fill it from the first cell, copy it, or press Delete to clear it" aria-label="Select whole table"><svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M8 0 5.5 2.5h1.75v4.75H2.5V5.5L0 8l2.5 2.5V8.75h4.75v4.75H5.5L8 16l2.5-2.5H8.75V8.75h4.75v1.75L16 8l-2.5-2.5v1.75H8.75V2.5h1.75z"/></svg></button>
+            <div class="lzt-scroll"><table class="lzt-table${selected && selected.kind === "all" ? " lzt-table-all" : ""}"><tbody>`;
             for (let r = 0; r < m.rows; r++) {
                 html += "<tr>";
                 for (let c = 0; c < m.cols; c++) {
@@ -326,15 +367,13 @@
                     const a = m.cells[i];
                     if (!a || a.r !== r || a.c !== c) continue;
                     const head = (m.header_row && a.r === 0) || (m.header_col && a.c === 0);
-                    const sel = selected && (selected.kind === "row"
-                        ? a.r <= selected.index && selected.index < a.r + a.rs
-                        : a.c <= selected.index && selected.index < a.c + a.cs);
+                    const sel = inSelection(a);
                     const cls = ["lzt-cell", head ? "lzt-head" : "", sel ? "lzt-selected" : "", a === a0 ? "lzt-focus" : ""].filter(Boolean).join(" ");
                     html += `<td class="${cls}"${a.rs > 1 ? ` rowspan="${a.rs}"` : ""}${a.cs > 1 ? ` colspan="${a.cs}"` : ""}><div class="lzt-in" contenteditable="true" data-r="${a.r}" data-c="${a.c}" spellcheck="true">${escapeHtml(a.text).replace(/\n/g, "<br>")}</div></td>`;
                 }
                 html += "</tr>";
             }
-            html += "</tbody></table></div>";
+            html += "</tbody></table></div></div>";
             root.innerHTML = html;
             if (refocus) {
                 const el = root.querySelector(`.lzt-in[data-r="${a0.r}"][data-c="${a0.c}"]`);
@@ -370,14 +409,14 @@
                 { label: "Insert column left", run: () => apply(() => { insertCol(m, a.c); focus = { r: a.r, c: a.c + 1 }; }), disabled: m.cols >= MAX_COLS },
                 { label: "Insert column right", run: () => apply(() => { insertCol(m, a.c + a.cs); }), disabled: m.cols >= MAX_COLS },
                 { label: "Delete column", run: () => apply(() => { deleteCol(m, focus.c); focus = { r: focus.r, c: Math.max(0, Math.min(focus.c, m.cols - 1)) }; }), disabled: m.cols <= 1 },
-                { label: "Select column", run: () => { selected = { kind: "col", index: focus.c }; draw(false); } }
+                { label: "Select column", run: () => select("col", focus.c) }
             ];
             if (kind === "row") return [
                 { toggle: true, label: "Header row", on: m.header_row, run: () => apply(() => { m.header_row = !m.header_row; }) },
                 { label: "Insert row above", run: () => apply(() => { insertRow(m, a.r); focus = { r: a.r + 1, c: a.c }; }), disabled: m.rows >= MAX_ROWS },
                 { label: "Insert row below", run: () => apply(() => { insertRow(m, a.r + a.rs); }), disabled: m.rows >= MAX_ROWS },
                 { label: "Delete row", run: () => apply(() => { deleteRow(m, focus.r); focus = { r: Math.max(0, Math.min(focus.r, m.rows - 1)), c: focus.c }; }), disabled: m.rows <= 1 },
-                { label: "Select row", run: () => { selected = { kind: "row", index: focus.r }; draw(false); } }
+                { label: "Select row", run: () => select("row", focus.r) }
             ];
             const mergeItem = (dir, label) => ({
                 label, disabled: !canMerge(m, a, dir),
@@ -433,6 +472,12 @@
             const el = e.target.closest(".lzt-in");
             if (!el) return;
             const r = +el.dataset.r, c = +el.dataset.c;
+            if (selected) {
+                // Clicking into a cell ends a row/column/table selection.
+                selected = null;
+                root.querySelectorAll(".lzt-selected").forEach((x) => x.classList.remove("lzt-selected"));
+                root.querySelectorAll(".lzt-table-all, .lzt-grab-on").forEach((x) => x.classList.remove("lzt-table-all", "lzt-grab-on"));
+            }
             if (r !== focus.r || c !== focus.c) {
                 focus = { r, c };
                 root.querySelectorAll(".lzt-focus").forEach((x) => x.classList.remove("lzt-focus"));
@@ -444,16 +489,40 @@
             if (el) { readCell(el); emit(); }
         });
         root.addEventListener("click", (e) => {
+            if (e.target.closest(".lzt-grab")) { select("all", 0); return; }
             const btn = e.target.closest(".lzt-tool");
             if (!btn) return;
             if (btn.classList.contains("lzt-tool-open")) { closeMenus(); return; }
             openMenu(btn, btn.dataset.menu);
         });
-        root.addEventListener("mousedown", (e) => { if (e.target.closest(".lzt-tool")) e.preventDefault(); });
+        root.addEventListener("mousedown", (e) => { if (e.target.closest(".lzt-tool") || e.target.closest(".lzt-grab")) e.preventDefault(); });
+        const onCopy = (e, cut) => {
+            if (!selected) return;
+            e.preventDefault();
+            (e.clipboardData || window.clipboardData).setData("text/plain", selectionTsv());
+            if (cut) {
+                m.cells.forEach((a) => { if (inSelection(a)) a.text = ""; });
+                apply(() => {});
+            }
+        };
+        root.addEventListener("copy", (e) => onCopy(e, false));
+        root.addEventListener("cut", (e) => onCopy(e, true));
         root.addEventListener("paste", (e) => {
+            const text = (e.clipboardData || window.clipboardData).getData("text");
+            if (selected) {
+                // Paste over a selected table/row/column: clear it, then fill
+                // from its first cell (growing the table if the paste is bigger).
+                e.preventDefault();
+                const o = selectionOrigin();
+                apply(() => {
+                    m.cells.forEach((a) => { if (inSelection(a)) a.text = ""; });
+                    pasteGrid(m, o.r, o.c, text);
+                    focus = o;
+                });
+                return;
+            }
             const el = e.target.closest(".lzt-in");
             if (!el) return;
-            const text = (e.clipboardData || window.clipboardData).getData("text");
             e.preventDefault();
             if (/\t/.test(text) || /\n./.test(text.trim())) {
                 apply(() => pasteGrid(m, +el.dataset.r, +el.dataset.c, text));
@@ -465,11 +534,18 @@
             // Delete/Backspace on a selected row/column clears its cells.
             if (selected && (e.key === "Delete" || e.key === "Backspace")) {
                 e.preventDefault();
-                m.cells.forEach((a) => {
-                    const hit = selected.kind === "row" ? a.r <= selected.index && selected.index < a.r + a.rs : a.c <= selected.index && selected.index < a.c + a.cs;
-                    if (hit) a.text = "";
-                });
+                m.cells.forEach((a) => { if (inSelection(a)) a.text = ""; });
                 apply(() => {});
+                return;
+            }
+            // Ctrl/Cmd+A: first press selects the cell's text as usual; a
+            // second press (or one in an empty cell) selects the whole table.
+            if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
+                const el = e.target.closest(".lzt-in");
+                if (selected || !el) { e.preventDefault(); select("all", 0); return; }
+                const sel = window.getSelection();
+                const whole = !el.textContent || (sel && sel.toString() === el.innerText);
+                if (whole) { e.preventDefault(); select("all", 0); }
                 return;
             }
             if (e.key === "Escape") { closeMenus(); if (selected) { selected = null; draw(true); } return; }
