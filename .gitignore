@@ -39,3 +39,6 @@ fix_*.py
 
 .DS_Store
 **/.DS_Store
+
+# macOS/FUSE temporary files
+.fuse_hidden*
