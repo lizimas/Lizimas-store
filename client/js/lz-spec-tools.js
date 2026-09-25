@@ -106,13 +106,19 @@
             <div class="lzs-or"><span>or</span></div>
             <div class="lzs-block">
                 <div class="lzs-title">Insert Table</div>
-                <p class="lzs-hint">Pick a table size, type or paste into it, use the table tools (header row/column, insert, delete, merge, split), then Add to Specifications. First column = label, other columns = value.</p>
+                <p class="lzs-hint">Type the number of rows and columns (or pick a size), type or paste into it, use the table tools (header row/column, insert, delete, merge, split), then Add to Specifications. First column = label, other columns = value.</p>
+                <div class="lzs-size-row">
+                    <label>Rows <input type="number" class="lzs-num lzs-rows" min="1" max="60" value="4"></label>
+                    <label>Columns <input type="number" class="lzs-num lzs-cols" min="1" max="12" value="2"></label>
+                    <button type="button" class="lzs-btn lzs-btn-navy" data-act="create-size">Create table</button>
+                    <span class="lzs-or-inline">or pick a size:</span>
                 <div class="lzs-picker-wrap">
-                    <button type="button" class="lzs-btn lzs-btn-navy" data-act="picker" aria-haspopup="true">&#9638; Insert Table</button>
+                    <button type="button" class="lzs-btn" data-act="picker" aria-haspopup="true">&#9638; Insert Table</button>
                     <div class="lzs-picker" hidden>
                         <div class="lzs-grid"></div>
                         <div class="lzs-grid-label">Select size</div>
                     </div>
+                </div>
                 </div>
                 <div class="lzs-table"${tableId ? ` id="${tableId}"` : ""}></div>
             </div>
@@ -144,7 +150,12 @@
             const x = e.target.closest(".lzs-grid-cell");
             if (!x) return;
             picker.hidden = true;
-            const model = LzTable.create(+x.dataset.r + 1, +x.dataset.c + 1);
+            createTable(+x.dataset.r + 1, +x.dataset.c + 1);
+        });
+        function createTable(rows, cols) {
+            if (editor && tableHost.querySelector(".lzt-editor") && LzTable.hasContent(editor.model) &&
+                !confirm("Replace the table you're working on with a new empty one?")) return;
+            const model = LzTable.create(rows, cols);
             editor = LzTable.edit(tableHost, model);
             const actions = document.createElement("div");
             actions.className = "lzs-actions";
@@ -152,14 +163,26 @@
             tableHost.appendChild(actions);
             const first = tableHost.querySelector(".lzt-in");
             if (first) first.focus();
-        });
+        }
         document.addEventListener("click", (e) => { if (!picker.hidden && !e.target.closest(".lzs-picker-wrap")) picker.hidden = true; });
 
-        host.addEventListener("click", (e) => {
+        host.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && e.target.closest(".lzs-num")) {
+                e.preventDefault(); // never submit the product form
+                host.querySelector('[data-act="create-size"]').click();
+            }
+        });
+                host.addEventListener("click", (e) => {
             const b = e.target.closest("[data-act]");
             if (!b) return;
             const act = b.dataset.act;
             if (act === "picker") { picker.hidden = !picker.hidden; return; }
+            if (act === "create-size") {
+                const rows = Math.max(1, Math.min(60, parseInt(host.querySelector(".lzs-rows").value, 10) || 1));
+                const cols = Math.max(1, Math.min(12, parseInt(host.querySelector(".lzs-cols").value, 10) || 1));
+                createTable(rows, cols);
+                return;
+            }
             if (act === "clear-text") { ta.value = ""; return; }
             if (act === "clear-table") { tableHost.innerHTML = ""; editor = null; return; }
             if (act === "add-text") {

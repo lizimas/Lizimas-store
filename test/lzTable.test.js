@@ -48,3 +48,12 @@ test("pasteGrid grows the table", () => {
   const m = T.create(1, 1); T.pasteGrid(m, 0, 0, "Colour\tBlack\nWeight\t2kg\nSize\tL\n"); valid(m);
   assert.deepEqual([m.rows, m.cols], [3, 2]); assert.equal(T.anchorAt(m, 2, 1).text, "L");
 });
+
+test("setSize grows and shrinks from the end; wouldLoseText flags typed cells", () => {
+  const m = T.create(2, 2); m.cells[3].text = "x";
+  T.setSize(m, 5, 4); valid(m); assert.deepEqual([m.rows, m.cols], [5, 4]);
+  assert.equal(T.wouldLoseText(m, 1, 4), true); assert.equal(T.wouldLoseText(m, 2, 2), false);
+  T.setSize(m, 1, 1); valid(m); assert.deepEqual([m.rows, m.cols], [1, 1]);
+  const g = T.create(3, 3); T.merge(g, T.anchorAt(g, 0, 0), "down"); T.merge(g, T.anchorAt(g, 0, 0), "down");
+  T.setSize(g, 2, 2); valid(g); assert.equal(T.anchorAt(g, 0, 0).rs, 2);
+});

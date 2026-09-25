@@ -2447,3 +2447,25 @@ table.lz-dr-cal td {
 .lzt-grab:hover, .lzt-grab:focus-visible, .lzt-grab-on { background: #2b6dd2; border-color: #2b6dd2; color: #fff; }
 .lzt-table-all { outline: 2px solid #6a9ad9; outline-offset: 1px; }
 .lzt-editor:focus { outline: none; }
+
+/* "+" bars for adding a column (right edge) / row (bottom edge) */
+.lzt-frame { display: grid; grid-template-columns: minmax(0, 1fr) 22px; grid-template-rows: auto 22px; column-gap: 4px; row-gap: 4px; }
+.lzt-frame .lzt-scroll { grid-column: 1; grid-row: 1; }
+.lzt-add { display: flex; align-items: center; justify-content: center; padding: 0; border: 1px dashed #b7c4d8; border-radius: 4px; background: #f7f9fc; color: #4a6fa5; font-size: 16px; font-weight: 700; line-height: 1; cursor: pointer; opacity: .75; transition: opacity .12s, background .12s; }
+.lzt-add:hover, .lzt-add:focus-visible { opacity: 1; background: #2b6dd2; border-color: #2b6dd2; border-style: solid; color: #fff; }
+.lzt-add:disabled { opacity: .3; cursor: not-allowed; }
+.lzt-add-col { grid-column: 2; grid-row: 1; }
+.lzt-add-row { grid-column: 1; grid-row: 2; }
+@media (hover: none) { .lzt-add { opacity: 1; } }
+
+/* Type-the-size controls (table toolbar + Specifications "Create table") */
+.lzt-size { display: inline-flex; align-items: center; gap: 4px; padding: 0 4px 0 8px; font-size: 12px; color: #6b7280; border-left: 1px solid #e5e7eb; margin-left: 2px; }
+.lzt-num, .lzs-num { width: 52px; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; font: inherit; font-size: 13px; text-align: center; }
+.lzt-set { padding: 4px 10px; border: 1px solid #1a1a2e; border-radius: 4px; background: #1a1a2e; color: #fff; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.lzs-size-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 10px; }
+.lzs-size-row label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #333; font-weight: 600; }
+.lzs-size-row .lzs-picker-wrap { margin-bottom: 0; }
+.lzs-or-inline { font-size: 12px; color: #9aa1ae; }
+.lzt-toolbar { flex-wrap: wrap; max-width: 100%; box-sizing: border-box; row-gap: 4px; }
+.lzt-x { white-space: nowrap; }
+@media (max-width: 600px) { .lzt-size { border-left: none; margin-left: 0; padding-left: 4px; } }

@@ -244,6 +244,22 @@
         return sortCells(m);
     }
 
+    // Resize to exactly rows x cols, adding/removing at the end.
+    function setSize(m, rows, cols) {
+        rows = clamp(rows, 1, MAX_ROWS);
+        cols = clamp(cols, 1, MAX_COLS);
+        while (m.rows < rows) insertRow(m, m.rows);
+        while (m.rows > rows) deleteRow(m, m.rows - 1);
+        while (m.cols < cols) insertCol(m, m.cols);
+        while (m.cols > cols) deleteCol(m, m.cols - 1);
+        return m;
+    }
+
+    // Would shrinking to rows x cols throw away typed text?
+    function wouldLoseText(m, rows, cols) {
+        return m.cells.some((a) => a.text.trim() && (a.r >= rows || a.c >= cols));
+    }
+
     // Fill from a spreadsheet paste (tab-separated rows) starting at (r, c),
     // growing the table as needed.
     function pasteGrid(m, r0, c0, text) {
@@ -355,7 +371,13 @@
                 <button type="button" class="lzt-tool" data-menu="col" aria-haspopup="true" title="Column">${ICONS.col}${ICONS.caret}</button>
                 <button type="button" class="lzt-tool" data-menu="row" aria-haspopup="true" title="Row">${ICONS.row}${ICONS.caret}</button>
                 <button type="button" class="lzt-tool" data-menu="merge" aria-haspopup="true" title="Merge cells">${ICONS.merge}${ICONS.caret}</button>
-                <span class="lzt-size">${m.rows} &times; ${m.cols}</span>
+                <span class="lzt-size" title="Type the number of rows and columns, then Set">
+                    <input type="number" class="lzt-num lzt-num-rows" min="1" max="${MAX_ROWS}" value="${m.rows}" aria-label="Rows">
+                    <span class="lzt-x">rows &times;</span>
+                    <input type="number" class="lzt-num lzt-num-cols" min="1" max="${MAX_COLS}" value="${m.cols}" aria-label="Columns">
+                    <span class="lzt-x">cols</span>
+                    <button type="button" class="lzt-set">Set</button>
+                </span>
             </div>
             <div class="lzt-frame">
             <button type="button" class="lzt-grab${selected && selected.kind === "all" ? " lzt-grab-on" : ""}" title="Select table - then paste to fill it from the first cell, copy it, or press Delete to clear it" aria-label="Select whole table"><svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M8 0 5.5 2.5h1.75v4.75H2.5V5.5L0 8l2.5 2.5V8.75h4.75v4.75H5.5L8 16l2.5-2.5H8.75V8.75h4.75v1.75L16 8l-2.5-2.5v1.75H8.75V2.5h1.75z"/></svg></button>
@@ -373,7 +395,11 @@
                 }
                 html += "</tr>";
             }
-            html += "</tbody></table></div></div>";
+            html += "</tbody></table></div>";
+            // Quick "+" bars: add a column on the right / a row at the bottom.
+            html += `<button type="button" class="lzt-add lzt-add-col" data-add="col" title="Add column" aria-label="Add column"${m.cols >= MAX_COLS ? " disabled" : ""}><span>+</span></button>`;
+            html += `<button type="button" class="lzt-add lzt-add-row" data-add="row" title="Add row" aria-label="Add row"${m.rows >= MAX_ROWS ? " disabled" : ""}><span>+</span></button>`;
+            html += "</div>";
             root.innerHTML = html;
             if (refocus) {
                 const el = root.querySelector(`.lzt-in[data-r="${a0.r}"][data-c="${a0.c}"]`);
@@ -490,12 +516,19 @@
         });
         root.addEventListener("click", (e) => {
             if (e.target.closest(".lzt-grab")) { select("all", 0); return; }
+            if (e.target.closest(".lzt-set")) { applySize(); return; }
+            const plus = e.target.closest(".lzt-add");
+            if (plus) {
+                if (plus.dataset.add === "row") apply(() => { insertRow(m, m.rows); focus = { r: m.rows - 1, c: 0 }; });
+                else apply(() => { insertCol(m, m.cols); focus = { r: 0, c: m.cols - 1 }; });
+                return;
+            }
             const btn = e.target.closest(".lzt-tool");
             if (!btn) return;
             if (btn.classList.contains("lzt-tool-open")) { closeMenus(); return; }
             openMenu(btn, btn.dataset.menu);
         });
-        root.addEventListener("mousedown", (e) => { if (e.target.closest(".lzt-tool") || e.target.closest(".lzt-grab")) e.preventDefault(); });
+        root.addEventListener("mousedown", (e) => { if (e.target.closest(".lzt-tool") || e.target.closest(".lzt-grab") || e.target.closest(".lzt-add")) e.preventDefault(); });
         const onCopy = (e, cut) => {
             if (!selected) return;
             e.preventDefault();
@@ -530,7 +563,23 @@
                 document.execCommand("insertText", false, text);
             }
         });
+        function applySize() {
+            const rows = clamp(root.querySelector(".lzt-num-rows").value, 1, MAX_ROWS);
+            const cols = clamp(root.querySelector(".lzt-num-cols").value, 1, MAX_COLS);
+            if (rows === m.rows && cols === m.cols) return;
+            if (wouldLoseText(m, rows, cols) &&
+                !confirm(`Shrinking to ${rows} x ${cols} removes cells that have text in them. Continue?`)) {
+                draw(false);
+                return;
+            }
+            apply(() => {
+                setSize(m, rows, cols);
+                focus = { r: Math.min(focus.r, m.rows - 1), c: Math.min(focus.c, m.cols - 1) };
+            });
+        }
+
         root.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && e.target.closest(".lzt-num")) { e.preventDefault(); applySize(); return; }
             // Delete/Backspace on a selected row/column clears its cells.
             if (selected && (e.key === "Delete" || e.key === "Backspace")) {
                 e.preventDefault();
@@ -573,7 +622,7 @@
     return {
         MAX_ROWS, MAX_COLS, MAX_TEXT,
         create, clone, normalize, occupancy, anchorAt, plainText, hasContent,
-        insertRow, deleteRow, insertCol, deleteCol, canMerge, merge, splitVertical, splitHorizontal, pasteGrid,
+        insertRow, deleteRow, insertCol, deleteCol, setSize, wouldLoseText, canMerge, merge, splitVertical, splitHorizontal, pasteGrid,
         toHtml, escapeHtml, edit
     };
 });
