@@ -197,7 +197,7 @@ function stockRows() {
     return stock.data.items.filter((i) => {
         if (stock.filter !== "all" && i.status !== stock.filter) return false;
         if (!q) return true;
-        const hay = stock.field === "name" ? i.name : (i.sku || "");
+        const hay = stock.field === "lizimas" ? (i.lizimasSku || "") : (i.sku || "");
         return String(hay).toLowerCase().includes(q);
     });
 }
@@ -219,7 +219,7 @@ function renderStock() {
         <div class="vc-toolbar">
             <select class="vc-input vc-field-select" aria-label="Search by" onchange="vcStockField(this.value)">
                 <option value="sku"${stock.field === "sku" ? " selected" : ""}>Seller SKU</option>
-                <option value="name"${stock.field === "name" ? " selected" : ""}>Product Name</option>
+                <option value="lizimas"${stock.field === "lizimas" ? " selected" : ""}>Lizimas Store SKU</option>
             </select>
             <label class="vc-search"><input type="search" placeholder="Search..." value="${esc(stock.q)}" oninput="vcStockSearch(this.value)" aria-label="Search products"><span>${ICON.search}</span></label>
             <button type="button" class="vc-btn vc-btn-outline" onclick="vcStockExport()">${ICON.download} Export</button>
@@ -253,7 +253,7 @@ function renderStockTable() {
             const [cls, label] = STOCK_STATUS_BADGE[r.status] || ["vc-badge-grey", r.status];
             return `<tr>
                 <td class="vc-col-check"><input type="checkbox" aria-label="Select ${esc(r.name)}"${stock.selected.has(r.id) ? " checked" : ""} onchange="vcStockSelect(${Number(r.id)}, this.checked)"></td>
-                <td><div class="vc-prod-name">${esc(r.name)}</div><div class="vc-prod-sku">${r.sku ? esc(r.sku) : "No SKU"}${r.fulfillmentType === "lizimas_fulfilled" ? " &middot; Fulfilled by Lizimas" : ""}</div></td>
+                <td><div class="vc-prod-name">${esc(r.name)}</div><div class="vc-prod-sku">Seller SKU: ${r.sku ? esc(r.sku) : "&mdash;"}</div><div class="vc-prod-sku">Lizimas SKU: ${r.lizimasSku ? esc(r.lizimasSku) : "&mdash;"}${r.fulfillmentType === "lizimas_fulfilled" ? " &middot; Fulfilled by Lizimas" : ""}</div></td>
                 <td><span class="vc-badge ${cls}">${label}</span></td>
                 <td class="vc-num">${fmtNum(r.available)}</td>
                 <td class="vc-num">${fmtNum(r.inTransit)}</td>
@@ -281,13 +281,13 @@ window.vcStockSelectAll = (on) => { stockRows().forEach((r) => (on ? stock.selec
 
 window.vcStockExport = () => {
     const rows = stockRows();
-    const head = ["Product", "Seller SKU", "Status", "Available", "In Transit", "Sold (30d)", "Days of Cover", "Target Stock", "Suggested Qty"];
+    const head = ["Product", "Seller SKU", "Lizimas Store SKU", "Status", "Available", "In Transit", "Sold (30d)", "Days of Cover", "Target Stock", "Suggested Qty"];
     const csvCell = (v) => {
         let s = String(v == null ? "" : v);
         if (/^[=+\-@]/.test(s)) s = "'" + s; // no spreadsheet formula injection
         return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const lines = [head, ...rows.map((r) => [r.name, r.sku || "", (STOCK_STATUS_BADGE[r.status] || [0, r.status])[1], r.available, r.inTransit, r.unitsSoldWindow, r.daysOfCover == null ? "" : r.daysOfCover, r.targetStock, r.suggestedQty])];
+    const lines = [head, ...rows.map((r) => [r.name, r.sku || "", r.lizimasSku || "", (STOCK_STATUS_BADGE[r.status] || [0, r.status])[1], r.available, r.inTransit, r.unitsSoldWindow, r.daysOfCover == null ? "" : r.daysOfCover, r.targetStock, r.suggestedQty])];
     const blob = new Blob([lines.map((l) => l.map(csvCell).join(",")).join("\n")], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -416,32 +416,64 @@ function renderPromoOverview(host, data) {
             </div>`).join("")
         : '<p class="vc-empty vc-empty-tight">No products are on promotion right now.</p>';
 
-    host.innerHTML = `
-        <h2 class="vc-page-title">Promotions Management</h2>
-        <section class="vc-section">
-            <h3 class="vc-h3">Lizimas Campaigns</h3>
-            ${campaigns}
-            <div class="vc-center"><button type="button" class="vc-viewall" onclick="${viewAll}">View All <span class="vc-round-gold">${ICON.chevDown}</span></button></div>
-        </section>
-        <section class="vc-section">
-            <h3 class="vc-h3">Revenue from promotions</h3>
-            <div class="vc-filter-row">
-                <select class="vc-input vc-country" aria-label="Country"><option>Uganda</option></select>
-                <div class="vc-chips" role="group" aria-label="Period">${[7, 30, 90].map((d) => `<button type="button" class="vc-chip${promo.days === d ? " vc-chip-active" : ""}" aria-pressed="${promo.days === d}" onclick="vcPromoDays(${d})">${d} Days</button>`).join("")}</div>
-            </div>
-            <div class="vc-chart-card">
+    const chips = `<div class="vc-chips" role="group" aria-label="Period">${[7, 30, 90].map((d) => `<button type="button" class="vc-chip${promo.days === d ? " vc-chip-active" : ""}" aria-pressed="${promo.days === d}" onclick="vcPromoDays(${d})">${d} Days</button>`).join("")}</div>`;
+    const country = '<select class="vc-input vc-country" aria-label="Country"><option>Uganda</option></select>';
+    const chartCard = `<div class="vc-chart-card">
                 <div class="vc-chart-caption">Total sales from promotions</div>
                 <div class="vc-chart-hero">${fmtUgx(data.revenue.revenue)}</div>
                 <div class="vc-chart-sub">${fmtNum(data.revenue.units)} items &middot; ${fmtNum(data.revenue.orders)} orders &middot; last ${data.days} days</div>
                 ${chartHtml(data.revenue.series)}
+            </div>`;
+    const campaignsBlock = `${campaigns}
+            <div class="vc-center"><button type="button" class="vc-viewall" onclick="${viewAll}">View All <span class="vc-round-gold">${ICON.chevDown}</span></button></div>`;
+    const highlightsBlock = `<div class="vc-card-plain">${highlightHtml}</div>
+            ${highlights.length > 3 ? `<div class="vc-center"><button type="button" class="vc-link-gold" onclick="vcToggleHighlights()">${promo.highlightsOpen ? "collapse" : `expand (${highlights.length - 3} more)`}</button></div>` : ""}`;
+
+    if (!isMobileShell()) {
+        // Desktop: Jumia "Promotions > Management" layout - campaigns on the
+        // left, revenue + highlight products on the right.
+        host.innerHTML = `
+        <div class="vc-crumb"><span class="vc-crumb-muted">Promotions</span> <span class="vc-crumb-sep">&gt;</span> <span class="vc-crumb-on">Management</span></div>
+        <h2 class="vc-page-title vc-pm-title">Promotions Management</h2>
+        <div class="vc-pm-grid">
+            <section class="vc-pm-left">
+                <h3 class="vc-pm-h">Lizimas Campaigns</h3>
+                ${campaignsBlock}
+            </section>
+            <section class="vc-pm-right">
+                <div class="vc-pm-rev-head">
+                    <h3 class="vc-pm-h">Revenue from promotions and top contributors</h3>
+                    <div class="vc-pm-rev-tools">${country}${chips}</div>
+                </div>
+                <div class="vc-pm-chart">${chartCard}</div>
+                <h3 class="vc-pm-h vc-pm-h-gap">Highlight products</h3>
+                <div class="vc-card-plain">${highlightHtml}</div>
+                <div class="vc-center"><button type="button" class="vc-link-gold" onclick="vdOpenPromoMonitoring()">expand</button></div>
+            </section>
+        </div>`;
+        bindChart(host);
+        return;
+    }
+
+    host.innerHTML = `
+        <h2 class="vc-page-title">Promotions Management</h2>
+        <section class="vc-section">
+            <h3 class="vc-h3">Lizimas Campaigns</h3>
+            ${campaignsBlock}
+        </section>
+        <section class="vc-section">
+            <h3 class="vc-h3">Revenue from promotions</h3>
+            <div class="vc-filter-row">
+                ${country}
+                ${chips}
             </div>
+            ${chartCard}
         </section>
         <section class="vc-section">
             <h3 class="vc-h3">Highlight products</h3>
-            <div class="vc-card-plain">${highlightHtml}</div>
-            ${highlights.length > 3 ? `<div class="vc-center"><button type="button" class="vc-link-gold" onclick="vcToggleHighlights()">${promo.highlightsOpen ? "collapse" : `expand (${highlights.length - 3} more)`}</button></div>` : ""}
+            ${highlightsBlock}
         </section>
-        ${isMobileShell() ? `<div class="vc-center" style="margin-top:6px;"><button type="button" class="vc-btn vc-btn-outline" onclick="vmShowScreen('promotions-propose')">Propose your own promotion</button></div>` : ""}`;
+        <div class="vc-center" style="margin-top:6px;"><button type="button" class="vc-btn vc-btn-outline" onclick="vmShowScreen('promotions-propose')">Propose your own promotion</button></div>`;
     bindChart(host);
 }
 
@@ -517,7 +549,10 @@ function bindChart(host) {
 
 window.vcPromoDays = (d) => { promo.days = d; loadPromoOverview(promo.overviewHost); };
 window.vcToggleHighlights = () => { promo.highlightsOpen = !promo.highlightsOpen; loadPromoOverview(promo.overviewHost); };
+// Desktop "View All" opens the full campaign list as its own page
+// (vendor-promo-monitor.js vdOpenCampaignsPage); scroll is the fallback.
 window.vcScrollToCampaigns = () => {
+    if (typeof vdOpenCampaignsPage === "function") { vdOpenCampaignsPage(); return; }
     const el = document.getElementById(promo.listHost);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
 };

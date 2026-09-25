@@ -341,16 +341,48 @@ exports.getMyProducts = async (req, res) => {
         const scopeClause = isManager
             ? ""
             : "AND p.created_by = $1";
+        // Vendor Product Management's "Deleted" filter asks for soft-deleted
+        // rows too (?include_deleted=1); every other caller keeps the old list.
+        const deletedClause = req.query && req.query.include_deleted === "1" ? "" : "AND p.deleted_at IS NULL";
 
+        // sale_price    = the vendor's own approved promotion running now.
+        // promo_price   = price in a Lizimas promotion campaign the vendor
+        //                 joined (vendor_promotions.campaign_id), running now.
+        // subsidy_price = a Lizimas Store flash-sale price running now
+        //                 (a campaign Lizimas runs on the product).
         const result = await pool.query(
             `SELECT p.*, dr.status AS deletion_request_status,
                     (p.created_by = $1) AS is_own,
-                    u.name AS owner_name
+                    u.name AS owner_name,
+                    vp.proposed_sale_price AS sale_price,
+                    promo.proposed_sale_price AS promo_price,
+                    fsi.sale_price AS subsidy_price
              FROM products p
              LEFT JOIN product_deletion_requests dr
                  ON dr.product_id = p.id AND dr.status = 'pending'
              LEFT JOIN users u ON u.id = p.created_by
-             WHERE p.deleted_at IS NULL ${scopeClause}
+             LEFT JOIN LATERAL (
+                 SELECT proposed_sale_price FROM vendor_promotions
+                 WHERE vendor_promotions.product_id = p.id AND vendor_promotions.status = 'approved'
+                   AND vendor_promotions.campaign_id IS NULL
+                   AND now() BETWEEN vendor_promotions.starts_at AND vendor_promotions.ends_at
+                 ORDER BY vendor_promotions.starts_at DESC LIMIT 1
+             ) vp ON true
+             LEFT JOIN LATERAL (
+                 SELECT proposed_sale_price FROM vendor_promotions
+                 WHERE vendor_promotions.product_id = p.id AND vendor_promotions.status = 'approved'
+                   AND vendor_promotions.campaign_id IS NOT NULL
+                   AND now() BETWEEN vendor_promotions.starts_at AND vendor_promotions.ends_at
+                 ORDER BY vendor_promotions.starts_at DESC LIMIT 1
+             ) promo ON true
+             LEFT JOIN LATERAL (
+                 SELECT fsi_inner.sale_price FROM flash_sale_items fsi_inner
+                 JOIN flash_sales fs ON fs.id = fsi_inner.flash_sale_id
+                 WHERE fsi_inner.product_id = p.id AND fs.is_active = true AND fs.ends_at >= now()
+                   AND (fs.starts_at IS NULL OR fs.starts_at <= now())
+                 ORDER BY fs.ends_at ASC LIMIT 1
+             ) fsi ON true
+             WHERE 1 = 1 ${deletedClause} ${scopeClause}
              ORDER BY p.id DESC`,
             [req.user.userId]
         );
@@ -433,6 +465,13 @@ exports.getProductById = async (req, res) => {
         // inputs/outputs entirely rather than just the rate: payout next to
         // the public price would let anyone back-calculate the rate anyway.
         const { vendor_desired_payout, commission_rate_applied, fixed_fee_applied, commission_rule_id, ...publicProduct } = result.rows[0];
+        // Page view counter (migrations/128_product_view_daily.sql) -
+        // fire-and-forget: a failed count must never hold up the page.
+        pool.query(
+            `INSERT INTO product_view_daily (product_id, day, views) VALUES ($1, (now() AT TIME ZONE 'UTC')::date, 1)
+             ON CONFLICT (product_id, day) DO UPDATE SET views = product_view_daily.views + 1`,
+            [publicProduct.id]
+        ).catch(() => {});
         res.json(publicProduct);
     } catch (err) {
         console.error(err);

@@ -283,6 +283,65 @@ exports.getPromotionsOverview = async (req, res) => {
     }
 };
 
+// --- Vendor: Monitor your promotions ---------------------------------------
+// One row per promotion that has started: the vendor's own approved
+// promotions, Lizimas campaign entries, and Lizimas flash sales on the
+// vendor's products. Page views = product_view_daily inside the promotion
+// window; items sold / revenue = non-cancelled order lines placed inside it.
+// status: ongoing (running now) or expired.
+exports.getPromotionMonitoring = async (req, res) => {
+    try {
+        const status = ["ongoing", "expired"].includes(req.query.status) ? req.query.status : "all";
+        const { rows } = await pool.query(
+            `WITH promos AS (
+                 SELECT 'promotion' AS kind, vp.id AS promo_id, vp.product_id, vp.starts_at, vp.ends_at,
+                        vp.proposed_sale_price AS promo_price, c.name AS campaign_name
+                 FROM vendor_promotions vp
+                 LEFT JOIN promotion_campaigns c ON c.id = vp.campaign_id
+                 WHERE vp.vendor_id = $1 AND vp.status = 'approved' AND vp.starts_at <= now()
+                 UNION ALL
+                 SELECT 'flash_sale', fsi.id, fsi.product_id, COALESCE(fs.starts_at, fs.created_at), fs.ends_at,
+                        fsi.sale_price, fs.title
+                 FROM flash_sale_items fsi
+                 JOIN flash_sales fs ON fs.id = fsi.flash_sale_id
+                 JOIN products fp ON fp.id = fsi.product_id
+                 WHERE fp.vendor_id = $1 AND COALESCE(fs.starts_at, fs.created_at) <= now()
+                   AND NOT EXISTS (SELECT 1 FROM vendor_promotions x WHERE x.flash_sale_item_id = fsi.id)
+             )
+             SELECT pr.kind, pr.promo_id, pr.product_id, pr.starts_at, pr.ends_at, pr.promo_price, pr.campaign_name,
+                    p.name AS product_name, p.sku, p.lizimas_sku, p.image,
+                    (pr.ends_at >= now()) AS ongoing,
+                    COALESCE((SELECT SUM(v.views) FROM product_view_daily v
+                              WHERE v.product_id = pr.product_id
+                                AND v.day BETWEEN (pr.starts_at AT TIME ZONE 'UTC')::date AND (LEAST(pr.ends_at, now()) AT TIME ZONE 'UTC')::date), 0) AS page_views,
+                    COALESCE(s.items_sold, 0) AS items_sold,
+                    COALESCE(s.revenue, 0) AS revenue
+             FROM promos pr
+             JOIN products p ON p.id = pr.product_id
+             LEFT JOIN LATERAL (
+                 SELECT SUM(oi.quantity) AS items_sold, SUM(oi.quantity * oi.price) AS revenue
+                 FROM order_items oi JOIN orders o ON o.id = oi.order_id
+                 WHERE oi.product_id = pr.product_id AND o.status <> 'cancelled'
+                   AND o.created_at BETWEEN pr.starts_at AND pr.ends_at
+             ) s ON true
+             WHERE ($2 = 'all' OR ($2 = 'ongoing' AND pr.ends_at >= now()) OR ($2 = 'expired' AND pr.ends_at < now()))
+             ORDER BY (pr.ends_at >= now()) DESC, pr.starts_at DESC
+             LIMIT 500`,
+            [req.vendorId, status]
+        );
+        res.json(rows.map((r) => ({
+            ...r,
+            page_views: Number(r.page_views),
+            items_sold: Number(r.items_sold),
+            revenue: Number(r.revenue),
+            status: r.ongoing ? "ongoing" : "expired",
+            country: "Uganda"
+        })));
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 // --- Admin -----------------------------------------------------------------
 
 exports.listCampaignsAdmin = async (req, res) => {

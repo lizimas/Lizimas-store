@@ -5,8 +5,8 @@
 <meta charset="UTF-8">
 <title>Lizimas Store — Vendor Dashboard</title>
 <link rel="stylesheet" href="../css/admin.css?v=37">
-<link rel="stylesheet" href="../css/vendor-desktop.css?v=2">
-<link rel="stylesheet" href="../css/vendor-mobile.css?v=8">
+<link rel="stylesheet" href="../css/vendor-desktop.css?v=4">
+<link rel="stylesheet" href="../css/vendor-mobile.css?v=10">
 </head>
 <body>
 
@@ -34,32 +34,31 @@
             <span>Fulfillment by Lizimas</span>
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
-        <div class="vm-pm-status-label">Status:</div>
-        <div class="vm-pm-all-pill">All</div>
-        <div class="vm-pm-group-label">Filter</div>
-        <div class="vm-pm-group" id="vm-products-pills"></div>
-        <div class="vm-card" style="padding:0; overflow:hidden;">
-            <div class="vm-bulk-bar">
-                <button class="vm-checkbox" disabled style="cursor:default; opacity:.4;"></button>
-                <span id="vm-bulk-label" style="flex:1; font-size:12.5px; color:#555;">Select items to apply bulk actions</span>
-            </div>
-            <div class="vm-bulk-actions">
-                <button class="vm-bulk-action vm-enabled" onclick="vmBulkAction('activate')">Activate</button>
-                <span class="vm-bulk-divider"></span>
-                <button class="vm-bulk-action vm-enabled" onclick="vmBulkAction('deactivate')">Deactivate</button>
-                <span class="vm-bulk-divider"></span>
-                <button class="vm-bulk-action vm-enabled" style="color:#DC2626;" onclick="vmBulkAction('delete')">Delete</button>
-                <span class="vm-bulk-divider"></span>
-                <button class="vm-bulk-action vm-enabled" onclick="vmPushSelectedToJumia()">Push to Jumia</button>
+        <div class="vpm-filters">
+            <div class="vpm-label">Status</div>
+            <div class="vpm-pills" id="vpm-pills"></div>
+            <div class="vpm-applied" id="vpm-applied"><span class="vpm-label">Country</span><button type="button" class="vpm-chip" onclick="vpOpenFilterSheet()">Uganda</button></div>
+            <label class="vpm-search"><input type="search" placeholder="Search by product name" oninput="vpSetSearch('name', this.value)" aria-label="Search by product name"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></label>
+            <label class="vpm-search"><input type="search" placeholder="Search by Seller SKU" oninput="vpSetSearch('sku', this.value)" aria-label="Search by Seller SKU"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></label>
+            <div class="vpm-actions-row">
+                <button type="button" class="vpm-check" id="vpm-check-all" aria-label="Select all on this page" onclick="vpMobileToggleAll()"></button>
+                <div class="vpm-select-wrap"><select id="vpm-action" class="vpm-select" aria-label="Product actions" onchange="vpMobileSetAction(this.value)"><option value="">Product actions</option><option value="activate">Activate</option><option value="deactivate">Deactivate</option><option value="delete">Delete</option></select><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></div>
+                <button type="button" class="vpm-go" id="vpm-go" aria-label="Apply product action" disabled onclick="vpMobileGo()"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></button>
             </div>
         </div>
-        <div id="vm-products-list" style="margin:0 14px 90px;"></div>
-        <div class="vm-fab-row">
-            <div class="vm-fab-cluster">
-                <button class="vm-fab vm-fab-outline" title="Filters"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></button>
-                <button class="vm-fab vm-fab-gold-outline" title="Add product" onclick="vmShowScreen('add-product')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
-                <button class="vm-fab vm-fab-gold" title="Export CSV" onclick="vmExportProductsCsv()"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="m6 11 6 6 6-6"/><path d="M5 21h14"/></svg></button>
+        <div class="vpm-panel">
+            <div id="vpm-list"></div>
+            <div class="vpm-pager" id="vpm-pager"></div>
+        </div>
+        <div class="vpm-fab">
+            <div class="vp-dd vpm-export-dd">
+                <button type="button" class="vpm-export" data-vp-menu onclick="vpToggleMenu('vpm-export-menu', event)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg> Export <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                <div id="vpm-export-menu" class="vp-menu vp-menu-up" hidden>
+                    <button type="button" onclick="vpExportCsv()">Export this view (.csv)</button>
+                </div>
             </div>
+            <button type="button" class="vpm-fab-btn" aria-label="Filters" onclick="vpOpenFilterSheet()"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></svg></button>
+            <button type="button" class="vpm-fab-btn" aria-label="Add product" onclick="vmShowScreen('add-product')"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
         </div>
     </div>
 
@@ -533,8 +532,16 @@
             <div id="vm-ad-campaigns-list"><div class="vm-loading-state">Loading...</div></div>
         </div>
         <div class="vm-btn-row">
-            <button class="vm-btn-primary" onclick="vmShowAdCampaignCreate()">+ New Campaign</button>
+            <button class="vm-btn-primary" onclick="vmOpenPromoMonitoring()">Monitor your promotions</button>
         </div>
+    </div>
+
+    <!-- Monitor your promotions ------------------------------------------------------ -->
+    <div class="vm-screen" id="vm-screen-promo-monitoring">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Monitor your promotions</span></div>
+        <div class="vpmon-status vpmon-status-m"></div>
+        <div id="vpmon-mobile" class="vpmon-mobile-list"></div>
+        <div class="vm-btn-row"><button class="vm-btn-primary" onclick="vpmonExport()">Export</button></div>
     </div>
 
     <!-- New ad campaign ------------------------------------------------------------ -->
@@ -938,13 +945,29 @@
                 </section>
 
                 <section id="tab-products" class="tab-content hidden">
-                    <h2 class="admin-page-title">My Products</h2>
-                    <p class="admin-page-subtitle">Products you've listed. New listings need admin approval before they go live. Deactivating a product pulls it off the storefront without deleting it or losing its approval.</p>
-                    <div id="vd-product-tier-status" style="font-size:12.5px; color:#666; margin:-6px 0 14px;"></div>
-                    <div id="vendor-products-filters" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;"></div>
-
-                    <div style="margin-bottom:12px;">
-                        <button type="button" onclick="vdToggleProductImportPanel()" style="background:#fff; color:var(--vd-navy); border:1.5px solid var(--vd-navy); border-radius:8px; padding:9px 16px; cursor:pointer; font-weight:600; font-size:13px;">Import Products</button>
+                    <div class="vp-crumb">Products</div>
+                    <div class="vp-head">
+                        <h2 class="vp-title">Product Management</h2>
+                        <div class="vp-head-actions">
+                            <div class="vp-dd">
+                                <button type="button" class="vp-btn vp-btn-outline" onclick="vpOpenColumnsPanel(event)">Manage Columns <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
+                            </div>
+                            <span class="vp-head-sep"></span>
+                            <button type="button" class="vp-btn vp-btn-outline-gold" onclick="vpAddProduct()">Add Product <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+                            <div class="vp-dd">
+                                <button type="button" class="vp-btn vp-btn-gold" data-vp-menu onclick="vpToggleMenu('vp-io-menu', event)">Import/Export <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg></button>
+                                <div id="vp-io-menu" class="vp-menu vp-menu-right" hidden>
+                                    <button type="button" onclick="vpImport()">Import products (.csv / .xlsx)</button>
+                                    <button type="button" onclick="vpExportCsv()">Export this view (.csv)</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="vd-product-tier-status" class="vp-tier"></div>
+                    <div id="vendor-products-filters" class="vp-status-row"></div>
+                    <div class="vp-search-row">
+                        <label class="vp-search"><input type="search" id="vp-search-name" placeholder="Search by Product Name" oninput="vpSetSearch('name', this.value)" aria-label="Search by Product Name"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></label>
+                        <label class="vp-country"><span class="vp-country-label">Countries *</span><select aria-label="Countries"><option>Uganda</option></select><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></label>
                     </div>
 
                     <div id="vd-product-import-panel" hidden class="panel" style="margin-bottom:16px;">
@@ -957,15 +980,23 @@
                         <div id="vd-product-import-results" style="margin-top:14px; font-size:12.5px;"></div>
                     </div>
 
-                    <div id="vendor-products-bulk-bar" hidden style="align-items:center; gap:10px; background:#F0F4FF; border:1px solid #C7D2FE; border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:13px;">
-                        <span id="vendor-products-selected-count">0 selected</span>
-                        <button onclick="bulkVendorProductAction('activate')" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Activate</button>
-                        <button onclick="bulkVendorProductAction('deactivate')" style="background:#B45309; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Deactivate</button>
-                        <button onclick="bulkVendorProductAction('delete')" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Delete</button>
-                        <button onclick="vmPushSelectedToJumia()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Push to Jumia</button>
-                    </div>
-                    <div class="panel">
-                        <div id="vendor-products-list">Loading...</div>
+                    <div class="vp-card">
+                        <div class="vp-bulkbar" id="vendor-products-bulk-bar">
+                            <span id="vendor-products-selected-count">Select items to apply bulk actions</span>
+                            <div class="vp-bulk-actions">
+                                <button type="button" id="vp-bulk-activate" class="vp-bulk-btn" disabled onclick="vpBulk('activate')">Activate <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg></button>
+                                <span class="vp-bulk-sep"></span>
+                                <div class="vp-dd">
+                                    <button type="button" id="vp-bulk-more" class="vp-bulk-btn vp-bulk-more" disabled data-vp-menu onclick="vpToggleMenu('vp-more-menu', event)">More Actions <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg></button>
+                                    <div id="vp-more-menu" class="vp-menu vp-menu-right" hidden>
+                                        <button type="button" onclick="vpBulk('deactivate')">Deactivate</button>
+                                        <button type="button" class="vp-danger" onclick="vpBulk('delete')">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="vendor-products-list"></div>
+                        <div id="vp-pager" class="vp-pager"></div>
                     </div>
 
                     <div id="vd-bulk-confirm-overlay" hidden style="position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center;">
@@ -993,19 +1024,45 @@
                 </section>
 
                 <section id="tab-consignments" class="tab-content hidden">
-                    <h2 class="admin-page-title">Fulfillment by Lizimas</h2>
-                    <p class="admin-page-subtitle">
-                        Ship stock to a Lizimas hub and we hold, pick and pack it for you. Once we count a shipment
-                        in, those units show as Lizimas-fulfilled on the product and no longer need your own handover
-                        for each order.
-                    </p>
-
-                    <div style="display:flex; justify-content:flex-end; margin-bottom:14px;">
-                        <button onclick="vdShowCreateConsignmentForm()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer;">+ Request Consignment</button>
+                    <div class="vp-crumb"><span class="vco-crumb-muted">Products</span> <span class="vco-crumb-sep">&gt;</span> Consignment</div>
+                    <div class="vco-top">
+                        <div class="vco-filters-col">
+                            <div class="vco-line"><span class="vp-status-label">Status</span><div class="vco-pills" id="vco-pills"></div></div>
+                            <div class="vco-line">
+                                <span class="vp-status-label">Country</span><span class="vco-chip">Uganda</span>
+                                <span class="vp-status-label">Date</span>
+                                <div class="vp-dd"><button type="button" class="vco-chip vco-chip-btn" id="vco-date-chip" data-vp-menu onclick="vpToggleMenu('vco-date-menu', event)">All</button><div id="vco-date-menu" class="vp-menu" hidden></div></div>
+                            </div>
+                        </div>
+                        <div class="vco-top-actions">
+                            <button type="button" class="vp-btn vp-btn-outline-gold" onclick="vcoOpenFilters()"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></svg> Filters</button>
+                            <div class="vp-dd">
+                                <button type="button" class="vp-btn vp-btn-gold" data-vp-menu onclick="vpToggleMenu('vco-export-menu', event)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg> Export <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                                <div id="vco-export-menu" class="vp-menu vp-menu-right" hidden>
+                                    <button type="button" onclick="vcoExport('view')">Export this view (.csv)</button>
+                                    <button type="button" onclick="vcoExport('all')">Export all consignments (.csv)</button>
+                                </div>
+                            </div>
+                            <button type="button" class="vp-btn vp-btn-gold" onclick="vdShowCreateConsignmentForm()"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 7v10M7 12h10" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg> Bulk Creation</button>
+                        </div>
                     </div>
-
-                    <div class="panel">
-                        <div id="vd-consignments-list">Loading...</div>
+                    <div class="vco-search-row">
+                        <div class="vco-bulk">
+                            <div class="vco-select-wrap"><select id="vco-bulk-select" aria-label="Bulk action" onchange="vcoSetBulk(this.value)"><option value="">Bulk Cancellation</option><option value="cancel">Cancel selected orders</option><option value="ship">Mark selected as shipped</option></select><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></div>
+                            <button type="button" class="vco-go" id="vco-bulk-go" aria-label="Apply bulk action" disabled onclick="vcoBulkGo()"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></button>
+                        </div>
+                        <div class="vco-searches">
+                            <label class="vco-search vco-search-co"><input type="search" placeholder="CO Number" aria-label="Search by CO Number" oninput="vcoSetSearch('co', this.value)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></label>
+                            <div class="vco-search vco-search-prod">
+                                <div class="vco-field-wrap"><select aria-label="Search products by" onchange="vcoSetField(this.value)"><option value="seller">Seller SKU</option><option value="lizimas">Lizimas Store SKU</option><option value="name">Product name</option></select><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></div>
+                                <input type="search" placeholder="Search products" aria-label="Search products" oninput="vcoSetSearch('q', this.value)">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="vco-body">
+                        <div class="vco-list-card"><div id="vco-list"><div class="vco-empty">Loading...</div></div><div class="vp-pager" id="vco-pager"></div></div>
+                        <div class="vco-detail-card" id="vco-detail"></div>
                     </div>
 
                     <div id="vd-consignment-create-overlay" hidden style="position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center;">
@@ -1300,9 +1357,7 @@
                 </section>
 
                 <section id="tab-promotions" class="tab-content hidden">
-                    <h2 class="admin-page-title">Promotions</h2>
-                    <div class="panel"><div class="vc-page vc-page-desktop" id="vd-promo-overview">Loading...</div></div>
-                    <div class="panel"><h3 style="margin:0 0 12px;">Lizimas Campaigns</h3><div class="vc-page vc-page-desktop" id="vd-promo-campaigns">Loading...</div></div>
+                    <div class="vc-page vc-page-desktop vc-pm-host" id="vd-promo-overview">Loading...</div>
                     <p class="admin-page-subtitle">
                         Propose a time-boxed sale price on one of your own products. Lizimas reviews every
                         promotion before it goes live, and decides separately whether to feature it on the
@@ -1337,6 +1392,26 @@
                     </div>
                 </section>
 
+                <section id="tab-promo-campaigns" class="tab-content hidden">
+                    <div class="vp-crumb"><button type="button" class="vpmon-crumb-link" onclick="vdOpenPromotionsTab()">Promotions</button> <span class="vco-crumb-sep">&gt;</span> Management</div>
+                    <div class="vpc-head">
+                        <button type="button" class="vpc-back" aria-label="Back to Promotions Management" onclick="vdOpenPromotionsTab()"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><polyline points="11 6 5 12 11 18"/></svg></button>
+                        <h2 class="vpc-title">Promotions Management</h2>
+                        <button type="button" class="vpc-filter" aria-label="Show or hide status filters" aria-pressed="true" onclick="vdToggleCampaignFilters(this)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></svg></button>
+                    </div>
+                    <div class="vc-page vc-page-desktop vpc-host" id="vd-promo-campaigns"></div>
+                </section>
+
+                <section id="tab-promo-monitoring" class="tab-content hidden">
+                    <div class="vp-crumb"><button type="button" class="vpmon-crumb-link" onclick="vdOpenPromotionsTab()">Promotions</button> <span class="vco-crumb-sep">&gt;</span> Monitoring</div>
+                    <div class="vpmon-head">
+                        <h2 class="vpmon-title">Monitor your promotions</h2>
+                        <button type="button" class="vp-btn vp-btn-gold vpmon-export" onclick="vpmonExport()">Export</button>
+                    </div>
+                    <div class="vpmon-status vpmon-status-bar"></div>
+                    <div class="vpmon-card-desk"><div class="vp-table-scroll" id="vpmon-desktop"></div></div>
+                </section>
+
                 <section id="tab-ads" class="tab-content hidden">
                     <h2 class="admin-page-title">Advertise Your Products</h2>
                     <div class="vc-ads-hero-host vc-ads-hero-desktop"></div>
@@ -1347,7 +1422,7 @@
                     </p>
 
                     <div style="display:flex; justify-content:flex-end; margin-bottom:14px;">
-                        <button onclick="vdShowCreateAdCampaignForm()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer;">+ New Campaign</button>
+                        <button type="button" class="vp-btn vp-btn-gold" onclick="vdOpenPromoMonitoring()">Monitor your promotions</button>
                     </div>
 
                     <div class="panel">
@@ -1697,7 +1772,7 @@
                                 <button type="button" onclick="vdShowJumiaImport()" style="background:#fff; color:var(--vd-navy); border:1.5px solid var(--vd-navy); border-radius:8px; padding:8px 14px; cursor:pointer; font-size:12.5px; font-weight:600;">Import from Jumia</button>
                             </div>
                         </div>
-                        <p style="font-size:12.5px; color:#888; margin:-4px 0 12px;">Export to Jumia to push products from here, or select them on the Manage Products tab and choose "Push to Jumia" there.</p>
+                        <p style="font-size:12.5px; color:#888; margin:-4px 0 12px;">Use Export to Jumia to push products from here.</p>
                         <div id="vd-jumia-links-list"></div>
                     </div>
 
@@ -1846,10 +1921,13 @@
     <script src="../js/lz-table.js?v=5"></script>
     <script src="../js/lz-spec-tools.js?v=2"></script>
     <script src="../js/description-block-editor.js?v=19"></script>
-    <script src="../js/vendor-dashboard.js?v=26"></script>
+    <script src="../js/vendor-dashboard.js?v=27"></script>
     <script src="../js/vendor-statements.js?v=2"></script>
-<script src="../js/vendor-mobile.js?v=11"></script>
+<script src="../js/vendor-mobile.js?v=12"></script>
+<script src="../js/vendor-products.js?v=1"></script>
+<script src="../js/vendor-consignments.js?v=1"></script>
+<script src="../js/vendor-promo-monitor.js?v=2"></script>
 <script src="../js/vendor-shop-setup.js?v=4"></script>
-<script src="../js/vendor-center.js?v=1"></script>
+<script src="../js/vendor-center.js?v=3"></script>
 </body>
 </html>

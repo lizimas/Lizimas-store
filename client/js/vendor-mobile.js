@@ -46,7 +46,8 @@ const VM_NAV_FALLBACK = {
     "pickers-create": "account",
     "pickers-edit": "account",
     "ads": "account",
-    "ads-create": "account"
+    "ads-create": "account",
+    "promo-monitoring": "account"
 };
 
 function vmShowScreen(name, opts) {
@@ -258,20 +259,7 @@ function vmRenderOrdersList() {
 
 let vmProductsFilter = "all";
 
-async function vmLoadProducts() {
-    const listEl = document.getElementById("vm-products-list");
-    listEl.innerHTML = '<div class="vm-loading-state">Loading...</div>';
-    try {
-        await loadVendorProducts(); // populates the shared vendorProductsCache global
-        vmRenderProductsPills();
-        vmRenderProductsList();
-        vmUpdateBulkBar();
-        vmLoadProductTierStatus();
-    } catch (error) {
-        console.error("vmLoadProducts error:", error);
-        listEl.innerHTML = '<div class="vm-loading-state">Could not load products.</div>';
-    }
-}
+
 
 // Shares the /api/vendors/me/product-tier endpoint with the desktop shell's
 // vdLoadProductTierStatus - just a different, mobile-styled target element.
@@ -290,83 +278,21 @@ async function vmLoadProductTierStatus() {
     }
 }
 
-function vmSetProductsFilter(key) {
-    vmProductsFilter = key;
-    vmRenderProductsPills();
-    vmRenderProductsList();
-}
 
-function vmRenderProductsPills() {
-    const el = document.getElementById("vm-products-pills");
-    el.innerHTML = VENDOR_PRODUCT_FILTERS.map(([key, label]) => {
-        const count = key === "all" ? vendorProductsCache.length : vendorProductsCache.filter(p => vendorProductFilterKey(p) === key).length;
-        const active = vmProductsFilter === key;
-        return `<div class="vm-pm-group-pill${active ? " active" : ""}" onclick="vmSetProductsFilter('${key}')">${label}${count ? ` (${count})` : ""}</div>`;
-    }).join("");
-}
 
-function vmProductCard(p) {
-    const checked = vendorProductsSelected.has(Number(p.id));
-    return `<div class="vm-order-card" style="display:flex; gap:10px;">
-        <button class="vm-checkbox${checked ? " checked" : ""}" onclick="vmToggleProduct(${p.id})">${checked ? VM_ICON.check : ""}</button>
-        <div style="flex:1; min-width:0;">
-            <div class="vm-order-card-top"><span style="font-size:13px; font-weight:600; color:var(--vm-navy);">${p.name}</span>${vendorProductStatusBadge(p)}</div>
-            <div class="vm-order-meta">Stock ${p.stock != null ? p.stock : "-"} &bull; Quality ${vendorQualityScoreBadge(p)}${p.possible_duplicate_of ? ` <span style="color:#B45309;">&#9888; possible duplicate</span>` : ""}</div>
-            <div class="vm-order-bottom"><span class="vm-order-amount">${vmFmtUgx(p.price)}</span></div>
-        </div>
-    </div>`;
-}
 
-function vmToggleProduct(id) {
-    const checked = !vendorProductsSelected.has(Number(id));
-    toggleVendorProductSelect(id, checked); // shared with desktop selection
-    vmRenderProductsList();
-    vmUpdateBulkBar();
-}
 
-function vmRenderProductsList() {
-    const el = document.getElementById("vm-products-list");
-    const rows = vmProductsFilter === "all" ? vendorProductsCache : vendorProductsCache.filter(p => vendorProductFilterKey(p) === vmProductsFilter);
-    if (!rows || rows.length === 0) {
-        el.innerHTML = '<div class="vm-empty-state">No records found!</div>';
-        return;
-    }
-    el.innerHTML = rows.map(vmProductCard).join("");
-}
 
-function vmUpdateBulkBar() {
-    const label = document.getElementById("vm-bulk-label");
-    if (label) label.textContent = vendorProductsSelected.size > 0 ? `${vendorProductsSelected.size} selected` : "Select items to apply bulk actions";
-}
 
-async function vmBulkAction(action) {
-    if (vendorProductsSelected.size === 0) { alert("Select at least one product first."); return; }
-    await bulkVendorProductAction(action); // confirms, calls the API, and refreshes vendorProductsCache
-    vmRenderProductsPills();
-    vmRenderProductsList();
-    vmUpdateBulkBar();
-}
 
-function vmExportProductsCsv() {
-    const rows = vmProductsFilter === "all" ? vendorProductsCache : vendorProductsCache.filter(p => vendorProductFilterKey(p) === vmProductsFilter);
-    if (!rows || rows.length === 0) { alert("Nothing to export in this view."); return; }
-    const header = ["Product Name", "Status", "Stock", "Price (UGX)"];
-    const lines = [header.join(",")].concat(rows.map(p => [
-        `"${(p.name || "").replace(/"/g, '""')}"`,
-        vendorProductFilterKey(p),
-        p.stock != null ? p.stock : "",
-        p.price != null ? p.price : ""
-    ].join(",")));
-    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "lizimas-products.csv";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
+
+
+
+
+
+
+
+
 
 // --- Settings, Shop Activation & Holiday Mode -------------------------------
 
@@ -1356,30 +1282,7 @@ function vmRenderJumiaLinks(links) {
     }).join("");
 }
 
-async function vmPushSelectedToJumia() {
-    if (vendorProductsSelected.size === 0) { alert("Select at least one product first."); return; }
-    if (!vmJumiaConnectionCache.connected) { alert("Connect to Jumia first (Menu > Settings > Applications)."); return; }
-    const ids = Array.from(vendorProductsSelected);
-    if (!confirm(`Push ${ids.length} product(s) to Jumia?`)) return;
-    try {
-        const result = await vendorAuthorizedFetch("/api/vendors/me/jumia/products/push-bulk", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productIds: ids })
-        });
-        if (result.error) { alert(result.error); return; }
-        const successCount = (result.successful || []).length;
-        const failedCount = (result.failed || []).length;
-        let message = `${successCount} product(s) pushed to Jumia.`;
-        if (failedCount > 0) {
-            message += `\n${failedCount} failed:\n` + result.failed.map(f => `- ${f.reason}`).join("\n");
-        }
-        alert(message);
-    } catch (error) {
-        console.error("vmPushSelectedToJumia error:", error);
-        alert("Could not push products to Jumia.");
-    }
-}
+
 
 // --- Import from Jumia ---
 

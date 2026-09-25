@@ -90,7 +90,7 @@ function summarizeReplenishment(rows) {
 
 async function getVendorStockOverview(vendorId) {
     const { rows } = await pool.query(
-        `SELECT p.id, p.name, p.sku, p.stock, p.consigned_stock, p.fulfillment_type, p.image,
+        `SELECT p.id, p.name, p.sku, p.lizimas_sku, p.stock, p.consigned_stock, p.fulfillment_type, p.image,
                 p.status, COALESCE(p.admin_restricted, false) AS admin_restricted, COALESCE(p.is_active, true) AS is_active,
                 COALESCE((SELECT SUM(oi.quantity) FROM order_items oi JOIN orders o ON o.id = oi.order_id
                           WHERE oi.product_id = p.id AND o.status = 'delivered'
@@ -107,6 +107,7 @@ async function getVendorStockOverview(vendorId) {
         id: row.id,
         name: row.name,
         sku: row.sku,
+        lizimasSku: row.lizimas_sku || null,
         image: row.image,
         fulfillmentType: row.fulfillment_type,
         ...computeReplenishment({

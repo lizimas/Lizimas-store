@@ -907,29 +907,11 @@ let vendorProductsFilter = "all";
 let vendorProductsSelected = new Set();
 let vendorProductsSearchTerm = "";
 
-function renderVendorProductFilters() {
-    const container = document.getElementById("vendor-products-filters");
-    if (!container) return;
-    container.innerHTML = VENDOR_PRODUCT_FILTERS.map(([key, label]) => {
-        const count = key === "all" ? vendorProductsCache.length : vendorProductsCache.filter(p => vendorProductFilterKey(p) === key).length;
-        const active = vendorProductsFilter === key;
-        return `<button onclick="setVendorProductsFilter('${key}')" style="padding:6px 12px; border-radius:999px; border:1px solid ${active ? "#1a1a2e" : "#ddd"}; background:${active ? "#1a1a2e" : "#fff"}; color:${active ? "#fff" : "#333"}; font-size:12px; cursor:pointer;">${label}${count ? ` (${count})` : ""}</button>`;
-    }).join("");
-}
 
-function setVendorProductsFilter(key) {
-    vendorProductsFilter = key;
-    renderVendorProductFilters();
-    renderVendorProductsTable();
-}
 
-function updateVendorProductsBulkBar() {
-    const bar = document.getElementById("vendor-products-bulk-bar");
-    const countEl = document.getElementById("vendor-products-selected-count");
-    if (!bar || !countEl) return;
-    bar.hidden = vendorProductsSelected.size === 0;
-    countEl.textContent = `${vendorProductsSelected.size} selected`;
-}
+
+
+
 
 function toggleVendorProductSelect(id, checked) {
     if (checked) vendorProductsSelected.add(Number(id));
@@ -937,12 +919,7 @@ function toggleVendorProductSelect(id, checked) {
     updateVendorProductsBulkBar();
 }
 
-function toggleAllVendorProductsSelect(checked, visibleIds) {
-    if (checked) visibleIds.forEach(id => vendorProductsSelected.add(Number(id)));
-    else visibleIds.forEach(id => vendorProductsSelected.delete(Number(id)));
-    updateVendorProductsBulkBar();
-    renderVendorProductsTable();
-}
+
 
 // Bulk action flow: confirm -> run -> results breakdown, matching the
 // Jumia Vendor Center pattern Ryan referenced (a confirmation step before
@@ -1159,74 +1136,9 @@ async function vdLoadProductTierStatus() {
     }
 }
 
-async function loadVendorProducts() {
-    try {
-        const products = await vendorAuthorizedFetch("/api/vendors/products");
-        vendorProductsCache = products;
-        vendorProductsSelected.clear();
-        updateVendorProductsBulkBar();
-        renderVendorProductFilters();
-        renderVendorProductsTable();
-    } catch (error) {
-        console.error("Load vendor products error:", error);
-    }
-}
 
-function renderVendorProductsTable() {
-    const container = document.getElementById("vendor-products-list");
-    if (!container) return;
 
-    if (!vendorProductsCache || vendorProductsCache.length === 0) {
-        container.innerHTML = `<p class="no-data">You haven't listed any products yet.</p>`;
-        return;
-    }
 
-    let rows = vendorProductsFilter === "all"
-        ? vendorProductsCache
-        : vendorProductsCache.filter(p => vendorProductFilterKey(p) === vendorProductsFilter);
-
-    if (vendorProductsSearchTerm) {
-        rows = rows.filter(p =>
-            (p.name || "").toLowerCase().includes(vendorProductsSearchTerm) ||
-            (p.sku || "").toLowerCase().includes(vendorProductsSearchTerm)
-        );
-    }
-
-    if (rows.length === 0) {
-        container.innerHTML = `<p class="no-data">No products in this view.</p>`;
-        return;
-    }
-
-    const visibleIds = rows.map(p => p.id);
-    const allSelected = visibleIds.length > 0 && visibleIds.every(id => vendorProductsSelected.has(Number(id)));
-
-    container.innerHTML = `
-        <table>
-            <thead><tr>
-                <th><input type="checkbox" ${allSelected ? "checked" : ""} onchange="toggleAllVendorProductsSelect(this.checked, ${JSON.stringify(visibleIds)})"></th>
-                <th>Product</th><th>SKU</th><th>Price</th><th>Stock</th><th>Quality</th><th>Status</th><th>Actions</th>
-            </tr></thead>
-            <tbody>
-                ${rows.map(p => `
-                    <tr>
-                        <td><input type="checkbox" ${vendorProductsSelected.has(Number(p.id)) ? "checked" : ""} onchange="toggleVendorProductSelect(${p.id}, this.checked)"></td>
-                        <td data-label="Product">${p.name}${p.possible_duplicate_of ? `<div style="font-size:11px; color:#B45309; margin-top:3px;">&#9888; Looks similar to another listing of yours</div>` : ""}</td>
-                        <td data-label="SKU">${p.sku || "—"}</td>
-                        <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
-                        <td data-label="Stock">${p.stock}</td>
-                        <td data-label="Quality">${vendorQualityScoreBadge(p)}</td>
-                        <td data-label="Status">${vendorProductStatusBadge(p)}${p.status === "rejected" && p.rejection_reason ? `<div style="font-size:11px; color:#991B1B; margin-top:4px;">${p.rejection_reason}</div>` : ""}</td>
-                        <td data-label="Actions">
-                            <button onclick="editVendorProduct(${p.id})" style="background:#1a1a2e; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">Edit</button>
-                            ${p.status === "approved" ? `<button onclick="bulkVendorProductActionSingle(${p.id}, '${p.is_active ? "deactivate" : "activate"}')" style="background:${p.is_active ? "#B45309" : "#16A34A"}; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; margin-right:6px;">${p.is_active ? "Deactivate" : "Activate"}</button>` : ""}
-                            <button onclick="deleteVendorProduct(${p.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">Delete</button>
-                        </td>
-                    </tr>
-                `).join("")}
-            </tbody>
-        </table>
-    `;
-}
 
 // Single-row equivalent of bulkVendorProductAction, for the per-row
 // Activate/Deactivate button - reuses the same bulk endpoint with a
@@ -1255,6 +1167,13 @@ async function bulkVendorProductActionSingle(id, action) {
 function vdSearchProducts() {
     const input = document.getElementById("vd-product-search-input");
     vendorProductsSearchTerm = input ? input.value.trim().toLowerCase() : "";
+    // Product Management (vendor-products.js) searches by name; mirror the term there.
+    if (typeof vpState !== "undefined") {
+        vpState.name = vendorProductsSearchTerm;
+        vpState.page = 1;
+        const box = document.getElementById("vp-search-name");
+        if (box) box.value = input ? input.value.trim() : "";
+    }
     const productsBtn = document.querySelector('.tab-btn[data-tab="products"]');
     if (productsBtn) productsBtn.click();
     else renderVendorProductsTable();
@@ -3351,7 +3270,6 @@ const VENDOR_PROMO_STATUS_CLASS = {
 
 async function loadVendorPromotionsTab() {
     vcLoadPromoOverview("vd-promo-overview");
-    vcLoadCampaigns("vd-promo-campaigns", "table");
     await Promise.all([populateVendorPromoProductSelect(), loadVendorPromotionsList()]);
 }
 
@@ -4212,47 +4130,7 @@ function vdConsignmentStatusBadge(status) {
     return `<span class="status-badge ${cls}">${label}</span>`;
 }
 
-async function vdLoadConsignments() {
-    const container = document.getElementById("vd-consignments-list");
-    if (!container) return;
-    try {
-        const consignments = await vendorAuthorizedFetch("/api/vendors/me/consignments");
-        if (consignments.error) { container.innerHTML = `<p class="no-data">${vendorEsc(consignments.error)}</p>`; return; }
-        vdConsignmentsCache = consignments || [];
-        if (vdConsignmentsCache.length === 0) {
-            container.innerHTML = `<p class="no-data">You haven't requested any consignments yet.</p>`;
-            return;
-        }
-        container.innerHTML = `
-            <table>
-                <thead><tr><th>#</th><th>Hub</th><th>Items</th><th>Status</th><th>Requested</th><th></th></tr></thead>
-                <tbody>
-                    ${vdConsignmentsCache.map(c => {
-                        const itemsSummary = (c.items || []).map(i => `${vendorEsc(i.product_name)} &times; ${i.quantity_requested}${i.quantity_received != null ? ` (received ${i.quantity_received})` : ""}`).join("<br>");
-                        const canShip = c.status === "requested";
-                        const canCancel = c.status === "requested" || c.status === "in_transit";
-                        return `
-                            <tr>
-                                <td data-label="#">${c.id}</td>
-                                <td data-label="Hub">${vendorEsc(c.dropoff_point_name)}</td>
-                                <td data-label="Items">${itemsSummary}</td>
-                                <td data-label="Status">${vdConsignmentStatusBadge(c.status)}</td>
-                                <td data-label="Requested">${new Date(c.created_at).toLocaleDateString()}</td>
-                                <td data-label="">
-                                    ${canShip ? `<button onclick="vdMarkConsignmentInTransit(${c.id})" style="background:#fff; border:1px solid #ccc; border-radius:6px; padding:5px 10px; font-size:11.5px; cursor:pointer; margin-right:6px;">Mark Shipped</button>` : ""}
-                                    ${canCancel ? `<button onclick="vdCancelConsignment(${c.id})" style="background:#fff; border:1px solid #DC2626; color:#DC2626; border-radius:6px; padding:5px 10px; font-size:11.5px; cursor:pointer;">Cancel</button>` : ""}
-                                    ${c.admin_notes ? `<div style="font-size:11px; color:#888; margin-top:4px;">Note: ${vendorEsc(c.admin_notes)}</div>` : ""}
-                                </td>
-                            </tr>`;
-                    }).join("")}
-                </tbody>
-            </table>
-        `;
-    } catch (error) {
-        console.error("vdLoadConsignments error:", error);
-        container.innerHTML = `<p class="no-data">Could not load consignments.</p>`;
-    }
-}
+
 
 async function vdShowCreateConsignmentForm() {
     document.getElementById("vd-consignment-create-error").textContent = "";

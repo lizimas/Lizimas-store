@@ -12,9 +12,12 @@ exports.listMyConsignments = async (req, res) => {
         if (!vendorId) return res.status(404).json({ error: "No vendor profile found for this account." });
 
         const { rows: consignments } = await pool.query(
-            `SELECT c.*, dp.name AS dropoff_point_name, dp.address AS dropoff_point_address
+            `SELECT c.*, dp.name AS dropoff_point_name, dp.address AS dropoff_point_address,
+                    u.name AS requested_by_name
              FROM vendor_consignments c
              JOIN dropoff_points dp ON dp.id = c.dropoff_point_id
+             LEFT JOIN vendors v ON v.id = c.vendor_id
+             LEFT JOIN users u ON u.id = v.user_id
              WHERE c.vendor_id = $1
              ORDER BY c.created_at DESC`,
             [vendorId]
@@ -23,7 +26,8 @@ exports.listMyConsignments = async (req, res) => {
 
         const ids = consignments.map((c) => c.id);
         const { rows: items } = await pool.query(
-            `SELECT ci.*, p.name AS product_name, p.sku AS product_sku
+            `SELECT ci.*, p.name AS product_name, p.sku AS product_sku,
+                    p.lizimas_sku AS product_lizimas_sku, p.price AS product_price
              FROM vendor_consignment_items ci
              JOIN products p ON p.id = ci.product_id
              WHERE ci.consignment_id = ANY($1::int[])

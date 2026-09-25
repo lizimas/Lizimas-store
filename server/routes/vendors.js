@@ -47,7 +47,8 @@ const {
     getMyCampaign: getMyPromotionCampaign,
     joinCampaign: joinPromotionCampaign,
     withdrawCampaignEntry: withdrawPromotionCampaignEntry,
-    getPromotionsOverview
+    getPromotionsOverview,
+    getPromotionMonitoring
 } = require("../controllers/promotionCampaignController");
 const { getMyKyc, updateMyKyc, uploadMyKycDocument, getMyKycDocumentUrl } = require("../controllers/vendorKycController");
 const { getMyShopSetup, updateMyShopInfo, updateMyCompanyInfo, updateMyShippingInfo, updateMyAdditionalInfo } = require("../controllers/vendorShopSetupController");
@@ -120,6 +121,7 @@ const { requireAuth, requireVendor } = require("../middleware/authMiddleware");
 const { otpLimiter } = require("../middleware/rateLimiter");
 const upload = require("../middleware/upload");
 const csvUpload = require("../middleware/csvUpload");
+const { getUsdToUgxRate } = require("../utils/fxRate");
 
 // Public: a prospective vendor applies, then logs in to check status/manage
 // listings once approved. Login itself is unrestricted by status - the
@@ -155,6 +157,15 @@ router.get("/jumia/oauth/callback", jumiaOAuthCallback);
 router.use(requireAuth, requireVendor);
 
 router.get("/me", getMyVendorProfile);
+// UGX-per-USD rate for Product Management's Currency filter (USD / Local).
+router.get("/fx-rate", async (req, res) => {
+    try {
+        const { rate, stale } = await getUsdToUgxRate();
+        res.json({ rate, stale: Boolean(stale) });
+    } catch (error) {
+        res.status(503).json({ error: "USD rate isn't available right now." });
+    }
+});
 router.patch("/me", requireVendorPermission("vc_shop_manager"), updateMyVendorProfile);
 router.patch("/me/storefront", requireVendorPermission("vc_shop_manager"), updateVendorStorefront);
 router.get("/me/shop-status", requireVendorPermission("vc_shop_manager", "vc_shop_viewer"), getVendorShopStatus);
@@ -282,6 +293,7 @@ router.get("/promotions", requireVendorPermission("vc_promotion_manager"), getMy
 // vendors join + revenue/highlights overview. See
 // server/controllers/promotionCampaignController.js.
 router.get("/me/promotions/overview", requireVendorPermission("vc_promotion_manager"), getPromotionsOverview);
+router.get("/me/promotions/monitoring", requireVendorPermission("vc_promotion_manager"), getPromotionMonitoring);
 router.get("/me/campaigns", requireVendorPermission("vc_promotion_manager"), listMyPromotionCampaigns);
 router.get("/me/campaigns/:id", requireVendorPermission("vc_promotion_manager"), getMyPromotionCampaign);
 router.post("/me/campaigns/:id/entries", requireVendorPermission("vc_promotion_manager"), joinPromotionCampaign);
