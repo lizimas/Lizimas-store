@@ -68,7 +68,9 @@ app.use((req, res, next) => {
 // retries are not site visitors and should not consume a browser's bucket.
 app.use("/webhooks/payments", webhookLimiter, require("./routes/paymentWebhook"));
 
-app.use(express.json());
+// 5mb (was the 100kb default): long product descriptions and rich-content
+// blocks (text, tables) are saved as JSON.
+app.use(express.json({ limit: "5mb" }));
 app.use(morgan("dev"));
 app.use(generalLimiter);
 app.use(logVisitor);

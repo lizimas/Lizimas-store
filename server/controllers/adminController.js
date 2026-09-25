@@ -5,6 +5,7 @@ const { sendOrderStatusEmail } = require("../utils/mailer");
 const XLSX = require("xlsx");
 const { parse } = require("csv-parse/sync");
 const { safePackageSize } = require("./productController");
+const { readMeasurements, saveMeasurements } = require("../utils/packageMeasurements");
 const { logActivity } = require("../utils/activityLog");
 
 // Base URL for links that leave the app (emails, receipts). Hardcoding the
@@ -353,7 +354,8 @@ exports.importProducts = async (req, res) => {
                 rowErrors.push(`status must be one of ${VALID_STATUSES.join(", ")} (or left blank)`);
             }
 
-            const packageSize = packageSizeRaw ? safePackageSize(packageSizeRaw) : null;
+            const rowMeasured = readMeasurements(row);
+            const packageSize = (rowMeasured.ok && rowMeasured.tier) || (packageSizeRaw ? safePackageSize(packageSizeRaw) : null);
 
             if (rowErrors.length) {
                 results.skipped++;
@@ -423,6 +425,9 @@ exports.importProducts = async (req, res) => {
                     setClauses.push(`image = $${params.length}`);
                 }
 
+                if (rowMeasured.ok && rowMeasured.provided) {
+                    for (const k of ["weight_kg", "length_cm", "width_cm", "height_cm"]) { params.push(rowMeasured.value[k]); setClauses.push(`${k} = $${params.length}`); }
+                }
                 params.push(targetId);
                 const updateResult = await client.query(
                     `UPDATE products SET ${setClauses.join(", ")} WHERE id = $${params.length} AND deleted_at IS NULL RETURNING id`,
@@ -436,12 +441,12 @@ exports.importProducts = async (req, res) => {
                     results.errors.push({ row: rowNum, name, errors: [`No product with id ${targetId} found`] });
                 }
             } else {
-                await client.query(
+                const insertedAdmin = await client.query(
                     `INSERT INTO products (
                         name, description, price, stock, category_id, created_by, status,
                         sku, brand, gtin, mpn, material, color, sleeve, style, length, fit, pattern,
                         care_instructions, occasion, warranty_months, package_size, image
-                     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
+                     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING id`,
                     [
                         name, description, price, stock, categoryId, req.user.userId, statusRaw || "approved",
                         sku || generateSku(brand, null), brand || null, gtin || null, mpn || null, material || null, color || null,
@@ -450,6 +455,7 @@ exports.importProducts = async (req, res) => {
                         imageRaw || null
                     ]
                 );
+                if (rowMeasured.ok && rowMeasured.provided) await saveMeasurements(client, insertedAdmin.rows[0].id, rowMeasured.value);
                 results.created++;
             }
         }
@@ -484,7 +490,8 @@ function csvField(value) {
 }
 
 const EXPORT_COLUMNS = [
-    "id", "sku", "name", "category", "description", "price", "stock", "package_size",
+    "id", "sku", "lizimas_sku", "name", "category", "description", "price", "stock", "package_size",
+    "weight_kg", "length_cm", "width_cm", "height_cm",
     "brand", "gtin", "mpn", "material", "color", "sleeve", "style", "length", "fit", "pattern",
     "care_instructions", "occasion", "warranty_months", "status", "image", "created_at"
 ];
@@ -510,8 +517,8 @@ exports.exportProducts = async (req, res) => {
         }
 
         const result = await pool.query(
-            `SELECT p.id, p.sku, p.name, c.name AS category, p.description, p.price, p.stock,
-                    p.package_size, p.brand, p.gtin, p.mpn, p.material, p.color, p.sleeve, p.style,
+            `SELECT p.id, p.sku, p.lizimas_sku, p.name, c.name AS category, p.description, p.price, p.stock,
+                    p.package_size, p.weight_kg, p.length_cm, p.width_cm, p.height_cm, p.brand, p.gtin, p.mpn, p.material, p.color, p.sleeve, p.style,
                     p.length, p.fit, p.pattern, p.care_instructions, p.occasion, p.warranty_months,
                     p.status, p.image, p.created_at
              FROM products p

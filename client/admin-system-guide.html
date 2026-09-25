@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>System Guide | Lizimas Admin</title>
+<link rel="stylesheet" href="css/lz-guide.css?v=1">
+</head>
+<body>
+<header class="g-top-bar">
+    <div class="g-top-inner">
+        <a class="g-brand" href="admin.html"><span class="g-brand-badge">L</span> Lizimas System Guide</a>
+        <label class="g-search-wrap" for="g-search">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="g-search" type="search" placeholder="Search by keyword - e.g. payout, commission, delivery fee, KYC, refund, flash sale" autocomplete="off" aria-label="Search the system guide">
+            <button type="button" id="g-clear" hidden>Clear</button>
+        </label>
+        <span id="g-count" aria-live="polite"></span>
+        <nav class="g-top-links" aria-label="Links">
+            <a href="admin.html">Admin panel</a>
+            <a href="seller-guide.html">Seller &amp; Staff Guide</a>
+        </nav>
+    </div>
+</header>
+
+<div class="g-layout">
+    <aside class="g-nav" aria-label="Guide contents">
+        <h2>Contents</h2>
+        <ul id="g-toc"></ul>
+        <div class="g-quick">
+            <h2>Quick searches</h2>
+            <button type="button" data-g-q="payout">Payouts</button>
+            <button type="button" data-g-q="commission">Commission</button>
+            <button type="button" data-g-q="delivery fee">Delivery fees</button>
+            <button type="button" data-g-q="approve product">Approve products</button>
+            <button type="button" data-g-q="kyc">KYC</button>
+            <button type="button" data-g-q="refund">Refunds</button>
+            <button type="button" data-g-q="suspend">Suspend vendor</button>
+            <button type="button" data-g-q="flash sale">Flash sales</button>
+            <button type="button" data-g-q="locked account">Locked accounts</button>
+            <button type="button" data-g-q="vendor center details">Vendor Center details</button>
+        </div>
+    </aside>
+
+    <main class="g-main">
+        <div class="g-hero">
+            <h1>How Lizimas Store works</h1>
+            <p>Every part of the system in one place: the <strong>customer site</strong>, the <strong>Vendor Center</strong>, <strong>staff</strong> tools and the <strong>admin panel</strong>. Each entry says <em>where</em> to find it. Type any word in the search bar (press <kbd>/</kbd> to jump to it); results are highlighted, and <kbd>Enter</kbd> jumps to the best match.</p>
+            <p>Start with <a href="#where-index">Where do I find&hellip;?</a> for the quickest route to any admin screen.</p>
+        </div>
+        <div id="g-noresults" hidden>Nothing matches every word you typed. Try fewer or shorter words.</div>
+        <div id="g-body"></div>
+        <p class="g-foot">Lizimas Store &middot; internal System Guide &middot; September 2026. Vendor-facing instructions live in the <a href="seller-guide.html">Seller &amp; Staff Guide</a>.</p>
+    </main>
+</div>
+<button type="button" id="g-top" hidden>&uarr; Top</button>
+
+<script>
+// Only signed-in admins are sent here from the admin panel; anyone else goes to the staff login.
+(function () { try { if (!localStorage.getItem("adminToken") && !localStorage.getItem("staffToken") && !localStorage.getItem("token")) location.replace("staff-login.html"); } catch (e) { /* ignore */ } })();
+
+window.LZ_GUIDE = { sections: [
+{ id: "overview", title: "1. The big picture", items: [
+  { id: "where-index", title: "Where do I find...? (admin quick index)", keywords: "index map where find navigate menu",
+    html: `<table>
+    <tr><th>I want to...</th><th>Go to (admin sidebar)</th></tr>
+    <tr><td>Approve or reject a product (staff or vendor)</td><td>Staff &amp; Approvals &rarr; Pending product approvals</td></tr>
+    <tr><td>Approve a new vendor / review KYC</td><td>Vendors &rarr; Pending applications / KYC</td></tr>
+    <tr><td>See a vendor's shop setup answers, exports and promotion results</td><td>Vendors &rarr; list &rarr; <strong>Vendor Center</strong> button</td></tr>
+    <tr><td>Warn, suspend or reinstate a vendor, freeze payouts, restrict a product</td><td>Vendors &rarr; Vendor Compliance</td></tr>
+    <tr><td>Pay vendors / see a vendor's wallet</td><td>Vendors &rarr; Vendor payouts (View Wallet)</td></tr>
+    <tr><td>Review payout accounts (MoMo or bank)</td><td>Payment Instruments</td></tr>
+    <tr><td>Set commission rates</td><td>Categories &rarr; Commission Engine</td></tr>
+    <tr><td>Set listing limits per vendor</td><td>Product Tiers</td></tr>
+    <tr><td>Homepage banners and tiles</td><td>Promotions (slots 1&ndash;6)</td></tr>
+    <tr><td>Discount codes / flash sales</td><td>Discount Codes / Flash Sales</td></tr>
+    <tr><td>Campaigns vendors can join</td><td>Vendors &rarr; Lizimas Promotion Campaigns</td></tr>
+    <tr><td>Block items from being listed</td><td>Prohibited Items</td></tr>
+    <tr><td>Orders and statuses</td><td>Orders</td></tr>
+    <tr><td>Handover inspections, drop-off points, returns awaiting collection</td><td>Vendors (Handovers / Drop-off Points / Returns)</td></tr>
+    <tr><td>Refund decisions</td><td>Vendors &rarr; Returns awaiting a refund decision</td></tr>
+    <tr><td>Consignment orders (Fulfillment by Lizimas)</td><td>Consignments</td></tr>
+    <tr><td>Ad campaigns and cost per click</td><td>Ad Campaigns</td></tr>
+    <tr><td>Brand authorizations</td><td>Brand Authorizations</td></tr>
+    <tr><td>Customers</td><td>Customers</td></tr>
+    <tr><td>Live chat, agents, SLAs</td><td>Live Support / Support Team</td></tr>
+    <tr><td>Create staff accounts, see staff activity</td><td>Staff &amp; Approvals</td></tr>
+    <tr><td>Locked accounts, login attempts, account-issue reports</td><td>Security</td></tr>
+    <tr><td>Traffic, product engagement, top searches</td><td>Dashboard / Analytics</td></tr>
+    <tr><td>Vendor and staff performance reports</td><td>Performance Reports</td></tr>
+    <tr><td>Your own password, 2FA, devices</td><td>Account</td></tr>
+    </table>` },
+  { id: "roles", title: "Who uses what", keywords: "roles customer vendor staff admin product staff store manager customer support vendor staff",
+    html: `<table>
+    <tr><th>Person</th><th>Logs in at</th><th>Uses</th></tr>
+    <tr><td>Customer</td><td><code>login.html</code> (or checks out as a guest)</td><td>Shop, pay, track orders, reviews, chat</td></tr>
+    <tr><td>Vendor (shop owner)</td><td><code>vendor-login.html</code></td><td>Vendor Center (<code>vendor/dashboard.html</code>)</td></tr>
+    <tr><td>Vendor team member</td><td><code>vendor-login.html</code></td><td>Vendor Center, limited by the permissions the owner gave</td></tr>
+    <tr><td>Product Staff</td><td><code>staff-login.html</code></td><td><code>staff/product.html</code>: submit products for approval</td></tr>
+    <tr><td>Store Manager</td><td><code>staff-login.html</code></td><td><code>staff/manager.html</code>: products go live immediately</td></tr>
+    <tr><td>Customer Support</td><td><code>staff-login.html</code></td><td><code>staff/chat.html</code>: live chat inbox</td></tr>
+    <tr><td>Admin</td><td><code>staff-login.html</code></td><td><code>admin.html</code>: everything</td></tr></table>` },
+  { id: "money-flow", title: "How money flows (price, commission, delivery, payout)", keywords: "money flow commission price payout delivery fee statement weekly cycle",
+    html: `<ol>
+    <li><strong>Price:</strong> a vendor enters the payout they want. The Commission Engine (Categories) adds the category's commission to get the customer price. Staff and admin enter the customer price directly.</li>
+    <li><strong>Delivery fee:</strong> set by the customer's delivery zone and the <em>largest delivery size</em> in the cart (Small, Medium or Large; Extra Large needs a quote). Each product's size is calculated from its packed weight and dimensions (see <a href="#package-size">Delivery size</a>).</li>
+    <li><strong>Payment:</strong> Mobile Money (MTN or Airtel), card (Flutterwave), FlexiPay or Cash on Delivery.</li>
+    <li><strong>Vendor earnings:</strong> collected in weekly cycles (Monday to Sunday). Each cycle creates a statement (earnings minus commission and refunds, plus adjustments). Admin reviews it and pays out to the vendor's approved payout account.</li>
+    </ol>` }
+]},
+{ id: "customer", title: "2. Customer site", items: [
+  { id: "c-browse", title: "Browsing and search", keywords: "home index products categories search sponsored flash sale grab or gone category", where: "<code>index.html</code>, <code>products.html</code>, <code>categories.html</code>",
+    html: `<p>The homepage shows Sponsored products (paid ads), Shop by Category, Explore Categories, the <em>Grab Or Gone!</em> flash sale with a countdown, and homepage promo slots 1&ndash;6 (set in admin &rarr; Promotions). Header search goes to <code>products.html?q=</code>; category and brand filters use <code>?category=</code> and <code>?brand=</code>. Every search is counted in admin &rarr; Dashboard / Analytics (top searches).</p>` },
+  { id: "c-product", title: "Product page", keywords: "product detail gallery variants specifications reviews seller score share", where: "<code>product-detail.html</code>",
+    html: `<p>Shows the photo gallery, colour and size variants with stock hints, Specifications, Description (rich blocks), Customer Reviews, share, and the seller panel with the vendor and seller score. "Save" is stored in the browser only. Product views are counted each day for analytics and for vendors' promotion monitoring.</p>` },
+  { id: "c-store", title: "Vendor storefront", keywords: "store storefront vendor page slug about badge", where: "<code>store.html?slug=...</code>",
+    html: `<p>A vendor's public page: business name, badges (Cash on Delivery or Payment First; verified brands), About text and their live products.</p>` },
+  { id: "c-cart-checkout", title: "Cart and checkout", keywords: "cart checkout delivery pickup map location payment mobile money card flexipay cash on delivery discount code guest", where: "<code>cart.html</code>, <code>checkout.html</code>",
+    html: `<ul><li>The cart is kept in the browser: select items, change quantity, remove.</li>
+    <li>Checkout: your details, then <strong>Home Delivery</strong> (pin on a map, share location, or search for the area, falling back to Region &rarr; District &rarr; Division &rarr; Area) or <strong>Self Pickup</strong> (free, at the Bugolobi store).</li>
+    <li>The delivery fee is shown by zone and delivery size. Enter a discount code in the Order Summary.</li>
+    <li>Payment: Mobile Money (a prompt on the phone, network detected from the number), card (Flutterwave; returns to <code>payment-return.html</code>), FlexiPay or Cash on Delivery. A customer account is not required.</li></ul>` },
+  { id: "c-orders", title: "Orders, tracking and reviews", keywords: "orders track order history review rating", where: "<code>orders.html</code>",
+    html: `<p>Signed-in customers see their order history and can review items. Anyone can track an order with the order ID plus phone number. Customers get order confirmation and status updates by email and SMS.</p>` },
+  { id: "c-returns", title: "Returns (customer side)", keywords: "returns 7 days refund exchange whatsapp", where: "<code>returns.html</code>",
+    html: `<p>Customers ask for a return within <strong>7 days of delivery</strong> via WhatsApp or chat (order number, reason, photo). Refunds go back by the original payment method. Admin decides refunds in Vendors &rarr; Returns awaiting a refund decision.</p>` },
+  { id: "c-account", title: "Customer accounts and security", keywords: "register login google facebook 2fa device approval forgot password keep me logged in report account issue data deletion", where: "<code>register.html</code>, <code>login.html</code>, <code>report.html</code>",
+    html: `<ul><li>Register with email (phone optional) or sign in with Google or Facebook.</li>
+    <li><strong>Keep me logged in:</strong> ticked, the login survives refreshes and closing tabs, but ends when the device restarts (the browser is quit). Unticked, it also ends once every Lizimas tab has been closed for about 45 seconds. The same applies to vendors.</li>
+    <li>Two-step verification by code or email code. A sign-in from an unknown device can need email approval (<code>device-approve.html</code>); refusing it locks the account.</li>
+    <li>Account problems are reported on <code>report.html</code> and handled in admin &rarr; Security. Facebook data-deletion status is shown on <code>data-deletion-status.html</code>.</li></ul>` },
+  { id: "c-help", title: "Help, chat and contact", keywords: "help faq contact chat whatsapp live support", where: "<code>help.html</code>, <code>faq.html</code>, <code>contact.html</code>, chat bubble on every page",
+    html: `<p>The live chat on every page goes to Customer Support agents (admin &rarr; Live Support / Support Team). There is also a WhatsApp button and email.</p>` }
+]},
+{ id: "vendor", title: "3. Vendor Center", intro: "Vendors run their whole shop here. The vendor-facing how-to is the <a href='seller-guide.html'>Seller &amp; Staff Guide</a>.", items: [
+  { id: "v-onboarding", title: "Registration, KYC and shop setup", keywords: "vendor registration kyc shop setup 5 steps existing shop seller type approval", where: "<code>vendor-register.html</code> &rarr; admin Vendors (approval) &rarr; Vendor Center Home (phone) / Dashboard",
+    html: `<ol><li>Register: email + code, personal details, Company or Individual, shop name, then accept the policies. You approve the application in admin &rarr; Vendors.</li>
+    <li>KYC: company (URSB, TIN, VAT, Form 20) or individual (National ID); plus a work permit for non-citizens. You review it in admin &rarr; Vendors &rarr; KYC.</li>
+    <li>Five shop setup steps: Shop, Company, Shipping, Payment, Additional Information (existing shop yes/no, existing shop name(s) and reason for a new shop, seller type, catalog details). <strong>Admin can read all the answers</strong> via Vendors &rarr; <strong>Vendor Center</strong> button.</li></ol>` },
+  { id: "v-products", title: "Vendor products", keywords: "vendor products add product payout qc manage products import bulk lizimas sku seller sku not live", where: "Vendor Center &rarr; Products",
+    html: `<ul><li>Add Products (the same form on computer and phone): name, SKU, category, description (no length limit), rich content, payout (customer price calculated), stock, packed weight &amp; size, brand, warranty, GTIN/MPN, photos, specifications, variants.</li>
+    <li>Every new or edited product is <em>Pending QC</em> until approved in admin &rarr; Staff &amp; Approvals.</li>
+    <li>Manage Products statuses: Pending QC, Not Ready To QC, Approved, Rejected, Active, Inactive, Deleted, Live, Not Live, Unauthorized (= restricted by admin), Pending Deletion.</li>
+    <li>Every product has a vendor <strong>Seller SKU</strong> and a permanent <strong>Lizimas Store SKU</strong> (ends in LZMS). Both appear in admin Products, approvals, compliance and consignments.</li></ul>` },
+  { id: "v-orders", title: "Vendor orders and handover", keywords: "vendor orders accept processing handover drop off inspection rejected delivered forfeited", where: "Vendor Center &rarr; Orders",
+    html: `<p>Accept &rarr; Processing &rarr; Ready for Handover (choose a drop-off point) &rarr; Handed Over &rarr; <em>admin inspects</em> (Vendors &rarr; Handovers) &rarr; In Delivery &rarr; Delivered. A rejected inspection goes back to the vendor with a reason. Returns must be collected within 7 days (21 days in total once moved to the central hub) or may be forfeited.</p>` },
+  { id: "v-fbl", title: "Stock Recommendation and Fulfillment by Lizimas", keywords: "stock recommendation consignment co number hub received incomplete", where: "Vendor Center &rarr; Stock Recommendation / Fulfillment by Lizimas; admin &rarr; Consignments",
+    html: `<p>Vendors see suggested reorder quantities and create consignment orders (CO numbers such as <code>CO-000012</code>) to send stock to a hub. Admin counts stock in under Consignments (Received, or Received Incomplete if short) or rejects it.</p>` },
+  { id: "v-promos", title: "Promotions, monitoring and ads", keywords: "vendor promotions campaigns monitor page views items sold revenue ads cpc", where: "Vendor Center &rarr; Promotions / Advertise Your Products",
+    html: `<p>Vendors propose their own sale prices (admin approves, and can Feature or Sponsor them), join Lizimas campaigns, and track each promotion's page views, items sold and revenue under <em>Monitor your promotions</em>. Pay-per-click ads are approved in admin &rarr; Ad Campaigns. Admin sees each vendor's promotion results in the <strong>Vendor Center</strong> details panel.</p>` },
+  { id: "v-money", title: "Account Statements and payouts (vendor side)", keywords: "statements weekly payout closing balance export transactions seller id", where: "Vendor Center &rarr; Account Statements",
+    html: `<p>Weekly statements (Monday to Sunday) with opening balance, earnings, charges, refunds, closing balance and payout, filtered by Open, Paid or Unpaid, in USD or local currency. Downloads: PDF, CSV and Export Transactions (all statements). Each export is logged under <em>Transactions Exports</em>, which admin can also see in the Vendor Center details panel.</p>` },
+  { id: "v-account", title: "Vendor account settings", keywords: "vendor users permissions pickers payment instruments brand authorization holiday mode jumia notices", where: "Vendor Center &rarr; Account",
+    html: `<p>Payout accounts (reviewed in admin &rarr; Payment Instruments), brand authorization (admin &rarr; Brand Authorizations), shop active / holiday mode, Jumia applications, team users with permissions, pickers, and compliance notices sent from admin.</p>` }
+]},
+{ id: "staff", title: "4. Staff tools", items: [
+  { id: "s-product", title: "Product Staff", keywords: "product staff submit approval my submissions", where: "<code>staff/product.html</code>",
+    html: `<p>Adds products with the customer price, stock, packed weight &amp; size (delivery size calculated automatically), specifications, sizes and colours, and photos. Products go to approval (admin &rarr; Staff &amp; Approvals).</p>` },
+  { id: "s-manager", title: "Store Manager", keywords: "store manager publish immediately delete request", where: "<code>staff/manager.html</code>",
+    html: `<p>Same form, but products go live immediately. Delete requests need admin approval (Staff &amp; Approvals &rarr; Deletion requests).</p>` },
+  { id: "s-support", title: "Customer Support", keywords: "customer support chat inbox assign transfer close", where: "<code>staff/chat.html</code>",
+    html: `<p>Live chat inbox with filters (All, Mine, Unassigned, Open, Pending, Waiting, Active, Closed), assign to me, transfer, close or reopen. Routing, SLAs and canned replies are set in admin &rarr; Support Team.</p>` }
+]},
+{ id: "admin", title: "5. Admin panel, tab by tab", items: [
+  { id: "a-dashboard", title: "Dashboard, Analytics, Performance Reports", keywords: "dashboard analytics visits engagement top searches performance reports csv", where: "Admin &rarr; Dashboard &amp; Analytics",
+    html: `<p><strong>Dashboard:</strong> key stats, visitors, low-stock products, top searches. <strong>Analytics:</strong> visits over a date range, product engagement (views, add-to-cart, units, revenue) with CSV, top pages, countries, browsers and searches. <strong>Performance Reports:</strong> vendor and staff performance by week, month, year or a custom range, with CSV.</p>` },
+  { id: "a-products", title: "Products", keywords: "admin products add edit export import csv jumia lizimas sku weight", where: "Admin &rarr; Products",
+    html: `<p>Add or edit Lizimas-owned products (the same packed weight &amp; size fields; no manual package size), search by name, Seller SKU or Lizimas SKU, export CSV by status (includes Lizimas SKU and measurements), import CSV (columns <code>weight_kg</code>, <code>length_cm</code>, <code>width_cm</code>, <code>height_cm</code> set the delivery size), and the Jumia export/sync/import.</p>` },
+  { id: "a-categories", title: "Categories and the Commission Engine", keywords: "categories commission engine rate default category tile image", where: "Admin &rarr; Categories",
+    html: `<p>Manage the category tree and tile images. The <strong>Commission Engine</strong> sets the marketplace default rate plus a rate per category; it turns vendor payouts into customer prices.</p>` },
+  { id: "a-tiers", title: "Product Tiers (listing limits)", keywords: "product tiers listing limit cap override 90 days", where: "Admin &rarr; Product Tiers",
+    html: `<p>A ladder based on 90-day sales that caps how many active listings a vendor can have. Look up a vendor to see their tier, or override it.</p>` },
+  { id: "a-marketing", title: "Promotions, Discount Codes, Flash Sales", keywords: "homepage slots banners discount codes flash sales grab or gone countdown", where: "Admin &rarr; Promotions / Discount Codes / Flash Sales",
+    html: `<ul><li><strong>Promotions:</strong> homepage slots 1&ndash;6 (banners, announcement strip, category tiles including video, grids).</li>
+    <li><strong>Discount Codes:</strong> percent or fixed amount, minimum order, usage limit, dates.</li>
+    <li><strong>Flash Sales:</strong> "Grab Or Gone" with a countdown, optional auto re-run, share link, items at up to 20% off. A flash-sale price shows to vendors as the <em>Subsidy Price</em>.</li></ul>` },
+  { id: "a-prohibited", title: "Prohibited Items", keywords: "prohibited items keywords rules block upload", where: "Admin &rarr; Prohibited Items",
+    html: `<p>Keyword or category rules with a reason. Matching products are blocked when they're uploaded (by vendors, staff or import).</p>` },
+  { id: "a-orders", title: "Orders", keywords: "orders status pending paid shipped delivered cancelled receipt", where: "Admin &rarr; Orders",
+    html: `<p>Filter by date and payment method, change the status (pending, paid, shipped, delivered, cancelled), and open the order detail and receipt.</p>` },
+  { id: "a-vendors", title: "Vendors (the main vendor hub)", keywords: "vendors approval kyc compliance warn suspend reinstate freeze payouts restrict product wallet drop off points handovers returns refunds campaigns messages pickers vendor center details", where: "Admin &rarr; Vendors",
+    html: `<ul><li>Pending applications and KYC review.</li>
+    <li><strong>Vendor Center</strong> button on each vendor: a read-only panel with shop setup answers (including existing shop name(s) and reason for a new shop), Transactions Exports, and Promotion monitoring (page views, items sold, revenue).</li>
+    <li>Compliance: warn, suspend or reinstate, freeze or unfreeze payouts, restrict or unrestrict products (the vendor sees these as <em>Unauthorized</em>), and history.</li>
+    <li>Drop-off points (and the central hub), handovers awaiting inspection, returns awaiting collection.</li>
+    <li>Vendor payouts and wallets; returns awaiting a refund decision (approving only records the refund; send the money separately).</li>
+    <li>Lizimas Promotion Campaigns (registration deadline, dates, discount range); approve vendor promotions and Feature or Sponsor them; vendor messages; picker lookup.</li></ul>` },
+  { id: "a-brand-pay", title: "Brand Authorizations and Payment Instruments", keywords: "brand authorization official store distributor payment instruments momo bank review payout blocked", where: "Admin &rarr; Brand Authorizations / Payment Instruments",
+    html: `<p>Review brand requests (official store or authorized distributor). Review vendor payout accounts. A pending account blocks payouts on that vendor's statements until you decide.</p>` },
+  { id: "a-consign-ads", title: "Consignments and Ad Campaigns", keywords: "consignments co number receive reject ad campaigns cpc budget approve", where: "Admin &rarr; Consignments / Ad Campaigns",
+    html: `<p><strong>Consignments:</strong> CO numbers with products and both SKUs; count stock in (per line) or reject, with notes. <strong>Ad Campaigns:</strong> set the default cost per click and the daily budget limits, then approve or reject campaigns.</p>` },
+  { id: "a-customers-support", title: "Customers, Live Support, Team Messages, Support Team", keywords: "customers live support queue agents queue rules canned responses sla audit team messages", where: "Admin &rarr; Customers &amp; Communication / Support Team",
+    html: `<p>Search customers. Watch the live chat queue. Turn staff Team Messages on or off. In Support Team (Support Control Center): live monitor, agents (department, skills, hours), queue rules (round robin, least busy or skill-based; max wait; overflow; offline message), canned responses, SLA targets, performance and audit log.</p>` },
+  { id: "a-staff", title: "Staff & Approvals", keywords: "staff create product staff store manager customer support approvals pending products deletion requests trash sessions activity log", where: "Admin &rarr; Staff &amp; Approvals",
+    html: `<p>Create staff accounts (Product Staff, Store Manager, Customer Support). Approve pending products, including vendor listings (the review card shows Seller SKU and Lizimas SKU). Handle deletion requests, the trash, staff login sessions and the activity log.</p>` },
+  { id: "a-security", title: "Security, Account, Notes", keywords: "security login attempts account issue reports locked accounts unlock account password 2fa devices notes", where: "Admin &rarr; Security / Account / Notes",
+    html: `<p><strong>Security:</strong> login attempts by portal, account-issue reports, and locked accounts (unlocking gives 15 minutes to register a device). <strong>Account:</strong> your username, email, password, 2FA and devices. <strong>Notes:</strong> private notes (pin, colour, search).</p>` }
+]},
+{ id: "rules", title: "6. Rules the system applies automatically", items: [
+  { id: "package-size", title: "Delivery size from weight and dimensions", keywords: "package size delivery tier weight dimensions small medium large extra large automatic", where: "Every product form (vendor, staff, admin) and CSV imports",
+    html: `<p>Nobody picks a package size any more. The packed weight (kg) and length, width and height (cm) set it, and the server recalculates on every save:</p>
+    <table><tr><th>Size</th><th>Up to</th></tr><tr><td>Small</td><td>3 kg, longest side 45 cm, 40 litres</td></tr><tr><td>Medium</td><td>30 kg, 80 cm, 120 litres</td></tr><tr><td>Large</td><td>40 kg, 200 cm, 700 litres</td></tr><tr><td>Extra Large</td><td>anything bigger</td></tr></table>
+    <p>Older products keep their existing size until someone adds measurements.</p>` },
+  { id: "product-live", title: "When a product is Live", keywords: "live visible buy qc approved active restricted stock holiday", html: `<p>It must be approved, active, not restricted, not deleted, and have stock above 0, and the vendor's shop must be active and not on holiday.</p>` },
+  { id: "sessions", title: "Sessions and \"Keep me logged in\"", keywords: "keep me logged in session restart logout token 7 days", html: `<p>Customer and vendor logins last up to 7 days at most. <em>Keep me logged in</em> ticked: signed in through refreshes and closed tabs, signed out after a device restart (browser quit). Unticked: also signed out once all Lizimas tabs have been closed for about 45 seconds. A web page can't see the device itself restarting; it sees the browser having been quit, which a restart always does.</p>` },
+  { id: "abandoned-signup", title: "Abandoned vendor sign-ups", keywords: "abandoned signup registration reminder alert email", html: `<p>If someone starts vendor registration and doesn't finish within 30 minutes, <strong>only admin</strong> gets an alert email (sent to ADMIN_ALERT_EMAIL). The applicant is <strong>not</strong> sent reminders.</p>` },
+  { id: "descriptions", title: "Product descriptions", keywords: "description length limit words characters rich content caption", html: `<p>Product descriptions have no length limit (a word and character counter shows under the box). Rich-content captions can be up to 1000 characters, link labels up to 200.</p>` }
+]},
+{ id: "gaps", title: "7. Things without an admin screen (yet)", items: [
+  { id: "no-screen", title: "Settings changed outside the admin panel", keywords: "delivery zone fees billing cycles close cycle database migration", html: `<ul>
+    <li><strong>Delivery zone fees</strong> (Small, Medium and Large fee per zone) live in the database and are changed through migrations. There's no admin screen yet.</li>
+    <li><strong>Weekly billing cycles and statements</strong> (close a cycle, approve and mark paid) have server routes under <code>/api/admin/billing/*</code> but no dedicated admin screen yet.</li></ul>
+    <p class="g-tip">Ask for either to be added to the admin panel if you'd like to manage it here.</p>` }
+]}
+]};
+</script>
+<script src="js/lz-guide.js?v=1"></script>
+</body>
+</html>

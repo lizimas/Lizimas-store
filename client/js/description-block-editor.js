@@ -492,7 +492,7 @@
                 // image blocks have no other use for it). Optional.
                 const caption = document.createElement("input");
                 caption.type = "text";
-                caption.maxLength = 300;
+                caption.maxLength = 1000;
                 caption.placeholder = "Caption shown under the photo (optional)";
                 caption.value = b.body || "";
                 caption.addEventListener("input", (e) => { blocks[i].body = e.target.value; });
@@ -567,7 +567,7 @@
 
                 const caption = document.createElement("input");
                 caption.type = "text";
-                caption.maxLength = 300;
+                caption.maxLength = 1000;
                 caption.placeholder = "Caption shown under the video (optional)";
                 caption.value = b.body || "";
                 caption.addEventListener("input", (e) => { blocks[i].body = e.target.value; });
@@ -582,7 +582,7 @@
 
                 const labelInput = document.createElement("input");
                 labelInput.type = "text";
-                labelInput.maxLength = 100;
+                labelInput.maxLength = 200;
                 labelInput.placeholder = 'Link text shown to customers (e.g. "See sizing guide")';
                 labelInput.value = b.body || "";
                 labelInput.addEventListener("input", (e) => { blocks[i].body = e.target.value; });

@@ -832,6 +832,99 @@ exports.downloadStatementCsvVendor = async (req, res) => {
     }
 };
 
+// --- Transactions Exports (vendor) --------------------------------------
+// migrations/129_vendor_transaction_exports.sql. The list under Account
+// Statements; each row can be downloaded again (files are rebuilt on demand).
+const EXPORT_KINDS = ["statement_pdf", "statement_csv", "all_transactions"];
+
+async function vendorStatementLabel(statementId, vendorId) {
+    const { rows } = await pool.query(
+        `SELECT s.id, s.vendor_id, c.period_start::text AS period_start, c.period_end::text AS period_end, s.created_at
+         FROM vendor_statements s LEFT JOIN vendor_billing_cycles c ON c.id = s.cycle_id
+         WHERE s.id = $1`,
+        [statementId]
+    );
+    if (!rows.length) return { error: "Statement not found.", code: 404 };
+    if (Number(rows[0].vendor_id) !== Number(vendorId)) return { error: "This statement does not belong to you.", code: 403 };
+    const r = rows[0];
+    const fmt = (d) => (d ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }) : "");
+    const number = statementNumber({ vendorId, periodEnd: r.period_end || r.created_at });
+    return { label: `${number}${r.period_start ? ` (${fmt(r.period_start)} - ${fmt(r.period_end)})` : ""}` };
+}
+
+exports.listTransactionExportsVendor = async (req, res) => {
+    try {
+        const vendorId = req.vendorId;
+        if (!vendorId) return res.status(404).json({ error: "No vendor profile." });
+        const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 5));
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const [rows, total] = await Promise.all([
+            pool.query(
+                `SELECT id, kind, statement_id, requested, status, created_at
+                 FROM vendor_transaction_exports WHERE vendor_id = $1
+                 ORDER BY created_at DESC, id DESC LIMIT $2 OFFSET $3`,
+                [vendorId, limit, (page - 1) * limit]
+            ),
+            pool.query("SELECT COUNT(*)::int AS n FROM vendor_transaction_exports WHERE vendor_id = $1", [vendorId])
+        ]);
+        res.json({ exports: rows.rows, total: total.rows[0].n, page, limit });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.recordTransactionExportVendor = async (req, res) => {
+    try {
+        const vendorId = req.vendorId;
+        if (!vendorId) return res.status(404).json({ error: "No vendor profile." });
+        const kind = String((req.body || {}).kind || "");
+        if (!EXPORT_KINDS.includes(kind)) return res.status(400).json({ error: "Unknown export type." });
+        let statementId = null;
+        let requested = "All statements";
+        if (kind !== "all_transactions") {
+            statementId = Number((req.body || {}).statement_id);
+            if (!Number.isInteger(statementId) || statementId <= 0) return res.status(400).json({ error: "Choose a statement to export." });
+            const found = await vendorStatementLabel(statementId, vendorId);
+            if (found.error) return res.status(found.code).json({ error: found.error });
+            requested = found.label;
+        }
+        const { rows } = await pool.query(
+            `INSERT INTO vendor_transaction_exports (vendor_id, kind, statement_id, requested, status, created_by)
+             VALUES ($1, $2, $3, $4, 'ready', $5)
+             RETURNING id, kind, statement_id, requested, status, created_at`,
+            [vendorId, kind, statementId, requested, req.user && (req.user.userId || req.user.id) || null]
+        );
+        res.status(201).json(rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Every statement's transactions in one CSV (newest first), one section per
+// statement - the same content as each statement's own CSV.
+exports.downloadAllTransactionsCsvVendor = async (req, res) => {
+    try {
+        const vendorId = req.vendorId;
+        if (!vendorId) return res.status(404).json({ error: "No vendor profile." });
+        const { rows } = await pool.query(
+            `SELECT s.id FROM vendor_statements s LEFT JOIN vendor_billing_cycles c ON c.id = s.cycle_id
+             WHERE s.vendor_id = $1 ORDER BY c.period_start DESC NULLS LAST, s.id DESC`,
+            [vendorId]
+        );
+        if (!rows.length) return res.status(404).json({ error: "You have no statements to export yet." });
+        let csv = "";
+        for (const r of rows) {
+            const data = await loadStatementExport(r.id);
+            csv += generateStatementCsv(data) + "\r\n\r\n";
+        }
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="all-transactions-${new Date().toISOString().slice(0, 10)}.csv"`);
+        res.send(csv);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 // --- Endpoint: mint a share link (vendor) -----------------------------
 // 30-day default expiry. Returns a URL like /api/statements/share/<token>.
 exports.shareStatementVendor = async (req, res) => {
@@ -916,8 +1009,10 @@ exports.listVendorStatements = async (req, res) => {
     try {
         const vendorId = req.vendorId;
         if (!vendorId) return res.status(404).json({ error: "No vendor profile." });
-        const vendorCurrencyRow = await pool.query("SELECT preferred_currency FROM vendors WHERE id = $1", [vendorId]);
+        const vendorCurrencyRow = await pool.query("SELECT preferred_currency, shop_id FROM vendors WHERE id = $1", [vendorId]);
         const currency = vendorCurrencyRow.rows[0]?.preferred_currency || "UGX";
+        // Seller ID shown in the Account Statements breadcrumb.
+        const sellerId = vendorCurrencyRow.rows[0]?.shop_id || null;
 
         // --- Current open cycle ---
         const { rows: cycleRows } = await pool.query(
@@ -1068,7 +1163,8 @@ exports.listVendorStatements = async (req, res) => {
                 open_statement_estimated: openStatementEstimated,
                 paid_last_3_months: paidLast3Months
             },
-            currency
+            currency,
+            seller_id: sellerId
         });
     } catch (error) {
         res.status(500).json({ error: error.message });

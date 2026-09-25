@@ -1443,56 +1443,15 @@ async function vmExportSelectedToJumia() {
 
 let vmPricingPreviewTimer = null;
 
-async function vmLoadAddProduct() {
-    if (!staffCategoriesLoaded) {
-        try {
-            const response = await fetch(`${API_URL}/api/products/categories`);
-            staffCategories = await response.json();
-            staffCategoriesLoaded = true;
-        } catch (error) {
-            console.error("vmLoadAddProduct categories error:", error);
-        }
-    }
-    const select = document.getElementById("vm-product-category");
-    if (select && staffCategories) select.innerHTML = buildGroupedCategoryOptions(staffCategories);
-    syncVmProductCategoryButtonLabel();
-    document.getElementById("vm-product-form-status").textContent = "";
-    const specsList = document.getElementById("vm-specs-list");
-    if (specsList) specsList.innerHTML = "";
-    const specsTableWrap = document.getElementById("vm-specs-table-wrap");
-    if (specsTableWrap) specsTableWrap.innerHTML = "";
-    vmSpecRowCounter = 0;
-}
+
 
 // Mobile counterpart to desktop's syncProductCategoryButtonLabel()/
 // openProductCategoryPicker() in vendor-dashboard.js - same CategoryPicker
 // component, same hidden-<select>-behind-a-button trick, just against the
 // vm- prefixed quick-add fields instead.
-function syncVmProductCategoryButtonLabel() {
-    const select = document.getElementById("vm-product-category");
-    const label = document.getElementById("vm-product-category-btn-label");
-    if (!select || !label) return;
-    const opt = select.options[select.selectedIndex];
-    if (opt && opt.value) {
-        label.textContent = opt.textContent;
-        label.style.color = "#333";
-    } else {
-        label.textContent = "Select a category";
-        label.style.color = "#999";
-    }
-}
 
-function openVmProductCategoryPicker() {
-    if (!window.CategoryPicker) return;
-    const select = document.getElementById("vm-product-category");
-    if (!select) return;
-    CategoryPicker.open(staffCategories, select.value || null, (cat) => {
-        if (!cat) return;
-        select.value = cat.id;
-        select.dispatchEvent(new Event("change"));
-        syncVmProductCategoryButtonLabel();
-    });
-}
+
+
 
 // Same key/value structure as desktop's Specifications section (and
 // staff/admin's) - kept as its own vm-prefixed id/function pair since this
@@ -1827,125 +1786,13 @@ function setupVmSpecsPasteHandler() {
 document.addEventListener("DOMContentLoaded", setupVmSpecsPasteHandler);
 
 
-function vmSchedulePricingPreview() {
-    clearTimeout(vmPricingPreviewTimer);
-    vmPricingPreviewTimer = setTimeout(vmUpdatePricingPreview, 400);
-}
 
-function vmHidePricingPreview() {
-    document.getElementById("vm-pricing-preview").style.display = "none";
-    document.getElementById("vm-pricing-preview-error").style.display = "none";
-}
 
-async function vmUpdatePricingPreview() {
-    const payoutRaw = document.getElementById("vm-product-payout").value;
-    const categoryId = document.getElementById("vm-product-category").value;
-    const previewEl = document.getElementById("vm-pricing-preview");
-    const errorEl = document.getElementById("vm-pricing-preview-error");
 
-    const payout = Number(payoutRaw);
-    if (!payoutRaw || !(payout > 0)) { vmHidePricingPreview(); return; }
 
-    try {
-        const result = await vendorAuthorizedFetch("/api/vendors/pricing/preview", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ desired_payout: payout, category_id: categoryId || null })
-        });
-        if (result.error) {
-            errorEl.textContent = result.error;
-            errorEl.style.display = "block";
-            previewEl.style.display = "none";
-            return;
-        }
-        errorEl.style.display = "none";
-        previewEl.style.display = "block";
-        document.getElementById("vm-preview-customer-price").textContent = Number(result.customer_price).toLocaleString();
-        document.getElementById("vm-preview-payout").textContent = Number(result.vendor_payout).toLocaleString();
-    } catch (error) {
-        console.error("vmUpdatePricingPreview error:", error);
-    }
-}
 
-async function vmSubmitProduct() {
-    const name = document.getElementById("vm-product-name").value.trim();
-    const category_id = document.getElementById("vm-product-category").value;
-    const description = document.getElementById("vm-product-description").value.trim();
-    const desiredPayout = document.getElementById("vm-product-payout").value;
-    const stock = document.getElementById("vm-product-stock").value;
-    const packageSize = document.getElementById("vm-product-package-size").value;
-    const imageFiles = document.getElementById("vm-product-images").files;
-    const statusEl = document.getElementById("vm-product-form-status");
-    const submitBtn = document.getElementById("vm-product-submit-btn");
 
-    if (!name || !desiredPayout || !stock) {
-        statusEl.textContent = "Name, payout, and stock are required.";
-        return;
-    }
-    if (!document.getElementById("vm-product-authenticity-confirm").checked) {
-        statusEl.textContent = "Please confirm the authenticity statement to continue.";
-        return;
-    }
 
-    submitBtn.disabled = true;
-    submitBtn.style.opacity = "0.6";
-    statusEl.textContent = "Saving...";
-
-    const formData = new FormData();
-    formData.append("name", name);
-    formData.append("category_id", category_id);
-    formData.append("description", description);
-    formData.append("desired_payout", desiredPayout);
-    formData.append("stock", stock);
-    formData.append("package_size", packageSize);
-    for (const file of imageFiles) formData.append("images", file);
-
-    try {
-        const token = getVendorToken();
-        const response = await fetch(`${API_URL}/api/vendors/products`, {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${token}` },
-            body: formData
-        });
-        const data = await response.json();
-        submitBtn.disabled = false;
-        submitBtn.style.opacity = "1";
-
-        if (!response.ok) {
-            statusEl.textContent = data.error || "Could not save product.";
-            return;
-        }
-
-        const specsPayload = vmCollectSpecRows();
-        if (data.product && data.product.id && specsPayload.length > 0) {
-            try {
-                await vendorAuthorizedFetch(`/api/vendors/products/${data.product.id}/options`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ specs: specsPayload })
-                });
-            } catch (optionsError) {
-                console.error("vmSubmitProduct specs error:", optionsError);
-            }
-        }
-
-        // Reset the quick-add form for next time.
-        ["vm-product-name", "vm-product-description", "vm-product-payout", "vm-product-stock"].forEach(id => document.getElementById(id).value = "");
-        document.getElementById("vm-product-images").value = "";
-        document.getElementById("vm-product-authenticity-confirm").checked = false;
-        document.getElementById("vm-specs-list").innerHTML = "";
-        const vmSpecsTableWrapAfterSubmit = document.getElementById("vm-specs-table-wrap");
-        if (vmSpecsTableWrapAfterSubmit) vmSpecsTableWrapAfterSubmit.innerHTML = "";
-        vmHidePricingPreview();
-
-        vmShowScreen("products");
-    } catch (error) {
-        console.error("vmSubmitProduct error:", error);
-        submitBtn.disabled = false;
-        submitBtn.style.opacity = "1";
-        statusEl.textContent = "Could not connect to server.";
-    }
-}
 
 // --- Promotions ------------------------------------------------------------
 // Reuses VENDOR_PROMO_STATUS_CLASS/VENDOR_PROMO_STATUS_LABEL and vendorEsc
@@ -2497,3 +2344,53 @@ document.addEventListener("DOMContentLoaded", () => {
 
     vmShowScreen("home");
 });
+
+
+// --- Add / edit product on phones --------------------------------------------
+// Ryan, Sept 2026: the phone uses the SAME product form as the desktop Vendor
+// Center (photos drag-drop/preview, rich content, specifications, variants,
+// packed weight & size) - the #vd-product-form-wrap block is moved into the
+// Add Product screen, and back into the desktop tab when that is opened, so
+// there is only one form to keep up to date.
+function lzPlaceProductForm(hostId) {
+    const wrap = document.getElementById("vd-product-form-wrap");
+    const host = document.getElementById(hostId);
+    if (wrap && host && wrap.parentElement !== host) host.appendChild(wrap);
+}
+
+let vmProductEditing = false;
+
+async function vmLoadAddProduct() {
+    const editing = vmProductEditing;
+    lzPlaceProductForm("vm-add-product-host");
+    if (typeof staffCategoriesLoaded !== "undefined" && staffCategoriesLoaded === false && typeof loadVendorCategories === "function") {
+        await loadVendorCategories();
+    }
+    if (!editing) {
+        if (typeof resetVendorProductForm === "function") resetVendorProductForm();
+        const blockHost = document.getElementById("desc-blocks-editor");
+        if (blockHost && window.LzBlockEditor) {
+            LzBlockEditor.mount(blockHost, null, { tokenKey: "vendorToken", apiBase: "/api/vendors/products" });
+        }
+    }
+    vmProductEditing = false;
+    if (window.LzPackage) LzPackage.bind("product");
+    const title = document.querySelector("#vm-screen-add-product .vm-header-title");
+    if (title && !editing) title.textContent = "Add Product";
+}
+
+// Edit from the phone's Manage Products list (row menu).
+async function vmEditProduct(id) {
+    vmProductEditing = true;
+    vmShowScreen("add-product");
+    lzPlaceProductForm("vm-add-product-host");
+    const title = document.querySelector("#vm-screen-add-product .vm-header-title");
+    if (title) title.textContent = "Edit Product";
+    try {
+        if (typeof editVendorProduct === "function") await editVendorProduct(id);
+    } catch (error) {
+        console.error("vmEditProduct error:", error);
+    }
+    const screen = document.getElementById("vm-screen-add-product");
+    if (screen) screen.scrollTop = 0;
+}

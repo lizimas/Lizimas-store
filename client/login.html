@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+<script src="js/lz-remember.js?v=2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Login - Lizimas Store</title>
@@ -59,8 +60,8 @@
 
         <div class="auth-meta-row">
             <label class="auth-remember" for="login-remember">
-                <input type="checkbox" id="login-remember">
-                Remember me
+                <input type="checkbox" id="login-remember" data-lz-remember="userToken">
+                Keep me logged in
             </label>
             <p class="auth-forgot">
                 <a href="forgot-password.html">Forgot password?</a>
@@ -156,7 +157,7 @@
 </div>
 
 <script src="js/api.js?v=1"></script>
-<script src="js/login.js?v=8"></script>
+<script src="js/login.js?v=9"></script>
 <script src="https://accounts.google.com/gsi/client" async defer
         onload="window.lzGsiReady = true; if (window.lzInitGoogleSignIn) lzInitGoogleSignIn();"></script>
 

@@ -2469,3 +2469,43 @@ table.lz-dr-cal td {
 .lzt-toolbar { flex-wrap: wrap; max-width: 100%; box-sizing: border-box; row-gap: 4px; }
 .lzt-x { white-space: nowrap; }
 @media (max-width: 600px) { .lzt-size { border-left: none; margin-left: 0; padding-left: 4px; } }
+
+/* Admin > Vendors > Vendor Center details (admin.js viewVendorCenterDetails) */
+.admin-vc-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 400; display: flex; justify-content: flex-end; }
+.admin-vc-overlay[hidden] { display: none; }
+.admin-vc-panel { width: min(1100px, 100%); height: 100%; background: #fff; overflow-y: auto; box-shadow: -8px 0 24px rgba(0,0,0,.2); font-size: 15px; }
+.admin-vc-head { position: sticky; top: 0; background: #fff; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 22px 28px 16px; border-bottom: 1px solid #eee; z-index: 1; }
+.admin-vc-head h3 { margin: 0 0 4px; font-size: 22px; color: #1a1a2e; }
+.admin-vc-close { background: none; border: 0; font-size: 30px; line-height: 1; cursor: pointer; color: #444; padding: 0 6px; }
+.admin-vc-body { padding: 10px 28px 40px; }
+.admin-vc-body section { margin-top: 22px; }
+.admin-vc-h { font-size: 19px; color: #1a1a2e; border-bottom: 3px solid #f4b400; display: inline-block; padding-bottom: 4px; margin: 0 0 8px; }
+.admin-vc-body h4 { font-size: 15.5px; margin: 18px 0 8px; color: #333; }
+.admin-vc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 24px; margin: 0; }
+.admin-vc-row { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid #f1f1f3; }
+.admin-vc-row dt { flex: 0 0 46%; color: #666; font-size: 14px; }
+.admin-vc-row dd { margin: 0; color: #111; font-size: 14.5px; word-break: break-word; }
+.admin-vc-row-hl { background: #fffaf0; padding-left: 8px; padding-right: 8px; }
+.admin-vc-muted { color: #888; font-size: 13.5px; }
+.admin-vc-body table { width: 100%; font-size: 14px; }
+@media (max-width: 700px) { .admin-vc-head, .admin-vc-body { padding-left: 16px; padding-right: 16px; } .admin-vc-row { flex-direction: column; gap: 2px; } }
+
+/* Packed weight & size -> automatic delivery tier (client/js/lz-package-size.js) */
+.lz-pack { border: 1px solid #e3e5e8; border-radius: 10px; padding: 12px 14px; background: #fafbfc; }
+.lz-pack-title { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; }
+.lz-pack-sub { font-weight: 400; color: #777; font-size: 13px; }
+.lz-pack-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.lz-pack-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #555; }
+.lz-pack-field input { width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; background: #fff; }
+.lz-pack-field input:focus { outline: 2px solid #1a1a2e; outline-offset: 1px; }
+.lz-pack-note { margin: 8px 0 0; font-size: 13px; color: #1b5e20; }
+.lz-pack-note-error { color: #b3261e; }
+@media (max-width: 560px) { .lz-pack-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* product description: roomier box + live word/character count (lz-text-counter.js) */
+textarea#product-description { min-height: 220px; resize: vertical; font-size: 14.5px; line-height: 1.5; }
+.lz-text-count { font-size: 12.5px; color: #777; margin-top: 4px; text-align: right; }
+/* Guide links in the admin / vendor sidebars */
+.admin-guide-link { display: block; text-decoration: none; color: inherit; padding: 9px 14px 9px 40px; font-size: 13.5px; border-radius: 8px; opacity: .9; }
+.admin-guide-link:hover { opacity: 1; background: rgba(255,255,255,.08); }
+.vd-guide-link { display: flex; align-items: center; gap: 10px; text-decoration: none; color: rgba(255,255,255,.85); padding: 10px 14px; border-radius: 10px; font-size: 15px; }
+.vd-guide-link:hover { background: rgba(255,255,255,.08); color: #fff; }

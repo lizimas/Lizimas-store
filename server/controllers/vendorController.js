@@ -1563,7 +1563,7 @@ exports.getVendorProductsAdmin = async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
-            `SELECT id, name, image, status, is_active, admin_restricted, restricted_reason
+            `SELECT id, name, image, sku, lizimas_sku, stock, status, is_active, admin_restricted, restricted_reason
              FROM products WHERE vendor_id = $1 AND deleted_at IS NULL
              ORDER BY name ASC`,
             [id]

@@ -1290,7 +1290,9 @@ function renderProductsTable() {
     });
 
     if (searchTerm) {
-        filtered = filtered.filter(p => p.name.toLowerCase().includes(searchTerm));
+        filtered = filtered.filter(p => p.name.toLowerCase().includes(searchTerm)
+            || String(p.sku || "").toLowerCase().includes(searchTerm)
+            || String(p.lizimas_sku || "").toLowerCase().includes(searchTerm));
     }
 
     if (filtered.length === 0) {
@@ -1315,7 +1317,7 @@ function renderProductsTable() {
                 ${filtered.map(p => `
                     <tr>
                         <td data-label=""><img class="product-table-thumb" src="${p.image || ''}" onerror="this.style.visibility='hidden'"></td>
-                        <td data-label="Name">${p.name} <span style="color:#999; font-size:0.85em; white-space:nowrap;">#${p.id}</span>${p.possible_duplicate_of ? `<div style="font-size:11px; color:#B45309; margin-top:2px;">&#9888; possible duplicate of #${p.possible_duplicate_of}</div>` : ""}</td>
+                        <td data-label="Name">${p.name} <span style="color:#999; font-size:0.85em; white-space:nowrap;">#${p.id}</span><div style="font-size:12px; color:#666; margin-top:2px;">Seller SKU: ${adminEsc(p.sku || "—")} &middot; Lizimas SKU: ${adminEsc(p.lizimas_sku || "—")}</div>${p.possible_duplicate_of ? `<div style="font-size:11px; color:#B45309; margin-top:2px;">&#9888; possible duplicate of #${p.possible_duplicate_of}</div>` : ""}</td>
                         <td data-label="Category">${p.category || "—"}</td>
                         <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
                         <td data-label="Stock">${p.stock}</td>
@@ -2012,6 +2014,7 @@ function openProductForm() {
     document.getElementById("product-price").value = "";
     document.getElementById("product-stock").value = "";
     document.getElementById("product-package-size").value = "Small";
+    if (window.LzPackage) LzPackage.fill("product", null);
     document.getElementById("product-image").value = "";
     pdPickedFiles = [];
     document.getElementById("product-image-preview").innerHTML = "";
@@ -2049,6 +2052,7 @@ function editProduct(id) {
     document.getElementById("product-price").value = product.price;
     document.getElementById("product-stock").value = product.stock;
     document.getElementById("product-package-size").value = product.package_size || "Small";
+    if (window.LzPackage) LzPackage.fill("product", product);
     document.getElementById("product-warranty-months").value = product.warranty_months || "";
     document.getElementById("product-brand").value = product.brand || "";
     document.getElementById("product-gtin").value = product.gtin || "";
@@ -2097,6 +2101,13 @@ async function saveProduct() {
     const saveBtnLabel = saveBtn ? saveBtn.textContent : null;
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving..."; }
 
+    // Delivery size is worked out from the packed weight/dimensions (lz-package-size.js).
+    const packError = window.LzPackage ? LzPackage.validate("product", !(document.getElementById("product-id") || {}).value) : null;
+    if (packError) {
+        const packStatus = document.getElementById("product-form-status");
+        if (packStatus) packStatus.textContent = packError; else alert(packError);
+        return;
+    }
     const formData = new FormData();
     formData.append("name", name);
     formData.append("category_id", category_id);
@@ -2104,6 +2115,7 @@ async function saveProduct() {
     formData.append("price", price);
     formData.append("stock", stock);
     formData.append("package_size", packageSize);
+    if (window.LzPackage) LzPackage.appendTo(formData, "product");
     formData.append("warranty_months", warrantyMonths);
     formData.append("brand", brand);
     formData.append("gtin", gtin);
@@ -3429,7 +3441,7 @@ async function viewPendingProduct(id) {
             ${category ? escapeReportText(category.name) : "Uncategorized"}${p.brand ? " · " + escapeReportText(p.brand) : ""}
         </div>
         <div style="font-size:20px; font-weight:700; color:#111; margin-bottom:4px;">UGX ${Number(p.price).toLocaleString()}</div>
-        <div style="font-size:13px; color:#777; margin-bottom:10px;">Stock: ${p.stock ?? "-"}${p.sku ? " &nbsp;·&nbsp; SKU: " + escapeReportText(p.sku) : ""}</div>
+        <div style="font-size:13px; color:#777; margin-bottom:10px;">Stock: ${p.stock ?? "-"}${p.sku ? " &nbsp;·&nbsp; Seller SKU: " + escapeReportText(p.sku) : ""}${p.lizimas_sku ? " &nbsp;·&nbsp; Lizimas SKU: " + escapeReportText(p.lizimas_sku) : ""}</div>
         ${extraFieldsHtml}
         <div style="font-size:14px; line-height:1.55; white-space:pre-wrap; margin-bottom:16px; color:#222;">
             ${p.description ? escapeReportText(p.description) : '<span style="color:#999; font-style:italic;">No description provided.</span>'}
@@ -7182,14 +7194,14 @@ async function loadConsignmentsAdmin() {
         }
         container.innerHTML = `
             <table>
-                <thead><tr><th>#</th><th>Vendor</th><th>Hub</th><th>Items</th><th>Status</th><th>Requested</th><th></th></tr></thead>
+                <thead><tr><th>CO Number</th><th>Vendor</th><th>Hub</th><th>Items</th><th>Status</th><th>Requested</th><th></th></tr></thead>
                 <tbody>
                     ${consignments.map(c => {
                         const itemsSummary = (c.items || []).map(i => `${adminEsc(i.product_name)} &times; ${i.quantity_requested}${i.quantity_received != null ? ` (recv ${i.quantity_received})` : ""}`).join("<br>");
                         const canReview = c.status === "requested" || c.status === "in_transit";
                         return `
                             <tr>
-                                <td data-label="#">${c.id}</td>
+                                <td data-label="CO Number">CO-${String(c.id).padStart(6, "0")}</td>
                                 <td data-label="Vendor">${adminEsc(c.vendor_business_name)}</td>
                                 <td data-label="Hub">${adminEsc(c.dropoff_point_name)}</td>
                                 <td data-label="Items">${itemsSummary}</td>
@@ -7213,7 +7225,7 @@ function openAdminConsignmentReview(id) {
     adminConsignmentReviewingId = id;
     document.getElementById("admin-consignment-review-error").textContent = "";
     document.getElementById("admin-consignment-review-notes").value = "";
-    document.getElementById("admin-consignment-review-id").textContent = `#${c.id}`;
+    document.getElementById("admin-consignment-review-id").textContent = `CO-${String(c.id).padStart(6, "0")}`;
     document.getElementById("admin-consignment-review-meta").textContent = `${c.vendor_business_name} - shipping to ${c.dropoff_point_name}${c.vendor_notes ? ` - vendor note: ${c.vendor_notes}` : ""}`;
 
     document.getElementById("admin-consignment-review-lines").innerHTML = `
@@ -7222,7 +7234,7 @@ function openAdminConsignmentReview(id) {
             <tbody>
                 ${(c.items || []).map(i => `
                     <tr>
-                        <td data-label="Product">${adminEsc(i.product_name)}${i.product_sku ? ` (${adminEsc(i.product_sku)})` : ""}</td>
+                        <td data-label="Product">${adminEsc(i.product_name)}<div style="font-size:12px; color:#666;">Seller SKU: ${adminEsc(i.product_sku || "—")} &middot; Lizimas SKU: ${adminEsc(i.product_lizimas_sku || "—")}</div></td>
                         <td data-label="Requested">${i.quantity_requested}</td>
                         <td data-label="Received"><input type="number" class="admin-cline-received" data-item-id="${i.id}" value="${i.quantity_requested}" min="0" style="width:90px; padding:6px; border:1px solid #ccc; border-radius:6px;"></td>
                     </tr>`).join("")}
@@ -8128,6 +8140,7 @@ function renderVendorCompliancePanel() {
                                     : `<button onclick="freezeVendorAccountPayouts(${v.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">Freeze Payouts</button>`}
                                 <button onclick="toggleVendorComplianceProducts(${v.id})" style="background:#fff; color:#1a1a2e; border:1px solid #1a1a2e; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">Products</button>
                                 <button onclick="viewVendorComplianceHistory(${v.id})" style="background:#fff; color:#1a1a2e; border:1px solid #1a1a2e; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">History</button>
+                                <button onclick="viewVendorCenterDetails(${v.id})" style="background:#f4b400; color:#1a1a2e; border:none; border-radius:6px; padding:5px 8px; font-size:12px; font-weight:600; cursor:pointer;">Vendor Center</button>
                             </div>
                             ${vendorComplianceOpenProductsId === v.id ? `<div id="vendor-compliance-products-${v.id}" style="margin-top:10px;">Loading...</div>` : ""}
                         </td>
@@ -8267,10 +8280,10 @@ async function loadVendorComplianceProducts(vendorId) {
                 <tbody>
                     ${products.map(p => `
                         <tr>
-                            <td data-label="Product">${p.name}</td>
+                            <td data-label="Product">${adminEsc(p.name)}<div style="font-size:12px; color:#666;">Seller SKU: ${adminEsc(p.sku || "—")} &middot; Lizimas SKU: ${adminEsc(p.lizimas_sku || "—")}</div></td>
                             <td data-label="Status">
                                 ${p.admin_restricted
-                                    ? `<span class="status-badge status-cancelled">Restricted</span>${p.restricted_reason ? ` <span style="color:#888; font-size:12px;">${p.restricted_reason}</span>` : ""}`
+                                    ? `<span class="status-badge status-cancelled" title="The vendor sees this as Unauthorized">Restricted</span>${p.restricted_reason ? ` <span style="color:#888; font-size:12px;">${p.restricted_reason}</span>` : ""}`
                                     : `<span class="status-badge status-paid">${p.status}</span>`}
                             </td>
                             <td data-label="Action">
@@ -10431,4 +10444,92 @@ function adminCommitBulkPaste() {
     } else {
         alert("Nothing to add — no valid label/value rows found.");
     }
+}
+
+
+// --- Vendor Center details (read-only) -------------------------------------
+// Ryan, Sept 2026: everything a vendor fills in / does in the Lizimas Vendor
+// Center that admin should be able to inspect - shop setup answers (incl.
+// existing shop name(s) + reason for a new shop), transaction exports and
+// promotion monitoring (page views, items sold, revenue).
+// GET /api/admin/vendors/:id/vendor-center (adminVendorCenterController.js).
+async function viewVendorCenterDetails(vendorId) {
+    let overlay = document.getElementById("admin-vc-overlay");
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "admin-vc-overlay";
+        overlay.className = "admin-vc-overlay";
+        overlay.addEventListener("click", (e) => { if (e.target === overlay) closeVendorCenterDetails(); });
+        document.body.appendChild(overlay);
+    }
+    overlay.innerHTML = `<div class="admin-vc-panel" role="dialog" aria-modal="true" aria-label="Vendor Center details"><div class="admin-vc-body">Loading...</div></div>`;
+    overlay.hidden = false;
+    try {
+        const d = await authorizedFetch(`/api/admin/vendors/${Number(vendorId)}/vendor-center`);
+        if (!d || d.error) { overlay.querySelector(".admin-vc-body").textContent = (d && d.error) || "Could not load details."; return; }
+        overlay.querySelector(".admin-vc-panel").innerHTML = renderVendorCenterDetails(d);
+    } catch (error) {
+        console.error("viewVendorCenterDetails error:", error);
+        overlay.querySelector(".admin-vc-body").textContent = "Could not load details.";
+    }
+}
+
+function closeVendorCenterDetails() {
+    const overlay = document.getElementById("admin-vc-overlay");
+    if (overlay) overlay.hidden = true;
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeVendorCenterDetails(); });
+
+function renderVendorCenterDetails(d) {
+    const v = d.vendor;
+    const p = d.shop_profile;
+    const yn = (b) => (b === true ? "Yes" : b === false ? "No" : "—");
+    const val = (x) => (x == null || x === "" ? '<span class="admin-vc-muted">Not filled in</span>' : adminEsc(x));
+    const addr = (prefix) => p ? [p[prefix + "_address_line1"], p[prefix + "_address_line2"], p[prefix + "_city"], p[prefix + "_region"], p[prefix + "_postal_code"], p[prefix + "_country"]].filter(Boolean).map(adminEsc).join(", ") || '<span class="admin-vc-muted">Not filled in</span>' : "";
+    const row = (label, value, highlight) => `<div class="admin-vc-row${highlight ? " admin-vc-row-hl" : ""}"><dt>${label}</dt><dd>${value}</dd></div>`;
+    const when = (x) => x ? new Date(x).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+    const day = (x) => x ? new Date(x).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+    const EXPORT_TYPE = { statement_pdf: "Statement transactions (PDF)", statement_csv: "Statement transactions (CSV)", all_transactions: "All transactions (CSV)" };
+
+    const shop = !p ? '<p class="admin-vc-muted">This vendor has not started shop setup yet.</p>' : `
+        <h4>Shop information</h4><dl class="admin-vc-grid">
+            ${row("Contact name", val(p.contact_name))}${row("Contact email", val(p.contact_email))}${row("Contact phone", val(p.contact_phone))}
+            ${row("Customer care phone", val(p.cc_phone))}${row("Customer care email", val(p.cc_email))}
+        </dl>
+        <h4>Company information</h4><dl class="admin-vc-grid">
+            ${row("Legal representative", val(p.legal_rep_full_name))}${row("Business address", addr("business"))}
+        </dl>
+        <h4>Shipping &amp; returns</h4><dl class="admin-vc-grid">
+            ${row("Shipping address", p.ship_same_as_business ? "Same as business address" : addr("ship"))}
+            ${row("Return address", p.return_same_as_business ? "Same as business address" : addr("return"))}
+        </dl>
+        <h4>Additional information - Shop details</h4><dl class="admin-vc-grid">
+            ${row("Existing shop on Lizimas Store?", yn(p.has_existing_shop), p.has_existing_shop === true)}
+            ${p.has_existing_shop === true ? row("Existing shop name(s)", val(p.existing_shop_names), true) + row("Reason for creating this shop", val(p.new_shop_reason), true) : ""}
+            ${row("Type of seller", p.seller_type_labels && p.seller_type_labels.length ? p.seller_type_labels.map(adminEsc).join(", ") : val(null))}
+        </dl>
+        <h4>Additional information - Catalog details</h4><dl class="admin-vc-grid">
+            ${row("Primary product category", val(p.primary_category_name))}${row("How they source products", val(p.sourcing_method_label))}
+            ${row("Also sells offline?", yn(p.sells_offline))}${row("Uses other online channels?", yn(p.uses_other_channels))}
+        </dl>
+        <p class="admin-vc-muted">Last updated ${when(p.updated_at)}</p>`;
+
+    const exportsHtml = d.transaction_exports.length
+        ? `<table><thead><tr><th>Type</th><th>Requested</th><th>Created</th><th>Status</th></tr></thead><tbody>${d.transaction_exports.map((e) => `<tr><td>${adminEsc(EXPORT_TYPE[e.kind] || e.kind)}</td><td>${adminEsc(e.requested || "")}</td><td>${when(e.created_at)}</td><td>${e.status === "ready" ? "Ready" : "Failed"}</td></tr>`).join("")}</tbody></table>`
+        : '<p class="admin-vc-muted">No exports yet.</p>';
+
+    const kind = (r) => (r.kind === "flash_sale" ? `Lizimas flash sale${r.campaign_name ? ": " + r.campaign_name : ""}` : r.campaign_name ? "Campaign: " + r.campaign_name : "Vendor promotion");
+    const promosHtml = d.promotions.length
+        ? `<table><thead><tr><th>Product</th><th>Seller SKU / Lizimas SKU</th><th>Promotion</th><th>Page Views</th><th>Items Sold</th><th>Revenue (UGX)</th><th>Period</th><th>Status</th></tr></thead><tbody>${d.promotions.map((r) => `<tr><td>${adminEsc(r.product_name)}</td><td>${adminEsc(r.sku || "—")}<br><span class="admin-vc-muted">${adminEsc(r.lizimas_sku || "")}</span></td><td>${adminEsc(kind(r))}</td><td>${Number(r.page_views).toLocaleString()}</td><td>${Number(r.items_sold).toLocaleString()}</td><td>${Number(r.revenue).toLocaleString()}</td><td>${day(r.starts_at)} – ${day(r.ends_at)}</td><td>${r.status === "ongoing" ? "Ongoing" : "Expired"}</td></tr>`).join("")}</tbody></table>`
+        : '<p class="admin-vc-muted">No promotions have run yet.</p>';
+
+    return `<div class="admin-vc-head">
+            <div><h3>${adminEsc(v.business_name)}</h3><div class="admin-vc-muted">Seller ID ${adminEsc(v.shop_id || "not assigned")} &middot; ${adminEsc(v.owner_name || "")} &middot; ${adminEsc(v.owner_email || "")}</div></div>
+            <button type="button" class="admin-vc-close" aria-label="Close" onclick="closeVendorCenterDetails()">&times;</button>
+        </div>
+        <div class="admin-vc-body">
+            <section><h3 class="admin-vc-h">Shop setup</h3>${shop}</section>
+            <section><h3 class="admin-vc-h">Transactions exports</h3>${exportsHtml}</section>
+            <section><h3 class="admin-vc-h">Promotion monitoring</h3>${promosHtml}</section>
+        </div>`;
 }

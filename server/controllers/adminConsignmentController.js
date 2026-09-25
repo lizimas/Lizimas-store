@@ -31,7 +31,7 @@ exports.listConsignmentsAdmin = async (req, res) => {
 
         const ids = consignments.map((c) => c.id);
         const { rows: items } = await pool.query(
-            `SELECT ci.*, p.name AS product_name, p.sku AS product_sku
+            `SELECT ci.*, p.name AS product_name, p.sku AS product_sku, p.lizimas_sku AS product_lizimas_sku
              FROM vendor_consignment_items ci
              JOIN products p ON p.id = ci.product_id
              WHERE ci.consignment_id = ANY($1::int[])

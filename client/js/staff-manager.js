@@ -404,6 +404,7 @@ function loadProductIntoForm(product) {
     document.getElementById("product-price").value = product.price;
     document.getElementById("product-stock").value = product.stock;
     document.getElementById("product-package-size").value = product.package_size || "Small";
+    if (window.LzPackage) LzPackage.fill("product", product);
     document.getElementById("product-warranty-months").value = product.warranty_months || "";
     document.getElementById("product-brand").value = product.brand || "";
     document.getElementById("product-gtin").value = product.gtin || "";
@@ -421,6 +422,7 @@ function resetProductForm() {
     document.getElementById("product-price").value = "";
     document.getElementById("product-stock").value = "";
     document.getElementById("product-package-size").value = "Small";
+    if (window.LzPackage) LzPackage.fill("product", null);
     document.getElementById("product-warranty-months").value = "";
     document.getElementById("product-brand").value = "";
     document.getElementById("product-gtin").value = "";
@@ -473,6 +475,13 @@ async function submitProductForm() {
     submitBtn.disabled = true;
     submitBtn.style.opacity = "0.6";
 
+    // Delivery size is worked out from the packed weight/dimensions (lz-package-size.js).
+    const packError = window.LzPackage ? LzPackage.validate("product", !(document.getElementById("product-id") || {}).value) : null;
+    if (packError) {
+        const packStatus = document.getElementById("product-form-status");
+        if (packStatus) packStatus.textContent = packError; else alert(packError);
+        return;
+    }
     const formData = new FormData();
     formData.append("name", name);
     formData.append("category_id", category_id);
@@ -480,6 +489,7 @@ async function submitProductForm() {
     formData.append("price", price);
     formData.append("stock", stock);
     formData.append("package_size", packageSize);
+    if (window.LzPackage) LzPackage.appendTo(formData, "product");
     formData.append("warranty_months", warrantyMonths);
     formData.append("brand", brand);
     formData.append("gtin", gtin);

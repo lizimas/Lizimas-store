@@ -79,7 +79,10 @@ const {
     downloadStatementPdfVendor,
     downloadStatementCsvVendor,
     shareStatementVendor,
-    updateMyPreferredCurrency
+    updateMyPreferredCurrency,
+    listTransactionExportsVendor,
+    recordTransactionExportVendor,
+    downloadAllTransactionsCsvVendor
 } = require("../controllers/billingController");
 const {
     addProduct,
@@ -343,5 +346,8 @@ router.patch("/me/currency", requireVendorPermission("vc_finance_viewer"), updat
 router.get("/me/statements/:id/pdf", requireVendorPermission("vc_finance_viewer"), downloadStatementPdfVendor);
 router.get("/me/statements/:id/csv", requireVendorPermission("vc_finance_viewer"), downloadStatementCsvVendor);
 router.post("/me/statements/:id/share", requireVendorPermission("vc_finance_viewer"), shareStatementVendor);
+router.get("/me/transactions/export.csv", requireVendorPermission("vc_finance_viewer"), downloadAllTransactionsCsvVendor);
+router.get("/me/transaction-exports", requireVendorPermission("vc_finance_viewer"), listTransactionExportsVendor);
+router.post("/me/transaction-exports", requireVendorPermission("vc_finance_viewer"), recordTransactionExportVendor);
 
 module.exports = router;

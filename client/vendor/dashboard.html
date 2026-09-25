@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="../js/lz-remember.js?v=2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Vendor Dashboard</title>
-<link rel="stylesheet" href="../css/admin.css?v=37">
-<link rel="stylesheet" href="../css/vendor-desktop.css?v=4">
-<link rel="stylesheet" href="../css/vendor-mobile.css?v=10">
+<link rel="stylesheet" href="../css/admin.css?v=41">
+<link rel="stylesheet" href="../css/vendor-desktop.css?v=8">
+<link rel="stylesheet" href="../css/vendor-mobile.css?v=11">
 </head>
 <body>
 
@@ -203,6 +204,10 @@
         <div class="vm-card" style="padding:4px 16px;">
             <div class="vm-group-header"><span class="vm-group-header-label">Platform Settings</span></div>
             <div class="vm-list-row" style="cursor:default;"><span class="vm-list-row-label">Currency</span><span style="font-size:12.5px; color:#888;">UGX &mdash; Uganda Shilling</span></div>
+            <a class="vm-list-row" href="../seller-guide.html" target="_blank" rel="noopener" style="text-decoration:none; color:inherit;">
+                <span class="vm-list-row-label">Seller Guide (how everything works)</span>
+                <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
+            </a>
             <button class="vm-list-row" onclick="vmShowScreen('commissions-fees')">
                 <span class="vm-list-row-label">Commissions and Fees</span>
                 <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
@@ -420,64 +425,10 @@
 
     <div class="vm-screen" id="vm-screen-add-product">
         <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Add Product</span></div>
-        <div class="vm-card">
-            <div class="vm-card-subtitle">Core details only for now &mdash; add brand, warranty and other extras from a larger screen once the product exists.</div>
-            <div class="vm-field">
-                <label class="vm-field-label">Product Name</label>
-                <input type="text" id="vm-product-name" class="vm-field-input" placeholder="e.g. Men's Leather Belt">
-            </div>
-            <div class="vm-field">
-                <label class="vm-field-label">Category</label>
-                <button type="button" id="vm-product-category-btn" class="vm-field-input" onclick="openVmProductCategoryPicker()" style="text-align:left; background:#fff; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
-                    <span id="vm-product-category-btn-label" style="color:#999;">Select a category</span>
-                    <span style="color:#F5C518;">&#128269;</span>
-                </button>
-                <select id="vm-product-category" style="display:none;" onchange="vmSchedulePricingPreview()"><option value="">Loading...</option></select>
-            </div>
-            <div class="vm-field">
-                <label class="vm-field-label">Description</label>
-                <textarea id="vm-product-description" class="vm-field-input" rows="3" placeholder="Describe your product"></textarea>
-            </div>
-            <div class="vm-field">
-                <label class="vm-field-label">Your Payout (UGX)</label>
-                <input type="number" id="vm-product-payout" class="vm-field-input" placeholder="Amount you want to be paid" oninput="vmSchedulePricingPreview()">
-            </div>
-            <div class="vm-note vm-note-info" id="vm-pricing-preview" style="display:none; margin-bottom:14px;">
-                Customer price: UGX <strong><span id="vm-preview-customer-price">0</span></strong><br>
-                Your payout: UGX <strong><span id="vm-preview-payout">0</span></strong>
-            </div>
-            <div class="vm-note" id="vm-pricing-preview-error" style="display:none; margin-bottom:14px; background:#fce8e6; color:#c5221f;"></div>
-            <div class="vm-field">
-                <label class="vm-field-label">Stock</label>
-                <input type="number" id="vm-product-stock" class="vm-field-input" placeholder="Quantity available">
-            </div>
-            <div class="vm-field">
-                <label class="vm-field-label">Package Size (delivery tier)</label>
-                <select id="vm-product-package-size" class="vm-field-input">
-                    <option value="Small">Small &mdash; fits in a boda rider's bag</option>
-                    <option value="Medium">Medium &mdash; boda, strapped or on the seat</option>
-                    <option value="Large">Large &mdash; van or special hire, one person</option>
-                    <option value="Extra Large">Extra Large &mdash; pickup or truck, two people</option>
-                </select>
-            </div>
-            <div class="vm-field">
-                <label class="vm-field-label">Photos</label>
-                <input type="file" id="vm-product-images" class="vm-field-input" accept="image/*" multiple>
-            </div>
-            <div class="vm-field">
-                <label class="vm-field-label">Specifications <span style="font-weight:400; color:#888;">(optional, shown on the product page)</span></label>
-                <div id="vm-specs-list" style="display:flex; flex-direction:column; gap:6px;"></div>
-                <button type="button" onclick="vmAddSpecRow()" class="vm-btn-help" style="border:1px solid #dfe1e8; border-radius:8px; padding:8px; margin-top:6px; background:#fff; cursor:pointer; width:100%;">+ Add Specification</button>
-
-                <div class="lz-spec-tools" data-add="vmAddSpecRow" data-table-id="vm-specs-table-wrap"></div>
-            </div>
-            <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; color:#555; margin:14px 0;">
-                <input type="checkbox" id="vm-product-authenticity-confirm" style="margin-top:2px;">
-                <span>I confirm this product is authentic and accurately described.</span>
-            </label>
-            <button class="vm-btn-primary" id="vm-product-submit-btn" onclick="vmSubmitProduct()">Save Product</button>
-            <div class="vm-btn-help" id="vm-product-form-status"></div>
+        <div class="vm-card vm-add-product-intro">
+            Same form as the desktop Vendor Center. Follow the <a href="../vendor-policies.html#content-images" target="_blank">Content &amp; Image Guidelines</a>: accurate name and description, your desired payout in UGX (Lizimas calculates the customer price), and at least three clear photos of the actual item. New listings are reviewed before they go live.
         </div>
+        <div id="vm-add-product-host" class="vm-add-product-host"></div>
     </div>
 
     <!-- Promotions -------------------------------------------------------------- -->
@@ -686,6 +637,9 @@
                     <button class="tab-btn" data-tab="messages">
                         <span class="sidebar-icon">&#128172;</span> Support
                     </button>
+                    <a class="vd-guide-link" href="../seller-guide.html" target="_blank" rel="noopener">
+                        <span class="sidebar-icon">&#128214;</span> Seller Guide
+                    </a>
                 </nav>
 
                 <div class="vd-sidebar-profile">
@@ -1096,6 +1050,9 @@
                         calculates the customer price for you), and at least three clear photos that show the actual item. New listings are reviewed before they go live.
                     </p>
 
+                    <!-- The same form is shown on phones: vendor-mobile.js moves this wrapper into the Add Product screen. -->
+                    <div id="vd-product-form-wrap">
+
                     <div class="panel">
                         <input type="hidden" id="product-id">
                         <div class="product-form-sections">
@@ -1121,7 +1078,7 @@
                                     </div>
                                     <div>
                                         <label style="font-size:13px; font-weight:600; color:#333;">Description</label>
-                                        <textarea id="product-description" rows="4" placeholder="Features, condition, intended use, and everything included in the box" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;"></textarea>
+                                        <textarea id="product-description" data-lz-count rows="10" placeholder="Features, condition, intended use, and everything included in the box" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;"></textarea>
                                     </div>
                                 </div>
                                 <div style="margin-top:14px;">
@@ -1149,13 +1106,17 @@
                                     </div>
                                     <p id="pricing-preview-error" style="display:none; font-size:12px; color:#B45309; background:#FFFBEB; border-radius:6px; padding:8px;"></p>
                                     <div>
-                                        <label style="font-size:13px; font-weight:600; color:#333;">Package Size (delivery tier)</label>
-                                        <select id="product-package-size" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%;">
-                                            <option value="Small">Small — fits in a boda rider's bag</option>
-                                            <option value="Medium">Medium — boda, strapped or on the seat</option>
-                                            <option value="Large">Large — van or special hire, one person</option>
-                                            <option value="Extra Large">Extra Large — pickup or truck, two people</option>
-                                        </select>
+                                        <div class="lz-pack" data-lz-pack="product">
+    <div class="lz-pack-title">Packed weight &amp; size <span class="lz-pack-sub">(sets the delivery charge automatically)</span></div>
+    <div class="lz-pack-grid">
+        <label class="lz-pack-field"><span>Weight (kg) *</span><input type="number" id="product-weight-kg" class="lz-pack-input" min="0.01" step="0.01" inputmode="decimal" placeholder="e.g. 1.5"></label>
+        <label class="lz-pack-field"><span>Length (cm)</span><input type="number" id="product-length-cm" class="lz-pack-input" min="0.1" step="0.1" inputmode="decimal" placeholder="L"></label>
+        <label class="lz-pack-field"><span>Width (cm)</span><input type="number" id="product-width-cm" class="lz-pack-input" min="0.1" step="0.1" inputmode="decimal" placeholder="W"></label>
+        <label class="lz-pack-field"><span>Height (cm)</span><input type="number" id="product-height-cm" class="lz-pack-input" min="0.1" step="0.1" inputmode="decimal" placeholder="H"></label>
+    </div>
+    <input type="hidden" id="product-package-size" value="Small">
+    <p class="lz-pack-note" id="product-package-tier-note" aria-live="polite"></p>
+</div>
                                     </div>
                                     <div style="display:flex; gap:12px;">
                                         <div style="flex:1;">
@@ -1230,6 +1191,7 @@
                         <button onclick="saveVendorProductOptions()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; margin-right:8px;">Save Colours/Sizes</button>
                         <p id="vendor-variant-options-status" style="font-size:13px; color:#666; margin-top:8px;"></p>
                         <div id="vendor-variant-stock-area" style="margin-top:16px;"></div>
+                    </div>
                     </div>
                 </section>
 
@@ -1921,10 +1883,12 @@
     <script src="../js/lz-table.js?v=5"></script>
     <script src="../js/lz-spec-tools.js?v=2"></script>
     <script src="../js/description-block-editor.js?v=19"></script>
-    <script src="../js/vendor-dashboard.js?v=27"></script>
-    <script src="../js/vendor-statements.js?v=2"></script>
-<script src="../js/vendor-mobile.js?v=12"></script>
-<script src="../js/vendor-products.js?v=1"></script>
+    <script src="../js/lz-package-size.js?v=2"></script>
+    <script src="../js/lz-text-counter.js?v=1"></script>
+    <script src="../js/vendor-dashboard.js?v=28"></script>
+    <script src="../js/vendor-statements.js?v=4"></script>
+<script src="../js/vendor-mobile.js?v=13"></script>
+<script src="../js/vendor-products.js?v=2"></script>
 <script src="../js/vendor-consignments.js?v=1"></script>
 <script src="../js/vendor-promo-monitor.js?v=2"></script>
 <script src="../js/vendor-shop-setup.js?v=4"></script>

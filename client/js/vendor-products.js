@@ -327,7 +327,8 @@ function vpOpenRowMenu(id, ev) {
     const f = vpFlags(p);
     const canToggle = f.approved && !f.unauthorized;
     const items = [];
-    if (typeof editVendorProduct === "function" && !window.matchMedia("(max-width: 768px)").matches) items.push(`<button type="button" onclick="vpCloseMenus(); editVendorProduct(${Number(id)})">Edit</button>`);
+    const onPhone = window.matchMedia("(max-width: 768px)").matches;
+    if (!f.deleted) items.push(`<button type="button" onclick="vpCloseMenus(); ${onPhone ? "vmEditProduct" : "editVendorProduct"}(${Number(id)})">Edit</button>`);
     if (canToggle) items.push(`<button type="button" onclick="vpCloseMenus(); vpToggleActive(${Number(id)}, ${!f.active})">${f.active ? "Deactivate" : "Activate"}</button>`);
     items.push(`<button type="button" class="vp-danger" onclick="vpCloseMenus(); vpDeleteOne(${Number(id)})">Delete</button>`);
     const menu = document.createElement("div");

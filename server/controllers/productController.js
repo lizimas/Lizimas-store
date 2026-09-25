@@ -44,6 +44,7 @@ function uploadBufferToCloudinary(fileBuffer) {
 }
 
 const { SIZE_RANK } = require("../utils/deliveryPricing");
+const { readMeasurements, saveMeasurements } = require("../utils/packageMeasurements");
 
 // Only the four known tiers may reach the database: package_size is a
 // pricing input, so an unrecognised value would silently mis-charge
@@ -75,7 +76,11 @@ exports.addProduct = async (req, res) => {
                 warranty_months, brand, gtin, mpn, desired_payout, sku } = req.body;
         let { price } = req.body;
 
-        const packageSize = safePackageSize(package_size);
+        // Delivery tier is calculated from the packed weight/dimensions
+        // (migrations/130); a sent package_size is only the fallback.
+        const measured = readMeasurements(req.body);
+        if (!measured.ok) return res.status(400).json({ error: measured.error });
+        const packageSize = measured.tier || safePackageSize(package_size);
         const warrantyMonths = warranty_months ? Number(warranty_months) : null;
 
         // Phase 8: prohibited items. Checked first, before any image
@@ -157,6 +162,10 @@ exports.addProduct = async (req, res) => {
         );
 
         const newProduct = product.rows[0];
+        if (measured.provided) {
+            await saveMeasurements(pool, newProduct.id, measured.value);
+            Object.assign(newProduct, measured.value);
+        }
 
         const imageRecords = [];
         for (const [imgIndex, imgPath] of imagePaths.entries()) {
@@ -1008,7 +1017,11 @@ exports.updateProduct = async (req, res) => {
                 warranty_months, brand, gtin, mpn, desired_payout, sku } = req.body;
         let { price } = req.body;
 
-        const packageSize = safePackageSize(package_size);
+        // Delivery tier is calculated from the packed weight/dimensions
+        // (migrations/130); a sent package_size is only the fallback.
+        const measured = readMeasurements(req.body);
+        if (!measured.ok) return res.status(400).json({ error: measured.error });
+        const packageSize = measured.tier || safePackageSize(package_size);
         const warrantyMonths = warranty_months ? Number(warranty_months) : null;
 
         // Phase 8: prohibited items - a vendor editing a listing into
@@ -1074,6 +1087,10 @@ exports.updateProduct = async (req, res) => {
         }
 
         const product = await pool.query(updateQuery, params);
+        if (product.rows[0] && measured.provided) {
+            await saveMeasurements(pool, product.rows[0].id, measured.value);
+            Object.assign(product.rows[0], measured.value);
+        }
 
         if (product.rows.length === 0) {
             return res.status(404).json({ error: "Product not found" });
@@ -1275,7 +1292,8 @@ exports.importVendorProducts = async (req, res) => {
                 }
             }
 
-            const packageSize = packageSizeRaw ? safePackageSize(packageSizeRaw) : null;
+            const rowMeasured = readMeasurements(row);
+            const packageSize = (rowMeasured.ok && rowMeasured.tier) || (packageSizeRaw ? safePackageSize(packageSizeRaw) : null);
 
             let categoryId = null;
             if (categoryName) {
@@ -1370,6 +1388,9 @@ exports.importVendorProducts = async (req, res) => {
                 if (sku) { params.push(sku); setClauses.push(`sku = $${params.length}`); }
                 if (imageRaw) { params.push(imageRaw); setClauses.push(`image = $${params.length}`); }
 
+                if (rowMeasured.ok && rowMeasured.provided) {
+                    for (const k of ["weight_kg", "length_cm", "width_cm", "height_cm"]) { params.push(rowMeasured.value[k]); setClauses.push(`${k} = $${params.length}`); }
+                }
                 params.push(targetRow.id, vendorId);
                 await client.query(
                     `UPDATE products SET ${setClauses.join(", ")} WHERE id = $${params.length - 1} AND vendor_id = $${params.length} AND deleted_at IS NULL`,
@@ -1397,6 +1418,7 @@ exports.importVendorProducts = async (req, res) => {
                 // Keep the in-memory maps current so a later row in the same
                 // file can target the product this row just created (e.g. by
                 // the sku it was just given).
+                if (rowMeasured.ok && rowMeasured.provided) await saveMeasurements(client, inserted.rows[0].id, rowMeasured.value);
                 const newRow = { id: inserted.rows[0].id, sku: inserted.rows[0].sku, admin_restricted: false, deleted_at: null };
                 byId.set(newRow.id, newRow);
                 if (newRow.sku) bySku.set(newRow.sku.toLowerCase(), newRow);

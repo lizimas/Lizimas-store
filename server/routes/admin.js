@@ -65,6 +65,7 @@ const {
     receiveConsignment,
     rejectConsignment
 } = require("../controllers/adminConsignmentController");
+const { getVendorCenterDetailsAdmin } = require("../controllers/adminVendorCenterController");
 const { searchPickersAdmin } = require("../controllers/adminPickerController");
 const {
     listCampaignsAdmin,
@@ -398,6 +399,7 @@ router.patch("/vendors/:id/freeze-payouts", freezeVendorPayouts);
 router.patch("/vendors/:id/unfreeze-payouts", unfreezeVendorPayouts);
 router.get("/vendors/:id/compliance-history", getVendorComplianceHistory);
 router.get("/vendors/:id/products", getVendorProductsAdmin);
+router.get("/vendors/:id/vendor-center", getVendorCenterDetailsAdmin);
 
 // Vendor Promotions (Task #64): admin review + homepage/sponsored control.
 // Lizimas promotion campaigns vendors join (migration 124).

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="js/lz-remember.js?v=2"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seller &amp; Staff Guide | Lizimas Store</title>
+<meta name="description" content="How to sell on Lizimas Store: register, set up your shop, add products, fulfil orders, get paid, and how Lizimas staff add products.">
+<link rel="stylesheet" href="css/lz-guide.css?v=1">
+</head>
+<body>
+<header class="g-top-bar">
+    <div class="g-top-inner">
+        <a class="g-brand" href="index.html"><span class="g-brand-badge">LV</span> Seller &amp; Staff Guide</a>
+        <label class="g-search-wrap" for="g-search">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="g-search" type="search" placeholder="Search the guide - e.g. photos, payout, handover, weight, consignment" autocomplete="off" aria-label="Search the guide">
+            <button type="button" id="g-clear" hidden>Clear</button>
+        </label>
+        <span id="g-count" aria-live="polite"></span>
+        <nav class="g-top-links" aria-label="Useful links">
+            <a href="vendor/dashboard.html">Vendor Center</a>
+            <a href="vendor-policies.html">Vendor Policies</a>
+            <a href="terms.html">Terms</a>
+        </nav>
+    </div>
+</header>
+
+<div class="g-layout">
+    <aside class="g-nav" aria-label="Guide contents">
+        <h2>Contents</h2>
+        <ul id="g-toc"></ul>
+        <div class="g-quick">
+            <h2>Popular searches</h2>
+            <button type="button" data-g-q="add product">Add a product</button>
+            <button type="button" data-g-q="photos">Photos</button>
+            <button type="button" data-g-q="weight">Weight &amp; size</button>
+            <button type="button" data-g-q="payout">Payouts</button>
+            <button type="button" data-g-q="handover">Handover</button>
+            <button type="button" data-g-q="not live">Not Live</button>
+            <button type="button" data-g-q="consignment">Consignment</button>
+            <button type="button" data-g-q="promotion">Promotions</button>
+            <button type="button" data-g-q="staff">Staff</button>
+        </div>
+    </aside>
+
+    <main class="g-main">
+        <div class="g-hero">
+            <h1>Selling on Lizimas Store</h1>
+            <p>Step-by-step help for <strong>vendors</strong> (running your shop in the Lizimas Vendor Center) and for <strong>Lizimas staff</strong> who add products. Type a word in the search bar above, or press <kbd>/</kbd> to jump to it.</p>
+            <p>Everything here follows our <a href="vendor-policies.html">Vendor Policies</a>, the <a href="terms.html#vendors">Terms &amp; Conditions (Vendors)</a> and the <a href="privacy.html">Privacy Policy</a>. If this guide and a policy ever disagree, the policy wins.</p>
+        </div>
+        <div id="g-noresults" hidden>No part of the guide matches that. Try a shorter word (e.g. "photo" instead of "photographs"), or <a href="contact.html">contact us</a>.</div>
+        <div id="g-body"></div>
+        <p class="g-foot">Lizimas Store &middot; Seller &amp; Staff Guide &middot; last updated September 2026. Questions? Use <strong>Support</strong> in the Vendor Center or <a href="contact.html">contact us</a>.</p>
+    </main>
+</div>
+<button type="button" id="g-top" hidden>&uarr; Top</button>
+
+<script>
+window.LZ_GUIDE = { sections: [
+{ id: "start", title: "1. Getting started as a vendor", intro: "What you need and how to open your Lizimas Store shop.", items: [
+  { id: "requirements", title: "What you need before you register", keywords: "documents requirements id tin vat ursb form 20 work permit individual company", where: '<a href="vendor-requirements.html">Vendor Requirements</a>',
+    html: `<ul>
+      <li><strong>Individual sellers:</strong> your National ID number and a clear photo of the ID (<a href="vendor-requirements.html#individual">details</a>).</li>
+      <li><strong>Companies:</strong> URSB registration number, TIN, VAT number and Form 20 (<a href="vendor-requirements.html#company">details</a>).</li>
+      <li><strong>Not a Ugandan citizen?</strong> You also need a valid work permit (<a href="vendor-requirements.html#work-permit">details</a>).</li>
+      <li>A Mobile Money or bank account in the <strong>same name</strong> as your verified identity, for payouts (<a href="vendor-requirements.html#payment">payout rules</a>).</li>
+    </ul>` },
+  { id: "register", title: "Register your shop", keywords: "sign up signup register email code verify account type shop name", where: '<a href="vendor-register.html">vendor-register.html</a>',
+    html: `<ol>
+      <li>Enter your email. <strong>It cannot be changed later</strong>, so use one you will keep.</li>
+      <li>Enter the 6-digit code we email you.</li>
+      <li>Add your full name, phone number and a password.</li>
+      <li>Choose <strong>Company</strong> or <strong>Individual</strong>, then enter your shop name, location and how you heard about us.</li>
+      <li>Read and accept the <a href="vendor-policies.html">Vendor Policies</a>, then press <strong>Submit</strong>.</li>
+    </ol>
+    <p>We review every application (<a href="vendor-requirements.html#review">how review works</a>). You'll get an email when your shop is approved.</p>` },
+  { id: "login", title: "Log in, two-step verification and \"Keep me logged in\"", keywords: "login sign in 2fa two factor authenticator code keep me logged in remember device approve forgot password", where: '<a href="vendor-login.html">vendor-login.html</a>',
+    html: `<ul>
+      <li>The first time you log in, you set up two-step verification: scan the QR code with an authenticator app, then enter the 6-digit code. If you don't have the app to hand, choose <strong>Email me a code instead</strong>.</li>
+      <li>Logging in from a new device may ask you to approve it from your email.</li>
+      <li><strong>Keep me logged in:</strong> ticked, you stay signed in when you refresh or close the tab; after your device restarts (or the browser is fully quit) you log in again. Unticked (best on shared devices), you're signed out once all Lizimas tabs have been closed.</li>
+      <li>Forgot your password? Use <a href="vendor-forgot-password.html">Forgot password</a>.</li>
+    </ul>` },
+  { id: "kyc", title: "Verify your identity and business (KYC)", keywords: "kyc verification identity business documents upload review locked", where: "Vendor Center &rarr; Dashboard &rarr; Identity &amp; Business Verification",
+    html: `<p>Upload your documents and press <strong>Submit for review</strong>:</p>
+    <ul><li>Company: URSB number, TIN, VAT, and your business registration, tax certificate, VAT certificate and Form 20.</li>
+    <li>Individual: National ID number and a photo of the ID.</li>
+    <li>Not a Ugandan citizen: tick the box and add your work permit.</li></ul>
+    <p>While your details are under review they're locked. If we reject something, you'll see why and can fix it.</p>` },
+  { id: "shop-setup", title: "Take your shop live: the 5 setup steps", keywords: "shop setup home shop information company shipping payment additional existing shop seller type catalog", where: "Vendor Center (phone) &rarr; Home: <em>Let's take your shop live!</em>",
+    html: `<p>Each step shows <strong>PENDING</strong> until it's complete:</p>
+    <ol>
+      <li><strong>Shop Information:</strong> your contact person and the customer-care phone and email shoppers will see.</li>
+      <li><strong>Company Information:</strong> legal representative, business address, TIN, VAT and TIN upload.</li>
+      <li><strong>Shipping Information:</strong> where we collect from and where returns go (use "same as business address" if it is).</li>
+      <li><strong>Payment Information:</strong> your Mobile Money or bank account. Each account is reviewed (Pending, Approved or Rejected).</li>
+      <li><strong>Additional Information:</strong>
+        <ul><li><em>Shop Details:</em> do you already have a shop on Lizimas Store? If <strong>Yes</strong>, list the name(s) of your existing shop(s), separated by semicolons, and say why you're creating another. Also: what type of seller are you?</li>
+        <li><em>Catalog Details:</em> your main product category, how you source products, and whether you also sell offline or on other online channels.</li></ul></li>
+    </ol>` }
+]},
+{ id: "products", title: "2. Adding products (vendors)", intro: "The same form works on a computer and on a phone: Vendor Center &rarr; Products &rarr; Add Products (phone: Manage Products &rarr; +).", items: [
+  { id: "add-product", title: "Add a product, step by step", keywords: "add product new listing form submit approval", where: "Vendor Center &rarr; Products &rarr; Add Products",
+    html: `<ol>
+      <li><strong>Basic information:</strong> an accurate product name (brand + model + key spec + colour), your own SKU (optional; we create one if you leave it blank), and the most specific category.</li>
+      <li><strong>Description:</strong> features, condition, intended use and <em>everything in the box</em>. There's no length limit. A counter shows how many words and characters you've written. Optionally add <strong>Rich Content</strong> blocks (photos, text, tables) below it.</li>
+      <li><strong>Pricing:</strong> enter <strong>Your Payout (UGX)</strong>, which is what you want to receive. Lizimas works out the customer price for you and shows a preview (see <a href="#payout-price">How pricing works</a>).</li>
+      <li><strong>Stock</strong>, <strong>packed weight &amp; size</strong> (see <a href="#weight-size">Weight &amp; size</a>), brand, warranty, and GTIN or MPN if you have them.</li>
+      <li><strong>Photos:</strong> at least 3 (see <a href="#photos">Photos</a>).</li>
+      <li><strong>Specifications</strong> (see <a href="#specs">Specifications</a>).</li>
+      <li>Tick the <strong>authenticity statement</strong> (<a href="vendor-policies.html#anti-counterfeit">Anti-Counterfeit Policy</a>) and press <strong>Submit for Approval</strong>.</li>
+      <li>Add colours or sizes afterwards if the product has variants (see <a href="#variants">Variants</a>).</li>
+    </ol>
+    <p class="g-tip">Every new or edited product goes through a quality check (QC) before it goes live. Editing an approved product sends it back to QC.</p>` },
+  { id: "photos", title: "Photos: what we accept", keywords: "photos images pictures upload drag drop white background watermark main image", where: "Add Products &rarr; Images",
+    html: `<ul>
+      <li>Drag and drop your photos onto the box, or tap it to choose them. The first photo becomes the main image, so upload your best front view first.</li>
+      <li>At least <strong>3 clear, well-lit photos of the actual item</strong>. A white or plain background is best.</li>
+      <li>No watermarks, phone numbers, logos of other shops, or stock photos of a different item.</li>
+      <li>Up to 5 MB per photo.</li>
+    </ul>
+    <p>Full rules: <a href="vendor-policies.html#content-images">Content &amp; Image Guidelines</a>. Staff use the same photo rules.</p>` },
+  { id: "weight-size", title: "Packed weight & size (delivery charge)", keywords: "package size delivery tier weight kg dimensions length width height cm small medium large extra large delivery fee", where: "Add Products &rarr; Packed weight &amp; size",
+    html: `<p>You no longer pick a package size. Enter the <strong>packed</strong> weight (kg, required) and the box's length, width and height (cm). The delivery size is worked out automatically, and that's what sets the delivery charge:</p>
+    <table><tr><th>Delivery size</th><th>How it ships</th><th>Roughly</th></tr>
+    <tr><td>Small</td><td>Boda, in the rider's bag</td><td>up to 3 kg, longest side 45 cm</td></tr>
+    <tr><td>Medium</td><td>Boda, strapped or on the seat</td><td>up to 30 kg, longest side 80 cm</td></tr>
+    <tr><td>Large</td><td>Special hire or van, one person</td><td>up to 40 kg, longest side 200 cm</td></tr>
+    <tr><td>Extra Large</td><td>Pickup or truck, two people</td><td>anything bigger or heavier</td></tr></table>
+    <p>A package moves up a size as soon as any one limit is passed. Measure the box as it will be handed over. See also <a href="vendor-policies.html#packaging">Packaging Guidelines</a>.</p>` },
+  { id: "payout-price", title: "How pricing works: your payout vs the customer price", keywords: "price payout commission fee customer price earn charges", where: "Add Products &rarr; Your Payout (UGX); phone: Account &rarr; Commissions and Fees",
+    html: `<p>You set <strong>what you want to receive</strong>. Lizimas adds its marketplace commission (which depends on the category) and calculates the price the customer pays. The preview on the form shows both before you submit. What you set is what you are paid for each unit sold, before any refunds or adjustments on your statement.</p>` },
+  { id: "specs", title: "Specifications, tables and rich content", keywords: "specifications specs table paste excel label value rich content blocks", where: "Add Products &rarr; Specifications / Rich Content",
+    html: `<ul>
+      <li><strong>Paste from Excel:</strong> paste rows of label and value and press <strong>Add to Specifications</strong>.</li>
+      <li><strong>Insert Table:</strong> type the number of rows and columns, or pick a size, then fill it in. Tick the top-left box to select everything for pasting. Use <strong>+</strong> to add rows or columns, merge cells, then Add to Specifications.</li>
+      <li><strong>Rich Content:</strong> extra photo, text, heading, table or video blocks shown under the description.</li>
+    </ul>` },
+  { id: "variants", title: "Variants: colours and sizes", keywords: "variants colours colors sizes stock per variant options", where: "Add Products &rarr; Colours/Sizes panel (after saving)",
+    html: `<p>Type the colours and sizes separated by commas and press <strong>Save Colours/Sizes</strong>. One row is created for each combination; set the stock for each row.</p>` },
+  { id: "import", title: "Add many products at once (import)", keywords: "import csv xlsx excel bulk upload spreadsheet", where: "Products &rarr; Manage Products &rarr; Import/Export &rarr; Import",
+    html: `<p>Upload a .csv, .xlsx or .xls file. Columns: <code>name</code>, <code>desired_payout</code> (required), <code>stock</code>, <code>description</code>, <code>category</code>, <code>sku</code>, <code>weight_kg</code>, <code>length_cm</code>, <code>width_cm</code>, <code>height_cm</code>, <code>brand</code>, <code>gtin</code>, <code>mpn</code>, <code>warranty_months</code>, <code>image</code> (a hosted image link), and others. A row with an existing <code>id</code> or <code>sku</code> updates that product. Everything imported goes to QC as pending.</p>` },
+  { id: "prohibited", title: "What you may not sell", keywords: "prohibited counterfeit fake banned items restricted brand authorization", where: '<a href="terms.html#prohibited">Terms: Prohibited items</a>',
+    html: `<p>Counterfeit or copied goods, prohibited or illegal items, and branded goods you're not allowed to sell. Listings that match a prohibited rule are blocked on upload. Selling an official brand? Apply under <a href="#brand-auth">Brand authorization</a>. See the <a href="vendor-policies.html#anti-counterfeit">Anti-Counterfeit Policy</a>.</p>` }
+]},
+{ id: "manage", title: "3. Managing your products", items: [
+  { id: "manage-products", title: "Product Management: statuses and filters", keywords: "manage products pending qc not ready approved rejected active inactive deleted live not live unauthorized pending deletion", where: "Vendor Center &rarr; Products &rarr; Manage Products",
+    html: `<table>
+    <tr><th>Status</th><th>Meaning</th></tr>
+    <tr><td>Pending QC</td><td>Waiting for our quality check</td></tr>
+    <tr><td>Not Ready To QC</td><td>Missing a main image, category or price. Add it so QC can start</td></tr>
+    <tr><td>Approved / Rejected</td><td>QC result. The rejection reason is shown on the product</td></tr>
+    <tr><td>Active / Inactive</td><td>Your own on/off switch</td></tr>
+    <tr><td>Live / Not Live</td><td>Whether customers can see and buy it right now</td></tr>
+    <tr><td>Unauthorized</td><td>Restricted by Lizimas (compliance or brand)</td></tr>
+    <tr><td>Pending Deletion</td><td>Your delete request is being reviewed</td></tr>
+    <tr><td>Deleted</td><td>Removed from your catalogue</td></tr></table>
+    <p>Tick products and use <strong>Activate</strong> or <strong>More Actions</strong> (Deactivate or Delete). Use <strong>Manage Columns</strong> to show Lizimas Store SKU, Promo Price, Creation Date and more. On a phone, use the filter button for date, visibility, quantity and USD prices.</p>` },
+  { id: "not-live", title: "Why is my product \"Not Live\"?", keywords: "not live hidden invisible why qc rejected inactive out of stock restricted", where: "Manage Products &rarr; Visible column (hover the reason)",
+    html: `<p>A product is Live only if it passed QC, you switched it <strong>Active</strong>, Lizimas hasn't restricted it, it isn't deleted, and its <strong>quantity is above 0</strong>. Hover <em>Not Live</em> to see the exact reason. Also check that your shop isn't on holiday mode (<a href="#shop-status">Shop status</a>).</p>` },
+  { id: "skus", title: "Seller SKU and Lizimas Store SKU", keywords: "sku seller sku lizimas sku code lzms", where: "Manage Products, Stock Recommendation, Consignments",
+    html: `<p><strong>Seller SKU</strong> is your own code. <strong>Lizimas Store SKU</strong> is created by us, ends in <code>LZMS</code> and never changes. You can search by either in Stock Recommendation and Consignments.</p>` },
+  { id: "stock", title: "Stock Recommendation", keywords: "stock recommendation low stock out of stock reorder suggested quantity days of cover generate co", where: "Vendor Center &rarr; Stock Recommendation",
+    html: `<p>Shows missed business, total SKUs, stock in transit, available stock and a <strong>suggested replenish quantity</strong> (about 30 days of stock based on your last 30 days of sales). Tick products and press <strong>Generate CO</strong> to send stock to a Lizimas hub.</p>` },
+  { id: "consignment", title: "Fulfillment by Lizimas (consignment orders)", keywords: "consignment fulfillment by lizimas hub co number bulk creation ship stock warehouse", where: "Vendor Center &rarr; Products &rarr; Fulfillment by Lizimas",
+    html: `<ol><li>Press <strong>Bulk Creation</strong>, choose the hub, and add products and quantities.</li>
+    <li>When you send the stock, open the order (CO number) and choose <strong>Mark shipped</strong>.</li>
+    <li>We count it in: <em>Received</em>, or <em>Received Incomplete</em> if some units were missing. Those units then ship from our hub and you don't need to hand them over order by order.</li></ol>
+    <p>Filters: Open, Closed, Received, Received Incomplete, Cancelled, and More. Search by CO number, SKU or product name. See the <a href="vendor-policies.html#fulfilment">Fulfilment Guidelines</a>.</p>` }
+]},
+{ id: "orders", title: "4. Orders, handover and returns", items: [
+  { id: "order-flow", title: "Handling an order", keywords: "orders accept processing ready for handover drop off point handed over delivery rejected inspection", where: "Vendor Center &rarr; Orders &rarr; All Orders",
+    html: `<ol><li><strong>Accept Order</strong></li><li><strong>Start Processing</strong> (pack it; see <a href="vendor-policies.html#packaging">Packaging</a>)</li><li><strong>Mark Ready for Handover</strong>, choose the drop-off point, then <strong>Mark Handed Over</strong> when you hand it in.</li></ol>
+    <p>We inspect it; it then moves to <em>In Delivery</em> and <em>Delivered</em>. If inspection <em>Rejects</em> it, the reason is shown. Fix it and hand it over again. Only people on your <a href="#pickers">Pickers</a> list may hand over for you. See the <a href="vendor-policies.html#delivery">Delivery Guidelines</a>.</p>` },
+  { id: "returns", title: "Returns and refunds", keywords: "returns refunds collect forfeited 7 days 21 days evidence decision", where: "Vendor Center &rarr; Orders &rarr; Returns / Returns &amp; Refunds",
+    html: `<p>Customers can return items within 7 days of delivery (<a href="returns.html">Returns Policy</a>). Collect returned items from the drop-off point within <strong>7 days</strong> (21 days in total once they're moved to the central hub), or they may be forfeited. Under <strong>Returns &amp; Refunds</strong> you can see the reason, the evidence photo and our refund decision, and add your response.</p>` }
+]},
+{ id: "money", title: "5. Getting paid", items: [
+  { id: "statements", title: "Account Statements and weekly payouts", keywords: "statements payout wallet weekly cycle closing balance export transactions download pdf csv seller id", where: "Vendor Center &rarr; Account Statements",
+    html: `<p>Earnings are grouped in <strong>weekly cycles (Monday to Sunday)</strong>. Each closed week creates a statement showing your opening balance, earnings, marketplace charges, refunds, <strong>closing balance</strong> and <strong>payout</strong>. After our review we send the payout to your approved account.</p>
+    <ul><li>Your Seller ID is shown at the top of the page.</li><li>Filter by Open, Paid or Unpaid. Show amounts in USD or local currency.</li>
+    <li><strong>Download all transactions</strong> (PDF), CSV, or <strong>Export Transactions</strong> for every statement at once. Your exports are listed under <strong>Transactions Exports</strong>, where you can download them again.</li></ul>` },
+  { id: "payment-accounts", title: "Payout accounts (Mobile Money or bank)", keywords: "payment information momo mobile money bank account payout number evidence rejected", where: "Account &rarr; Payment Information (or Home &rarr; step 4)",
+    html: `<p>Add your MoMo or bank account and upload the evidence we ask for. It must be in the same name as your verified identity (<a href="vendor-requirements.html#payment">rules</a>). While an account is <em>Pending</em>, payouts wait. If it's <em>Rejected</em>, edit it and resubmit.</p>` }
+]},
+{ id: "growth", title: "6. Promotions and advertising", items: [
+  { id: "promos", title: "Promotions: your own sales and Lizimas campaigns", keywords: "promotions sale price campaign join nominate discount management view all", where: "Vendor Center &rarr; Promotions",
+    html: `<ul><li><strong>Propose a Promotion:</strong> choose a product, sale price and dates. We review it.</li>
+    <li><strong>Lizimas Campaigns:</strong> press <strong>View All</strong>, open a campaign and nominate products within its discount range before the registration end date.</li>
+    <li>The page also shows revenue from promotions (last 7, 30 or 90 days) and your highlighted products.</li></ul>` },
+  { id: "monitor", title: "Monitor your promotions", keywords: "monitor promotions page views items sold revenue ongoing expired export", where: "Promotions &rarr; expand (under Highlight products), or Advertise &rarr; Monitor your promotions",
+    html: `<p>For every promotion: page views, items sold, revenue, period and status (Ongoing or Expired). Use <strong>Export</strong> for a CSV.</p>` },
+  { id: "ads", title: "Advertise your products (pay per click)", keywords: "advertise ads sponsored cpc cost per click budget campaign", where: "Vendor Center &rarr; Advertise Your Products &rarr; Create a campaign",
+    html: `<p>Set a campaign name, daily and total budget, and the products to promote, then submit. We review it. You pay only when a shopper clicks your sponsored product.</p>` }
+]},
+{ id: "account", title: "7. Running your account", items: [
+  { id: "shop-status", title: "Shop status and holiday mode", keywords: "shop active holiday mode close shop vacation away", where: "Account &rarr; Settings &rarr; Shop Status",
+    html: `<p>Switch your shop off, or set <strong>Holiday Mode</strong> with start and end dates. Your products are hidden from customers during that time.</p>` },
+  { id: "users", title: "Users and permissions (your team)", keywords: "users staff team permissions roles invite product manager order manager finance", where: "Account &rarr; Manage Users (shop owner only)",
+    html: `<p>Invite team members by name and email, and choose what they can do:</p>
+    <table><tr><th>Permission</th><th>Allows</th></tr>
+    <tr><td>Product Manager</td><td>View, export, import and manage products</td></tr>
+    <tr><td>Product Viewer / Product Update</td><td>View only / update existing products</td></tr>
+    <tr><td>Order Viewer / Order Manager</td><td>See orders / manage orders</td></tr>
+    <tr><td>Order report</td><td>Receive order email reports</td></tr>
+    <tr><td>Finance Viewer</td><td>Account Statements and transaction exports</td></tr>
+    <tr><td>Promotion Manager</td><td>Promotions</td></tr>
+    <tr><td>Shop Viewer / Shop Manager</td><td>See / manage everything in the shop</td></tr>
+    <tr><td>Advertising Manager</td><td>Advertising</td></tr></table>` },
+  { id: "pickers", title: "Pickers (who may hand over packages)", keywords: "pickers handover people authorized id", where: "Account &rarr; Manage Pickers",
+    html: `<p>Add the name, phone number and (optionally) ID of each person allowed to hand over packages for your shop.</p>` },
+  { id: "brand-auth", title: "Brand authorization", keywords: "brand authorization official store authorized distributor documents", where: "Account &rarr; Brand Authorization",
+    html: `<p>Selling a brand as its official store or authorized distributor? Choose the tier and upload the documents we ask for. Only verified brands appear on your storefront.</p>` },
+  { id: "storefront", title: "Your storefront", keywords: "storefront about shop page badge cash on delivery", where: "Vendor Center &rarr; Storefront",
+    html: `<p>Write your <em>About</em> text (up to 1000 characters; no phone numbers or addresses) and choose your badge (Cash on Delivery or Payment First). Use <strong>View storefront</strong> to see what shoppers see.</p>` },
+  { id: "jumia", title: "Connect a Jumia shop (Applications)", keywords: "jumia applications integration sync import export client id", where: "Account &rarr; Manage Applications",
+    html: `<p>Create an application with your Jumia Client ID and Refresh Token, then use Product Sync, Export to Jumia or Import from Jumia.</p>` },
+  { id: "support-vendor", title: "Getting help", keywords: "support help contact messages feedback", where: "Vendor Center &rarr; Support",
+    html: `<p>Open a support thread with Lizimas from <strong>Support</strong> (also <em>Give us your feedback!</em> in the profile menu). Compliance notices from Lizimas appear under <strong>Account &rarr; Notices</strong>. Read the <a href="vendor-policies.html#vendor-data">Vendor Data Protection Policy</a> for how we handle your data.</p>` }
+]},
+{ id: "staff", title: "8. For Lizimas staff: adding products", intro: "Staff log in at <a href='staff-login.html'>staff-login.html</a>. The same product rules, photo rules and packed weight &amp; size apply as for vendors.", items: [
+  { id: "staff-product", title: "Product Staff: add a product", keywords: "staff product staff add product submit approval my submissions", where: "Staff &rarr; Add Product (staff/product.html)",
+    html: `<ol><li>Fill in the name, category and description (no length limit; the word counter is under the box).</li>
+    <li>Enter the <strong>price (UGX)</strong> directly. Staff set the customer price, not a payout.</li>
+    <li>Enter stock and the <strong>packed weight &amp; size</strong>. The delivery size is calculated automatically, as for vendors (<a href="#weight-size">details</a>).</li>
+    <li>Add warranty, brand, GTIN or MPN, specifications, available sizes and colours (with a photo per colour), and the product photos (<a href="#photos">photo rules</a>).</li>
+    <li>Press <strong>Submit for Approval</strong>. Track it under <strong>My Submissions</strong>. Edits need approval again.</li></ol>` },
+  { id: "staff-manager", title: "Store Manager: publish and manage", keywords: "store manager publish live my products delete request", where: "Staff &rarr; staff/manager.html",
+    html: `<p>Same form, but your products <strong>go live immediately</strong>. <strong>My Products</strong> has All, Live and Pending filters. Deleting a product sends a request that admin approves.</p>` },
+  { id: "staff-security", title: "Staff account security", keywords: "staff 2fa security password team messages", where: "Any staff page &rarr; Account security",
+    html: `<p>Turn on two-step verification, keep your personal details up to date, and use <strong>Team Messages</strong> to reach admin.</p>` }
+]},
+{ id: "policies", title: "9. Policies and terms (links)", items: [
+  { id: "policy-links", title: "All the rules in one place", keywords: "policies terms conditions privacy returns links anti counterfeit content images delivery fulfilment packaging data protection",
+    html: `<ul>
+      <li><a href="vendor-policies.html#anti-counterfeit">Anti-Counterfeit Policy</a></li>
+      <li><a href="vendor-policies.html#content-images">Content &amp; Image Guidelines</a></li>
+      <li><a href="vendor-policies.html#delivery">Delivery Guidelines</a></li>
+      <li><a href="vendor-policies.html#fulfilment">Fulfilment Guidelines</a></li>
+      <li><a href="vendor-policies.html#packaging">Packaging Guidelines</a></li>
+      <li><a href="vendor-policies.html#vendor-data">Vendor Data Protection &amp; Privacy Policy</a></li>
+      <li><a href="vendor-requirements.html">Vendor Requirements</a></li>
+      <li>Terms &amp; Conditions: <a href="terms.html#vendors">Vendors</a>, <a href="terms.html#products">Products</a>, <a href="terms.html#prohibited">Prohibited items</a>, <a href="terms.html#payment">Payment</a>, <a href="terms.html#delivery">Delivery</a>, <a href="terms.html#returns">Returns</a>, <a href="terms.html#termination">Termination</a></li>
+      <li><a href="returns.html">Returns Policy</a> &middot; <a href="privacy.html">Privacy Policy</a> &middot; <a href="faq.html">FAQ</a> &middot; <a href="help.html">Help Centre</a> &middot; <a href="contact.html">Contact</a></li>
+    </ul>` }
+]}
+]};
+</script>
+<script src="js/lz-guide.js?v=1"></script>
+</body>
+</html>

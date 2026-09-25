@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="js/lz-remember.js?v=2"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Signing you in — Lizimas Store</title>
@@ -35,6 +36,7 @@
 
     if (data.t && data.u) {
         localStorage.setItem("userToken", data.t);
+        if (window.LzRemember) LzRemember.apply("userToken");
         localStorage.setItem("userInfo", JSON.stringify(data.u));
         window.location.replace("orders.html");
         return;

@@ -45,6 +45,7 @@ async function registerAccount() {
         const result = await apiPost("/auth/register", { name, email, password, phone });
 
         localStorage.setItem("userToken", result.token);
+        if (window.LzRemember) LzRemember.apply("userToken");
         localStorage.setItem("userInfo", JSON.stringify(result.user));
 
         statusEl.textContent = "Account created! Redirecting...";

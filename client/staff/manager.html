@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Store Manager</title>
-<link rel="stylesheet" href="../css/admin.css?v=37">
+<link rel="stylesheet" href="../css/admin.css?v=41">
 <link rel="stylesheet" href="../css/staff-messages-widget.css?v=4">
 </head>
 <body>
@@ -27,6 +27,7 @@
                     Message Admin
                     <span id="lz-tm-nav-badge" style="display:none; position:absolute; top:-6px; right:8px; background:#c02b2b; color:#fff; border-radius:999px; font-size:11px; font-weight:700; min-width:18px; height:18px; align-items:center; justify-content:center; padding:0 5px;">0</span>
                 </button>
+                <a href="../seller-guide.html#staff" target="_blank" rel="noopener" style="display:block; margin:16px 16px 0; text-align:center; background:#f4b400; color:#1a1a2e; border-radius:8px; padding:10px; font-weight:600; text-decoration:none;">&#128214; Product upload guide</a>
                 <button onclick="staffLogout()" style="margin:16px; background:#DC2626; color:#fff; border:none; border-radius:8px; padding:10px; cursor:pointer; width:calc(100% - 32px);">Log Out</button>
             </aside>
 
@@ -50,7 +51,7 @@
                                     <input type="hidden" id="product-id">
                                     <input type="text" id="product-name" placeholder="Product name">
                                     <select id="product-category"></select>
-                                    <textarea id="product-description" placeholder="Description"></textarea>
+                                    <textarea id="product-description" data-lz-count rows="10" placeholder="Description"></textarea>
                                 </div>
                             </div>
 
@@ -60,14 +61,17 @@
                                     <input type="number" id="product-price" placeholder="Price (UGX)">
                                     <input type="number" id="product-stock" placeholder="Stock quantity">
                                     <div>
-                                        <label for="product-package-size" style="font-size:13px; font-weight:600; color:#333;">Package Size (delivery tier)</label>
-                                        <select id="product-package-size">
-                                            <option value="Small">Small — fits in a boda rider's bag</option>
-                                            <option value="Medium">Medium — boda, strapped or on the seat</option>
-                                            <option value="Large">Large — van or special hire, one person</option>
-                                            <option value="Extra Large">Extra Large — pickup or truck, two people</option>
-                                        </select>
-                                        <p style="font-size:12px; color:#666; margin:4px 0 0;">Pick by how the item ships, not its price. See docs/package-sizes.md.</p>
+                                        <div class="lz-pack" data-lz-pack="product">
+    <div class="lz-pack-title">Packed weight &amp; size <span class="lz-pack-sub">(sets the delivery charge automatically)</span></div>
+    <div class="lz-pack-grid">
+        <label class="lz-pack-field"><span>Weight (kg) *</span><input type="number" id="product-weight-kg" class="lz-pack-input" min="0.01" step="0.01" inputmode="decimal" placeholder="e.g. 1.5"></label>
+        <label class="lz-pack-field"><span>Length (cm)</span><input type="number" id="product-length-cm" class="lz-pack-input" min="0.1" step="0.1" inputmode="decimal" placeholder="L"></label>
+        <label class="lz-pack-field"><span>Width (cm)</span><input type="number" id="product-width-cm" class="lz-pack-input" min="0.1" step="0.1" inputmode="decimal" placeholder="W"></label>
+        <label class="lz-pack-field"><span>Height (cm)</span><input type="number" id="product-height-cm" class="lz-pack-input" min="0.1" step="0.1" inputmode="decimal" placeholder="H"></label>
+    </div>
+    <input type="hidden" id="product-package-size" value="Small">
+    <p class="lz-pack-note" id="product-package-tier-note" aria-live="polite"></p>
+</div>
                                         <label for="product-warranty-months" style="font-size:13px; font-weight:600; color:#333; margin-top:10px; display:block;">Warranty (months)</label>
                                         <input type="number" id="product-warranty-months" placeholder="e.g. 12" min="0">
                                         <p style="font-size:12px; color:#666; margin:4px 0 0;">Leave blank if this product has no manufacturer warranty. Shown on the product page as "X Months Manufacturer Warranty".</p>
@@ -163,7 +167,9 @@
     <script src="../js/category-select.js?v=2"></script>
     <script src="../js/lz-table.js?v=5"></script>
     <script src="../js/lz-spec-tools.js?v=2"></script>
-    <script src="../js/staff-manager.js?v=6"></script>
+    <script src="../js/lz-package-size.js?v=2"></script>
+    <script src="../js/lz-text-counter.js?v=1"></script>
+    <script src="../js/staff-manager.js?v=7"></script>
     <script src="../js/photo-crop.js?v=1"></script>
 <script src="../js/staff-messages-widget.js?v=4"></script>
 <script>

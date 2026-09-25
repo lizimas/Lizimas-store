@@ -60,6 +60,8 @@ function vsStatusStyle(displayStatus) {
 // --- Sub-tab switcher (called by the buttons in dashboard.html) ---------
 
 window.switchWalletSubTab = function (which) {
+    const section = document.getElementById("tab-wallet");
+    if (section) section.classList.toggle("vs-statements-mode", which === "statements");
     const walletView = document.getElementById("wallet-subview-wallet");
     const statementsView = document.getElementById("wallet-subview-statements");
     const btnWallet = document.getElementById("wallet-subtab-wallet");
@@ -147,33 +149,114 @@ function renderStatementsFull() {
     const d = vendorStatementsState.data;
 
     root.innerHTML = `
-        <div style="display:flex; justify-content:flex-end; margin-bottom:14px;">
-            <button onclick="downloadAllStatementsCsv()" style="background:#f59e0b; color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer;">Export Transactions</button>
+        <div class="vs-crumb"><span class="vs-crumb-muted">Account Statements</span> <span class="vs-crumb-sep">&gt;</span> <span class="vs-crumb-on" title="Your Seller ID">${vendorEsc(d.seller_id || "Seller ID not set")}</span></div>
+        <div class="vs-head">
+            <h2 class="vs-title">Account Statements</h2>
+            <button type="button" class="vs-export-btn" onclick="downloadAllStatementsCsv()">Export Transactions</button>
         </div>
 
         ${renderStatementsCards(d)}
 
-        <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; margin-bottom:14px;">
-            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-                <span style="font-size:11px; font-weight:700; color:#6b7280; letter-spacing:.5px;">STATUS:</span>
+        <div class="vs-filterbar">
+            <div class="vs-filter-group" role="group" aria-label="Status">
+                <span class="vs-filter-label">Status:</span>
                 ${renderFilterChip("all", "ALL")}
                 ${renderFilterChip("open", "OPEN")}
                 ${renderFilterChip("paid", "PAID")}
                 ${renderFilterChip("unpaid", "UNPAID")}
             </div>
-            <div class="vs-filter-row" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-left:auto;">
-                <span style="font-size:11px; font-weight:700; color:#6b7280; letter-spacing:.5px;">CURRENCY:</span>
+            <div class="vs-filter-group vs-filter-row vs-currency" role="radiogroup" aria-label="Currency">
+                <span class="vs-filter-label">Currency:</span>
                 ${renderCurrencyChip(d.currency, "USD", "USD")}
-                ${renderCurrencyChip(d.currency, "UGX", "LOCAL (UGX)")}
+                ${renderCurrencyChip(d.currency, "UGX", "LOCAL")}
             </div>
         </div>
 
-        <div class="vs-main-grid" style="display:grid; grid-template-columns: minmax(260px, 340px) 1fr; gap:16px; align-items:start;">
+        <div class="vs-main-grid">
             <div>${renderStatementsList(d)}</div>
             <div>${renderStatementsDetail(d)}</div>
         </div>
+
+        <div class="vs-exports-card">
+            <h3 class="vs-exports-title">Transactions Exports</h3>
+            <div id="vs-exports"><div class="vs-exports-empty">Loading...</div></div>
+        </div>
     `;
+    loadTransactionExports();
 }
+
+// --- Transactions Exports (migrations/129_vendor_transaction_exports.sql) --
+const vsExports = { page: 1, limit: 5 };
+const VS_EXPORT_TYPE = { statement_pdf: "Statement transactions (PDF)", statement_csv: "Statement transactions (CSV)", all_transactions: "All transactions (CSV)" };
+
+async function loadTransactionExports() {
+    const host = document.getElementById("vs-exports");
+    if (!host) return;
+    try {
+        const data = await vendorAuthorizedFetch(`/api/vendors/me/transaction-exports?page=${vsExports.page}&limit=${vsExports.limit}`);
+        if (data.error) { host.innerHTML = `<div class="vs-exports-empty">${vendorEsc(data.error)}</div>`; return; }
+        const rows = data.exports || [];
+        const total = Number(data.total) || 0;
+        const pages = Math.max(1, Math.ceil(total / vsExports.limit));
+        const start = (vsExports.page - 1) * vsExports.limit;
+        const when = (v) => new Date(v).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+        const btn = (label, page, off, icon) => `<button type="button" class="vs-pg" aria-label="${label}" ${off ? "disabled" : ""} onclick="vsExportsPage(${page})">${icon}</button>`;
+        host.innerHTML = `<div class="vs-exports-scroll"><table class="vs-exports-table">
+            <thead><tr><th>Type</th><th>Requested</th><th>Created</th><th>Status</th><th class="vs-right">Download</th></tr></thead>
+            <tbody>${rows.map((r) => `<tr>
+                <td>${vendorEsc(VS_EXPORT_TYPE[r.kind] || r.kind)}</td>
+                <td>${vendorEsc(r.requested || "")}</td>
+                <td>${vendorEsc(when(r.created_at))}</td>
+                <td><span class="vs-export-status vs-export-${vendorEsc(r.status)}">${r.status === "ready" ? "Ready" : "Failed"}</span></td>
+                <td class="vs-right">${r.status === "ready" ? `<button type="button" class="vs-dl" onclick="vsDownloadExport('${vendorEsc(r.kind)}', ${r.statement_id == null ? "null" : Number(r.statement_id)})">Download</button>` : ""}</td>
+            </tr>`).join("") || '<tr><td colspan="5" class="vs-exports-empty">No exports to display.</td></tr>'}</tbody>
+        </table></div>
+        <div class="vs-exports-pager"><span>Items per page: ${vsExports.limit}</span><span>${total ? `${start + 1} – ${start + rows.length} of ${total}` : "0 of 0"}</span>
+            <span class="vs-pg-group">${btn("First page", 1, vsExports.page <= 1, "|&lsaquo;")}${btn("Previous page", vsExports.page - 1, vsExports.page <= 1, "&lsaquo;")}${btn("Next page", vsExports.page + 1, vsExports.page >= pages, "&rsaquo;")}${btn("Last page", pages, vsExports.page >= pages, "&rsaquo;|")}</span></div>`;
+    } catch (error) {
+        console.error("loadTransactionExports error:", error);
+        host.innerHTML = '<div class="vs-exports-empty">Could not load exports.</div>';
+    }
+}
+
+window.vsExportsPage = function (p) { vsExports.page = p; loadTransactionExports(); };
+
+async function recordTransactionExport(kind, statementId) {
+    try {
+        await vendorAuthorizedFetch("/api/vendors/me/transaction-exports", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ kind, statement_id: statementId })
+        });
+        vsExports.page = 1;
+        loadTransactionExports();
+    } catch (e) { console.error("recordTransactionExport error:", e); }
+}
+
+async function vsFetchDownload(url, filename) {
+    const res = await fetch(url, { headers: { "Authorization": "Bearer " + getVendorToken() } });
+    if (!res.ok) {
+        let msg = "Could not download.";
+        try { const j = await res.json(); if (j.error) msg = j.error; } catch (e) { /* not json */ }
+        throw new Error(msg);
+    }
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// Download button on an exports row - rebuilds the same file, no new row.
+window.vsDownloadExport = async function (kind, statementId) {
+    try {
+        if (kind === "all_transactions") await vsFetchDownload("/api/vendors/me/transactions/export.csv", `all-transactions-${new Date().toISOString().slice(0, 10)}.csv`);
+        else await window.downloadStatement(kind === "statement_csv" ? "csv" : "pdf", statementId, { record: false });
+    } catch (e) { alert(e.message); }
+};
 
 // Phase 4 Beat 3 - clickable currency chip. Active currency is highlighted;
 // clicking the inactive one updates the vendor's preferred_currency and
@@ -182,13 +265,7 @@ function renderStatementsFull() {
 // currency, same as vendors.preferred_currency behaves server-side).
 function renderCurrencyChip(activeCurrency, code, label) {
     const isActive = (activeCurrency || "UGX") === code;
-    const style = isActive
-        ? "padding:4px 10px; border-radius:999px; background:#16264f; color:#fff; font-size:12px; font-weight:600; border:none; cursor:default;"
-        : "padding:4px 10px; border-radius:999px; background:#f3f4f6; color:#374151; font-size:12px; font-weight:600; border:none; cursor:pointer;";
-    if (isActive) {
-        return `<span style="${style}">${vendorEsc(label)}</span>`;
-    }
-    return `<button type="button" onclick="setVendorPreferredCurrency('${code}')" style="${style}">${vendorEsc(label)}</button>`;
+    return `<label class="vs-radio"><input type="radio" name="vs-currency" value="${code}"${isActive ? " checked" : ""} onchange="setVendorPreferredCurrency('${code}')"><span></span>${vendorEsc(label)}</label>`;
 }
 
 window.setVendorPreferredCurrency = async function (currency) {
@@ -212,28 +289,16 @@ window.setVendorPreferredCurrency = async function (currency) {
 function renderStatementsCards(d) {
     const c = d.currency || "UGX";
     const cards = [
-        { label: "Due & Unpaid", value: vsFormatMoney(d.metrics.due_and_unpaid, c), highlight: d.metrics.due_and_unpaid > 0 },
-        { label: "Open Statement", value: vsFormatMoney(d.metrics.open_statement_estimated, c), highlight: false },
-        { label: "Paid in the last 3 months", value: vsFormatMoney(d.metrics.paid_last_3_months, c), highlight: false }
+        { label: "Due & Unpaid", value: vsFormatMoney(d.metrics.due_and_unpaid, c) },
+        { label: "Open Statement", value: vsFormatMoney(d.metrics.open_statement_estimated, c) },
+        { label: "Paid in the last 3 months", value: vsFormatMoney(d.metrics.paid_last_3_months, c) }
     ];
-    return `
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-bottom:18px;">
-            ${cards.map(card => `
-                <div style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:18px;">
-                    <div style="font-size:22px; font-weight:800; color:${card.highlight ? "#16264f" : "#111"}; margin-bottom:6px;">${vendorEsc(card.value)}</div>
-                    <div style="font-size:12.5px; color:#6b7280;">${vendorEsc(card.label)}</div>
-                </div>
-            `).join("")}
-        </div>
-    `;
+    return `<div class="vs-cards">${cards.map((card) => `<div class="vs-card"><div class="vs-card-value">${vendorEsc(card.value)}</div><div class="vs-card-label">${vendorEsc(card.label)}</div></div>`).join("")}</div>`;
 }
 
 function renderFilterChip(key, label) {
     const active = vendorStatementsState.filter === key;
-    const style = active
-        ? "background:#16264f; color:#fff; border:none; padding:5px 12px; border-radius:999px; font-size:12px; font-weight:700; cursor:pointer;"
-        : "background:#f3f4f6; color:#374151; border:1px solid #d1d5db; padding:5px 12px; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer;";
-    return '<button onclick="setStatementsFilter(\'' + key + '\')" style="' + style + '">' + label + "</button>";
+    return `<button type="button" class="vs-chip vs-chip-${key}${active ? " vs-chip-on" : ""}" aria-pressed="${active}" onclick="setStatementsFilter('${key}')">${key === "all" ? "" : '<span class="vs-dot"></span>'}${label}</button>`;
 }
 
 window.setStatementsFilter = function (key) {
@@ -255,139 +320,86 @@ function filterStatements(statements) {
     return statements;
 }
 
+const VS_FLAG_UG = '<svg class="vs-flag" viewBox="0 0 18 12" width="18" height="12" aria-label="Uganda" role="img"><rect width="18" height="2" y="0" fill="#000"/><rect width="18" height="2" y="2" fill="#fcdc04"/><rect width="18" height="2" y="4" fill="#d90000"/><rect width="18" height="2" y="6" fill="#000"/><rect width="18" height="2" y="8" fill="#fcdc04"/><rect width="18" height="2" y="10" fill="#d90000"/><circle cx="9" cy="6" r="2.2" fill="#fff"/></svg>';
+
 function renderStatementsList(d) {
     const filtered = filterStatements(d.statements);
     const current = d.currentCycle;
-
+    const showOpen = current && (vendorStatementsState.filter === "all" || vendorStatementsState.filter === "open");
     let rows = "";
-
-    // Open cycle card (if any) always shows at top
-    if (current && (vendorStatementsState.filter === "all" || vendorStatementsState.filter === "open")) {
-        rows += `
-            <div style="border:2px solid #f59e0b; border-radius:8px; padding:14px; margin-bottom:10px; background:#fffbeb;">
-                <div style="font-size:13px; font-weight:700; color:#92400e; margin-bottom:4px;">OPEN</div>
-                <div style="font-size:13.5px; font-weight:600; margin-bottom:4px;">${vendorEsc(vsFormatPeriod(current.period_start, current.period_end))}</div>
-                <div style="font-size:11.5px; color:#6b7280; margin-bottom:6px;">Closes in ${current.daysRemaining} day${current.daysRemaining === 1 ? "" : "s"}</div>
-                <div style="font-size:15px; font-weight:800; color:#16264f;">${vendorEsc(vsFormatMoney(current.estimatedAmount, current.currency))}</div>
-            </div>
-        `;
+    if (showOpen) {
+        const sel = vendorStatementsState.selectedStatementId === null;
+        rows += `<button type="button" class="vs-row${sel ? " vs-row-on" : ""}" onclick="selectStatement(null)">
+            <span class="vs-row-main"><span class="vs-row-period">${vendorEsc(vsFormatPeriod(current.period_start, current.period_end))}</span>
+            <span class="vs-row-meta">${VS_FLAG_UG}<span>Closes in ${current.daysRemaining} day${current.daysRemaining === 1 ? "" : "s"}</span><span class="vs-status vs-status-open"><span class="vs-dot"></span>OPEN</span></span></span>
+            <span class="vs-row-pay">${vendorEsc(vsFormatMoney(current.estimatedAmount, current.currency))}</span>
+        </button>`;
     }
-
-    if (filtered.length === 0 && !(current && (vendorStatementsState.filter === "all" || vendorStatementsState.filter === "open"))) {
-        rows += '<div style="padding:30px 20px; text-align:center; color:#9ca3af; font-size:13px;">No statements in this filter.</div>';
+    if (!filtered.length && !showOpen) {
+        rows += '<div class="vs-list-empty">No statements in this filter.</div>';
     } else {
-        rows += filtered.map(s => {
-            const selected = s.id === vendorStatementsState.selectedStatementId;
-            const st = vsStatusStyle(s.display_status);
-            const border = selected ? "2px solid #16264f" : "1px solid #e5e7eb";
-            return `
-                <div onclick="selectStatement(${s.id})" style="border:${border}; border-radius:8px; padding:14px; margin-bottom:10px; background:#fff; cursor:pointer;">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
-                        <div style="flex:1; min-width:0;">
-                            <div style="font-size:13.5px; font-weight:600; margin-bottom:4px;">${vendorEsc(vsFormatPeriod(s.period_start, s.period_end))}</div>
-                            <div style="font-size:11.5px; color:#6b7280; margin-bottom:6px; word-break:break-all;">${vendorEsc(s.statement_number)}</div>
-                            <div style="display:inline-flex; align-items:center; gap:5px; background:${st.bg}; color:${st.fg}; padding:3px 8px; border-radius:999px; font-size:10.5px; font-weight:700;">
-                                <span style="width:6px; height:6px; border-radius:50%; background:${st.dot};"></span>
-                                ${vendorEsc(s.display_status)}
-                            </div>
-                        </div>
-                        <div style="font-size:13.5px; font-weight:700; color:#111; white-space:nowrap;">
-                            ${vendorEsc(vsFormatMoney(s.amount_due, s.currency))}
-                        </div>
-                    </div>
-                </div>
-            `;
+        rows += filtered.map((s) => {
+            const sel = s.id === vendorStatementsState.selectedStatementId;
+            const cls = s.display_status === "PAID" ? "paid" : s.display_status === "REJECTED" ? "rejected" : "unpaid";
+            return `<button type="button" class="vs-row${sel ? " vs-row-on" : ""}" onclick="selectStatement(${s.id})">
+                <span class="vs-row-main"><span class="vs-row-period">${vendorEsc(vsFormatPeriod(s.period_start, s.period_end))}</span>
+                <span class="vs-row-meta">${VS_FLAG_UG}<span class="vs-row-no">${vendorEsc(s.statement_number)}</span><span class="vs-status vs-status-${cls}"><span class="vs-dot"></span>${vendorEsc(s.display_status)}</span></span></span>
+                <span class="vs-row-pay">${vendorEsc(vsFormatMoney(s.amount_due, s.currency))}</span>
+            </button>`;
         }).join("");
     }
-
-    return `<div>${rows}</div>`;
+    return `<div class="vs-list"><div class="vs-list-head"><span>Period / Number / Status</span><span>Payout</span></div>${rows}</div>`;
 }
 
 function renderStatementsDetail(d) {
     const id = vendorStatementsState.selectedStatementId;
-    const s = d.statements.find(x => x.id === id);
+    const s = d.statements.find((x) => x.id === id);
+    const line = (label, value, strong) => `<div class="vs-line${strong ? " vs-line-strong" : ""}"><span>${label}</span><span>${value}</span></div>`;
 
     if (!s) {
-        // No statement selected - show the current open cycle summary if there is one
         if (d.currentCycle) {
             const c = d.currentCycle;
-            return `
-                <div style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:20px;">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
-                        <div>
-                            <div style="font-size:16px; font-weight:700; margin-bottom:4px;">${vendorEsc(vsFormatPeriod(c.period_start, c.period_end))}</div>
-                            <div style="font-size:12px; color:#6b7280;">Open cycle - closes in ${c.daysRemaining} day${c.daysRemaining === 1 ? "" : "s"}</div>
-                        </div>
-                        <span style="background:#fef3c7; color:#92400e; padding:4px 10px; border-radius:999px; font-size:11px; font-weight:700;">OPEN</span>
-                    </div>
-                    <div style="border-top:1px solid #e5e7eb; padding-top:14px;">
-                        <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:10px;">
-                            <span>Estimated amount</span><strong>${vendorEsc(vsFormatMoney(c.estimatedAmount, c.currency))}</strong>
-                        </div>
-                        <div style="font-size:12px; color:#9ca3af;">This estimate updates as orders are delivered. A final statement will be generated when the cycle closes.</div>
-                    </div>
-                </div>
-            `;
+            return `<div class="vs-detail">
+                <div class="vs-detail-head"><div class="vs-detail-period">${vendorEsc(vsFormatPeriod(c.period_start, c.period_end))}</div>
+                <div class="vs-detail-meta"><span>Open cycle - closes in ${c.daysRemaining} day${c.daysRemaining === 1 ? "" : "s"}</span><span class="vs-status vs-status-open"><span class="vs-dot"></span>OPEN</span></div></div>
+                ${line("Estimated amount", vendorEsc(vsFormatMoney(c.estimatedAmount, c.currency)))}
+                <div class="vs-detail-note">This estimate updates as orders are delivered. The final statement is generated when the cycle closes.</div>
+            </div>`;
         }
-        return '<div style="padding:60px 20px; text-align:center; color:#9ca3af; font-size:13px; border:1px dashed #e5e7eb; border-radius:10px;">Select a statement to view details.</div>';
+        return '<div class="vs-detail vs-detail-empty">Select a statement to view details.</div>';
     }
 
-    const st = vsStatusStyle(s.display_status);
-
-    return `
-        <div style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:20px;">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
-                <div>
-                    <div style="font-size:16px; font-weight:700; margin-bottom:4px;">${vendorEsc(vsFormatPeriod(s.period_start, s.period_end))}</div>
-                    <div style="font-size:12px; color:#6b7280;">${vendorEsc(s.statement_number)}</div>
-                </div>
-                <span style="background:${st.bg}; color:${st.fg}; padding:4px 10px; border-radius:999px; font-size:11px; font-weight:700;">${vendorEsc(s.display_status)}</span>
-            </div>
-
-            <div style="border-top:1px solid #e5e7eb; padding-top:14px; margin-bottom:14px;">
-                <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:8px;">
-                    <span>Opening Balance</span><span>${vendorEsc(vsFormatMoney(s.opening_balance, s.currency))}</span>
-                </div>
-            </div>
-
-            <div style="border-top:1px solid #e5e7eb; padding-top:14px; margin-bottom:14px;">
-                <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:8px;">
-                    <span>Earnings</span><span>${vendorEsc(vsFormatMoney(s.earnings, s.currency))}</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:8px;">
-                    <span>Marketplace charges</span><span>-${vendorEsc(vsFormatMoney(s.commissions, s.currency))}</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:8px;">
-                    <span>Refunds</span><span>-${vendorEsc(vsFormatMoney(s.refund_deductions, s.currency))}</span>
-                </div>
-                ${s.adjustments !== 0 ? `<div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:8px;"><span>Adjustments</span><span>${vendorEsc(vsFormatMoney(s.adjustments, s.currency))}</span></div>` : ""}
-            </div>
-
-            <div style="border-top:2px solid #16264f; padding-top:14px; margin-bottom:8px;">
-                <div style="display:flex; justify-content:space-between; font-size:15px; font-weight:800; color:#16264f;">
-                    <span>CLOSING BALANCE</span><span>${vendorEsc(vsFormatMoney(s.amount_due, s.currency))}</span>
-                </div>
-            </div>
-
-            <div style="border-top:1px solid #e5e7eb; padding-top:14px; margin-bottom:16px;">
-                <div style="display:flex; justify-content:space-between; font-size:15px; font-weight:800; color:#16264f;">
-                    <span>PAYOUT</span><span>${vendorEsc(vsFormatMoney(s.amount_due, s.currency))}</span>
-                </div>
-                ${s.paid_at ? '<div style="font-size:12px; color:#6b7280; margin-top:6px;">Paid on ' + vendorEsc(vsFormatDate(s.paid_at)) + "</div>" : ""}
-            </div>
-
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <button onclick="downloadStatement('pdf', ${s.id})" style="background:#f59e0b; color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer;">Download all transactions</button>
-                <button onclick="downloadStatement('csv', ${s.id})" style="background:#fff; color:#16264f; border:1px solid #16264f; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer;">CSV</button>
-                <button onclick="shareStatement(${s.id})" style="background:#fff; color:#16264f; border:1px solid #16264f; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer;">Share</button>
+    const cls = s.display_status === "PAID" ? "paid" : s.display_status === "REJECTED" ? "rejected" : "unpaid";
+    const money = (v) => vendorEsc(vsFormatMoney(v, s.currency));
+    return `<div class="vs-detail">
+        <div class="vs-detail-head">
+            <div class="vs-detail-period">${vendorEsc(vsFormatPeriod(s.period_start, s.period_end))}</div>
+            <div class="vs-detail-meta"><span>${vendorEsc(s.statement_number)}</span><span class="vs-status vs-status-${cls}"><span class="vs-dot"></span>${vendorEsc(s.display_status)}</span></div>
+        </div>
+        ${line("Opening Balance", money(s.opening_balance))}
+        <div class="vs-detail-body">
+            ${line("Earnings", money(s.earnings))}
+            ${line("Marketplace charges", "-" + money(s.commissions))}
+            ${line("Refunds", "-" + money(s.refund_deductions))}
+            ${Number(s.adjustments) !== 0 ? line("Adjustments", money(s.adjustments)) : ""}
+        </div>
+        <div class="vs-detail-foot">
+            ${line("CLOSING BALANCE", money(s.amount_due), true)}
+            ${line("PAYOUT", money(s.amount_due), true)}
+            ${s.paid_at ? `<div class="vs-detail-note">Paid on ${vendorEsc(vsFormatDate(s.paid_at))}</div>` : ""}
+            <div class="vs-detail-actions">
+                <button type="button" class="vs-btn-outline" onclick="shareStatement(${s.id})">Share</button>
+                <button type="button" class="vs-btn-outline" onclick="downloadStatement('csv', ${s.id})">CSV</button>
+                <button type="button" class="vs-export-btn" onclick="downloadStatement('pdf', ${s.id})">Download all transactions</button>
             </div>
         </div>
-    `;
+    </div>`;
 }
 
 // --- Actions -----------------------------------------------------------
 
-window.downloadStatement = async function (kind, id) {
+window.downloadStatement = async function (kind, id, opts) {
+    const record = !(opts && opts.record === false);
     try {
         const token = getVendorToken();
         const url = kind === "csv"
@@ -408,6 +420,7 @@ window.downloadStatement = async function (kind, id) {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(a.href);
+        if (record) recordTransactionExport(kind === "csv" ? "statement_csv" : "statement_pdf", id);
     } catch (error) {
         console.error("Download statement error:", error);
         alert("Could not download statement.");
@@ -432,10 +445,10 @@ window.shareStatement = async function (id) {
     }
 };
 
-window.downloadAllStatementsCsv = function () {
-    // Simplified: downloads the current selected statement's CSV.
-    // A full async export batch would be Beat 2b.
-    const id = vendorStatementsState.selectedStatementId;
-    if (!id) { alert("Select a statement to export."); return; }
-    window.downloadStatement("csv", id);
+// Export Transactions - every statement's transactions in one CSV.
+window.downloadAllStatementsCsv = async function () {
+    try {
+        await vsFetchDownload("/api/vendors/me/transactions/export.csv", `all-transactions-${new Date().toISOString().slice(0, 10)}.csv`);
+        recordTransactionExport("all_transactions", null);
+    } catch (e) { alert(e.message); }
 };

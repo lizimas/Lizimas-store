@@ -24,7 +24,9 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
     storage,
     fileFilter,
-    limits: { fileSize: 5 * 1024 * 1024 } // 5MB per file
+    // fieldSize: text fields (the product description) up to 5MB - multer's
+    // default is 1MB (Sept 2026, longer descriptions).
+    limits: { fileSize: 5 * 1024 * 1024, fieldSize: 5 * 1024 * 1024 } // 5MB per file
 });
 
 // Promotions only. A slot 4 row tile may carry a short clip instead of a

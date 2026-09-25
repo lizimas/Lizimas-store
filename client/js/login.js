@@ -23,6 +23,7 @@ async function loginAccount() {
         }
 
         localStorage.setItem("userToken", result.token);
+        if (window.LzRemember) LzRemember.apply("userToken", (document.getElementById("login-remember") || {}).checked);
         localStorage.setItem("userInfo", JSON.stringify(result.user));
 
         statusEl.textContent = "Login successful! Redirecting...";
@@ -74,6 +75,7 @@ async function handleGoogleCredential(response) {
         }
 
         localStorage.setItem("userToken", result.token);
+        if (window.LzRemember) LzRemember.apply("userToken", (document.getElementById("login-remember") || {}).checked);
         localStorage.setItem("userInfo", JSON.stringify(result.user));
 
         statusEl.textContent = "Login successful! Redirecting...";
@@ -158,6 +160,7 @@ async function verifyTwoFactor() {
         const result = await apiPost("/auth/login/2fa", { pendingToken: pendingLoginToken, code });
 
         localStorage.setItem("userToken", result.token);
+        if (window.LzRemember) LzRemember.apply("userToken", (document.getElementById("login-remember") || {}).checked);
         localStorage.setItem("userInfo", JSON.stringify(result.user));
 
         statusEl.textContent = "Login successful! Redirecting...";

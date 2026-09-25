@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+<script src="js/lz-remember.js?v=2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Vendor Login - Lizimas Store</title>
@@ -56,9 +57,15 @@
             </span>
         </div>
 
-        <p class="auth-forgot">
-            <a href="vendor-forgot-password.html">Forgot password?</a>
-        </p>
+        <div class="auth-meta-row">
+            <label class="auth-remember" for="vendor-login-remember">
+                <input type="checkbox" id="vendor-login-remember" data-lz-remember="vendorToken">
+                Keep me logged in
+            </label>
+            <p class="auth-forgot">
+                <a href="vendor-forgot-password.html">Forgot password?</a>
+            </p>
+        </div>
 
         <input type="text" id="login-2fa-code" class="hidden auth-input-wrap" placeholder="Enter 6-digit code">
         <button id="login-2fa-btn" class="hidden auth-submit" onclick="submitVendorLogin2FA()">Verify Code</button>
@@ -81,14 +88,14 @@
         <button id="login-btn" class="auth-submit" onclick="handleVendorLogin()">Sign in</button>
 
         <p class="auth-foot">
-            Not a vendor yet? <a href="vendor-register.html">Apply here</a>
+            Not a vendor yet? <a href="vendor-register.html">Apply here</a> &middot; <a href="seller-guide.html">Seller Guide</a>
         </p>
 
     </div>
 
 </div>
 
-<script src="js/vendor-auth.js?v=2"></script>
+<script src="js/vendor-auth.js?v=3"></script>
 <script src="js/password-toggle.js?v=2"></script>
 </body>
 </html>

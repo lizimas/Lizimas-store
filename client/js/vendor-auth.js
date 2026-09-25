@@ -6,6 +6,8 @@ function getVendorToken() {
 
 function setVendorToken(token) {
     localStorage.setItem("vendorToken", token);
+    // "Keep me logged in" (lz-remember.js): unticked = ends when the browser closes.
+    if (window.LzRemember) LzRemember.apply("vendorToken", (document.getElementById("vendor-login-remember") || {}).checked);
 }
 
 let vendorPendingLoginToken = null;

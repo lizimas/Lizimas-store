@@ -57,6 +57,7 @@ function setupVendorTabs() {
             if (button.dataset.tab === "consignments") vdLoadConsignments();
             if (button.dataset.tab === "inventory") loadVendorInventory();
             if (button.dataset.tab === "inventory") vdLoadStockRecommendations();
+            if (button.dataset.tab === "add-product" && typeof lzPlaceProductForm === "function") lzPlaceProductForm("tab-add-product");
             if (button.dataset.tab === "add-product" && staffCategoriesLoaded === false) loadVendorCategories();
             if (button.dataset.tab === "add-product" && !document.getElementById("product-id").value) {
                 const blockHost = document.getElementById("desc-blocks-editor");
@@ -1191,6 +1192,7 @@ function resetVendorProductForm() {
     document.getElementById("product-stock").value = "";
     hideVendorPricingPreview();
     document.getElementById("product-package-size").value = "Small";
+    if (window.LzPackage) LzPackage.fill("product", null);
     document.getElementById("product-warranty-months").value = "";
     document.getElementById("product-brand").value = "";
     document.getElementById("product-gtin").value = "";
@@ -2088,6 +2090,7 @@ async function editVendorProduct(id) {
     document.getElementById("product-payout").value = product.vendor_desired_payout || product.price || "";
     document.getElementById("product-stock").value = product.stock || "";
     document.getElementById("product-package-size").value = product.package_size || "Small";
+    if (window.LzPackage) LzPackage.fill("product", product);
     document.getElementById("product-warranty-months").value = product.warranty_months || "";
     document.getElementById("product-brand").value = product.brand || "";
     document.getElementById("product-gtin").value = product.gtin || "";
@@ -2157,6 +2160,13 @@ async function submitVendorProductForm() {
     submitBtn.disabled = true;
     submitBtn.style.opacity = "0.6";
 
+    // Delivery size is worked out from the packed weight/dimensions (lz-package-size.js).
+    const packError = window.LzPackage ? LzPackage.validate("product", !(document.getElementById("product-id") || {}).value) : null;
+    if (packError) {
+        const packStatus = document.getElementById("product-form-status");
+        if (packStatus) packStatus.textContent = packError; else alert(packError);
+        return;
+    }
     const formData = new FormData();
     formData.append("name", name);
     formData.append("sku", sku);
@@ -2165,6 +2175,7 @@ async function submitVendorProductForm() {
     formData.append("desired_payout", desiredPayout);
     formData.append("stock", stock);
     formData.append("package_size", packageSize);
+    if (window.LzPackage) LzPackage.appendTo(formData, "product");
     formData.append("warranty_months", warrantyMonths);
     formData.append("brand", brand);
     formData.append("gtin", gtin);
@@ -2224,7 +2235,9 @@ async function submitVendorProductForm() {
         }
 
         resetVendorProductForm();
-        document.querySelector('.tab-btn[data-tab="products"]').click();
+        // Phones show this same form in the mobile Add Product screen.
+        if (window.matchMedia("(max-width: 768px)").matches && typeof vmShowScreen === "function") vmShowScreen("products");
+        else document.querySelector('.tab-btn[data-tab="products"]').click();
 
     } catch (error) {
         console.error("Submit product error:", error);

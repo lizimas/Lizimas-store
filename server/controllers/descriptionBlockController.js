@@ -189,15 +189,18 @@ const saveDescriptionBlocks = async (req, res) => {
             });
         }
 
-        if ((b.type === "image" || b.type === "video") && b.body && String(b.body).length > 300) {
+        // Limits raised Sept 2026 (Ryan: longer product descriptions for
+        // vendors, staff and admin) - captions 300 -> 1000, link labels
+        // 100 -> 200. Text/heading/grid/table bodies have no length cap.
+        if ((b.type === "image" || b.type === "video") && b.body && String(b.body).length > 1000) {
             return res.status(400).json({
-                message: `Block ${i}: caption is ${String(b.body).length} characters, limit is 300.`
+                message: `Block ${i}: caption is ${String(b.body).length} characters, limit is 1000.`
             });
         }
 
-        if (b.type === "link" && String(b.body).length > 100) {
+        if (b.type === "link" && String(b.body).length > 200) {
             return res.status(400).json({
-                message: `Block ${i}: link label is ${String(b.body).length} characters, limit is 100.`
+                message: `Block ${i}: link label is ${String(b.body).length} characters, limit is 200.`
             });
         }
     }
