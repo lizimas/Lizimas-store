@@ -5,6 +5,7 @@
 <meta charset="UTF-8">
 <title>Lizimas Store — Admin Dashboard</title>
 <link rel="stylesheet" href="css/admin.css?v=41">
+    <link rel="stylesheet" href="css/admin-product-discounts.css?v=2">
 </head>
 <body>
 
@@ -71,6 +72,7 @@
                             <button class="tab-btn vd-sub-item vd-sub-item-nested" data-tab="categories">&#128450; Categories</button>
                             <button class="tab-btn vd-sub-item vd-sub-item-nested" data-tab="product-tiers-admin">&#127942; Product Tiers</button>
                             <button class="tab-btn vd-sub-item" data-tab="promotions">&#127919; Promotions</button>
+                            <button class="tab-btn vd-sub-item" data-tab="product-discounts">&#127991; Discount Promotions</button>
                             <button class="tab-btn vd-sub-item" data-tab="discounts">&#127903; Discount Codes</button>
                             <button class="tab-btn vd-sub-item" data-tab="flash-sales">&#128293; Flash Sales</button>
                             <button class="tab-btn vd-sub-item" data-tab="prohibited-items-admin">&#128683; Prohibited Items</button>
@@ -855,6 +857,68 @@
                             </thead>
                             <tbody id="promotions-table-body"></tbody>
                         </table>
+                    </div>
+                </section>
+
+                <section id="tab-product-discounts" class="tab-content hidden">
+                    <h2 class="admin-page-title">Discount Promotions</h2>
+                    <p class="admin-page-sub">Put a % discount on one or many products, each with its own %.
+                       Only the % is saved, so it always follows the product&rsquo;s price: 30% off
+                       UGX 500,000 is UGX 350,000, and if the price becomes UGX 700,000 it is still
+                       30% off (UGX 490,000). Type the <b>% off</b> or type what the <b>customer pays</b>
+                       &mdash; the other is worked out for you. A running flash sale or approved vendor
+                       promotion on the same product takes priority until it ends.</p>
+
+                    <div class="panel pdx-card" id="pdx-builder">
+                        <h3>1. Find products</h3>
+                        <div class="pdx-toolbar">
+                            <input type="search" id="pdx-search" placeholder="Search name, SKU, brand, seller or category" autocomplete="off">
+                            <button type="button" id="pdx-select-all" class="pdx-btn-ghost">Tick all shown</button>
+                            <button type="button" id="pdx-add" class="add-btn">Add to discount</button>
+                        </div>
+                        <div id="pdx-results" class="pdx-results"></div>
+
+                        <h3>2. Set the discount <span id="pdx-sel-count" class="pdx-muted"></span></h3>
+                        <div class="pdx-toolbar">
+                            <label class="pdx-inline">Same % for all
+                                <input type="number" id="pdx-default-pct" min="0.01" max="99.99" step="any" placeholder="e.g. 30">
+                            </label>
+                            <button type="button" id="pdx-apply-all" class="pdx-btn-ghost">Apply to all rows</button>
+                            <button type="button" id="pdx-clear" class="pdx-btn-ghost">Clear list</button>
+                        </div>
+                        <div class="pdx-table-wrap">
+                            <table class="pdx-table">
+                                <thead><tr><th>Product</th><th>Old price (current)</th><th>% off</th><th>Customer pays</th><th>Saving</th><th></th></tr></thead>
+                                <tbody id="pdx-selected"></tbody>
+                            </table>
+                        </div>
+
+                        <h3>3. When</h3>
+                        <div class="pdx-toolbar">
+                            <label class="pdx-inline">Name (optional)<input type="text" id="pdx-label" maxlength="120" placeholder="e.g. Month-end sale"></label>
+                            <label class="pdx-inline">Starts<input type="datetime-local" id="pdx-starts"></label>
+                            <label class="pdx-inline">Ends (optional)<input type="datetime-local" id="pdx-ends"></label>
+                        </div>
+                        <p class="pdx-muted">Leave Starts empty to start now, and Ends empty to run until you end it.
+                           Saving a product that already has a discount replaces the old one.</p>
+                        <button type="button" id="pdx-save" class="add-btn" disabled>Save discounts</button>
+                    </div>
+
+                    <div class="panel pdx-card">
+                        <div class="pdx-list-head">
+                            <h3>Discounts <span id="pdx-list-count" class="pdx-muted"></span></h3>
+                            <div class="pdx-seg">
+                                <button type="button" data-pdx-show="current" class="is-on">Running &amp; scheduled</button>
+                                <button type="button" data-pdx-show="ended">Ended</button>
+                            </div>
+                            <button type="button" id="pdx-end-selected" class="pdx-btn-ghost pdx-danger">End selected</button>
+                        </div>
+                        <div class="pdx-table-wrap">
+                            <table class="pdx-table">
+                                <thead><tr><th></th><th>Product</th><th>Current price</th><th>% off</th><th>Customer pays</th><th>Dates</th><th>Status</th><th></th></tr></thead>
+                                <tbody id="pdx-list"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </section>
 
@@ -2359,6 +2423,7 @@
 <script src="js/lz-package-size.js?v=2"></script>
     <script src="js/lz-text-counter.js?v=1"></script>
     <script src="js/admin.js?v=vc2"></script>
+<script src="js/admin-product-discounts.js?v=2"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

@@ -1,4 +1,5 @@
 const pool = require("../config/database");
+const { discountedPrice } = require("../utils/productDiscounts");
 const { sendOrderStatusSms } = require("../utils/sms");
 const { sendOrderStatusEmail, sendOrderConfirmationEmail } = require("../utils/mailer");
 const { sign: signReceipt } = require("../routes/receipt");
@@ -164,11 +165,26 @@ exports.checkout = async (req, res) => {
                      LIMIT 1`,
                     [productId]
                 );
+                // Admin percent discount (Discount Promotions, migration
+                // 132): stores only the percent, so the price charged is
+                // worked out from the product's CURRENT price. Used only when
+                // no flash sale or approved vendor promotion is running.
+                const pctDiscount = (flashPrice.rows.length || vendorPromoPrice.rows.length)
+                    ? { rows: [] }
+                    : await client.query(
+                        `SELECT percent FROM product_discounts
+                         WHERE product_id = $1 AND is_active = true
+                           AND starts_at <= now() AND (ends_at IS NULL OR ends_at > now())
+                         LIMIT 1`,
+                        [productId]
+                    );
                 const itemPrice = flashPrice.rows.length
                     ? Number(flashPrice.rows[0].sale_price)
                     : vendorPromoPrice.rows.length
                         ? Number(vendorPromoPrice.rows[0].proposed_sale_price)
-                        : Number(product.price);
+                        : pctDiscount.rows.length
+                            ? discountedPrice(product.price, pctDiscount.rows[0].percent)
+                            : Number(product.price);
                 total += itemPrice * quantity;
 
                 validatedItems.push({

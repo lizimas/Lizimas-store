@@ -159,7 +159,10 @@ async function loadProductDetail() {
                 alert("Please choose an option first.");
                 return;
             }
-            const cartPrice = pdSelectedVariantPrice !== null ? pdSelectedVariantPrice : product.price;
+            // The cart shows what checkout will charge: the running sale or
+            // discount price when there is one (checkout re-prices anyway).
+            const cartPrice = pdSelectedVariantPrice !== null ? pdSelectedVariantPrice
+                : (pdHasDiscount ? pdSalePrice : product.price);
             addToCart(product.id, product.name, cartPrice, cartImage, product.description, pdSelectedColorId, pdSelectedColorName, pdSelectedSizeId, pdSelectedSizeName, pdSelectedVariantId, pdSelectedVariantName);
         };
 

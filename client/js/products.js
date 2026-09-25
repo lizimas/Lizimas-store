@@ -9,6 +9,20 @@ let allProducts = [];
 // what the flash-deals section showed them. allProducts stays the full
 // catalogue even on a scoped category/brand/search view (see below), so
 // patching it once here covers every lookup path.
+// Admin percent discount (Discount Promotions, migration 132). The server
+// sends discount_percent + discount_price worked out from today's price;
+// this shows it as the card price with the old price struck through.
+function applyPercentDiscounts(list) {
+    (list || []).forEach(product => {
+        const dp = Number(product.discount_price);
+        if (!(dp > 0) || !(dp < Number(product.price))) return;
+        product.originalPrice = Number(product.price);
+        product.discount = Math.round(Number(product.discount_percent));
+        product.price = dp;
+    });
+    return list;
+}
+
 async function applyActiveFlashSalePricing() {
     try {
         const response = await fetch(`${API_URL}/api/flash-sales/active`);
@@ -21,8 +35,11 @@ async function applyActiveFlashSalePricing() {
             const item = saleByProductId.get(product.id);
             if (!item) return;
             const salePrice = Number(item.sale_price);
-            if (!(salePrice < Number(product.price))) return;
-            product.originalPrice = product.price;
+            // A flash sale wins over a percent discount, measured against
+            // the product's real listed price.
+            const listed = Number(product.originalPrice || product.price);
+            if (!(salePrice < listed)) return;
+            product.originalPrice = listed;
             product.discount = Math.round((1 - salePrice / product.originalPrice) * 100);
             product.price = salePrice;
         });
@@ -34,7 +51,7 @@ async function applyActiveFlashSalePricing() {
 async function loadProducts() {
     try {
         const response = await fetch(`${API_URL}/api/products`);
-        allProducts = await response.json();
+        allProducts = applyPercentDiscounts(await response.json());
         await applyActiveFlashSalePricing();
         console.log("Lizimas Products Loaded:", allProducts);
 
@@ -98,7 +115,7 @@ async function loadProducts() {
             let scoped = [];
             try {
                 const r = await fetch(`${API_URL}/api/products?category=${encodeURIComponent(requestedCategory)}`);
-                if (r.ok) scoped = await r.json();
+                if (r.ok) scoped = applyPercentDiscounts(await r.json());
             } catch (error) {
                 console.error("Category load failed:", error);
             }
@@ -115,7 +132,7 @@ async function loadProducts() {
             let branded = [];
             try {
                 const r = await fetch(`${API_URL}/api/products?brand=${encodeURIComponent(requestedBrand)}`);
-                if (r.ok) branded = await r.json();
+                if (r.ok) branded = applyPercentDiscounts(await r.json());
             } catch (error) {
                 console.error("Brand load failed:", error);
             }

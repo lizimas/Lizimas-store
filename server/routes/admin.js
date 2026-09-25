@@ -180,6 +180,12 @@ const {
     setFlashSaleActive,
     deleteFlashSale
 } = require("../controllers/flashSaleController");
+const {
+    listProductDiscounts,
+    searchDiscountProducts,
+    saveProductDiscounts,
+    endProductDiscounts
+} = require("../controllers/productDiscountController");
 const csvUpload = require("../middleware/csvUpload");
 const jumiaAdmin = require("../controllers/jumiaAdminController");
 const { getSecurityLogins, unlockAccount, getAccountReports, updateAccountReport } = require("../controllers/adminController");
@@ -443,6 +449,12 @@ router.post("/discount-codes/generate-code", generateCode);
 router.post("/discount-codes", createDiscountCode);
 router.patch("/discount-codes/:id/active", setDiscountCodeActive);
 router.delete("/discount-codes/:id", deleteDiscountCode);
+
+// Discount Promotions - percent off many products (migration 132)
+router.get("/product-discounts", listProductDiscounts);
+router.get("/product-discounts/products", searchDiscountProducts);
+router.post("/product-discounts", saveProductDiscounts);
+router.patch("/product-discounts/end", endProductDiscounts);
 
 router.get("/flash-sales", listFlashSales);
 router.get("/flash-sales/:id", getFlashSale);

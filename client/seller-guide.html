@@ -40,6 +40,8 @@
             <button type="button" data-g-q="not live">Not Live</button>
             <button type="button" data-g-q="consignment">Consignment</button>
             <button type="button" data-g-q="promotion">Promotions</button>
+            <button type="button" data-g-q="active live">Active vs Live</button>
+            <button type="button" data-g-q="checklist">Checklist</button>
             <button type="button" data-g-q="staff">Staff</button>
         </div>
     </aside>
@@ -170,14 +172,74 @@ window.LZ_GUIDE = { sections: [
     <li>We count it in: <em>Received</em>, or <em>Received Incomplete</em> if some units were missing. Those units then ship from our hub and you don't need to hand them over order by order.</li></ol>
     <p>Filters: Open, Closed, Received, Received Incomplete, Cancelled, and More. Search by CO number, SKU or product name. See the <a href="vendor-policies.html#fulfilment">Fulfilment Guidelines</a>.</p>` }
 ]},
-{ id: "orders", title: "4. Orders, handover and returns", items: [
+{ id: "pm-guide", title: "4. Product Management explained (vendors and staff)", intro: "A plain-language reference to the Product Management page: every column, the bulk buttons, Active vs Live, why a product isn't live, and how to choose the right category. It applies to vendors and to Lizimas staff.", items: [
+  { id: "pm-columns", title: "Product Management table columns", keywords: "columns name seller sku price sale price subsidy price promo price quantity visible active actions checkbox table", where: "Vendor Center &rarr; Products &rarr; Manage Products",
+    html: `<table>
+    <tr><th>Column</th><th>What it means</th><th>Important notes</th></tr>
+    <tr><td>Checkbox</td><td>Selects one or more products</td><td>Needed for bulk actions (Activate, Deactivate, Delete)</td></tr>
+    <tr><td>Name</td><td>Full product title, with its QC status underneath</td><td>Click it to open the product's edit page</td></tr>
+    <tr><td>Seller SKU</td><td>Your own product code</td><td>Should be unique for each product; filled in for you if left blank</td></tr>
+    <tr><td>Lizimas Store SKU</td><td>The code Lizimas gives every product (ends in LZMS)</td><td>Created automatically and never changes (optional column)</td></tr>
+    <tr><td>Price</td><td>Regular selling price</td><td>The main price customers see</td></tr>
+    <tr><td>Sale Price</td><td>Your own approved promotion price while it's running</td><td>Optional; blank when no sale is running</td></tr>
+    <tr><td>Promo Price</td><td>Price in a Lizimas campaign you joined, while it's running</td><td>Optional column</td></tr>
+    <tr><td>Subsidy Price</td><td>Special price while Lizimas Store runs a flash sale on the product</td><td>Controlled by Lizimas Store campaigns</td></tr>
+    <tr><td>Quantity</td><td>Available stock</td><td>If 0, the product can't be Live</td></tr>
+    <tr><td>Creation Date / Deletion / Quality Score</td><td>When it was added / whether deletion is pending / how complete the listing is</td><td>Optional columns (Manage Columns)</td></tr>
+    <tr><td>Visible</td><td>Whether the product is <strong>Live</strong> or <strong>Not Live</strong> on the Lizimas Store website</td><td>Most important for sales. Hover Not Live to see why</td></tr>
+    <tr><td>Active</td><td>Whether the product is <strong>Active</strong> or <strong>Inactive</strong> in your account</td><td>Controlled by you; can be switched on after QC approval</td></tr>
+    <tr><td>Actions</td><td>Options for that one product (Edit, Activate/Deactivate, Delete)</td><td>&mdash;</td></tr></table>
+    <p>Use <strong>Manage Columns</strong> to choose the optional columns. <strong>+ New Default</strong> saves your choice, <strong>Apply filters</strong> uses it now, and <strong>Reset Filters</strong> goes back to your saved default.</p>` },
+  { id: "pm-bulk", title: "Activate and More Actions", keywords: "activate more actions bulk deactivate delete selected", where: "Manage Products &rarr; bar above the table (phone: Product actions + arrow)",
+    html: `<p>These buttons work once you tick one or more products.</p>
+    <ul><li><strong>Activate:</strong> changes the selected products from <em>Inactive</em> to <em>Active</em>. Products that haven't passed QC are skipped.</li>
+    <li><strong>More Actions (&#8942;):</strong> <em>Deactivate</em> (takes them off the website without deleting) and <em>Delete</em> (removes them; products with past orders are archived).</li></ul>
+    <p>You always see a confirmation first, then a summary of what succeeded, failed or was skipped, with a downloadable report.</p>` },
+  { id: "pm-active-live", title: "The difference between Active and Live", keywords: "active live difference visible buy customers", where: "Manage Products &rarr; Active and Visible columns",
+    html: `<table>
+    <tr><th>Status</th><th>Meaning</th><th>Controlled by</th><th>Can customers buy it?</th></tr>
+    <tr><td>Active</td><td>The product is switched ON in your Vendor Center</td><td>You (the seller)</td><td>Not necessarily</td></tr>
+    <tr><td>Live</td><td>The product is visible on the Lizimas Store website and in stock</td><td>Lizimas Store system</td><td>Yes</td></tr></table>
+    <p class="g-tip"><strong>Key point:</strong> a product must be <strong>both Active and Live</strong> before customers can see and buy it.</p>` },
+  { id: "pm-not-live-reasons", title: "Common reasons a product stays \"Not Live\" (even after activating)", keywords: "not live reasons pending qc rejected no price stock zero unauthorized brand incomplete wrong category shop not activated solution", where: "Manage Products &rarr; hover Not Live",
+    html: `<table>
+    <tr><th>Reason</th><th>Explanation</th><th>Solution</th></tr>
+    <tr><td>Pending QC</td><td>Still waiting for the Lizimas Store quality check</td><td>Wait 1&ndash;2 working days, or edit and resubmit</td></tr>
+    <tr><td>Not Ready To QC</td><td>Missing a main image, category or price</td><td>Complete them so QC can start</td></tr>
+    <tr><td>Rejected</td><td>Failed quality control</td><td>Read the rejection reason, fix it and save to resubmit</td></tr>
+    <tr><td>No price or stock = 0</td><td>Missing price or quantity</td><td>Add the correct price and stock</td></tr>
+    <tr><td>Unauthorized brand / restricted</td><td>The brand isn't approved for your account, or Lizimas restricted the product</td><td>Apply for <a href="#brand-auth">brand authorization</a> or contact support</td></tr>
+    <tr><td>Incomplete information</td><td>Missing attributes, poor images or a short description</td><td>Complete all the important fields (see the checklist below)</td></tr>
+    <tr><td>Wrong category</td><td>The category is too broad or incorrect</td><td>Choose the most detailed category (see below)</td></tr>
+    <tr><td>Inactive</td><td>You switched it off</td><td>Turn on the Active switch</td></tr>
+    <tr><td>Shop not fully activated / holiday mode</td><td>Your seller account has restrictions, or your shop is paused</td><td>Finish the <a href="#shop-setup">shop setup</a>, check <a href="#shop-status">shop status</a>, or contact Lizimas Store support</td></tr></table>` },
+  { id: "pm-categories", title: "How Lizimas Store classifies products (category)", keywords: "category classification leaf level detailed smartphone smartband soundbar television examples approval", where: "Add Products &rarr; Category",
+    html: `<p>Lizimas Store needs the <strong>most detailed (last-level) category</strong>. Pick the deepest option in the category picker.</p>
+    <table><tr><th>Product</th><th>Category path</th></tr>
+    <tr><td>Smartphone</td><td>Phones &amp; Tablets &gt; Mobile Phones &gt; Smartphones</td></tr>
+    <tr><td>Smartband (e.g. Galaxy Fit 3)</td><td>Phones &amp; Tablets &gt; Wearable Technology &gt; Smart Watches / Fitness Trackers</td></tr>
+    <tr><td>Soundbar</td><td>Electronics &gt; Television Accessories &gt; Sound Bars</td></tr>
+    <tr><td>Television</td><td>Electronics &gt; Televisions &gt; Smart TVs</td></tr></table>
+    <p class="g-tip"><strong>Rule:</strong> the more specific the category, the higher the chance of approval. The exact names follow the live category list; use these as a pattern (department &gt; group &gt; specific type).</p>` },
+  { id: "pm-checklist", title: "Quick checklist before submitting a product", keywords: "checklist before submitting category images title attributes price stock description weight", where: "Before pressing Submit for Approval",
+    html: `<ul>
+    <li>&#9744; Correct and detailed category selected</li>
+    <li>&#9744; Good quality images (white background preferred), at least 3 &mdash; <a href="vendor-policies.html#content-images">Content &amp; Image Guidelines</a></li>
+    <li>&#9744; Complete product title in the Lizimas Store format (brand, model, key specs, colour)</li>
+    <li>&#9744; All important attributes filled in (brand, colour, size, warranty)</li>
+    <li>&#9744; Correct price and stock quantity</li>
+    <li>&#9744; Packed weight and size entered (sets the delivery charge)</li>
+    <li>&#9744; Clear product description</li>
+    <li>&#9744; Genuine product, and brand authorization if needed &mdash; <a href="vendor-policies.html#anti-counterfeit">Anti-Counterfeit Policy</a></li></ul>` }
+]},
+{ id: "orders", title: "5. Orders, handover and returns", items: [
   { id: "order-flow", title: "Handling an order", keywords: "orders accept processing ready for handover drop off point handed over delivery rejected inspection", where: "Vendor Center &rarr; Orders &rarr; All Orders",
     html: `<ol><li><strong>Accept Order</strong></li><li><strong>Start Processing</strong> (pack it; see <a href="vendor-policies.html#packaging">Packaging</a>)</li><li><strong>Mark Ready for Handover</strong>, choose the drop-off point, then <strong>Mark Handed Over</strong> when you hand it in.</li></ol>
     <p>We inspect it; it then moves to <em>In Delivery</em> and <em>Delivered</em>. If inspection <em>Rejects</em> it, the reason is shown. Fix it and hand it over again. Only people on your <a href="#pickers">Pickers</a> list may hand over for you. See the <a href="vendor-policies.html#delivery">Delivery Guidelines</a>.</p>` },
   { id: "returns", title: "Returns and refunds", keywords: "returns refunds collect forfeited 7 days 21 days evidence decision", where: "Vendor Center &rarr; Orders &rarr; Returns / Returns &amp; Refunds",
     html: `<p>Customers can return items within 7 days of delivery (<a href="returns.html">Returns Policy</a>). Collect returned items from the drop-off point within <strong>7 days</strong> (21 days in total once they're moved to the central hub), or they may be forfeited. Under <strong>Returns &amp; Refunds</strong> you can see the reason, the evidence photo and our refund decision, and add your response.</p>` }
 ]},
-{ id: "money", title: "5. Getting paid", items: [
+{ id: "money", title: "6. Getting paid", items: [
   { id: "statements", title: "Account Statements and weekly payouts", keywords: "statements payout wallet weekly cycle closing balance export transactions download pdf csv seller id", where: "Vendor Center &rarr; Account Statements",
     html: `<p>Earnings are grouped in <strong>weekly cycles (Monday to Sunday)</strong>. Each closed week creates a statement showing your opening balance, earnings, marketplace charges, refunds, <strong>closing balance</strong> and <strong>payout</strong>. After our review we send the payout to your approved account.</p>
     <ul><li>Your Seller ID is shown at the top of the page.</li><li>Filter by Open, Paid or Unpaid. Show amounts in USD or local currency.</li>
@@ -185,7 +247,7 @@ window.LZ_GUIDE = { sections: [
   { id: "payment-accounts", title: "Payout accounts (Mobile Money or bank)", keywords: "payment information momo mobile money bank account payout number evidence rejected", where: "Account &rarr; Payment Information (or Home &rarr; step 4)",
     html: `<p>Add your MoMo or bank account and upload the evidence we ask for. It must be in the same name as your verified identity (<a href="vendor-requirements.html#payment">rules</a>). While an account is <em>Pending</em>, payouts wait. If it's <em>Rejected</em>, edit it and resubmit.</p>` }
 ]},
-{ id: "growth", title: "6. Promotions and advertising", items: [
+{ id: "growth", title: "7. Promotions and advertising", items: [
   { id: "promos", title: "Promotions: your own sales and Lizimas campaigns", keywords: "promotions sale price campaign join nominate discount management view all", where: "Vendor Center &rarr; Promotions",
     html: `<ul><li><strong>Propose a Promotion:</strong> choose a product, sale price and dates. We review it.</li>
     <li><strong>Lizimas Campaigns:</strong> press <strong>View All</strong>, open a campaign and nominate products within its discount range before the registration end date.</li>
@@ -195,7 +257,7 @@ window.LZ_GUIDE = { sections: [
   { id: "ads", title: "Advertise your products (pay per click)", keywords: "advertise ads sponsored cpc cost per click budget campaign", where: "Vendor Center &rarr; Advertise Your Products &rarr; Create a campaign",
     html: `<p>Set a campaign name, daily and total budget, and the products to promote, then submit. We review it. You pay only when a shopper clicks your sponsored product.</p>` }
 ]},
-{ id: "account", title: "7. Running your account", items: [
+{ id: "account", title: "8. Running your account", items: [
   { id: "shop-status", title: "Shop status and holiday mode", keywords: "shop active holiday mode close shop vacation away", where: "Account &rarr; Settings &rarr; Shop Status",
     html: `<p>Switch your shop off, or set <strong>Holiday Mode</strong> with start and end dates. Your products are hidden from customers during that time.</p>` },
   { id: "users", title: "Users and permissions (your team)", keywords: "users staff team permissions roles invite product manager order manager finance", where: "Account &rarr; Manage Users (shop owner only)",
@@ -220,7 +282,7 @@ window.LZ_GUIDE = { sections: [
   { id: "support-vendor", title: "Getting help", keywords: "support help contact messages feedback", where: "Vendor Center &rarr; Support",
     html: `<p>Open a support thread with Lizimas from <strong>Support</strong> (also <em>Give us your feedback!</em> in the profile menu). Compliance notices from Lizimas appear under <strong>Account &rarr; Notices</strong>. Read the <a href="vendor-policies.html#vendor-data">Vendor Data Protection Policy</a> for how we handle your data.</p>` }
 ]},
-{ id: "staff", title: "8. For Lizimas staff: adding products", intro: "Staff log in at <a href='staff-login.html'>staff-login.html</a>. The same product rules, photo rules and packed weight &amp; size apply as for vendors.", items: [
+{ id: "staff", title: "9. For Lizimas staff: adding products", intro: "Staff log in at <a href='staff-login.html'>staff-login.html</a>. The same product rules, photo rules and packed weight &amp; size apply as for vendors. Before submitting, go through <a href='#pm-categories'>choosing the right category</a> and the <a href='#pm-checklist'>checklist</a>, and see <a href='#pm-not-live-reasons'>why products stay Not Live</a>.", items: [
   { id: "staff-product", title: "Product Staff: add a product", keywords: "staff product staff add product submit approval my submissions", where: "Staff &rarr; Add Product (staff/product.html)",
     html: `<ol><li>Fill in the name, category and description (no length limit; the word counter is under the box).</li>
     <li>Enter the <strong>price (UGX)</strong> directly. Staff set the customer price, not a payout.</li>
@@ -232,7 +294,7 @@ window.LZ_GUIDE = { sections: [
   { id: "staff-security", title: "Staff account security", keywords: "staff 2fa security password team messages", where: "Any staff page &rarr; Account security",
     html: `<p>Turn on two-step verification, keep your personal details up to date, and use <strong>Team Messages</strong> to reach admin.</p>` }
 ]},
-{ id: "policies", title: "9. Policies and terms (links)", items: [
+{ id: "policies", title: "10. Policies and terms (links)", items: [
   { id: "policy-links", title: "All the rules in one place", keywords: "policies terms conditions privacy returns links anti counterfeit content images delivery fulfilment packaging data protection",
     html: `<ul>
       <li><a href="vendor-policies.html#anti-counterfeit">Anti-Counterfeit Policy</a></li>

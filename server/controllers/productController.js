@@ -44,6 +44,7 @@ function uploadBufferToCloudinary(fileBuffer) {
 }
 
 const { SIZE_RANK } = require("../utils/deliveryPricing");
+const { ACTIVE_DISCOUNT_LATERAL } = require("../utils/productDiscounts");
 const { readMeasurements, saveMeasurements } = require("../utils/packageMeasurements");
 
 // Only the four known tiers may reach the database: package_size is a
@@ -285,10 +286,16 @@ exports.getProducts = async (req, res) => {
                           AND ac.status = 'active' AND ac.budget_spent < ac.total_budget
                           AND (ac.start_date IS NULL OR ac.start_date <= CURRENT_DATE)
                           AND (ac.end_date IS NULL OR ac.end_date >= CURRENT_DATE)
-                    ) AS ad_sponsored
+                    ) AS ad_sponsored,
+                    -- Admin percent discount (migration 132). The storefront
+                    -- (products.js) turns this into price/originalPrice; a
+                    -- running flash sale still overrides it there.
+                    pd.percent AS discount_percent,
+                    CASE WHEN pd.percent IS NOT NULL THEN ROUND(products.price * (1 - pd.percent / 100)) END AS discount_price
              FROM products
              LEFT JOIN categories ON products.category_id = categories.id
              LEFT JOIN vendors ON vendors.id = products.vendor_id
+             ${ACTIVE_DISCOUNT_LATERAL}
              WHERE products.status = 'approved' AND products.is_active = true AND products.admin_restricted = false AND products.deleted_at IS NULL
                AND (products.vendor_id IS NULL OR (
                     vendors.shop_active = true
@@ -365,7 +372,12 @@ exports.getMyProducts = async (req, res) => {
                     u.name AS owner_name,
                     vp.proposed_sale_price AS sale_price,
                     promo.proposed_sale_price AS promo_price,
-                    fsi.sale_price AS subsidy_price
+                    -- subsidy_price also carries an admin percent discount
+                    -- (Discount Promotions, migration 132) - worked out from
+                    -- the current price, so it follows any price change.
+                    COALESCE(fsi.sale_price,
+                             CASE WHEN pd.percent IS NOT NULL THEN ROUND(p.price * (1 - pd.percent / 100)) END) AS subsidy_price,
+                    pd.percent AS lizimas_discount_percent
              FROM products p
              LEFT JOIN product_deletion_requests dr
                  ON dr.product_id = p.id AND dr.status = 'pending'
@@ -391,6 +403,13 @@ exports.getMyProducts = async (req, res) => {
                    AND (fs.starts_at IS NULL OR fs.starts_at <= now())
                  ORDER BY fs.ends_at ASC LIMIT 1
              ) fsi ON true
+             LEFT JOIN LATERAL (
+                 SELECT percent FROM product_discounts
+                 WHERE product_discounts.product_id = p.id AND product_discounts.is_active = true
+                   AND product_discounts.starts_at <= now()
+                   AND (product_discounts.ends_at IS NULL OR product_discounts.ends_at > now())
+                 LIMIT 1
+             ) pd ON true
              WHERE 1 = 1 ${deletedClause} ${scopeClause}
              ORDER BY p.id DESC`,
             [req.user.userId]
@@ -434,8 +453,12 @@ exports.getProductById = async (req, res) => {
         // vendor_promotions' own snapshotted original_price.
         const result = await pool.query(
             `SELECT products.*, vendors.business_name AS vendor_business_name, vendors.slug AS vendor_slug,
-                    COALESCE(fsi.sale_price, vp.proposed_sale_price) AS sale_price,
-                    CASE WHEN fsi.sale_price IS NOT NULL THEN products.price ELSE vp.original_price END AS original_price
+                    COALESCE(fsi.sale_price, vp.proposed_sale_price,
+                             CASE WHEN pd.percent IS NOT NULL THEN ROUND(products.price * (1 - pd.percent / 100)) END) AS sale_price,
+                    CASE WHEN fsi.sale_price IS NOT NULL THEN products.price
+                         WHEN vp.proposed_sale_price IS NOT NULL THEN vp.original_price
+                         WHEN pd.percent IS NOT NULL THEN products.price END AS original_price,
+                    CASE WHEN fsi.sale_price IS NULL AND vp.proposed_sale_price IS NULL THEN pd.percent END AS discount_percent
              FROM products
              LEFT JOIN vendors ON vendors.id = products.vendor_id AND vendors.status = 'approved'
              LEFT JOIN LATERAL (
@@ -458,6 +481,7 @@ exports.getProductById = async (req, res) => {
                  ORDER BY vendor_promotions.starts_at DESC
                  LIMIT 1
              ) vp ON true
+             ${ACTIVE_DISCOUNT_LATERAL}
              WHERE products.id = $1 AND products.deleted_at IS NULL AND products.status = 'approved' AND products.is_active = true AND products.admin_restricted = false
                AND (products.vendor_id IS NULL OR (
                     vendors.shop_active = true
