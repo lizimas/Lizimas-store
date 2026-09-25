@@ -181,7 +181,7 @@ function vssRender({ compact }) {
     const intro = compact
         ? `<div class="vss-card"><h2 class="vss-h2">Shop profile</h2><p class="vss-muted">Tap a section to review or update it.</p><div class="vss-tiles" id="vss-tiles">${vssTilesHtml()}</div></div>`
         : `<div class="vss-card">
-            <div class="vss-brand"><span class="vm-header-brand-badge" title="Lizimas Vendor" aria-label="Lizimas Vendor">LV</span><span class="vss-status-pill" style="background:${s.bg}; color:${s.color};">${s.text}</span></div>
+            <div class="vss-brand"><span class="vss-brand-name"><span class="vm-header-brand-badge" title="Lizimas Vendor" aria-label="Lizimas Vendor">LV</span><span class="vss-brand-text">Lizimas Vendor Center</span></span><span class="vss-status-pill" style="background:${s.bg}; color:${s.color};">${s.text}</span></div>
             <h1 class="vss-h1">Welcome to Lizimas Store!<br>Let's take your shop live!</h1>
             <p class="vss-muted">Complete all the sections below to take your shop live.</p>
             <p class="vss-progress" id="vss-progress">${vssData.completed_count} of ${VSS_STEPS.length} sections completed</p>
@@ -294,8 +294,9 @@ function vssCompanyForm() {
         : "";
     const taxDoc = (vssData.documents || []).find((d) => d.document_type === "tax_certificate");
 
-    const tinUpload = isCompany
-        ? `<div class="vss-field"><div class="vss-label-row"><span class="vss-label">Upload Tax Identification Number (TIN)</span><span class="vss-req">Required</span></div>
+    // Shown for every account type (Jumia layout); required for companies.
+    const tinUpload = true
+        ? `<div class="vss-field"><div class="vss-label-row"><span class="vss-label">Upload Tax Identification Number (TIN)</span>${isCompany ? '<span class="vss-req">Required</span>' : ""}</div>
             <label class="vss-input vss-upload"><span id="vss-tin-file-label">${taxDoc ? vssV(taxDoc.original_filename || "Uploaded") : "Upload .jpg, .jpeg, .png or .pdf"}</span>
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                 <input type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" class="vss-hidden" onchange="vssUploadTin(this)">
@@ -304,8 +305,8 @@ function vssCompanyForm() {
 
     const details = vssSection(isCompany ? "Company Details" : "Business Details", "Please provide the following details of your business",
         vssField({ id: "vss-tin", label: "Tax Identification Number (TIN)", value: c.tin_number, placeholder: "or fiscal number", required: isCompany })
-        + tinUpload
-        + vssField({ id: "vss-vat", label: "VAT Number", value: c.vat_number, placeholder: "VAT Number", required: isCompany }));
+        + vssField({ id: "vss-vat", label: "VAT Number", value: c.vat_number, placeholder: "VAT Number", required: isCompany })
+        + tinUpload);
 
     const selected = new Set(c.legal_rep_id_types || []);
     const opts = vssData.id_type_options || [];

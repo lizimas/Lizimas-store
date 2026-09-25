@@ -140,7 +140,7 @@ function vmStatTile(label, value, color) {
 
 function vmRenderHomeKpi(v, data) {
     const o = data.orders, e = data.earnings, p = data.products;
-    const header = `<div class="vm-header"><div class="vm-header-brand"><span class="vm-header-brand-badge" title="Lizimas Vendor" aria-label="Lizimas Vendor">LV</span><span class="vm-header-eyebrow">Welcome back,</span></div><div class="vm-header-title">${v.business_name || "Lizimas Store"}</div></div>`;
+    const header = `<div class="vm-header"><div class="vm-header-brand"><span class="vm-header-brand-badge" title="Lizimas Vendor" aria-label="Lizimas Vendor">LV</span><span class="vm-header-eyebrow">Lizimas Vendor Center</span></div><div class="vm-header-title">Welcome back, ${vendorEsc(v.business_name || "Lizimas Store")}</div></div>`;
     const stats = `<div style="margin:-4px 14px 14px;">
         <div class="vm-stat-row">${vmStatTile("Today's Orders", o.today)}${vmStatTile("Pending Handover", o.pendingHandover, o.pendingHandover > 0 ? "var(--vm-amber-text)" : null)}</div>
         <div class="vm-stat-row">${vmStatTile("Awaiting Delivery", o.awaitingDelivery)}${vmStatTile("Completed", o.completed, "var(--vm-green-text)")}</div>

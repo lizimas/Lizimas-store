@@ -691,3 +691,6 @@ table.vc-table { display: table; }
 .vc-table td { border-bottom: 1px solid #f1f2f4; padding: 14px 12px; }
 .vc-table td::before { content: none; }
 .vc-tooltip[hidden] { display: none; }
+
+.vss-brand-name { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.vss-brand-text { font-size: 13px; font-weight: 700; color: var(--vm-navy); white-space: nowrap; }

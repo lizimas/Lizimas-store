@@ -288,7 +288,10 @@ exports.uploadMyKycDocument = async (req, res) => {
         }
 
         const documentType = req.body.document_type;
-        const allowedTypes = requiredDocumentTypesForKyc({ accountType: vendor.account_type, requiresWorkPermit: true });
+        // tax_certificate is also accepted (optional) for individual accounts -
+        // the shop-setup Company Information step shows the TIN upload to
+        // every vendor, as Jumia does.
+        const allowedTypes = [...new Set([...requiredDocumentTypesForKyc({ accountType: vendor.account_type, requiresWorkPermit: true }), "tax_certificate"])];
         if (!allowedTypes.includes(documentType)) {
             return res.status(400).json({
                 error: `${KYC_DOCUMENT_LABELS[documentType] || documentType} isn't a document type accepted for a ${vendor.account_type} account. Accepted: ${allowedTypes.map((t) => KYC_DOCUMENT_LABELS[t] || t).join(", ")}.`
