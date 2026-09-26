@@ -25,7 +25,11 @@
         conversations: [],
         activeId: null,
         cursor: 0,
-        sending: false
+        sending: false,
+        tier: "agent",
+        senior: false,
+        events: [],
+        conv: null
     };
 
     var listTimer = null;
@@ -65,6 +69,16 @@
 
         var res = await fetch(API + path, options);
 
+        if (res.status === 403) {
+            // "Not your chat" / "senior agents only" are normal answers, not
+            // an expired login - show them instead of signing out.
+            var denied = await res.clone().json().catch(function () { return {}; });
+            if (denied && (denied.code === "not_your_chat" || denied.code === "senior_only")) {
+                var err = new Error(denied.message || "Not allowed");
+                err.code = denied.code;
+                throw err;
+            }
+        }
         if (res.status === 401 || res.status === 403) {
             stopPolling();
             localStorage.removeItem("staffToken");
@@ -97,6 +111,7 @@
 
         if (f === "mine") { p.set("status", "all"); p.set("mine", "true"); }
         else if (f === "unassigned") { p.set("status", "active"); p.set("unassigned", "true"); }
+        else if (f === "escalated") { p.set("status", "active"); p.set("escalated", "true"); }
         else { p.set("status", f); }
 
         if (state.search) p.set("search", state.search);
@@ -143,6 +158,11 @@
             if (c.status === "waiting" && c.escalated_at) {
                 tags += '<span class="sc-tag sc-tag-wait">'
                       + esc(waitLabel(c.escalated_at)) + "</span>";
+            }
+            if (c.escalation_level > 0) tags += '<span class="sc-tag sc-tag-esc">Escalated</span>';
+            if (c.priority === "critical" || c.priority === "high") {
+                tags += '<span class="sc-tag sc-tag-prio-' + esc(c.priority) + '">'
+                      + (c.priority === "critical" ? "Critical" : "High") + "</span>";
             }
             if (c.is_guest) tags += '<span class="sc-tag sc-tag-guest">Guest</span>';
             if (c.assigned_staff_name) {
@@ -191,6 +211,8 @@
 
             if (state.cursor === 0) {
                 $("sc-messages").innerHTML = "";
+                state.conv = data.conversation;
+                state.events = data.events || [];
                 renderHeader(data.conversation);
                 await loadAgents();
                 renderDetail(data.conversation);
@@ -203,6 +225,13 @@
                 $("sc-messages").innerHTML = '<p class="sc-empty">No messages yet.</p>';
             }
         } catch (error) {
+            if (error.code === "not_your_chat") {
+                if (threadTimer) { clearInterval(threadTimer); threadTimer = null; }
+                $("sc-messages").innerHTML = '<p class="sc-empty">' + esc(error.message) + "</p>";
+                $("sc-composer").hidden = true;
+                $("sc-detail-body").innerHTML = '<p class="sc-empty">' + esc(error.message) + "</p>";
+                return;
+            }
             console.error("Poll thread error:", error);
             setOffline(true);
         }
@@ -259,8 +288,20 @@
                 ? (c.assigned_staff_id === (me && me.id) ? "You" : "Agent #" + c.assigned_staff_id)
                 : "Nobody");
 
+        var mine = me && c.assigned_staff_id === me.id;
+        var tierName = state.senior ? "senior" : "agent";
+
+        if (c.escalation_level > 0 || c.priority === "high" || c.priority === "critical") {
+            html += '<div class="sc-flag">'
+                  + (c.escalation_level > 0 ? "Escalated" + (c.escalation_level > 1 ? " \u00d7" + c.escalation_level : "") + " \u00b7 " : "")
+                  + esc((c.priority || "normal").replace(/^./, function (x) { return x.toUpperCase(); })) + " priority</div>";
+        }
+
         html += '<div class="sc-actions">';
-        html += '<button class="sc-btn sc-btn-primary" data-action="assign">Assign to me</button>';
+        if (!mine && (state.senior || !c.assigned_staff_id)) {
+            html += '<button class="sc-btn sc-btn-primary" data-action="assign">'
+                  + (c.assigned_staff_id ? "Take over this chat" : "Assign to me") + "</button>";
+        }
         if (c.status === "closed") {
             html += '<button class="sc-btn" data-action="reopen">Reopen conversation</button>';
         } else {
@@ -268,34 +309,79 @@
             html += '<button class="sc-btn" data-action="close">Close conversation</button>';
         }
         html += "</div>";
+        html += '<p class="sc-action-msg" id="sc-action-msg" role="status"></p>';
 
-        // Transfer: hand the thread to a named colleague, or put it back in the
-        // queue when the right owner is not obvious.
+        if (c.status !== "closed") {
+            // Escalate: any agent can pass a difficult case to a senior agent.
+            html += '<div class="sc-escalate">';
+            html += "<strong>Escalate to senior agent</strong>";
+            html += '<select id="sc-esc-reason">'
+                  + '<option value="complaint">Complaint</option>'
+                  + '<option value="refund">Refund or return dispute</option>'
+                  + '<option value="payment">Payment problem</option>'
+                  + '<option value="delivery">Delivery problem</option>'
+                  + '<option value="angry_customer">Upset customer</option>'
+                  + '<option value="needs_approval">Needs a senior decision</option>'
+                  + '<option value="other">Other</option></select>';
+            html += '<textarea id="sc-esc-note" rows="2" maxlength="1000" placeholder="What has been tried so far? (seen by the team only)"></textarea>';
+            html += '<button class="sc-btn sc-btn-warn" data-action="escalate">Escalate</button>';
+            html += "</div>";
+        }
+
+        // Transfer to a named colleague: senior agents and up. Everyone can
+        // hand a chat back to the queue.
         if (c.status !== "closed") {
             html += '<div class="sc-transfer">';
-            html += "<strong>Transfer this chat</strong>";
-            var others = agentList.filter(function (a) {
-                return !(me && a.staff_id === me.id);
-            });
-
-            if (others.length === 0) {
-                html += '<p class="sc-transfer-empty">No other agents on the team yet. '
-                      + "Return it to the queue instead.</p>";
-            } else {
-                html += '<select id="sc-transfer-select">';
-                html += '<option value="">Choose a colleague...</option>';
-                others.forEach(function (a) {
-                    var dot = a.is_online ? "\u25CF " : "\u25CB ";
-                    var nm = a.staff_name || ("Agent #" + a.staff_id);
-                    html += '<option value="' + a.staff_id + '">' + esc(dot + nm)
-                          + " (" + a.active_chats + ")</option>";
+            if (state.senior) {
+                html += "<strong>Transfer this chat</strong>";
+                var others = agentList.filter(function (a) {
+                    return !(me && a.staff_id === me.id);
                 });
-                html += "</select>";
-                html += '<button class="sc-btn" data-action="transfer">Transfer</button>';
+                if (others.length === 0) {
+                    html += '<p class="sc-transfer-empty">No other agents on the team yet. '
+                          + "Return it to the queue instead.</p>";
+                } else {
+                    html += '<select id="sc-transfer-select">';
+                    html += '<option value="">Choose a colleague...</option>';
+                    others.forEach(function (a) {
+                        var dot = a.is_online ? "\u25CF " : "\u25CB ";
+                        var nm = a.staff_name || ("Agent #" + a.staff_id);
+                        var t = a.tier === "senior_agent" ? " \u00b7 Senior" : a.tier === "supervisor" ? " \u00b7 Supervisor" : "";
+                        html += '<option value="' + a.staff_id + '">' + esc(dot + nm + t)
+                              + " (" + a.active_chats + ")</option>";
+                    });
+                    html += "</select>";
+                    html += '<button class="sc-btn" data-action="transfer">Transfer</button>';
+                }
             }
             html += '<button class="sc-btn" data-action="requeue">Return to queue</button>';
             html += "</div>";
         }
+
+        // Team notes: staff-only notes and escalation history. Senior agents
+        // use these to coach and hand over; customers never see them.
+        var notes = (state.events || []).filter(function (ev) {
+            return ev.event_type === "internal_note" || ev.event_type === "escalated_to_senior";
+        });
+        html += '<div class="sc-notes"><strong>Team notes</strong>';
+        if (!notes.length) html += '<p class="sc-notes-empty">No notes yet.</p>';
+        notes.forEach(function (ev) {
+            var m = ev.meta || {};
+            var who = esc(ev.actor_name || "Staff");
+            var when = esc(new Date(ev.created_at).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }));
+            if (ev.event_type === "internal_note") {
+                html += '<div class="sc-note-item"><span class="sc-note-who">' + who
+                      + (m.tier === "senior_agent" ? ' <em>Senior</em>' : m.tier === "supervisor" ? ' <em>Supervisor</em>' : "")
+                      + " \u00b7 " + when + "</span>" + esc(m.text || "") + "</div>";
+            } else {
+                html += '<div class="sc-note-item sc-note-esc"><span class="sc-note-who">' + who + " escalated \u00b7 " + when + "</span>"
+                      + esc((m.reason || "").replace(/_/g, " ")) + (m.note ? ": " + esc(m.note) : "")
+                      + (m.to_staff_id ? "" : " (no senior on duty - flagged)") + "</div>";
+            }
+        });
+        html += '<textarea id="sc-note-text" rows="2" maxlength="2000" placeholder="Add a note for the team (the customer never sees it)"></textarea>';
+        html += '<button class="sc-btn" data-action="note">Add note</button>';
+        html += "</div>";
 
         // Honest placeholder rather than fabricated data: there is no endpoint
         // yet that returns a customer's orders, spend, or delivery address.
@@ -315,9 +401,47 @@
              + "</div>";
     }
 
+    function actionMsg(text, bad) {
+        var el = $("sc-action-msg");
+        if (!el) return;
+        el.textContent = text || "";
+        el.className = "sc-action-msg" + (bad ? " is-bad" : "");
+    }
+
     async function doAction(action) {
         if (!state.activeId) return;
         var body = {};
+
+        if (action === "escalate") {
+            try {
+                var r = await api("/api/chat/conversations/" + state.activeId + "/escalate", {
+                    method: "POST",
+                    body: JSON.stringify({ reason: $("sc-esc-reason").value, note: $("sc-esc-note").value })
+                });
+                state.cursor = 0;
+                await pollThread();
+                actionMsg(r && r.message);
+                await loadList();
+            } catch (error) {
+                actionMsg(error.message, true);
+            }
+            return;
+        }
+        if (action === "note") {
+            var text = ($("sc-note-text").value || "").trim();
+            if (!text) return;
+            try {
+                await api("/api/chat/conversations/" + state.activeId + "/notes", {
+                    method: "POST",
+                    body: JSON.stringify({ text: text })
+                });
+                state.cursor = 0;
+                await pollThread();
+            } catch (error) {
+                actionMsg(error.message, true);
+            }
+            return;
+        }
 
         if (action === "assign") body.assigned_staff_id = me ? me.id : null;
 
@@ -348,6 +472,44 @@
             await loadList();
         } catch (error) {
             console.error("Conversation action error:", error);
+            actionMsg(error.message, true);
+        }
+    }
+
+    /* ------------------------------------------------------ team view */
+
+    // Senior agents and up: who is on duty, their load, today's numbers.
+    function fmtSecs(n) {
+        if (n == null) return "\u2013";
+        if (n < 60) return n + "s";
+        return Math.floor(n / 60) + "m " + (n % 60) + "s";
+    }
+    async function openTeam() {
+        var box = $("sc-team");
+        box.hidden = false;
+        $("sc-team-body").innerHTML = '<p class="sc-empty">Loading\u2026</p>';
+        try {
+            var d = await api("/api/chat/team");
+            if (!d) return;
+            var html = '<div class="sc-team-stats">'
+                + '<span><b>' + d.waiting + "</b> waiting</span>"
+                + '<span><b>' + d.escalated_open + "</b> escalated</span>"
+                + '<span><b>' + d.awaiting_first_reply + "</b> awaiting first reply</span></div>";
+            html += '<table class="sc-team-table"><thead><tr><th>Agent</th><th>Role</th><th>Status</th><th>Chats now</th><th>Escalated</th><th>Closed today</th><th>Avg first reply</th></tr></thead><tbody>';
+            d.agents.forEach(function (a) {
+                var status = a.is_online && a.is_available ? '<span class="sc-dot on"></span>Available'
+                    : a.is_online ? '<span class="sc-dot away"></span>Online, not taking chats'
+                    : '<span class="sc-dot off"></span>Offline';
+                var full = a.active_chats >= a.max_concurrent ? " sc-full" : "";
+                html += "<tr><td>" + esc(a.name) + "</td><td>" + esc(a.tier_label) + "</td><td>" + status + "</td>"
+                      + '<td class="' + full + '">' + a.active_chats + " / " + a.max_concurrent + "</td>"
+                      + "<td>" + a.escalated_chats + "</td><td>" + a.closed_today + "</td><td>" + fmtSecs(a.avg_first_response_s) + "</td></tr>";
+            });
+            html += "</tbody></table>";
+            html += '<p class="sc-team-tip">Open the <b>Escalated</b> filter to pick up difficult chats. Use <b>Take over</b> or <b>Transfer</b> on any chat, and leave coaching in <b>Team notes</b>.</p>';
+            $("sc-team-body").innerHTML = html;
+        } catch (error) {
+            $("sc-team-body").innerHTML = '<p class="sc-empty">' + esc(error.message) + "</p>";
         }
     }
 
@@ -495,6 +657,11 @@
             if (btn) doAction(btn.dataset.action);
         });
 
+        var teamBtn = $("sc-team-btn");
+        if (teamBtn) teamBtn.addEventListener("click", openTeam);
+        var teamClose = $("sc-team-close");
+        if (teamClose) teamClose.addEventListener("click", function () { $("sc-team").hidden = true; });
+
         $("sc-back").addEventListener("click", function () {
             $("sc-thread-panel").classList.remove("is-open");
         });
@@ -557,6 +724,20 @@
         } catch (error) {
             console.error("Identity lookup failed:", error);
         }
+        try {
+            var t = await api("/api/chat/me");
+            if (t) {
+                state.tier = t.tier;
+                state.senior = !!t.senior;
+                if (t.tier !== "agent") {
+                    $("sc-agent").insertAdjacentHTML("beforeend", ' <span class="sc-tier">' + esc(t.label) + "</span>");
+                }
+            }
+        } catch (error) {
+            console.error("Tier lookup failed:", error);
+        }
+        var teamBtn = $("sc-team-btn");
+        if (teamBtn) teamBtn.hidden = !state.senior;
 
         wire();
         await loadList();

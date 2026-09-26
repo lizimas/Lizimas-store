@@ -532,3 +532,34 @@
   border: 1px solid #d4d7e0; border-radius: 8px; font-size: 14px; }
 .sc-transfer .sc-btn { margin-right: 6px; }
 .sc-transfer-empty { font-size: 13px; color: #6b7280; margin: 0 0 8px; }
+
+/* Senior Agent role (Sept 2026) ------------------------------------------ */
+.sc-tier { display: inline-block; margin-left: 6px; background: #f4b400; color: #1a1a2e; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 700; vertical-align: middle; }
+.sc-tag-esc { background: #fdecec; color: #b42318; }
+.sc-tag-prio-high { background: #fff4cc; color: #8a6100; }
+.sc-tag-prio-critical { background: #b42318; color: #fff; }
+.sc-flag { background: #fdecec; color: #912018; border: 1px solid #f5c2c0; border-radius: 8px; padding: 6px 10px; font-size: 13px; font-weight: 600; margin: 8px 0; }
+.sc-action-msg { font-size: 13px; color: #067647; margin: 6px 0 0; min-height: 1em; }
+.sc-action-msg.is-bad { color: #b42318; }
+.sc-escalate, .sc-notes { margin-top: 14px; padding-top: 12px; border-top: 1px solid #eaecf0; display: flex; flex-direction: column; gap: 6px; }
+.sc-escalate select, .sc-escalate textarea, .sc-notes textarea { width: 100%; box-sizing: border-box; border: 1px solid #d0d5dd; border-radius: 8px; padding: 7px 9px; font: inherit; font-size: 13px; }
+.sc-btn-warn { background: #b42318 !important; color: #fff !important; border-color: #b42318 !important; }
+.sc-notes-empty { color: #6b7280; font-size: 13px; margin: 0; }
+.sc-note-item { background: #fffbeb; border: 1px solid #f3dc96; border-radius: 8px; padding: 7px 9px; font-size: 13px; line-height: 1.4; white-space: pre-wrap; }
+.sc-note-item.sc-note-esc { background: #fdecec; border-color: #f5c2c0; }
+.sc-note-who { display: block; font-size: 11px; color: #6b7280; margin-bottom: 2px; white-space: normal; }
+.sc-note-who em { font-style: normal; background: #f4b400; color: #1a1a2e; border-radius: 999px; padding: 0 6px; font-weight: 700; }
+.sc-team { position: fixed; inset: 0; background: rgba(15, 18, 35, .45); z-index: 60; display: flex; align-items: flex-start; justify-content: center; padding: 60px 16px 16px; }
+.sc-team[hidden] { display: none; }
+.sc-team-panel { background: #fff; border-radius: 12px; width: min(900px, 100%); max-height: calc(100vh - 90px); overflow: auto; padding: 16px 18px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+.sc-team-head { display: flex; align-items: center; justify-content: space-between; }
+.sc-team-head h3 { margin: 0; color: #1a1a2e; }
+.sc-team-stats { display: flex; gap: 16px; flex-wrap: wrap; margin: 10px 0; font-size: 14px; }
+.sc-team-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sc-team-table th { text-align: left; background: #f8f9fb; padding: 8px; color: #475467; white-space: nowrap; }
+.sc-team-table td { padding: 8px; border-bottom: 1px solid #f2f4f7; }
+.sc-team-table .sc-full { color: #b42318; font-weight: 700; }
+.sc-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #98a2b3; }
+.sc-dot.on { background: #12b76a; } .sc-dot.away { background: #f4b400; }
+.sc-team-tip { color: #6b7280; font-size: 12px; margin-top: 10px; }
+@media (max-width: 760px) { .sc-team-table { display: block; overflow-x: auto; white-space: nowrap; } }

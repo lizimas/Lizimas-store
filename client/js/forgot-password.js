@@ -12,12 +12,15 @@ async function sendResetLink() {
 
     if (btn && btn.disabled) return;
 
+    statusEl.classList.remove("is-ok");
     statusEl.textContent = "Sending...";
     if (btn) btn.disabled = true;
 
     try {
         const result = await apiPost("/auth/forgot-password", { email });
-        statusEl.textContent = result.message || "If an account with that email exists, a password reset link has been sent.";
+        statusEl.classList.add("is-ok");
+        statusEl.textContent = (result.message || "If an account with that email exists, a password reset link has been sent.")
+            + " Check your inbox (and spam folder) - the link works for 30 minutes.";
         startForgotCooldown(60);
     } catch (error) {
         console.error(error);

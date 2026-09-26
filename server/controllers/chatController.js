@@ -43,8 +43,25 @@ async function loadOwnedConversation(conversationId, req) {
 const {
     assignWaiting,
     logEvent,
+    findSeniorStaffId,
     ESCALATION_REASONS
 } = require("../services/chatRouting");
+const { getTier, isSenior, canActOn, escalatedPriority, TIER_LABELS } = require("../lib/supportTier");
+
+// Senior Agent role (Sept 2026): a plain agent works their own chats and
+// unassigned ones; senior agents, supervisors and admins can open and act on
+// every chat. Returns the tier, or sends a 403 and returns null.
+async function requireChatAccess(req, res, conv) {
+    const tier = await getTier(pool, req.user);
+    if (canActOn(tier, currentUserId(req), conv)) return tier;
+    let owner = "another agent";
+    try {
+        const r = await pool.query("SELECT name FROM users WHERE id = $1", [conv.assigned_staff_id]);
+        if (r.rows[0]) owner = r.rows[0].name;
+    } catch (e) { /* keep generic name */ }
+    res.status(403).json({ message: `This chat belongs to ${owner}. Ask a senior agent to transfer it to you.`, code: "not_your_chat" });
+    return null;
+}
 
 exports.startConversation = async (req, res) => {
     const { name, phone, email, subject, message } = req.body;
@@ -312,6 +329,14 @@ exports.listConversations = async (req, res) => {
         if (unassigned) {
             where.push("c.assigned_staff_id IS NULL");
         }
+        if (req.query.escalated === "true") {
+            where.push("c.escalation_level > 0 AND c.status IN ('waiting', 'open', 'pending')");
+        }
+        const tier = await getTier(pool, req.user);
+        if (!isSenior(tier)) {
+            params.push(currentUserId(req));
+            where.push(`(c.assigned_staff_id = $${params.length} OR c.assigned_staff_id IS NULL)`);
+        }
         if (search) {
             // One parameter reused across four columns, so an agent can paste
             // a phone number or type a partial name and get the same result.
@@ -326,6 +351,7 @@ exports.listConversations = async (req, res) => {
             `SELECT c.id, c.subject, c.status, c.staff_unread, c.last_message_at,
                     c.created_at, c.assigned_staff_id,
                     c.escalated_at, c.assigned_at, c.first_response_at,
+                    c.priority, c.escalation_level, c.department,
                     COALESCE(u.name, c.guest_name) AS display_name,
                     COALESCE(u.phone, c.guest_phone) AS display_phone,
                     (c.customer_id IS NULL) AS is_guest,
@@ -365,6 +391,7 @@ exports.getConversationForStaff = async (req, res) => {
         if (!conv.rows[0]) {
             return res.status(404).json({ message: "Conversation not found" });
         }
+        if (!(await requireChatAccess(req, res, conv.rows[0]))) return;
 
         const messages = await pool.query(
             `SELECT id, sender_type, sender_staff_id, body, attachment_url, created_at
@@ -415,6 +442,14 @@ exports.postStaffMessage = async (req, res) => {
 
     if (!body || !String(body).trim()) {
         return res.status(400).json({ message: "Message cannot be empty" });
+    }
+    try {
+        const c0 = await pool.query("SELECT id, assigned_staff_id FROM chat_conversations WHERE id = $1", [req.params.id]);
+        if (!c0.rows[0]) return res.status(404).json({ message: "Conversation not found" });
+        if (!(await requireChatAccess(req, res, c0.rows[0]))) return;
+    } catch (error) {
+        console.error("Chat access check error:", error);
+        return res.status(500).json({ message: "Failed to send the reply" });
     }
 
     const client = await pool.connect();
@@ -492,6 +527,24 @@ exports.updateConversation = async (req, res) => {
     }
 
     const staffId = currentUserId(req);
+    // "Return to queue" sends assigned_staff_id: null - that has to clear the
+    // owner (COALESCE below would otherwise keep them).
+    const unassign = Object.prototype.hasOwnProperty.call(req.body, "assigned_staff_id") && req.body.assigned_staff_id === null;
+    try {
+        const c0 = await pool.query("SELECT id, assigned_staff_id FROM chat_conversations WHERE id = $1", [req.params.id]);
+        if (!c0.rows[0]) return res.status(404).json({ message: "Conversation not found" });
+        const tier = await requireChatAccess(req, res, c0.rows[0]);
+        if (!tier) return;
+        // A plain agent can take a chat themselves or hand it back to the
+        // queue; moving it to a named colleague is for senior agents (or use
+        // Escalate to senior).
+        if (!isSenior(tier) && assigned_staff_id && Number(assigned_staff_id) !== Number(staffId)) {
+            return res.status(403).json({ message: "Only a senior agent can transfer a chat to someone else. Use Escalate to senior instead.", code: "senior_only" });
+        }
+    } catch (error) {
+        console.error("Chat access check error:", error);
+        return res.status(500).json({ message: "Failed to update the conversation" });
+    }
     const client = await pool.connect();
     let freedCapacity = false;
 
@@ -522,8 +575,9 @@ exports.updateConversation = async (req, res) => {
         const result = await client.query(
             `UPDATE chat_conversations
              SET status = $2,
-                 assigned_staff_id = COALESCE($3, assigned_staff_id),
-                 assigned_at = CASE WHEN $3 IS NOT NULL THEN CURRENT_TIMESTAMP
+                 assigned_staff_id = CASE WHEN $8 THEN NULL ELSE COALESCE($3, assigned_staff_id) END,
+                 assigned_at = CASE WHEN $8 THEN NULL
+                                    WHEN $3 IS NOT NULL THEN CURRENT_TIMESTAMP
                                     ELSE assigned_at END,
                  closed_at = CASE WHEN $4 THEN CURRENT_TIMESTAMP
                                   WHEN $5 THEN NULL
@@ -549,7 +603,8 @@ exports.updateConversation = async (req, res) => {
                 closing,
                 reopening,
                 staffId,
-                markResolved
+                markResolved,
+                unassign
             ]
         );
 
@@ -557,6 +612,7 @@ exports.updateConversation = async (req, res) => {
         if (closing) eventType = "closed";
         else if (reopening) eventType = "reopened";
         else if (assigned_staff_id) eventType = "reassigned";
+        else if (unassign) eventType = "returned_to_queue";
         else if (next !== before) eventType = "status_changed";
 
         if (eventType) {
@@ -571,8 +627,9 @@ exports.updateConversation = async (req, res) => {
 
         await client.query("COMMIT");
 
-        // Closing frees a slot, so the queue gets a chance to drain into it.
-        if (freedCapacity) {
+        // Closing frees a slot, so the queue gets a chance to drain into it;
+        // a chat handed back to the queue is routed again straight away.
+        if (freedCapacity || unassign) {
             try {
                 await assignWaiting(pool, {});
             } catch (routingError) {
@@ -729,14 +786,16 @@ exports.getAvailability = async (req, res) => {
                     (sa.last_heartbeat IS NOT NULL
                      AND sa.last_heartbeat >
                          CURRENT_TIMESTAMP - INTERVAL '90 seconds') AS is_online,
-                    COUNT(c.id)::int AS active_chats
+                    COUNT(c.id)::int AS active_chats,
+                    COALESCE(ag.role, 'agent') AS tier
                FROM staff_availability sa
                LEFT JOIN users u ON u.id = sa.staff_id
+               LEFT JOIN support_agents ag ON ag.staff_id = sa.staff_id
                LEFT JOIN chat_conversations c
                  ON c.assigned_staff_id = sa.staff_id
                 AND c.status IN ('open', 'pending')
               GROUP BY sa.staff_id, u.name, sa.is_available, sa.max_concurrent,
-                       sa.last_heartbeat, sa.went_available_at
+                       sa.last_heartbeat, sa.went_available_at, ag.role
               ORDER BY sa.staff_id`
         );
 
@@ -744,5 +803,153 @@ exports.getAvailability = async (req, res) => {
     } catch (error) {
         console.error("Get availability error:", error);
         res.status(500).json({ message: "Failed to load availability" });
+    }
+};
+
+// ---------------------------------------------------------------------------
+// Senior Agent role (Ryan, Sept 2026). See server/lib/supportTier.js.
+// ---------------------------------------------------------------------------
+
+// GET /api/chat/me - the signed-in person's support tier.
+exports.getMyTier = async (req, res) => {
+    try {
+        const tier = await getTier(pool, req.user);
+        res.json({ tier, label: TIER_LABELS[tier] || tier, senior: isSenior(tier) });
+    } catch (error) {
+        console.error("Get tier error:", error);
+        res.status(500).json({ message: "Failed to load your role" });
+    }
+};
+
+// POST /api/chat/conversations/:id/escalate  { reason, note }
+// Any agent can pass a difficult chat up. It is raised to at least 'high'
+// priority and handed to the least-busy on-duty senior agent (never the
+// person escalating). With no senior on duty it stays with the current agent,
+// flagged, and shows in every senior's Escalated list.
+exports.escalateConversation = async (req, res) => {
+    const staffId = currentUserId(req);
+    const reason = String((req.body && req.body.reason) || "").trim().slice(0, 60) || "difficult_case";
+    const note = String((req.body && req.body.note) || "").trim().slice(0, 1000);
+    const client = await pool.connect();
+    try {
+        const c0 = await pool.query("SELECT id, assigned_staff_id FROM chat_conversations WHERE id = $1", [req.params.id]);
+        if (!c0.rows[0]) { client.release(); return res.status(404).json({ message: "Conversation not found" }); }
+        if (!(await requireChatAccess(req, res, c0.rows[0]))) { client.release(); return; }
+
+        await client.query("BEGIN");
+        const cur = await client.query(
+            "SELECT id, status, department, priority, escalation_level, assigned_staff_id FROM chat_conversations WHERE id = $1 FOR UPDATE",
+            [req.params.id]
+        );
+        const conv = cur.rows[0];
+        if (conv.status === "closed") {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ message: "Reopen the chat before escalating it." });
+        }
+        const seniorId = await findSeniorStaffId(client, conv.department, staffId);
+        const priority = escalatedPriority(conv.priority);
+        const upd = await client.query(
+            `UPDATE chat_conversations
+                SET escalation_level = escalation_level + 1,
+                    priority = $2,
+                    assigned_staff_id = COALESCE($3, assigned_staff_id),
+                    assigned_at = CASE WHEN $3 IS NOT NULL THEN CURRENT_TIMESTAMP ELSE assigned_at END,
+                    status = CASE WHEN $3 IS NOT NULL AND status = 'waiting' THEN 'open' ELSE status END
+              WHERE id = $1
+              RETURNING id, status, priority, escalation_level, assigned_staff_id`,
+            [conv.id, priority, seniorId]
+        );
+        await logEvent(client, {
+            conversationId: conv.id,
+            eventType: "escalated_to_senior",
+            actorType: "staff",
+            actorStaffId: staffId,
+            meta: { reason, note: note || null, from_staff_id: conv.assigned_staff_id, to_staff_id: seniorId, priority }
+        });
+        await client.query("COMMIT");
+
+        let seniorName = null;
+        if (seniorId) {
+            const r = await pool.query("SELECT name FROM users WHERE id = $1", [seniorId]);
+            seniorName = r.rows[0] ? r.rows[0].name : null;
+        }
+        res.json({
+            conversation: upd.rows[0],
+            handed_to: seniorId ? { staff_id: seniorId, name: seniorName } : null,
+            message: seniorId
+                ? `Escalated to ${seniorName || "a senior agent"}.`
+                : "No senior agent is on duty right now. The chat stays with you, flagged as escalated - the next senior agent will see it in their Escalated list."
+        });
+    } catch (error) {
+        await client.query("ROLLBACK").catch(() => {});
+        console.error("Escalate conversation error:", error);
+        res.status(500).json({ message: "Failed to escalate the chat" });
+    } finally {
+        client.release();
+    }
+};
+
+// POST /api/chat/conversations/:id/notes  { text }
+// Team-only notes on a chat (customers never see them) - how senior agents
+// coach and hand over. Anyone who can open the chat can add one.
+exports.addInternalNote = async (req, res) => {
+    const text = String((req.body && req.body.text) || "").trim();
+    if (!text) return res.status(400).json({ message: "Write a note first." });
+    if (text.length > 2000) return res.status(400).json({ message: "Notes can be up to 2000 characters." });
+    try {
+        const c0 = await pool.query("SELECT id, assigned_staff_id FROM chat_conversations WHERE id = $1", [req.params.id]);
+        if (!c0.rows[0]) return res.status(404).json({ message: "Conversation not found" });
+        const tier = await requireChatAccess(req, res, c0.rows[0]);
+        if (!tier) return;
+        await logEvent(pool, {
+            conversationId: Number(req.params.id),
+            eventType: "internal_note",
+            actorType: "staff",
+            actorStaffId: currentUserId(req),
+            meta: { text, tier }
+        });
+        res.status(201).json({ message: "Note added." });
+    } catch (error) {
+        console.error("Add note error:", error);
+        res.status(500).json({ message: "Failed to add the note" });
+    }
+};
+
+// GET /api/chat/team - senior agents and up: the team's live load and today's
+// numbers, plus how many escalated chats are open.
+exports.getTeam = async (req, res) => {
+    try {
+        const tier = await getTier(pool, req.user);
+        if (!isSenior(tier)) return res.status(403).json({ message: "The team view is for senior agents.", code: "senior_only" });
+        const agents = await pool.query(
+            `SELECT u.id AS staff_id, u.name,
+                    COALESCE(a.role, 'agent') AS tier,
+                    a.department,
+                    COALESCE(sa.is_available, false) AS is_available,
+                    (sa.last_heartbeat IS NOT NULL AND sa.last_heartbeat > CURRENT_TIMESTAMP - INTERVAL '90 seconds') AS is_online,
+                    COALESCE(sa.max_concurrent, 4) AS max_concurrent,
+                    (SELECT COUNT(*)::int FROM chat_conversations c WHERE c.assigned_staff_id = u.id AND c.status IN ('open','pending')) AS active_chats,
+                    (SELECT COUNT(*)::int FROM chat_conversations c WHERE c.assigned_staff_id = u.id AND c.status IN ('open','pending') AND c.escalation_level > 0) AS escalated_chats,
+                    (SELECT COUNT(*)::int FROM chat_conversations c WHERE c.closed_by_staff_id = u.id AND c.closed_at >= CURRENT_DATE) AS closed_today,
+                    (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (c.first_response_at - COALESCE(c.assigned_at, c.created_at)))))::int
+                       FROM chat_conversations c
+                      WHERE c.assigned_staff_id = u.id AND c.first_response_at >= CURRENT_DATE
+                        AND c.first_response_at >= COALESCE(c.assigned_at, c.created_at)) AS avg_first_response_s
+               FROM users u
+               LEFT JOIN support_agents a ON a.staff_id = u.id
+               LEFT JOIN staff_availability sa ON sa.staff_id = u.id
+              WHERE u.deleted_at IS NULL AND (u.role = 'customer_support' OR a.id IS NOT NULL)
+              ORDER BY is_online DESC, u.name`
+        );
+        const counts = await pool.query(
+            `SELECT COUNT(*) FILTER (WHERE status = 'waiting')::int AS waiting,
+                    COUNT(*) FILTER (WHERE escalation_level > 0 AND status IN ('waiting','open','pending'))::int AS escalated_open,
+                    COUNT(*) FILTER (WHERE status IN ('open','pending') AND assigned_staff_id IS NOT NULL AND first_response_at IS NULL)::int AS awaiting_first_reply
+               FROM chat_conversations`
+        );
+        res.json({ agents: agents.rows.map((r) => ({ ...r, tier_label: TIER_LABELS[r.tier] || r.tier })), ...counts.rows[0] });
+    } catch (error) {
+        console.error("Get team error:", error);
+        res.status(500).json({ message: "Failed to load the team" });
     }
 };

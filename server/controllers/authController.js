@@ -1206,9 +1206,14 @@ async function forgotPassword(req, res) {
         // Self-service reset covers customer and vendor accounts. Staff/admin
         // are intentionally excluded (see forcePasswordReset below) - they get
         // reset links only from an admin action, never by requesting one here.
+        // Case-insensitive: people often type their email with a capital.
+        // Vendor staff (Vendor Center users) sign in on the vendor page too.
         const result = await pool.query(
-            "SELECT id, name, email FROM users WHERE email = $1 AND role IN ('customer', 'vendor')",
-            [email]
+            `SELECT id, name, email, role FROM users
+              WHERE LOWER(email) = LOWER($1) AND role IN ('customer', 'vendor', 'vendor_staff')
+                AND deleted_at IS NULL
+              LIMIT 1`,
+            [String(email).trim()]
         );
 
         if (result.rows.length === 0) {
@@ -1219,15 +1224,19 @@ async function forgotPassword(req, res) {
 
         const user = result.rows[0];
 
+        // 30 minutes (was 5 - too short to find the email and open it). Still
+        // single-use: see resetPassword's password_changed_at check.
+        const RESET_MINUTES = 30;
+        const portal = user.role === "customer" ? "customer" : "vendor";
         const resetToken = jwt.sign(
-            { userId: user.id, email: user.email, purpose: "passwordReset" },
+            { userId: user.id, email: user.email, purpose: "passwordReset", portal },
             JWT_SECRET,
-            { expiresIn: "5m" }
+            { expiresIn: `${RESET_MINUTES}m` }
         );
 
-        const resetLink = `${req.protocol}://${req.get("host")}/reset-password.html?token=${resetToken}`;
+        const resetLink = `${req.protocol}://${req.get("host")}/reset-password.html?token=${resetToken}&portal=${portal}`;
 
-        sendPasswordResetEmail(user.email, resetLink, 5).catch(err => console.error("Password reset email failed:", err));
+        sendPasswordResetEmail(user.email, resetLink, RESET_MINUTES).catch(err => console.error("Password reset email failed:", err));
 
         res.json({ message: genericMessage });
 
@@ -1245,9 +1254,6 @@ async function resetPassword(req, res) {
             return res.status(400).json({ error: "Token and new password are required." });
         }
 
-        if (newPassword.length < 6) {
-            return res.status(400).json({ error: "Password must be at least 6 characters." });
-        }
 
         let decoded;
         try {
@@ -1264,7 +1270,7 @@ async function resetPassword(req, res) {
         // change stamps password_changed_at, and a token issued before that stamp
         // is treated as spent. NULL means never recorded, which stays valid.
         const freshness = await pool.query(
-            "SELECT password_changed_at FROM users WHERE id = $1",
+            "SELECT password_changed_at, role FROM users WHERE id = $1",
             [decoded.userId]
         );
 
@@ -1277,14 +1283,27 @@ async function resetPassword(req, res) {
             return res.status(401).json({ error: "This reset link has already been used. Please request a new one." });
         }
 
+        // Customers: at least 8 characters with a letter and a number. Vendors,
+        // vendor staff and staff: the same strong rule as their sign-up.
+        const role = freshness.rows[0].role;
+        if (role === "customer") {
+            if (!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(newPassword)) {
+                return res.status(400).json({ error: "Use at least 8 characters, including a letter and a number." });
+            }
+        } else if (!isStrongPassword(newPassword)) {
+            return res.status(400).json({ error: "Use at least 8 characters with an uppercase letter, a lowercase letter, a number and a symbol." });
+        }
+
         const hashedPassword = await bcrypt.hash(newPassword, 10);
 
         await pool.query(
             "UPDATE users SET password = $1, must_reset_password = false, password_changed_at = NOW() WHERE id = $2",
             [hashedPassword, decoded.userId]
         );
+        // A new password signs the account out everywhere else.
+        await pool.query("DELETE FROM sessions WHERE user_id = $1", [decoded.userId]).catch(() => {});
 
-        res.json({ message: "Password reset successfully. You can now log in with your new password." });
+        res.json({ message: "Password reset successfully. You can now log in with your new password.", role });
 
     } catch (error) {
         console.error("Reset password error:", error);

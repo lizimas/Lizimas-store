@@ -24,8 +24,8 @@ async function submitStaffPasswordReset() {
         return;
     }
 
-    if (newPassword.length < 6) {
-        statusEl.textContent = "Password must be at least 6 characters.";
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(newPassword)) {
+        statusEl.textContent = "Use at least 8 characters with an uppercase letter, a lowercase letter, a number and a symbol.";
         return;
     }
 

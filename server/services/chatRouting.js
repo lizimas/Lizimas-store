@@ -23,6 +23,7 @@
  */
 
 const { isWithinShift } = require("../lib/schedule");
+const { needsSenior } = require("../lib/supportTier");
 
 // An agent who closed their laptop without toggling off still has
 // is_available = true. Only a recent heartbeat proves someone is watching.
@@ -113,6 +114,56 @@ async function findDepartmentMatchedStaffId(client, department, now = new Date()
 }
 
 /**
+ * Senior Agent routing (Sept 2026): the least-busy on-duty senior agent or
+ * supervisor, preferring one whose department/skills match, inside their
+ * shift if they have one. Used first for difficult chats (see
+ * lib/supportTier.needsSenior) and by "Escalate to senior".
+ *
+ * @param client          pool or checked-out client
+ * @param department      conversation department (may be null)
+ * @param excludeStaffId  never pick this person (the agent escalating)
+ * @returns staff_id or null when no senior is on duty
+ */
+async function findSeniorStaffId(client, department, excludeStaffId = null, now = new Date()) {
+    const candidates = await client.query(
+        `SELECT sa.staff_id, agents.id AS support_agent_id
+           FROM staff_availability sa
+           JOIN support_agents agents
+             ON agents.staff_id = sa.staff_id
+            AND agents.active = TRUE
+            AND agents.role IN ('senior_agent', 'supervisor')
+           LEFT JOIN chat_conversations c
+             ON c.assigned_staff_id = sa.staff_id
+            AND c.status IN ('open', 'pending')
+          WHERE sa.is_available = TRUE
+            AND sa.last_heartbeat IS NOT NULL
+            AND sa.last_heartbeat >
+                CURRENT_TIMESTAMP - INTERVAL '${HEARTBEAT_TIMEOUT_SECONDS} seconds'
+            AND ($2::int IS NULL OR sa.staff_id <> $2::int)
+          GROUP BY sa.staff_id, sa.went_available_at, agents.id, agents.department, agents.skills, agents.role
+          ORDER BY (agents.department = $1 OR $1 = ANY(agents.skills)) DESC NULLS LAST,
+                   (agents.role = 'senior_agent') DESC,
+                   COUNT(c.id) ASC, sa.went_available_at ASC NULLS FIRST
+          LIMIT 10`,
+        [department || null, excludeStaffId]
+    );
+    if (candidates.rows.length === 0) return null;
+
+    const shiftRows = await client.query(
+        `SELECT agent_id, day_of_week, start_time, end_time
+           FROM support_shifts
+          WHERE agent_id = ANY($1::int[])`,
+        [candidates.rows.map((c) => c.support_agent_id)]
+    );
+    const shiftsByAgent = {};
+    for (const s of shiftRows.rows) {
+        (shiftsByAgent[s.agent_id] = shiftsByAgent[s.agent_id] || []).push(s);
+    }
+    const match = candidates.rows.find((c) => isWithinShift(shiftsByAgent[c.support_agent_id], now));
+    return match ? match.staff_id : null;
+}
+
+/**
  * Assign waiting conversations to the least-busy available agent.
  *
  * With no conversationId, drains the queue oldest-first until either no
@@ -138,15 +189,16 @@ async function assignWaiting(pool, { conversationId = null, maxAssignments = 500
                 // conversations instead of one waiting on the other.
                 const conv = conversationId
                     ? await client.query(
-                        `SELECT id, department FROM chat_conversations
+                        `SELECT id, department, priority, escalation_level FROM chat_conversations
                          WHERE id = $1 AND status = 'waiting'
                          FOR UPDATE SKIP LOCKED`,
                         [conversationId]
                     )
                     : await client.query(
-                        `SELECT id, department FROM chat_conversations
+                        `SELECT id, department, priority, escalation_level FROM chat_conversations
                          WHERE status = 'waiting'
-                         ORDER BY escalated_at ASC NULLS FIRST, id ASC
+                         ORDER BY (priority = 'critical') DESC, (priority = 'high') DESC,
+                                  escalated_at ASC NULLS FIRST, id ASC
                          LIMIT 1
                          FOR UPDATE SKIP LOCKED`
                     );
@@ -160,8 +212,17 @@ async function assignWaiting(pool, { conversationId = null, maxAssignments = 500
 
                 let staffId = null;
                 let departmentMatched = false;
+                let seniorMatched = false;
 
-                if (department) {
+                // Difficult chats (high/critical, escalated, Returns &
+                // Refunds) go to an on-duty senior agent first.
+                if (needsSenior(conv.rows[0])) {
+                    staffId = await findSeniorStaffId(client, department);
+                    seniorMatched = staffId !== null;
+                    departmentMatched = seniorMatched;
+                }
+
+                if (!staffId && department) {
                     staffId = await findDepartmentMatchedStaffId(client, department);
                     departmentMatched = staffId !== null;
                 }
@@ -214,7 +275,8 @@ async function assignWaiting(pool, { conversationId = null, maxAssignments = 500
                     meta: {
                         via: conversationId ? "escalation" : "queue_drain",
                         department: department || null,
-                        department_matched: departmentMatched
+                        department_matched: departmentMatched,
+                        senior_matched: seniorMatched
                     }
                 });
 
@@ -236,6 +298,7 @@ async function assignWaiting(pool, { conversationId = null, maxAssignments = 500
 
 module.exports = {
     assignWaiting,
+    findSeniorStaffId,
     logEvent,
     ESCALATION_REASONS,
     HEARTBEAT_TIMEOUT_SECONDS,

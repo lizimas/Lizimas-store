@@ -13,7 +13,11 @@ const {
     setAvailability,
     heartbeat,
     getAvailability,
-    getLiveOverview
+    getLiveOverview,
+    getMyTier,
+    escalateConversation,
+    addInternalNote,
+    getTeam
 } = require("../controllers/chatController");
 
 const {
@@ -46,6 +50,12 @@ router.get("/conversations", requireAuth, requireSupportOrAdmin, listConversatio
 router.get("/conversations/:id", requireAuth, requireSupportOrAdmin, getConversationForStaff);
 router.post("/conversations/:id/messages", requireAuth, requireSupportOrAdmin, postStaffMessage);
 router.patch("/conversations/:id", requireAuth, requireSupportOrAdmin, updateConversation);
+
+// Senior Agent role: escalate to a senior, team-only notes, team view.
+router.post("/conversations/:id/escalate", requireAuth, requireSupportOrAdmin, escalateConversation);
+router.post("/conversations/:id/notes", requireAuth, requireSupportOrAdmin, addInternalNote);
+router.get("/me", requireAuth, requireSupportOrAdmin, getMyTier);
+router.get("/team", requireAuth, requireSupportOrAdmin, getTeam);
 
 // Presence. Distinct single-segment paths, so none of these collide with the
 // public "/:id" routes above.

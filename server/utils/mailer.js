@@ -729,9 +729,9 @@ async function sendSecurityLockAlert(details) {
         "If it was not, the password should be treated as compromised and changed once access is restored."
     ].join("\n");
 
-    const recipients = [details.email, process.env.ADMIN_ALERT_EMAIL]
-        .filter(Boolean)
-        .join(",");
+    // Sign-in emails go to the account holder only (Ryan, Sept 2026: no
+    // second address copied in).
+    const recipients = details.email;
 
     try {
         await transporter.sendMail({
@@ -781,7 +781,7 @@ async function sendDeviceApprovalRequest(details) {
 
     await transporter.sendMail({
         from: process.env.EMAIL_USER,
-        to: [email, process.env.ADMIN_ALERT_EMAIL].filter(Boolean).join(","),
+        to: email,
         subject: `Approve sign-in for ${email}`,
         html
     });
