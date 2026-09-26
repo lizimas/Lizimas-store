@@ -1,0 +1,102 @@
+/* Read-only product view (client/js/admin-product-view.js). Reuses the
+   product form classes from admin.css (.product-form-section, .field-row,
+   .lz-pack) so it looks like the form the product was submitted with. */
+
+body.apv-open { overflow: hidden; }
+
+.apv-overlay {
+    position: fixed; inset: 0; z-index: 3000;
+    background: #f4f5f7; display: flex; flex-direction: column;
+}
+.apv-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: #1a1a2e; color: #fff; padding: 12px 20px; flex-shrink: 0;
+}
+.apv-bar-title { font-size: 17px; font-weight: 700; min-width: 0; overflow-wrap: anywhere; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.apv-bar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.apv-close {
+    background: rgba(255,255,255,.12); border: none; color: #fff; width: 36px; height: 36px;
+    border-radius: 50%; font-size: 24px; line-height: 1; cursor: pointer;
+}
+.apv-close:hover, .apv-close:focus-visible { background: rgba(255,255,255,.25); }
+
+.apv-body { flex: 1; overflow-y: auto; padding: 18px 20px 40px; box-sizing: border-box; }
+.apv-body > * { max-width: 1100px; margin-left: auto; margin-right: auto; }
+.apv-loading { padding: 60px 0; text-align: center; color: #666; }
+.apv-sub { font-size: 13px; color: #555; margin-bottom: 8px; }
+.apv-readonly-note {
+    font-size: 13px; color: #92400E; background: #FFFBEB; border: 1px solid #FDE68A;
+    border-radius: 8px; padding: 8px 12px; margin-bottom: 14px;
+}
+.apv-panel { background: #fff; border-radius: 12px; padding: 18px; margin-bottom: 16px; box-sizing: border-box; }
+.apv-panel .product-form-section h4 { margin-top: 0; }
+
+.apv-badge { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 11.5px; font-weight: 700; letter-spacing: .02em; }
+
+/* A value laid out like the form's input box, but not an input. */
+.apv-value {
+    padding: 10px; border: 1px solid #e1e3e8; border-radius: 8px; background: #f8f9fb;
+    font-size: 14px; color: #1f2937; min-height: 20px; overflow-wrap: anywhere; margin-top: 4px;
+}
+.apv-multiline { white-space: pre-wrap; line-height: 1.55; min-height: 120px; }
+.apv-empty { color: #9aa1ae; font-style: italic; }
+.apv-muted { color: #9aa1ae; }
+.apv-note { font-size: 13px; color: #555; margin: 0; }
+
+.apv-pricing { background: #F0F4FF; border: 1px solid #C7D2FE; border-radius: 8px; padding: 12px; font-size: 13px; color: #333; }
+.lz-pack .apv-value { margin-top: 0; background: #fff; }
+
+.apv-blocks-frame { border: 1px solid #e1e3e8; border-radius: 8px; padding: 12px; background: #fff; }
+.apv-blocks-frame > .apv-value { margin-top: 0; border: none; padding: 0; background: none; }
+.apv-blocks-frame .pd-desc-blocks { max-width: 100%; }
+
+.apv-images { gap: 12px; }
+.apv-img { position: relative; display: block; }
+.apv-images .apv-img img { width: 150px; height: 150px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd; display: block; }
+.apv-img-tag, .apv-img-colour {
+    position: absolute; left: 6px; font-size: 11px; font-weight: 700; border-radius: 4px; padding: 1px 6px;
+}
+.apv-img-tag { top: 6px; background: #f4b400; color: #1a1a2e; }
+.apv-img-colour { bottom: 6px; background: rgba(26,26,46,.8); color: #fff; }
+
+.apv-specs { display: flex; flex-direction: column; gap: 6px; }
+.apv-spec-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 8px; }
+.apv-spec-row .apv-value { margin-top: 0; }
+
+.apv-table-wrap { overflow-x: auto; }
+.apv-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.apv-table th, .apv-table td { padding: 9px 10px; border-bottom: 1px solid #eef0f3; text-align: left; }
+.apv-table th { background: #f8f9fb; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: #555; }
+.apv-own { display: inline-block; background: #FEF3C7; color: #92400E; border-radius: 4px; padding: 0 6px; font-size: 11px; font-weight: 700; margin-left: 4px; }
+
+.apv-auth {
+    font-size: 13px; display: flex; gap: 8px; align-items: flex-start; background: #FFF8E1;
+    padding: 10px; border-radius: 8px; margin-top: 20px;
+}
+.apv-auth input { margin-top: 3px; }
+
+.apv-btn { border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.apv-approve { background: #16A34A; color: #fff; }
+.apv-reject { background: #DC2626; color: #fff; }
+.apv-foot { display: flex; gap: 8px; justify-content: flex-end; }
+
+@media (max-width: 640px) {
+    .apv-bar { padding: 10px 12px; }
+    .apv-bar-actions .apv-btn { display: none; } /* phones use the buttons at the bottom */
+    .apv-body { padding: 12px 10px 32px; }
+    .apv-panel { padding: 12px; }
+    .apv-panel [style*="display:flex; gap:12px"] { flex-direction: column; }
+    .apv-spec-row { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 6px; }
+    .apv-images .apv-img img { width: 100px; height: 100px; }
+}
+
+/* admin.css stacks every table into cards under 600px; keep real tables
+   here (they scroll sideways inside their wrapper instead). */
+.apv-overlay table { display: table; }
+.apv-overlay thead { display: table-header-group; }
+.apv-overlay tbody { display: table-row-group; }
+.apv-overlay tr { display: table-row; margin: 0; border: none; border-radius: 0; padding: 0; box-shadow: none; background: none; }
+.apv-overlay th, .apv-overlay td { display: table-cell; }
+.apv-overlay td::before { content: none !important; }
+.apv-overlay .pdb-table-wrap, .apv-table-wrap { overflow-x: auto; }
+.apv-overlay .apv-table { min-width: 460px; }

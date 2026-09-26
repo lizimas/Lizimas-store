@@ -39,6 +39,7 @@ const { chatAttachment } = require("../middleware/upload");
 const upload = require("../middleware/upload");
 
 const {
+    getProductFullView,
     getPendingProducts,
     approveProduct,
     rejectProduct,
@@ -316,6 +317,7 @@ router.get("/staff/:id/login-history", getLoginHistory);
 
 // Product approval workflow
 router.get("/products/pending", getPendingProducts);
+router.get("/products/:id/full", getProductFullView);
 router.patch("/products/:id/approve", approveProduct);
 router.patch("/products/:id/reject", rejectProduct);
 router.patch("/products/:id/restrict", restrictVendorProduct);

@@ -36,6 +36,27 @@ async function vendorAuthorizedFetch(path, options = {}) {
     try { return JSON.parse(text); } catch (e) { throw new Error(`HTTP ${response.status}: ${text.slice(0, 200)}`); }
 }
 
+// The phone-style shell is used at every screen size (vendor-wide.css).
+function vdPhoneShell() {
+    const el = document.querySelector(".vendor-mobile-shell");
+    return !!el && getComputedStyle(el).display !== "none" && typeof vmShowScreen === "function";
+}
+
+// Opens a Vendor Center section by its old sidebar name in the phone-style
+// shell: sections the phone app has get their own screen, the rest open in
+// the "More tools" frame (vmOpenDeskTab, vendor-mobile.js).
+const VD_TAB_TO_SCREEN = { overview: "home", orders: "orders", products: "products", "add-product": "add-product",
+    consignments: "consignments", promotions: "promotions", ads: "ads", wallet: "wallet", account: "account" };
+function vdOpenSection(tab) {
+    if (!vdPhoneShell()) {
+        const button = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+        if (button) button.click();
+        return;
+    }
+    if (VD_TAB_TO_SCREEN[tab]) vmShowScreen(VD_TAB_TO_SCREEN[tab]);
+    else if (typeof vmOpenDeskTab === "function") vmOpenDeskTab(tab);
+}
+
 // --- Tabs -----------------------------------------------------------------
 
 function setupVendorTabs() {
@@ -1175,6 +1196,7 @@ function vdSearchProducts() {
         const box = document.getElementById("vp-search-name");
         if (box) box.value = input ? input.value.trim() : "";
     }
+    if (vdPhoneShell()) { vmShowScreen("products"); return; }
     const productsBtn = document.querySelector('.tab-btn[data-tab="products"]');
     if (productsBtn) productsBtn.click();
     else renderVendorProductsTable();
@@ -1858,12 +1880,20 @@ async function loadVendorVariantOptions(productId) {
         document.getElementById("vendor-variant-sizes").value = (opts.sizes || []).map(s => s.name).join(", ");
         vendorVariantStockEnabled = !!(productRes && productRes.variant_stock_enabled);
 
+        // Own payouts per variant (never public) - merged onto the public list.
+        vendorVariantPrices = {};
+        try {
+            const vp = await vendorAuthorizedFetch(`/api/vendors/products/${productId}/variant-prices`);
+            (vp.variants || []).forEach(v => { vendorVariantPrices[v.id] = v; });
+        } catch (e) { /* prices optional */ }
+
         renderVendorVariantStockArea(opts.colors || [], opts.sizes || [], opts.variants || []);
     } catch (error) {
         console.error("Load vendor variant options error:", error);
     }
 }
 
+let vendorVariantPrices = {};
 function renderVendorVariantStockArea(colors, sizes, variants) {
     const area = document.getElementById("vendor-variant-stock-area");
     if (!area) return;
@@ -1894,19 +1924,21 @@ function renderVendorVariantStockArea(colors, sizes, variants) {
     area.innerHTML = `
         <p style="font-size:13px; margin:0 0 10px;">Mode: ${mode}</p>
         <table style="width:100%; margin-bottom:12px;">
-            <thead><tr><th>Colour</th><th>Size</th><th>Stock</th></tr></thead>
+            <thead><tr><th>Colour</th><th>Size</th><th>Stock</th><th>Your payout (UGX)</th><th>Customer price</th></tr></thead>
             <tbody>
                 ${variants.map(v => `
                     <tr>
                         <td data-label="Colour">${colorName[v.color_id] || "—"}</td>
                         <td data-label="Size">${sizeName[v.size_id] || "—"}</td>
                         <td data-label="Stock"><input type="number" min="0" step="1" data-variant-id="${v.id}" value="${Number(v.stock) || 0}" class="vendor-variant-stock-input" style="width:80px; padding:6px; border:1px solid #ccc; border-radius:6px;"></td>
+                        <td data-label="Your payout"><input type="number" min="1" step="1" data-variant-id="${v.id}" value="${vendorVariantPrices[v.id] && vendorVariantPrices[v.id].vendor_payout != null ? Number(vendorVariantPrices[v.id].vendor_payout) : ""}" data-orig="${vendorVariantPrices[v.id] && vendorVariantPrices[v.id].vendor_payout != null ? Number(vendorVariantPrices[v.id].vendor_payout) : ""}" placeholder="Product price" class="vendor-variant-payout-input" style="width:130px; padding:6px; border:1px solid #ccc; border-radius:6px;"></td>
+                        <td data-label="Customer price">${vendorVariantPrices[v.id] ? "UGX " + Number(vendorVariantPrices[v.id].price || vendorVariantPrices[v.id].product_price || 0).toLocaleString() : "—"}</td>
                     </tr>
                 `).join("")}
             </tbody>
         </table>
-        <p style="font-size:13px; color:#666; margin:0 0 10px;">${variants.length} variants, ${inStock} with stock.</p>
-        <button onclick="saveVendorVariantStock()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; margin-right:8px;">Save Stock</button>
+        <p style="font-size:13px; color:#666; margin:0 0 10px;">${variants.length} variants, ${inStock} with stock. Leave a payout blank to sell that variant at the product's price; enter one when a colour or size costs more or less.</p>
+        <button onclick="saveVendorVariantStock()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; margin-right:8px;">Save Stock &amp; Prices</button>
         <button onclick="generateVendorVariants()" style="background:#fff; color:#1a1a2e; border:1px solid #1a1a2e; border-radius:8px; padding:10px 16px; cursor:pointer; margin-right:8px;">Re-generate Missing</button>
         <button onclick="toggleVendorVariantStockMode()" style="background:${vendorVariantStockEnabled ? "#B45309" : "#16A34A"}; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">${vendorVariantStockEnabled ? "Revert to Simple Stock" : "Enable Variant Stock"}</button>
     `;
@@ -1963,9 +1995,20 @@ async function saveVendorVariantStock() {
         variant_id: Number(el.dataset.variantId),
         stock: Number(el.value)
     }));
+    const payoutEls = {};
+    document.querySelectorAll(".vendor-variant-payout-input").forEach(el => { payoutEls[el.dataset.variantId] = el; });
+    updates.forEach(u => {
+        const el = payoutEls[u.variant_id];
+        // Only send payouts the vendor changed, so untouched rows keep their price.
+        if (el && el.value.trim() !== (el.dataset.orig || "")) u.payout = el.value.trim() === "" ? null : Number(el.value);
+    });
 
     if (updates.some(u => !Number.isInteger(u.stock) || u.stock < 0)) {
         alert("Stock values must be whole numbers of zero or more.");
+        return;
+    }
+    if (updates.some(u => u.payout !== null && u.payout !== undefined && !(u.payout > 0))) {
+        alert("A variant payout must be more than 0, or left blank to use the product price.");
         return;
     }
 
@@ -2251,7 +2294,7 @@ async function submitVendorProductForm() {
 
         resetVendorProductForm();
         // Phones show this same form in the mobile Add Product screen.
-        if (window.matchMedia("(max-width: 768px)").matches && typeof vmShowScreen === "function") vmShowScreen("products");
+        if (typeof vmShowScreen === "function") vmShowScreen("products");
         else document.querySelector('.tab-btn[data-tab="products"]').click();
 
     } catch (error) {
@@ -3469,8 +3512,7 @@ async function openVendorNotification(id, linkTab) {
         console.error("Mark vendor notification read error:", error);
     }
     if (linkTab) {
-        const button = document.querySelector(`.tab-btn[data-tab="${linkTab}"]`);
-        if (button) button.click();
+        vdOpenSection(linkTab);
     }
     toggleVendorNotifPanel();
 }

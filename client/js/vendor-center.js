@@ -20,7 +20,8 @@
 
 const esc = (s) => vendorEsc(s == null ? "" : s);
 const api = (path, opts) => vendorAuthorizedFetch(path, opts);
-const isMobileShell = () => window.matchMedia("(max-width: 768px)").matches;
+// The phone-style shell is used at every screen size now (vendor-wide.css).
+const isMobileShell = () => { const el = document.querySelector(".vendor-mobile-shell"); return !!el && getComputedStyle(el).display !== "none"; };
 const fmtUgx = (n) => "UGX " + Math.round(Number(n) || 0).toLocaleString();
 const fmtNum = (n) => (Number(n) || 0).toLocaleString();
 

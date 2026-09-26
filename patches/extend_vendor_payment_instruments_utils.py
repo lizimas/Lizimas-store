@@ -22,7 +22,7 @@ if n != 1:
     print(f"ABORT: anchor found {n}x (expected 1). No changes made.")
     sys.exit(1)
 
-replacement = '''// --- Evidence document extension (Ryan, Sept 2026, Jumia-parity) -----------
+replacement = '''// --- Evidence document extension (Ryan, Sept 2026, parity) -----------
 // migration 122 adds evidence_cloudinary_public_id (+ resource_type/format/
 // filename/bytes/uploaded_at) directly on vendor_payment_instruments - one
 // document per INSTRUMENT, not per vendor, since a vendor can hold several

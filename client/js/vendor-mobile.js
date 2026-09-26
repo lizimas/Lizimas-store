@@ -47,8 +47,51 @@ const VM_NAV_FALLBACK = {
     "pickers-edit": "account",
     "ads": "account",
     "ads-create": "account",
-    "promo-monitoring": "account"
+    "promo-monitoring": "account",
+    "desk": "account"
 };
+
+// --- More tools (computers) -------------------------------------------------
+// Sections the phone app has no screen of its own for. On a computer they
+// open inside the phone-style frame: the section's existing content is moved
+// into #vm-desk-host and its usual loader runs (the hidden sidebar button's
+// click handler), so nothing is re-implemented.
+const VM_DESK_TABS = {
+    overview: "Performance Overview",
+    inventory: "Inventory",
+    returns: "Returns",
+    refunds: "Returns & Refunds",
+    reviews: "Reviews",
+    reports: "Analytics & Reports",
+    storefront: "Storefront",
+    messages: "Support & Feedback"
+};
+function vmOpenDeskTab(tab) {
+    const section = document.getElementById(`tab-${tab}`);
+    const host = document.getElementById("vm-desk-host");
+    if (!section || !host) return;
+    host.querySelectorAll(".tab-content").forEach(el => { if (el !== section) el.classList.add("hidden"); });
+    if (section.parentElement !== host) host.appendChild(section);
+    const title = document.getElementById("vm-desk-title");
+    if (title) title.textContent = VM_DESK_TABS[tab] || "More";
+    vmShowScreen("desk");
+    const btn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+    if (btn) btn.click();
+    section.classList.remove("hidden");
+    window.scrollTo({ top: 0 });
+}
+window.vmOpenDeskTab = vmOpenDeskTab;
+
+function vmDeskToolsCard() {
+    const chev = '<span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>';
+    const rows = Object.keys(VM_DESK_TABS).filter(t => document.getElementById(`tab-${t}`)).map(t =>
+        `<button class="vm-list-row" onclick="vmOpenDeskTab('${t}')"><span class="vm-list-row-label">${VM_DESK_TABS[t].replace(/&/g, "&amp;")}</span>${chev}</button>`).join("");
+    return `<div class="vm-card vm-desk-only" style="padding:4px 16px;">
+        <div class="vm-group-header"><span class="vm-group-header-label">More tools</span></div>
+        ${rows}
+        <a class="vm-list-row" href="../seller-guide.html" target="_blank" rel="noopener" style="text-decoration:none; color:inherit;"><span class="vm-list-row-label">Seller Guide</span>${chev}</a>
+    </div>`;
+}
 
 function vmShowScreen(name, opts) {
     opts = opts || {};
@@ -2288,7 +2331,7 @@ function vmRenderProfile(v, notices) {
             <span class="vm-list-row-label">Advertise your Products</span>
             <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
         </button>
-        <button class="vm-list-row" onclick="alert('Give us your feedback needs a bigger screen for now \u2014 switch to desktop.')">
+        <button class="vm-list-row" onclick="vmFeedback()">
             <span class="vm-list-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg></span>
             <span class="vm-list-row-label">Give us your feedback!</span>
             <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
@@ -2300,7 +2343,12 @@ function vmRenderProfile(v, notices) {
         <span class="vm-list-row-label">Logout</span>
     </button></div>`;
 
-    return statusCard + detailsCard + momoCard + moreCard + noticesCard + logoutRow;
+    return statusCard + detailsCard + momoCard + moreCard + vmDeskToolsCard() + noticesCard + logoutRow;
+}
+
+function vmFeedback() {
+    if (window.matchMedia("(min-width: 769px)").matches) { vmOpenDeskTab("messages"); return; }
+    alert("Give us your feedback needs a bigger screen for now \u2014 switch to a computer.");
 }
 
 async function vmSaveMomoNumber() {

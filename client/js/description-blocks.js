@@ -1,17 +1,9 @@
 // Renders product_description_blocks under the Description heading.
 // If a product has no blocks, we leave the plain <p id="pd-description">
 // alone and do nothing — full backwards compatibility.
+// Also exposed as window.LzDescBlocks.render(mountEl, blocks) so the admin
+// panel's read-only product view shows blocks exactly as shoppers see them.
 (function () {
-    const mount = document.getElementById("pd-desc-blocks");
-    if (!mount) return;
-
-    // Canonical URLs are /product/<slug>-<id>; legacy links use ?id=<id>.
-    let productId = new URLSearchParams(location.search).get("id");
-    if (!productId) {
-        const m = location.pathname.match(/-(\d+)\/?$/);
-        if (m) productId = m[1];
-    }
-    if (!productId) return;
 
     // Cloudinary transform: resize + auto format/quality, skipped for any
     // URL that isn't Cloudinary so external images still render.
@@ -279,7 +271,7 @@
         return section;
     }
 
-    function render(blocks) {
+    function render(blocks, mount) {
         const frag = document.createDocumentFragment();
         blocks.forEach((b) => {
             if (b.type === "image") {
@@ -333,16 +325,30 @@
             }
         });
         mount.appendChild(frag);
-
-        // Blocks won — retire the legacy paragraph.
-        const legacy = document.getElementById("pd-description");
-        if (legacy) legacy.style.display = "none";
     }
+
+    window.LzDescBlocks = { render: (mountEl, blocks) => render(blocks || [], mountEl) };
+
+    const mount = document.getElementById("pd-desc-blocks");
+    if (!mount) return;
+
+    // Canonical URLs are /product/<slug>-<id>; legacy links use ?id=<id>.
+    let productId = new URLSearchParams(location.search).get("id");
+    if (!productId) {
+        const m = location.pathname.match(/-(\d+)\/?$/);
+        if (m) productId = m[1];
+    }
+    if (!productId) return;
 
     fetch(`/api/products/${encodeURIComponent(productId)}/description-blocks`)
         .then((r) => (r.ok ? r.json() : []))
         .then((blocks) => {
-            if (Array.isArray(blocks) && blocks.length) render(blocks);
+            if (Array.isArray(blocks) && blocks.length) {
+                render(blocks, mount);
+                // Blocks won — retire the legacy paragraph.
+                const legacy = document.getElementById("pd-description");
+                if (legacy) legacy.style.display = "none";
+            }
         })
         .catch((err) => console.error("description-blocks:", err));
 })();

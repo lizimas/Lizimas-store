@@ -39,12 +39,12 @@ replacement = '''const KYC_STATUS_LABELS = {
     suspended: "Suspended"
 };
 
-// --- Jumia-parity extension (Ryan, Sept 2026) -------------------------------
+// --- parity extension (Ryan, Sept 2026) -------------------------------
 // migration 088 widened vendor_kyc_documents.document_type to
 // national_id/business_registration/bank_certificate/tax_certificate/
 // vat_certificate/momo_statement/certificate_of_incorporation months ago,
 // but the app never used most of it. migration 122 adds form_20 and
-// work_permit (the two Jumia requires that weren't in that set at all)
+// work_permit (the two added for Uganda KYC)
 // plus TIN/VAT number fields on vendor_kyc itself.
 
 const KYC_DOCUMENT_TYPES = [

@@ -161,7 +161,9 @@ async function loadProductDetail() {
             }
             // The cart shows what checkout will charge: the running sale or
             // discount price when there is one (checkout re-prices anyway).
+            const pickPrice = pdColorSizeVariantPrice();
             const cartPrice = pdSelectedVariantPrice !== null ? pdSelectedVariantPrice
+                : pickPrice !== null ? pickPrice
                 : (pdHasDiscount ? pdSalePrice : product.price);
             addToCart(product.id, product.name, cartPrice, cartImage, product.description, pdSelectedColorId, pdSelectedColorName, pdSelectedSizeId, pdSelectedSizeName, pdSelectedVariantId, pdSelectedVariantName);
         };
@@ -569,6 +571,7 @@ function selectSize(sizeId, sizeName) {
 // actually tracking stock per variant, and only when the number is low enough
 // to be useful to the customer.
 function updateStockHint() {
+    pdApplyVariantPrice();
     let el = document.getElementById("pd-stock-hint");
 
     const sizeRow = document.querySelector(".pd-size-buttons");
@@ -607,6 +610,43 @@ function updateStockHint() {
     } else {
         el.textContent = "";
     }
+}
+
+// Per-variant prices: a colour+size with its own price sells at that price
+// (checkout charges the same). Returns null when the pick uses the product price.
+function pdColorSizeVariantPrice() {
+    if (pdVariantStockEnabled !== true || !pdSelectedColorId || !pdSelectedSizeId) return null;
+    const v = pdVariants.find(x =>
+        Number(x.color_id) === Number(pdSelectedColorId) && Number(x.size_id) === Number(pdSelectedSizeId));
+    return v && v.own_price && Number(v.price) > 0 ? Number(v.price) : null;
+}
+
+let pdBasePriceSnapshot = null;
+function pdApplyVariantPrice() {
+    const priceEl = document.getElementById("pd-price");
+    if (!priceEl) return;
+    const orig = document.getElementById("pd-price-original");
+    const badge = document.getElementById("pd-discount-badge");
+    const vp = pdColorSizeVariantPrice();
+    if (vp === null) {
+        if (pdBasePriceSnapshot) {
+            priceEl.textContent = pdBasePriceSnapshot.text;
+            if (orig) orig.hidden = pdBasePriceSnapshot.origHidden;
+            if (badge) badge.hidden = pdBasePriceSnapshot.badgeHidden;
+            pdBasePriceSnapshot = null;
+        }
+        return;
+    }
+    if (!pdBasePriceSnapshot) {
+        pdBasePriceSnapshot = {
+            text: priceEl.textContent,
+            origHidden: orig ? orig.hidden : true,
+            badgeHidden: badge ? badge.hidden : true
+        };
+    }
+    priceEl.textContent = "UGX " + vp.toLocaleString();
+    if (orig) orig.hidden = true;
+    if (badge) badge.hidden = true;
 }
 
 function updateSizeAvailability() {

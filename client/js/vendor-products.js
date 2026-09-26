@@ -299,6 +299,7 @@ function vpImport() {
 }
 
 function vpAddProduct() {
+    if (typeof vdPhoneShell === "function" && vdPhoneShell()) { vmShowScreen("add-product"); return; }
     const btn = document.querySelector('.tab-btn[data-tab="add-product"]');
     if (btn) btn.click();
 }
@@ -327,7 +328,7 @@ function vpOpenRowMenu(id, ev) {
     const f = vpFlags(p);
     const canToggle = f.approved && !f.unauthorized;
     const items = [];
-    const onPhone = window.matchMedia("(max-width: 768px)").matches;
+    const onPhone = typeof vdPhoneShell === "function" ? vdPhoneShell() : window.matchMedia("(max-width: 768px)").matches;
     if (!f.deleted) items.push(`<button type="button" onclick="vpCloseMenus(); ${onPhone ? "vmEditProduct" : "editVendorProduct"}(${Number(id)})">Edit</button>`);
     if (canToggle) items.push(`<button type="button" onclick="vpCloseMenus(); vpToggleActive(${Number(id)}, ${!f.active})">${f.active ? "Deactivate" : "Activate"}</button>`);
     items.push(`<button type="button" class="vp-danger" onclick="vpCloseMenus(); vpDeleteOne(${Number(id)})">Delete</button>`);

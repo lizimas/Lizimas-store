@@ -803,29 +803,7 @@ exports.generateProductVariants = async (req, res) => {
 
 // Bulk-update variant stock for one product. Single transaction so the grid
 // cannot half-save. Rows not belonging to this product are rejected outright.
-// Per-variant prices (migration 138). A variant's customer price comes from
-// its own vendor payout through the product's commission snapshot; with no
-// payout of its own it sells at the product's price.
-function variantPriceFromPayout(product, payout) {
-    const rate = product.commission_rate_applied;
-    if (rate == null) return null;
-    return computePricing({ vendorPayout: payout, rate: Number(rate), fixedFee: Number(product.fixed_fee_applied) || 0 }).customerPrice;
-}
-async function repriceVariants(db, product) {
-    await db.query(
-        `UPDATE product_variants SET price = $2 WHERE product_id = $1 AND vendor_payout IS NULL`,
-        [product.id, product.price]
-    );
-    if (product.commission_rate_applied == null) return;
-    const own = await db.query(
-        `SELECT id, vendor_payout FROM product_variants WHERE product_id = $1 AND vendor_payout IS NOT NULL`,
-        [product.id]
-    );
-    for (const v of own.rows) {
-        const price = variantPriceFromPayout(product, v.vendor_payout);
-        if (price) await db.query(`UPDATE product_variants SET price = $1 WHERE id = $2`, [price, v.id]);
-    }
-}
+const { variantPriceFromPayout, repriceVariants } = require("../utils/variantPricing");
 exports.repriceVariants = repriceVariants;
 
 // GET /api/vendors/products/:id/variant-prices - the owner's own variant
@@ -1041,7 +1019,10 @@ exports.getProductOptions = async (req, res) => {
         );
 
         const variants = await pool.query(
-            `SELECT id, variant_name, color_id, size_id, price, stock FROM product_variants WHERE product_id = $1`,
+            `SELECT v.id, v.variant_name, v.color_id, v.size_id, v.price, v.stock,
+                    (v.price > 0 AND (v.vendor_payout IS NOT NULL OR v.price IS DISTINCT FROM p.price)) AS own_price
+               FROM product_variants v JOIN products p ON p.id = v.product_id WHERE v.product_id = $1
+              ORDER BY v.id`,
             [id]
         );
 
@@ -1723,6 +1704,54 @@ exports.getPendingProducts = async (req, res) => {
     }
 };
 
+// GET /api/admin/products/:id/full - everything the submitter entered on the
+// product form, for the admin panel's read-only view (Ryan, Sept 2026):
+// name, category path, description and description blocks, payout and
+// pricing, stock, packed size, brand/warranty/GTIN/MPN, every photo,
+// specifications, colours, sizes and each variant's stock and price.
+exports.getProductFullView = async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid product." });
+        const product = (await pool.query(
+            `SELECT p.*, u.name AS submitted_by_name, u.email AS submitted_by_email,
+                    v.business_name AS vendor_business_name
+               FROM products p
+               LEFT JOIN users u ON u.id = p.created_by
+               LEFT JOIN vendors v ON v.id = p.vendor_id
+              WHERE p.id = $1`,
+            [id]
+        )).rows[0];
+        if (!product) return res.status(404).json({ error: "Product not found." });
+
+        const [categoryPath, images, colors, sizes, variants, specs, blocks] = await Promise.all([
+            product.category_id ? pool.query(
+                `WITH RECURSIVE chain AS (
+                     SELECT id, name, parent_id, 0 AS depth FROM categories WHERE id = $1
+                     UNION ALL
+                     SELECT c.id, c.name, c.parent_id, chain.depth + 1 FROM categories c JOIN chain ON c.id = chain.parent_id
+                     WHERE chain.depth < 10
+                 ) SELECT name FROM chain ORDER BY depth DESC`,
+                [product.category_id]
+            ).then(r => r.rows.map(x => x.name)) : Promise.resolve([]),
+            pool.query(`SELECT id, image_path, color_id, display_order FROM product_images WHERE product_id = $1
+                        ORDER BY COALESCE(display_order, 999999), id`, [id]).then(r => r.rows),
+            pool.query(`SELECT id, name, image_path FROM product_colors WHERE product_id = $1 ORDER BY display_order, id`, [id]).then(r => r.rows),
+            pool.query(`SELECT id, name FROM product_sizes WHERE product_id = $1 ORDER BY display_order, id`, [id]).then(r => r.rows),
+            pool.query(`SELECT id, variant_name, color_id, size_id, price, stock, vendor_payout, image_path
+                          FROM product_variants WHERE product_id = $1 ORDER BY id`, [id]).then(r => r.rows),
+            pool.query(`SELECT label, value FROM product_specifications WHERE product_id = $1 ORDER BY display_order, id`, [id]).then(r => r.rows),
+            pool.query(`SELECT id, "position", type, body, image_url, image_width, image_height, alt_text, payload
+                          FROM product_description_blocks WHERE product_id = $1 ORDER BY "position", id`, [id]).then(r => r.rows)
+        ]);
+
+        res.json({ product, category_path: categoryPath, images, colors, sizes, variants, specs, blocks });
+    } catch (error) {
+        console.error("getProductFullView error:", error.message);
+        res.status(500).json({ error: "Could not load this product." });
+    }
+};
+
 exports.approveProduct = async (req, res) => {
     try {
         const { id } = req.params;
@@ -2033,3 +2062,4 @@ exports.unrestrictVendorProduct = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+

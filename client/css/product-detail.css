@@ -207,96 +207,21 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 }
 
 /* ---- Product description blocks ---- */
-.pd-desc-blocks {
-    margin: 0 auto 16px;
-    max-width: 1000px;
-}
 /* Grid cells keep their own left alignment; only section headings centre. */
-.pd-desc-blocks .pdb-grid-caption,
-.pd-desc-blocks .pdb-grid-body,
-.pd-desc-blocks .pdb-grid-cell { text-align: left; }
-
-.pd-desc-blocks .pdb-img {
-    width: 100%;
-    margin: 0 0 14px;
-    background: #f2f2f2;
-    overflow: hidden;
-    border-radius: 6px;
-}
 
 /* Small caption text under a standalone Image block - optional, shown to
    shoppers (unlike alt text). Deliberately small/gray, unlike the bolder
    .pdb-grid-caption used for multi-column grid images. */
-.pd-desc-blocks .pdb-caption {
-    font-size: 12px;
-    line-height: 1.5;
-    color: #888;
-    text-align: center;
-    margin: -6px 0 14px;
-}
-.pd-desc-blocks .pdb-img img {
-    display: block;
-    width: 100%;
-    height: auto;
-}
-.pd-desc-blocks .pdb-heading {
-    margin: 32px 0 10px;
-    font-size: 26.5px;
-    line-height: 1.25;
-    font-weight: 700;
-    text-align: center;
-    color: #0d1b3e;
-}
-.pd-desc-blocks .pdb-text {
-    margin: 0 0 14px;
-    font-size: 13.5px;
-    line-height: 1.65;
-    text-align: left;
-    color: #333;
-    white-space: pre-line;
-}
 
 /* Never crop a description image — letterbox if the stored ratio is off */
-.pd-desc-blocks .pdb-img img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-}
 
 /* Video block - same width/rounding treatment as .pdb-img, just with a
    16:9 box reserved up front (set inline via style.aspectRatio) so the
    iframe/video doesn't jump the layout on load. */
-.pd-desc-blocks .pdb-video {
-    width: 100%;
-    margin: 0 0 14px;
-    background: #000;
-    overflow: hidden;
-    border-radius: 6px;
-}
 
 /* Link block - a bordered pill/button rather than plain underlined text,
    so it reads as a tappable action inside the rich content rather than
    stray blue text. */
-.pd-desc-blocks .pdb-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0 0 14px;
-    padding: 10px 18px;
-    border: 1px solid #0d1b3e;
-    border-radius: 8px;
-    color: #0d1b3e;
-    font-size: 13.5px;
-    font-weight: 600;
-    text-decoration: none;
-}
-.pd-desc-blocks .pdb-link::after {
-    content: "\2192";
-}
-.pd-desc-blocks .pdb-link:hover {
-    background: #0d1b3e;
-    color: #fff;
-}
 
 /* Full-width (edge-to-edge) Image block, Lulu-style: breaks out of
    .pd-desc-blocks' max-width and of any padding on its ancestors (the
@@ -305,19 +230,6 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
    of how deeply the block is nested. body's overflow-x:hidden above is
    there so a scrollbar's few extra pixels of vw never cause a sideways
    scroll on desktop. */
-.pd-desc-blocks .pdb-img-full {
-    width: 100vw;
-    max-width: 100vw;
-    position: relative;
-    left: 50%;
-    right: 50%;
-    margin-left: -50vw;
-    margin-right: -50vw;
-    border-radius: 0;
-}
-.pd-desc-blocks .pdb-img-full img {
-    border-radius: 0;
-}
 
 /* Full-width (edge-to-edge) Grid section - same breakout technique as
    .pdb-img-full, applied to the whole multi-column block (Ryan, Sept 2026:
@@ -325,29 +237,9 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
    via the Grid block never covered the full screen no matter what). Side
    padding keeps the images from touching the absolute viewport edge with
    zero breathing room; the inter-column gap is unaffected. */
-.pdb-grid-section.pdb-grid-full {
-    width: 100vw;
-    max-width: 100vw;
-    position: relative;
-    left: 50%;
-    right: 50%;
-    margin-left: -50vw;
-    margin-right: -50vw;
-    padding: 0 16px;
-    box-sizing: border-box;
-}
-.pdb-grid-section.pdb-grid-full .pdb-grid-cell img {
-    border-radius: 4px;
-}
 
 
 /* Description blocks: pasted lists keep numbering, ticks and levels. */
-.pdb-text p { margin: 0 0 10px; }
-.pdb-text ul, .pdb-text ol { margin: 8px 0; padding-left: 24px; }
-.pdb-text li { margin: 4px 0; line-height: 1.6; }
-.pdb-text ul.lzbe-check { list-style: none; padding-left: 0; }
-.pdb-text ul.lzbe-check > li { display: flex; align-items: flex-start; gap: 9px; margin: 0 0 10px; line-height: 1.45; font-size: 0.85rem; }
-.pdb-text .tick { flex: 0 0 20px; width: 20px; height: 20px; margin-top: 1px; border-radius: 50%; background: #fbeaea; color: #c0392b; font-weight: 700; font-size: 0.72rem; display: inline-flex; align-items: center; justify-content: center; }
 
 
 /* Description / Specifications tabs sit under the gallery in the left column
@@ -382,80 +274,15 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 /* Multi-column feature grid. Column count comes from the block payload via
    --pdb-grid-cols; anything above two collapses to two on a phone so the
    images never shrink below a usable size. */
-.pdb-grid-section {
-    margin: 30px 0;
-}
-
-.pdb-grid {
-    display: grid;
-    grid-template-columns: repeat(var(--pdb-grid-cols, 3), minmax(0, 1fr));
-    gap: 20px;
-}
-
-.pdb-grid-cell img {
-    width: 100%;
-    height: auto;
-    display: block;
-    border-radius: 10px;
-}
-
-.pdb-grid-caption {
-    font-weight: 700;
-    font-size: 15px;
-    color: #1a1a2e;
-    margin-top: 10px;
-}
-
-.pdb-grid-body {
-    font-size: 14px;
-    line-height: 1.55;
-    color: #555;
-    margin-top: 4px;
-}
-
-.pdb-grid-body ul, .pdb-grid-body ol { margin: 4px 0 0; padding-left: 22px; }
-.pdb-grid-body li { margin: 3px 0; line-height: 1.55; }
-.pdb-grid-body ul.lzbe-check { list-style: none; padding-left: 0; }
-.pdb-grid-body ul.lzbe-check > li { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 8px; line-height: 1.4; font-size: 0.85rem; }
-.pdb-grid-body .tick { flex: 0 0 18px; width: 18px; height: 18px; margin-top: 1px; border-radius: 50%; background: #fbeaea; color: #c0392b; font-weight: 700; font-size: 0.68rem; display: inline-flex; align-items: center; justify-content: center; }
-.pdb-grid-body p { margin: 0 0 6px; }
-.pdb-grid-body p:last-child { margin-bottom: 0; }
 
 /* Per-item video (grid block) - same 16:9 reserved box as the standalone
    video block, sized to the column instead of the full width. */
-.pdb-grid-video {
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    background: #000;
-    overflow: hidden;
-    border-radius: 10px;
-}
 
 /* Per-item link (grid block). "Whole tile" keeps the cell's vertical
    stacking (media/caption/body) since an <a> is inline by default; "media"
    or "caption" only wraps that one piece, so it stays inline-ish there. */
-.pdb-grid-link {
-    display: block;
-    color: inherit;
-    text-decoration: none;
-}
-.pdb-grid-link-whole {
-    display: flex;
-    flex-direction: column;
-}
-.pdb-grid-link:hover .pdb-grid-caption {
-    text-decoration: underline;
-}
-
-@media (max-width: 640px) {
-    .pdb-grid {
-        grid-template-columns: repeat(min(var(--pdb-grid-cols, 2), 2), minmax(0, 1fr));
-        gap: 14px;
-    }
-}
 
 /* A heading that introduces a tick list stays left-aligned with its list. */
-.pd-desc-blocks .pdb-heading:has(+ .pdb-text ul.lzbe-check) { text-align: left; }
 
 
 
@@ -630,7 +457,3 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 }
 
 /* Table description block (client/js/lz-table.js toHtml) */
-.pdb-table-wrap { overflow-x: auto; margin: 14px 0; }
-.pdb-table { border-collapse: collapse; width: 100%; font-size: 14px; }
-.pdb-table th, .pdb-table td { border: 1px solid #d5d8de; padding: 9px 12px; text-align: left; vertical-align: top; }
-.pdb-table th { background: #f4f5f7; font-weight: 700; color: #1a1a2e; }

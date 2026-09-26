@@ -1,0 +1,55 @@
+/* Vendor Center on computers (Ryan, Sept 2026): the desktop uses the same
+   organisation and placement as the phone app - Home / Manage Products /
+   Orders / Account, with Account as the hub - stretched to fill the whole
+   screen instead of the old sidebar layout. Nothing is cropped: the shell
+   is full width and content reflows into columns. */
+
+.admin-shell { display: none !important; }
+.vendor-mobile-shell { display: block; }
+.vm-desk-only { display: none; }
+
+@media (min-width: 769px) {
+    .vm-desk-only { display: block; }
+    .vendor-mobile-shell {
+        max-width: none;
+        width: 100%;
+        padding-bottom: 88px;
+    }
+    .vm-screen.active { padding: 0 0 12px; }
+}
+
+/* Wider screens: same order as the phone, reflowed into columns. */
+.vm-list-row { box-sizing: border-box; }
+@media (min-width: 769px) {
+    .vm-screen .vm-header { padding-left: 28px; padding-right: 28px; }
+    .vm-card, .vm-order-card { margin-left: 24px; margin-right: 24px; }
+    .vpm-pills { flex-wrap: wrap; overflow-x: visible; }
+}
+@media (min-width: 1024px) {
+    /* Home: the five setup tiles side by side, form fields two per row. */
+    .vss-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); max-width: none; gap: 12px; }
+    .vss-section { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
+    .vss-section > .vss-section-title, .vss-section > .vss-section-sub,
+    .vss-section > :not(.vss-field) { grid-column: 1 / -1; }
+
+    /* Manage Products / Orders: cards in a grid instead of one long list. */
+    #vpm-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); column-gap: 28px; }
+
+    /* Account hub: cards in two columns. */
+    #vm-profile-body { columns: 2; column-gap: 0; padding-top: 4px; }
+    #vm-profile-body > .vm-card { break-inside: avoid; display: inline-block; width: calc(100% - 48px); box-sizing: border-box; }
+}
+@media (min-width: 1600px) {
+    #vm-profile-body { columns: 3; }
+}
+
+/* More tools frame: the moved sections keep their computer styling. */
+.vm-desk-frame .admin-main { min-height: 0; }
+
+/* Fulfillment by Lizimas row sat 14px past the right edge (width 100% + margins). */
+#vm-screen-products > .vm-list-row { width: calc(100% - 28px); }
+@media (min-width: 769px) {
+    #vm-screen-products > .vm-list-row { width: calc(100% - 48px); margin-left: 24px !important; margin-right: 24px !important; }
+    /* Summary tiles wrap onto new rows instead of scrolling sideways. */
+    .vc-tiles { grid-auto-flow: row; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); overflow-x: visible; }
+}

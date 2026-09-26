@@ -1,4 +1,25 @@
 
+## DONE (Sept 2026): per-variant prices, phone layout on computers, admin read-only product view
+
+**Per-variant prices** (migration 138, `product_variants.vendor_payout`): vendors enter an
+optional payout per colour/size in the Variants grid (blank = the product's price); the
+customer price comes from the product's commission snapshot (`server/utils/variantPricing.js`).
+The product page shows the variant's price once colour and size are picked, the cart carries it,
+and checkout charges it (`checkoutController` maps colour+size to the variant). Staff/admin can
+set a variant price directly. A vendor save only sends payouts that were changed.
+
+**Vendor Center on computers** uses the phone app's organisation (Home / Manage Products /
+Orders / Account) stretched to the full screen (`client/css/vendor-wide.css`); the old sidebar
+shell is hidden. Sections the phone app has no screen for (Performance Overview, Inventory,
+Returns, Refunds, Reviews, Analytics, Storefront, Support) are under Account > More tools on
+computers and open inside the same frame (`vmOpenDeskTab`).
+
+**Admin read-only product view** (`client/js/admin-product-view.js`,
+`GET /api/admin/products/:id/full`): opens any product exactly as submitted, laid out like the
+upload form, with nothing editable. Used by Pending Products > View and a new View button in
+Products. Description-block styles moved to `client/css/desc-blocks.css` (shared with the
+product page; product page verified pixel-identical).
+
 ## DONE (Sept 2026): sessions in httpOnly cookies + Google/Facebook callback cleanup
 
 - Session tokens now live in per-portal httpOnly cookies (lz_s_user / lz_s_vendor /

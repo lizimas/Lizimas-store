@@ -1,5 +1,39 @@
 const pool = require("../config/database");
 const { discountedPrice } = require("../utils/productDiscounts");
+
+// The price a plain product (or a variant with no price of its own) sells at
+// right now: a running flash sale, else an approved vendor promotion, else an
+// admin percent discount (Discount Promotions), else the listed price.
+async function productSalePrice(client, productId, basePrice) {
+    const flashPrice = await client.query(
+        `SELECT fsi.sale_price FROM flash_sale_items fsi
+         JOIN flash_sales fs ON fs.id = fsi.flash_sale_id
+         WHERE fsi.product_id = $1
+           AND fs.is_active = true
+           AND fs.ends_at >= now()
+           AND (fs.starts_at IS NULL OR fs.starts_at <= now())
+         LIMIT 1`,
+        [productId]
+    );
+    if (flashPrice.rows.length) return Number(flashPrice.rows[0].sale_price);
+    const vendorPromoPrice = await client.query(
+        `SELECT proposed_sale_price FROM vendor_promotions
+         WHERE product_id = $1 AND status = 'approved'
+           AND starts_at <= now() AND ends_at >= now()
+         LIMIT 1`,
+        [productId]
+    );
+    if (vendorPromoPrice.rows.length) return Number(vendorPromoPrice.rows[0].proposed_sale_price);
+    const pctDiscount = await client.query(
+        `SELECT percent FROM product_discounts
+         WHERE product_id = $1 AND is_active = true
+           AND starts_at <= now() AND (ends_at IS NULL OR ends_at > now())
+         LIMIT 1`,
+        [productId]
+    );
+    if (pctDiscount.rows.length) return discountedPrice(basePrice, pctDiscount.rows[0].percent);
+    return Number(basePrice);
+}
 const { sendOrderStatusSms } = require("../utils/sms");
 const { sendOrderStatusEmail, sendOrderConfirmationEmail } = require("../utils/mailer");
 const { sign: signReceipt } = require("../routes/receipt");
@@ -52,7 +86,7 @@ exports.checkout = async (req, res) => {
 
         for (const item of items) {
             const productId = Number(item.productId);
-            const variantId = item.variantId ? Number(item.variantId) : null;
+            let variantId = item.variantId ? Number(item.variantId) : null;
             const quantity = Number(item.quantity);
             const colorId = item.colorId ? Number(item.colorId) : null;
             const sizeId = item.sizeId ? Number(item.sizeId) : null;
@@ -62,9 +96,23 @@ exports.checkout = async (req, res) => {
                 return res.status(400).json({ error: "Invalid item in cart." });
             }
 
+            // A colour + size pick on a product that tracks stock per variant
+            // is that variant: its own stock and, if set, its own price
+            // (per-variant prices, migration 138).
+            if (!variantId && colorId && sizeId) {
+                const matched = await client.query(
+                    `SELECT v.id FROM product_variants v JOIN products p ON p.id = v.product_id
+                      WHERE v.product_id = $1 AND v.color_id = $2 AND v.size_id = $3
+                        AND p.variant_stock_enabled = true
+                      LIMIT 1`,
+                    [productId, colorId, sizeId]
+                );
+                if (matched.rows[0]) variantId = matched.rows[0].id;
+            }
+
             if (variantId) {
                 const variantResult = await client.query(
-                    "SELECT v.id, v.product_id, v.variant_name, v.price, v.stock, p.name AS product_name, p.sku, p.vendor_id, p.commission_rate_applied, p.fixed_fee_applied, p.commission_rule_id, COALESCE(v.image_path, p.image) AS image_url, c.name AS color_name, s.name AS size_name FROM product_variants v JOIN products p ON p.id = v.product_id LEFT JOIN product_colors c ON c.id = v.color_id LEFT JOIN product_sizes s ON s.id = v.size_id WHERE v.id = $1 AND v.product_id = $2",
+                    "SELECT v.id, v.product_id, v.variant_name, v.price, v.vendor_payout, v.stock, p.price AS product_price, p.name AS product_name, p.sku, p.vendor_id, p.commission_rate_applied, p.fixed_fee_applied, p.commission_rule_id, COALESCE(v.image_path, p.image) AS image_url, c.name AS color_name, s.name AS size_name FROM product_variants v JOIN products p ON p.id = v.product_id LEFT JOIN product_colors c ON c.id = v.color_id LEFT JOIN product_sizes s ON s.id = v.size_id WHERE v.id = $1 AND v.product_id = $2",
                     [variantId, productId]
                 );
 
@@ -82,7 +130,11 @@ exports.checkout = async (req, res) => {
                     });
                 }
 
-                const itemPrice = Number(variant.price);
+                // A variant with its own price sells at it; one that just
+                // follows the product's price also gets the product's sale.
+                const ownPrice = Number(variant.price) > 0 &&
+                    (variant.vendor_payout != null || Number(variant.price) !== Number(variant.product_price));
+                const itemPrice = ownPrice ? Number(variant.price) : await productSalePrice(client, productId, variant.product_price);
                 total += itemPrice * quantity;
 
                 validatedItems.push({
@@ -138,53 +190,7 @@ exports.checkout = async (req, res) => {
                     sizeName = sr.rows.length ? sr.rows[0].name : null;
                 }
 
-                // A currently-running flash sale on this product wins over the
-                // regular price - flash_sale_items only pins to a plain
-                // product (no variant), which is why this check lives here
-                // rather than in the variant branch above.
-                const flashPrice = await client.query(
-                    `SELECT fsi.sale_price FROM flash_sale_items fsi
-                     JOIN flash_sales fs ON fs.id = fsi.flash_sale_id
-                     WHERE fsi.product_id = $1
-                       AND fs.is_active = true
-                       AND fs.ends_at >= now()
-                       AND (fs.starts_at IS NULL OR fs.starts_at <= now())
-                     LIMIT 1`,
-                    [productId]
-                );
-                // An approved vendor promotion (Task #64) also wins over the
-                // regular price, independent of whether admin featured it on
-                // the homepage (homepage_featured only gates the flash_sales
-                // materialization above, which a featured promotion also
-                // creates - checked separately here so a non-featured
-                // approved promotion is still honored at checkout).
-                const vendorPromoPrice = await client.query(
-                    `SELECT proposed_sale_price FROM vendor_promotions
-                     WHERE product_id = $1 AND status = 'approved'
-                       AND starts_at <= now() AND ends_at >= now()
-                     LIMIT 1`,
-                    [productId]
-                );
-                // Admin percent discount (Discount Promotions, migration
-                // 132): stores only the percent, so the price charged is
-                // worked out from the product's CURRENT price. Used only when
-                // no flash sale or approved vendor promotion is running.
-                const pctDiscount = (flashPrice.rows.length || vendorPromoPrice.rows.length)
-                    ? { rows: [] }
-                    : await client.query(
-                        `SELECT percent FROM product_discounts
-                         WHERE product_id = $1 AND is_active = true
-                           AND starts_at <= now() AND (ends_at IS NULL OR ends_at > now())
-                         LIMIT 1`,
-                        [productId]
-                    );
-                const itemPrice = flashPrice.rows.length
-                    ? Number(flashPrice.rows[0].sale_price)
-                    : vendorPromoPrice.rows.length
-                        ? Number(vendorPromoPrice.rows[0].proposed_sale_price)
-                        : pctDiscount.rows.length
-                            ? discountedPrice(product.price, pctDiscount.rows[0].percent)
-                            : Number(product.price);
+                const itemPrice = await productSalePrice(client, productId, product.price);
                 total += itemPrice * quantity;
 
                 validatedItems.push({

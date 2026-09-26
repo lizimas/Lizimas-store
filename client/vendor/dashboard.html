@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="../css/admin.css?v=42">
 <link rel="stylesheet" href="../css/vendor-desktop.css?v=8">
 <link rel="stylesheet" href="../css/vendor-mobile.css?v=11">
+<link rel="stylesheet" href="../css/vendor-wide.css?v=1">
 </head>
 <body>
 
@@ -555,6 +556,13 @@
         <div id="vm-profile-body"><div class="vm-loading-state">Loading...</div></div>
     </div>
 
+    <!-- More tools (computers): sections the phone app has no screen for,
+         shown inside the same phone-style frame (vmOpenDeskTab). -->
+    <div class="vm-screen" id="vm-screen-desk">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title" id="vm-desk-title">More</span></div>
+        <div class="vendor-desktop-shell vm-desk-frame"><main id="vm-desk-host" class="admin-main vm-desk-host"></main></div>
+    </div>
+
     <div class="vm-bottom-nav">
         <button class="vm-nav-item" data-vm-nav="home"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 9-7 9 7"/><path d="M5 10v10h14V10"/></svg><span>Home</span></button>
         <button class="vm-nav-item" data-vm-nav="products"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.59a2 2 0 0 0 2.82 0l4.6-4.6a2 2 0 0 0 0-2.58Z"/></svg><span>Manage Products</span></button>
@@ -726,7 +734,7 @@
                             <div class="vd-card">
                                 <h3 class="vd-card-title">
                                     <span>Sales Overview</span>
-                                    <a href="#" onclick="document.querySelector('.tab-btn[data-tab=\'reports\']').click(); return false;">View Reports</a>
+                                    <a href="#" onclick="vdOpenSection('reports'); return false;">View Reports</a>
                                 </h3>
                                 <div class="vd-chart-container">
                                     <canvas id="vd-sales-overview-chart"></canvas>
@@ -736,7 +744,7 @@
                             <div class="vd-card">
                                 <h3 class="vd-card-title">
                                     <span>Recent Orders</span>
-                                    <a href="#" onclick="document.querySelector('.tab-btn[data-tab=\'orders\']').click(); return false;">View All</a>
+                                    <a href="#" onclick="vdOpenSection('orders'); return false;">View All</a>
                                 </h3>
                                 <div id="vd-recent-orders-list">Loading...</div>
                             </div>
@@ -750,10 +758,10 @@
                         </div>
 
                         <div>
-                            <button class="vd-primary-cta" onclick="document.querySelector('.tab-btn[data-tab=\'add-product\']').click();">+ Add New Product</button>
+                            <button class="vd-primary-cta" onclick="vdOpenSection('add-product');">+ Add New Product</button>
 
                             <div class="vd-card">
-                                <button class="vd-quick-row" onclick="document.querySelector('.tab-btn[data-tab=\'products\']').click();">
+                                <button class="vd-quick-row" onclick="vdOpenSection('products');">
                                     <span class="vd-quick-icon" style="background:#EAF2FF; color:#1D4ED8;">&#127978;</span>
                                     <span class="vd-quick-text">
                                         <span class="vd-quick-title">Manage Products</span>
@@ -761,7 +769,7 @@
                                     </span>
                                     <span class="vd-quick-chevron">&#8250;</span>
                                 </button>
-                                <button class="vd-quick-row" onclick="document.querySelector('.tab-btn[data-tab=\'orders\']').click();">
+                                <button class="vd-quick-row" onclick="vdOpenSection('orders');">
                                     <span class="vd-quick-icon" style="background:#EAFBF1; color:#16A34A;">&#128179;</span>
                                     <span class="vd-quick-text">
                                         <span class="vd-quick-title">View Orders</span>
@@ -769,7 +777,7 @@
                                     </span>
                                     <span class="vd-quick-chevron">&#8250;</span>
                                 </button>
-                                <button class="vd-quick-row" onclick="document.querySelector('.tab-btn[data-tab=\'inventory\']').click();">
+                                <button class="vd-quick-row" onclick="vdOpenSection('inventory');">
                                     <span class="vd-quick-icon" style="background:#FFF3E0; color:#B45309;">&#128200;</span>
                                     <span class="vd-quick-text">
                                         <span class="vd-quick-title">Update Inventory</span>
@@ -777,7 +785,7 @@
                                     </span>
                                     <span class="vd-quick-chevron">&#8250;</span>
                                 </button>
-                                <button class="vd-quick-row" onclick="document.querySelector('.tab-btn[data-tab=\'account\']').click();">
+                                <button class="vd-quick-row" onclick="vdOpenSection('account');">
                                     <span class="vd-quick-icon" style="background:#F3EEFF; color:#7C3AED;">&#9881;</span>
                                     <span class="vd-quick-text">
                                         <span class="vd-quick-title">Store Settings</span>
@@ -795,7 +803,7 @@
                             <div class="vd-help-card">
                                 <div style="font-weight:700; color:var(--vd-navy); font-size:13.5px;">Need Help?</div>
                                 <p style="font-size:12.5px; color:var(--vd-subtext); margin:4px 0 0;">Our support team is here for you.</p>
-                                <a href="#" onclick="document.querySelector('.tab-btn[data-tab=\'messages\']').click(); return false;">Contact Support</a>
+                                <a href="#" onclick="vdOpenSection('messages'); return false;">Contact Support</a>
                             </div>
                         </div>
                     </div>
@@ -1886,13 +1894,13 @@
     <script src="../js/description-block-editor.js?v=20"></script>
     <script src="../js/lz-package-size.js?v=3"></script>
     <script src="../js/lz-text-counter.js?v=1"></script>
-    <script src="../js/vendor-dashboard.js?v=29"></script>
+    <script src="../js/vendor-dashboard.js?v=30"></script>
     <script src="../js/vendor-statements.js?v=4"></script>
-<script src="../js/vendor-mobile.js?v=13"></script>
-<script src="../js/vendor-products.js?v=2"></script>
+<script src="../js/vendor-mobile.js?v=14"></script>
+<script src="../js/vendor-products.js?v=3"></script>
 <script src="../js/vendor-consignments.js?v=1"></script>
 <script src="../js/vendor-promo-monitor.js?v=2"></script>
 <script src="../js/vendor-shop-setup.js?v=4"></script>
-<script src="../js/vendor-center.js?v=3"></script>
+<script src="../js/vendor-center.js?v=4"></script>
 </body>
 </html>
