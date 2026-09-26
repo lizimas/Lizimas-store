@@ -96,10 +96,11 @@
         const tier = computePackageSize(m);
         if (hidden && tier) hidden.value = tier;
         if (!note) return tier;
-        if (!checked.ok) { note.textContent = checked.errors[0]; note.className = "lz-pack-note lz-pack-note-error"; }
-        else if (tier) { note.textContent = `Delivery size: ${tier} (${TIER_NOTES[tier]}) - worked out automatically.`; note.className = "lz-pack-note"; }
-        else if (hidden && hidden.dataset.saved) { note.textContent = `Current delivery size: ${hidden.dataset.saved}. Enter the weight to recalculate it.`; note.className = "lz-pack-note"; }
-        else { note.textContent = "Enter the packed weight - the delivery size is worked out automatically."; note.className = "lz-pack-note"; }
+        // Ryan, Sept 2026: the delivery size is worked out quietly in the
+        // background - the person uploading only sees a message when a
+        // number they typed can't be used.
+        if (!checked.ok) { note.textContent = checked.errors[0]; note.className = "lz-pack-note lz-pack-note-error"; note.hidden = false; }
+        else { note.textContent = ""; note.className = "lz-pack-note"; note.hidden = true; }
         return tier;
     }
 

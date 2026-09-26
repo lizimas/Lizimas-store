@@ -57,3 +57,16 @@ test("setSize grows and shrinks from the end; wouldLoseText flags typed cells", 
   const g = T.create(3, 3); T.merge(g, T.anchorAt(g, 0, 0), "down"); T.merge(g, T.anchorAt(g, 0, 0), "down");
   T.setSize(g, 2, 2); valid(g); assert.equal(T.anchorAt(g, 0, 0).rs, 2);
 });
+
+// Clipboard parsing (Sept 2026: a pasted table used to land in one cell).
+const LzT = require("../client/js/lz-table.js");
+test("clipboardToTsv: tabs and line endings", () => {
+    assert.strictEqual(LzT.clipboardToTsv("", "a\tb\r\nc\td\r\n"), "a\tb\nc\td");
+    assert.strictEqual(LzT.clipboardToTsv("", "a\tb\rc\td"), "a\tb\nc\td");
+});
+test("clipboardToTsv: Label: Value and spaced columns", () => {
+    assert.strictEqual(LzT.clipboardToTsv("", "Brand: Samsung\nColour: Black"), "Brand\tSamsung\nColour\tBlack");
+    assert.strictEqual(LzT.clipboardToTsv("", "Brand    Samsung\nRAM   8 GB"), "Brand\tSamsung\nRAM\t8 GB");
+    assert.strictEqual(LzT.clipboardToTsv("", "just one line"), "just one line");
+    assert.strictEqual(LzT.clipboardToTsv("", "line one\nline two"), "line one\nline two");
+});

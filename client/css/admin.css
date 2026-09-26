@@ -2410,6 +2410,8 @@ table.lz-dr-cal td {
 .lzt-table td.lzt-head { background: #f2f2f2; }
 .lzt-table td.lzt-head .lzt-in { font-weight: 700; }
 .lzt-table td.lzt-selected { background: #e2ecfb; }
+.lzt-table-range .lzt-in { -webkit-user-select: none; user-select: none; caret-color: transparent; }
+.lzt-table-range td.lzt-selected { background: #d4e3fa; }
 .lzt-table td.lzt-focus { outline: 2px solid #6a9ad9; outline-offset: -2px; }
 .lzt-in { min-height: 22px; padding: 8px 10px; font-size: 14px; line-height: 1.45; outline: none; white-space: pre-wrap; word-break: break-word; }
 @media (max-width: 600px) {

@@ -277,6 +277,46 @@
         return m;
     }
 
+    // Clipboard -> tab-separated text that pasteGrid understands (Ryan, Sept
+    // 2026: pasting a copied table used to land in a single cell).
+    //  - HTML with a <table> (web pages, Word, Google Docs/Sheets): one row
+    //    per <tr>, one cell per <td>/<th> (colspan keeps the columns lined up).
+    //  - Plain text: any line ending (\r\n, \r, \n); tabs split cells. With
+    //    no tabs at all, several lines that all look like "Label: Value" or
+    //    "Label   Value" (2+ spaces) are split into two columns.
+    function clipboardToTsv(html, text) {
+        if (html && /<table[\s>]/i.test(html) && typeof DOMParser !== "undefined") {
+            try {
+                const doc = new DOMParser().parseFromString(html, "text/html");
+                const table = doc.querySelector("table");
+                if (table) {
+                    const rows = [...table.querySelectorAll("tr")].map((tr) => {
+                        const out = [];
+                        [...tr.children].filter((c) => /^(TD|TH)$/.test(c.tagName)).forEach((c) => {
+                            out.push(String(c.textContent || "").replace(/\s+/g, " ").trim());
+                            for (let k = 1; k < (parseInt(c.getAttribute("colspan"), 10) || 1); k++) out.push("");
+                        });
+                        return out;
+                    }).filter((r) => r.length);
+                    if (rows.length) return rows.map((r) => r.join("\t")).join("\n");
+                }
+            } catch (e) { /* fall back to plain text */ }
+        }
+        let t = String(text || "").replace(/\r\n?/g, "\n");
+        if (t.endsWith("\n")) t = t.slice(0, -1);
+        if (t.includes("\t")) return t;
+        const lines = t.split("\n").filter((l) => l.trim());
+        if (lines.length > 1) {
+            if (lines.every((l) => /^[^:\t]{1,60}:\s*\S/.test(l.trim()))) {
+                return lines.map((l) => { const i = l.indexOf(":"); return l.slice(0, i).trim() + "\t" + l.slice(i + 1).trim(); }).join("\n");
+            }
+            if (lines.every((l) => /\S\s{2,}\S/.test(l.trim()))) {
+                return lines.map((l) => l.trim().split(/\s{2,}/).join("\t")).join("\n");
+            }
+        }
+        return t;
+    }
+
     // ---- Rendering (storefront + preview) ------------------------------------
 
     function escapeHtml(s) {
@@ -331,6 +371,10 @@
         function inSelection(a) {
             if (!selected) return false;
             if (selected.kind === "all") return true;
+            if (selected.kind === "range") {
+                return a.r <= selected.r1 && a.r + a.rs - 1 >= selected.r0 &&
+                       a.c <= selected.c1 && a.c + a.cs - 1 >= selected.c0;
+            }
             return selected.kind === "row"
                 ? a.r <= selected.index && selected.index < a.r + a.rs
                 : a.c <= selected.index && selected.index < a.c + a.cs;
@@ -338,14 +382,16 @@
         // Top-left position a paste into the current selection starts from.
         function selectionOrigin() {
             if (!selected || selected.kind === "all") return { r: 0, c: 0 };
+            if (selected.kind === "range") return { r: selected.r0, c: selected.c0 };
             return selected.kind === "row" ? { r: selected.index, c: 0 } : { r: 0, c: selected.index };
         }
         // Selected region as tab-separated text (Excel/Sheets paste format).
         function selectionTsv() {
-            const r0 = selected.kind === "row" ? selected.index : 0;
-            const r1 = selected.kind === "row" ? selected.index : m.rows - 1;
-            const c0 = selected.kind === "col" ? selected.index : 0;
-            const c1 = selected.kind === "col" ? selected.index : m.cols - 1;
+            const rg = selected.kind === "range";
+            const r0 = rg ? selected.r0 : selected.kind === "row" ? selected.index : 0;
+            const r1 = rg ? selected.r1 : selected.kind === "row" ? selected.index : m.rows - 1;
+            const c0 = rg ? selected.c0 : selected.kind === "col" ? selected.index : 0;
+            const c1 = rg ? selected.c1 : selected.kind === "col" ? selected.index : m.cols - 1;
             const lines = [];
             for (let r = r0; r <= r1; r++) {
                 const cols = [];
@@ -363,6 +409,69 @@
             draw(false);
             root.focus();
         }
+
+        // Drag across cells (or Shift+click) selects a block of cells, like
+        // a spreadsheet. The block can then be pasted into, copied, cut or
+        // cleared with Delete.
+        function rangeFrom(p, q) {
+            let r0 = Math.min(p.r, q.r), r1 = Math.max(p.r, q.r);
+            let c0 = Math.min(p.c, q.c), c1 = Math.max(p.c, q.c);
+            // grow to cover merged cells that stick out of the block
+            for (let changed = true; changed;) {
+                changed = false;
+                m.cells.forEach((a) => {
+                    const overlaps = a.r <= r1 && a.r + a.rs - 1 >= r0 && a.c <= c1 && a.c + a.cs - 1 >= c0;
+                    if (!overlaps) return;
+                    if (a.r < r0) { r0 = a.r; changed = true; }
+                    if (a.c < c0) { c0 = a.c; changed = true; }
+                    if (a.r + a.rs - 1 > r1) { r1 = a.r + a.rs - 1; changed = true; }
+                    if (a.c + a.cs - 1 > c1) { c1 = a.c + a.cs - 1; changed = true; }
+                });
+            }
+            return { kind: "range", r0, c0, r1, c1 };
+        }
+        function paintSelection() {
+            root.querySelectorAll(".lzt-in").forEach((el) => {
+                const a = anchorAt(m, +el.dataset.r, +el.dataset.c);
+                const td = el.parentElement;
+                td.classList.toggle("lzt-selected", !!(a && inSelection(a)));
+                if (selected) td.classList.remove("lzt-focus");
+            });
+            const tbl = root.querySelector(".lzt-table");
+            if (tbl) tbl.classList.toggle("lzt-table-range", !!(selected && selected.kind === "range"));
+        }
+        function selectRange(p, q) {
+            selected = rangeFrom(p, q);
+            closeMenus();
+            const s = window.getSelection();
+            if (s) s.removeAllRanges();
+            paintSelection();
+        }
+        let dragFrom = null;
+        root.addEventListener("mousedown", (e) => {
+            const el = e.target.closest(".lzt-in");
+            if (!el || e.button !== 0) return;
+            const here = { r: +el.dataset.r, c: +el.dataset.c };
+            if (e.shiftKey) {
+                e.preventDefault();
+                selectRange(focus, here);
+                root.focus({ preventScroll: true });
+                return;
+            }
+            dragFrom = here;
+        });
+        root.addEventListener("mouseover", (e) => {
+            if (!dragFrom || !(e.buttons & 1)) return;
+            const el = e.target.closest(".lzt-in");
+            if (!el) return;
+            const here = { r: +el.dataset.r, c: +el.dataset.c };
+            if (here.r === dragFrom.r && here.c === dragFrom.c && !(selected && selected.kind === "range")) return;
+            selectRange(dragFrom, here);
+        });
+        document.addEventListener("mouseup", () => {
+            if (dragFrom && selected && selected.kind === "range") root.focus({ preventScroll: true });
+            dragFrom = null;
+        });
 
         function draw(refocus) {
             const occ = occupancy(m);
@@ -390,7 +499,7 @@
                     if (!a || a.r !== r || a.c !== c) continue;
                     const head = (m.header_row && a.r === 0) || (m.header_col && a.c === 0);
                     const sel = inSelection(a);
-                    const cls = ["lzt-cell", head ? "lzt-head" : "", sel ? "lzt-selected" : "", a === a0 ? "lzt-focus" : ""].filter(Boolean).join(" ");
+                    const cls = ["lzt-cell", head ? "lzt-head" : "", sel ? "lzt-selected" : "", a === a0 && !selected && refocus ? "lzt-focus" : ""].filter(Boolean).join(" ");
                     html += `<td class="${cls}"${a.rs > 1 ? ` rowspan="${a.rs}"` : ""}${a.cs > 1 ? ` colspan="${a.cs}"` : ""}><div class="lzt-in" contenteditable="true" data-r="${a.r}" data-c="${a.c}" spellcheck="true">${escapeHtml(a.text).replace(/\n/g, "<br>")}</div></td>`;
                 }
                 html += "</tr>";
@@ -504,11 +613,21 @@
                 root.querySelectorAll(".lzt-selected").forEach((x) => x.classList.remove("lzt-selected"));
                 root.querySelectorAll(".lzt-table-all, .lzt-grab-on").forEach((x) => x.classList.remove("lzt-table-all", "lzt-grab-on"));
             }
-            if (r !== focus.r || c !== focus.c) {
-                focus = { r, c };
-                root.querySelectorAll(".lzt-focus").forEach((x) => x.classList.remove("lzt-focus"));
-                el.parentElement.classList.add("lzt-focus");
-            }
+            focus = { r, c };
+            root.querySelectorAll(".lzt-focus").forEach((x) => x.classList.remove("lzt-focus"));
+            el.parentElement.classList.add("lzt-focus");
+        });
+        // The blue outline marks the cell being typed in only while the caret
+        // is in it - it used to stay on the first cell and look like a bold,
+        // selected box.
+        root.addEventListener("focusout", (e) => {
+            if (!e.target.closest(".lzt-in")) return;
+            setTimeout(() => {
+                const act = document.activeElement;
+                if (!act || !act.closest || !act.closest(".lzt-in") || !root.contains(act)) {
+                    root.querySelectorAll(".lzt-focus").forEach((x) => x.classList.remove("lzt-focus"));
+                }
+            }, 0);
         });
         root.addEventListener("input", (e) => {
             const el = e.target.closest(".lzt-in");
@@ -541,15 +660,23 @@
         root.addEventListener("copy", (e) => onCopy(e, false));
         root.addEventListener("cut", (e) => onCopy(e, true));
         root.addEventListener("paste", (e) => {
-            const text = (e.clipboardData || window.clipboardData).getData("text");
+            const cd = e.clipboardData || window.clipboardData;
+            const text = clipboardToTsv(cd.getData("text/html"), cd.getData("text/plain") || cd.getData("text"));
+            const isGrid = /\t/.test(text) || /\n/.test(text);
             if (selected) {
-                // Paste over a selected table/row/column: clear it, then fill
-                // from its first cell (growing the table if the paste is bigger).
+                // Paste over a selected block/row/column/table: a copied table
+                // fills it cell by cell from its first cell (growing the table
+                // if the paste is bigger); a single value goes into every
+                // selected cell, like a spreadsheet.
                 e.preventDefault();
                 const o = selectionOrigin();
                 apply(() => {
-                    m.cells.forEach((a) => { if (inSelection(a)) a.text = ""; });
-                    pasteGrid(m, o.r, o.c, text);
+                    if (isGrid) {
+                        m.cells.forEach((a) => { if (inSelection(a)) a.text = ""; });
+                        pasteGrid(m, o.r, o.c, text);
+                    } else {
+                        m.cells.forEach((a) => { if (inSelection(a)) a.text = text.trim().slice(0, MAX_TEXT); });
+                    }
                     focus = o;
                 });
                 return;
@@ -557,7 +684,7 @@
             const el = e.target.closest(".lzt-in");
             if (!el) return;
             e.preventDefault();
-            if (/\t/.test(text) || /\n./.test(text.trim())) {
+            if (isGrid) {
                 apply(() => pasteGrid(m, +el.dataset.r, +el.dataset.c, text));
             } else {
                 document.execCommand("insertText", false, text);
@@ -622,7 +749,7 @@
     return {
         MAX_ROWS, MAX_COLS, MAX_TEXT,
         create, clone, normalize, occupancy, anchorAt, plainText, hasContent,
-        insertRow, deleteRow, insertCol, deleteCol, setSize, wouldLoseText, canMerge, merge, splitVertical, splitHorizontal, pasteGrid,
+        insertRow, deleteRow, insertCol, deleteCol, setSize, wouldLoseText, canMerge, merge, splitVertical, splitHorizontal, pasteGrid, clipboardToTsv,
         toHtml, escapeHtml, edit
     };
 });
