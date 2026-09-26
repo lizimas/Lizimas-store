@@ -2157,16 +2157,28 @@ async function submitVendorProductForm() {
         return;
     }
 
-    submitBtn.disabled = true;
-    submitBtn.style.opacity = "0.6";
-
-    // Delivery size is worked out from the packed weight/dimensions (lz-package-size.js).
+    // Checked BEFORE the button is locked, so a problem never leaves the
+    // form stuck on "Saving...". Delivery size is worked out from the
+    // packed weight/dimensions (lz-package-size.js); description blocks
+    // that are half filled in are outlined in red and nothing is saved
+    // (completely empty ones are dropped).
     const packError = window.LzPackage ? LzPackage.validate("product", !(document.getElementById("product-id") || {}).value) : null;
     if (packError) {
         const packStatus = document.getElementById("product-form-status");
         if (packStatus) packStatus.textContent = packError; else alert(packError);
         return;
     }
+    if (window.LzBlockEditor && LzBlockEditor.validate) {
+        const blockCheck = LzBlockEditor.validate();
+        if (!blockCheck.ok) {
+            statusEl.textContent = "Fix the rich content block outlined in red: " + blockCheck.message;
+            return;
+        }
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.style.opacity = "0.6";
+
     const formData = new FormData();
     formData.append("name", name);
     formData.append("sku", sku);
@@ -2229,6 +2241,9 @@ async function submitVendorProductForm() {
             const blockRes = await LzBlockEditor.save(savedProductId);
             if (!blockRes.ok) {
                 statusEl.textContent = "Product saved, but rich content failed: " + blockRes.message;
+                // Stay on this product: re-saving updates it instead of
+                // creating a duplicate.
+                document.getElementById("product-id").value = savedProductId;
                 loadVendorProducts();
                 return;
             }

@@ -445,6 +445,25 @@ async function submitProductForm() {
         return;
     }
 
+    // Checked BEFORE the button is locked, so a problem never leaves the
+    // form stuck on "Saving...". Delivery size is worked out from the
+    // packed weight/dimensions (lz-package-size.js); description blocks
+    // that are half filled in are outlined in red and nothing is saved
+    // (completely empty ones are dropped).
+    const packError = window.LzPackage ? LzPackage.validate("product", !(document.getElementById("product-id") || {}).value) : null;
+    if (packError) {
+        const packStatus = document.getElementById("product-form-status");
+        if (packStatus) packStatus.textContent = packError; else alert(packError);
+        return;
+    }
+    if (window.LzBlockEditor && LzBlockEditor.validate) {
+        const blockCheck = LzBlockEditor.validate();
+        if (!blockCheck.ok) {
+            statusEl.textContent = "Fix the description block outlined in red: " + blockCheck.message;
+            return;
+        }
+    }
+
     if (!confirm("Submit this product for approval?")) {
         return;
     }
@@ -452,13 +471,6 @@ async function submitProductForm() {
     submitBtn.disabled = true;
     submitBtn.style.opacity = "0.6";
 
-    // Delivery size is worked out from the packed weight/dimensions (lz-package-size.js).
-    const packError = window.LzPackage ? LzPackage.validate("product", !(document.getElementById("product-id") || {}).value) : null;
-    if (packError) {
-        const packStatus = document.getElementById("product-form-status");
-        if (packStatus) packStatus.textContent = packError; else alert(packError);
-        return;
-    }
     const formData = new FormData();
     formData.append("name", name);
     formData.append("category_id", category_id);
@@ -495,11 +507,16 @@ async function submitProductForm() {
 
         const savedProductId = data.product ? data.product.id : id;
 
+        // The result used to be ignored, so a failed block save vanished
+        // without a word. Now it's shown (the product itself is saved).
+        let blockSaveWarning = "";
         if (savedProductId && window.LzBlockEditor) {
             try {
-                await LzBlockEditor.save(savedProductId);
+                const blockRes = await LzBlockEditor.save(savedProductId);
+                if (!blockRes.ok) blockSaveWarning = "Product saved, but description blocks failed: " + blockRes.message;
             } catch (e) {
                 console.error("Description blocks save failed:", e);
+                blockSaveWarning = "Product saved, but description blocks failed to save - please open it again and re-save.";
             }
         }
         const returnedImages = data.images || [];
@@ -533,6 +550,13 @@ async function submitProductForm() {
             }
         }
 
+        if (blockSaveWarning) {
+            // Keep the form open so the blocks can be fixed and re-saved.
+            statusEl.textContent = blockSaveWarning;
+            document.getElementById("product-id").value = savedProductId;
+            await loadMyProducts();
+            return;
+        }
         showToast(data.message || "Saved successfully.");
         resetProductForm();
         await loadMyProducts();

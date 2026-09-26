@@ -6,6 +6,7 @@
 <title>Lizimas Store — Admin Dashboard</title>
 <link rel="stylesheet" href="css/admin.css?v=41">
     <link rel="stylesheet" href="css/admin-product-discounts.css?v=2">
+    <link rel="stylesheet" href="css/admin-users.css?v=1">
 </head>
 <body>
 
@@ -142,6 +143,7 @@
                             </button>
                             <button class="tab-btn vd-sub-item" data-tab="staff">&#9989; Staff &amp; Approvals</button>
                             <button class="tab-btn vd-sub-item" data-tab="security">&#128737; Security</button>
+                            <button class="tab-btn vd-sub-item" data-tab="admin-users">&#128101; Users &amp; Permissions</button>
                             <button class="tab-btn vd-sub-item" data-tab="account">&#9881; Account</button>
                             <button class="tab-btn vd-sub-item" data-tab="notes">&#128221; Notes</button>
                             <a class="vd-sub-item admin-guide-link" href="admin-system-guide.html" target="_blank" rel="noopener">&#128214; System Guide</a>
@@ -2284,6 +2286,52 @@
                     </div>
                 </section>
 
+                <section id="tab-admin-users" class="tab-content hidden">
+                    <h2 class="admin-page-title">Users &amp; Permissions</h2>
+                    <p class="admin-page-sub">Give team members their own admin login and choose which sections each one can use &mdash;
+                       the same idea as Manage Users in the Vendor Center. They get an emailed setup link (valid 15 minutes),
+                       set their own password and 2FA, then sign in on this page. Only you (the store owner) can see this screen.
+                       Changes apply straight away.</p>
+
+                    <div class="panel aux-card">
+                        <div class="aux-head">
+                            <h3>Manage Users <span id="aux-count" class="aux-muted"></span></h3>
+                            <input type="search" id="aux-search" placeholder="Search name or email" aria-label="Search users">
+                            <button type="button" class="add-btn" id="aux-create-btn">+ Create User</button>
+                        </div>
+                        <div class="aux-table-wrap">
+                            <table class="aux-table">
+                                <thead><tr><th>Name</th><th>Email</th><th>Permissions</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead>
+                                <tbody id="aux-list"><tr><td colspan="6" class="aux-muted">Loading&hellip;</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="panel aux-card" id="aux-editor" hidden>
+                        <h3 id="aux-editor-title">Create User</h3>
+                        <div class="aux-fields" id="aux-new-fields">
+                            <label>Name<input type="text" id="aux-name" maxlength="120" placeholder="Full name"></label>
+                            <label>Email<input type="email" id="aux-email" placeholder="name@example.com"></label>
+                        </div>
+                        <h4 class="aux-sub">Assign Permissions</h4>
+                        <div class="aux-perm-tools">
+                            <button type="button" class="aux-link" id="aux-all">Tick all</button>
+                            <button type="button" class="aux-link" id="aux-none">Clear</button>
+                        </div>
+                        <div id="aux-perms" class="aux-perms"></div>
+                        <p class="aux-muted">Every user can always open their own Account settings and Notes. Managing users stays with you.</p>
+                        <p id="aux-error" class="aux-err" role="alert"></p>
+                        <div class="aux-actions">
+                            <button type="button" class="add-btn" id="aux-save">Send Invite</button>
+                            <button type="button" class="aux-btn" id="aux-cancel">Cancel</button>
+                            <span class="aux-spacer"></span>
+                            <button type="button" class="aux-btn" id="aux-resend" hidden>Resend invite</button>
+                            <button type="button" class="aux-btn" id="aux-toggle" hidden>Disable</button>
+                            <button type="button" class="aux-btn aux-danger" id="aux-delete" hidden>Remove</button>
+                        </div>
+                    </div>
+                </section>
+
                 <section id="tab-account" class="tab-content hidden">
                     <h2 class="admin-page-title">Account Settings</h2>
                     <p class="admin-page-subtitle">Manage your login credentials and security.</p>
@@ -2416,14 +2464,15 @@
 <script src="js/prepare-picked-file.js?v=10"></script>
 <script src="js/lz-table.js?v=5"></script>
 <script src="js/lz-spec-tools.js?v=2"></script>
-<script src="js/description-block-editor.js?v=19"></script>
+<script src="js/description-block-editor.js?v=20"></script>
 <script src="js/category-select.js?v=2"></script>
 <script src="js/category-picker.js?v=1"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
 <script src="js/lz-package-size.js?v=2"></script>
     <script src="js/lz-text-counter.js?v=1"></script>
-    <script src="js/admin.js?v=vc2"></script>
+    <script src="js/admin.js?v=vc4"></script>
 <script src="js/admin-product-discounts.js?v=2"></script>
+<script src="js/admin-users.js?v=1"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

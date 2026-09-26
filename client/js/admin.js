@@ -86,11 +86,54 @@ function clearToken() {
     localStorage.removeItem("adminToken");
 }
 
-function showDashboard() {
+// Admin panel Users & Permissions (migration 133): the owner sees every tab;
+// a team member only sees the tabs their permissions open.
+window.lzAdminAccess = null;
+async function loadAdminAccess() {
+    try {
+        const res = await fetch(`${API_URL}/api/admin/my-access`, { cache: "no-store", headers: { Authorization: `Bearer ${getToken()}` } });
+        if (res.status === 401) return null;
+        if (!res.ok) return { owner: true };
+        return await res.json();
+    } catch (e) {
+        return { owner: true };
+    }
+}
+
+function applyAdminAccess(access) {
+    window.lzAdminAccess = access;
+    document.body.classList.toggle("lz-admin-staff", !!(access && !access.owner));
+    if (!access || access.owner) return true;
+    const allowed = new Set(access.tabs || []);
+    document.querySelectorAll(".tab-btn[data-tab]").forEach((b) => {
+        b.hidden = !allowed.has(b.dataset.tab);
+        b.style.display = b.hidden ? "none" : "";
+    });
+    document.querySelectorAll(".vd-nav-group").forEach((g) => {
+        const any = [...g.querySelectorAll(".tab-btn[data-tab]")].some((b) => !b.hidden);
+        g.style.display = any ? "" : "none";
+    });
+    return allowed.has("overview");
+}
+
+async function showDashboard() {
     document.getElementById("login-screen").classList.add("hidden");
     document.getElementById("dashboard-screen").classList.remove("hidden");
-    loadAllDashboardData();
-    initAnalyticsAndPerformance();
+    const access = await loadAdminAccess();
+    if (!access) { clearToken(); showLogin("Session expired. Please log in again."); return; }
+    const seesDashboard = applyAdminAccess(access);
+    if (seesDashboard) {
+        loadAllDashboardData();
+        initAnalyticsAndPerformance();
+    } else {
+        // Open the first section this team member can use.
+        const first = [...document.querySelectorAll(".tab-btn[data-tab]")].find((b) => !b.hidden);
+        if (first) {
+            const group = first.closest(".vd-nav-group");
+            if (group) group.classList.add("vd-nav-open");
+            first.click();
+        }
+    }
 }
 
 function showLogin(errorMessage) {
@@ -305,7 +348,7 @@ async function submitLogin2FA() {
             return;
         }
 
-        if (data.user.role !== "admin") {
+        if (data.user.role !== "admin" && data.user.role !== "admin_staff") {
             document.getElementById("login-error").textContent = "This account does not have admin access.";
             return;
         }
@@ -336,6 +379,12 @@ async function authorizedFetch(path, options = {}) {
         }
     });
 
+    if (response.status === 403) {
+        // A section this admin team member wasn't given (migration 133) is
+        // not an expired session - say so instead of signing them out.
+        const body = await response.clone().json().catch(() => ({}));
+        if (body && body.code === "no_permission") throw new Error(body.error || "You don't have permission for this section.");
+    }
     if (response.status === 401 || response.status === 403) {
         clearToken();
         showLogin("Session expired. Please log in again.");
@@ -2095,19 +2144,31 @@ async function saveProduct() {
         return;
     }
 
-    if (pdSaveInFlight) return;
-    pdSaveInFlight = true;
-    const saveBtn = document.getElementById("product-save-btn");
-    const saveBtnLabel = saveBtn ? saveBtn.textContent : null;
-    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving..."; }
-
-    // Delivery size is worked out from the packed weight/dimensions (lz-package-size.js).
+    // Checked BEFORE the button is locked, so a problem never leaves the
+    // form stuck on "Saving...". Delivery size is worked out from the
+    // packed weight/dimensions (lz-package-size.js); description blocks
+    // that are half filled in are outlined in red and nothing is saved
+    // (completely empty ones are dropped).
     const packError = window.LzPackage ? LzPackage.validate("product", !(document.getElementById("product-id") || {}).value) : null;
     if (packError) {
         const packStatus = document.getElementById("product-form-status");
         if (packStatus) packStatus.textContent = packError; else alert(packError);
         return;
     }
+    if (window.LzBlockEditor && LzBlockEditor.validate) {
+        const blockCheck = LzBlockEditor.validate();
+        if (!blockCheck.ok) {
+            errorEl.textContent = "Fix the description block outlined in red: " + blockCheck.message;
+            return;
+        }
+    }
+
+    if (pdSaveInFlight) return;
+    pdSaveInFlight = true;
+    const saveBtn = document.getElementById("product-save-btn");
+    const saveBtnLabel = saveBtn ? saveBtn.textContent : null;
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving..."; }
+
     const formData = new FormData();
     formData.append("name", name);
     formData.append("category_id", category_id);
@@ -2180,6 +2241,9 @@ async function saveProduct() {
             const blockRes = await LzBlockEditor.save(savedProductId);
             if (!blockRes.ok) {
                 errorEl.textContent = "Product saved, but description blocks failed: " + blockRes.message;
+                // Stay on this product: re-saving updates it instead of
+                // creating a duplicate.
+                document.getElementById("product-id").value = savedProductId;
                 loadProducts();
                 return;
             }

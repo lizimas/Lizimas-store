@@ -41,7 +41,10 @@ async function submitStaffPasswordReset() {
         statusEl.textContent = result.message || "Password reset successfully.";
 
         setTimeout(() => {
-            window.location.href = "staff-login.html";
+            // Admin team members (invited from Admin > Users & Permissions)
+            // sign in on the admin page, not the staff login.
+            window.location.href = new URLSearchParams(window.location.search).get("portal") === "admin"
+                ? "admin.html" : "staff-login.html";
         }, 2000);
 
     } catch (error) {

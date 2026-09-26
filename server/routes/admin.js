@@ -181,6 +181,16 @@ const {
     deleteFlashSale
 } = require("../controllers/flashSaleController");
 const {
+    getMyAccess,
+    listAdminUsers,
+    createAdminUser,
+    updateAdminUser,
+    setAdminUserEnabled,
+    resendAdminUserInvite,
+    deleteAdminUser
+} = require("../controllers/adminUsersController");
+const { requireOwnerAdmin } = require("../middleware/authMiddleware");
+const {
     listProductDiscounts,
     searchDiscountProducts,
     saveProductDiscounts,
@@ -215,6 +225,16 @@ router.patch("/vendor-messages/:id/unescalate", requireAuth, requireSupportOrAdm
 router.get("/jumia/oauth/callback", jumiaAdmin.adminJumiaOAuthCallback);
 
 router.use(requireAuth, requireAdmin);
+
+// Admin panel Users & Permissions (migration 133). my-access is open to every
+// admin user; managing users is owner-only.
+router.get("/my-access", getMyAccess);
+router.get("/admin-users", requireOwnerAdmin, listAdminUsers);
+router.post("/admin-users", requireOwnerAdmin, createAdminUser);
+router.put("/admin-users/:id", requireOwnerAdmin, updateAdminUser);
+router.patch("/admin-users/:id/enabled", requireOwnerAdmin, setAdminUserEnabled);
+router.post("/admin-users/:id/resend-invite", requireOwnerAdmin, resendAdminUserInvite);
+router.delete("/admin-users/:id", requireOwnerAdmin, deleteAdminUser);
 router.use("/support", require("./supportAdmin"));
 
 router.get("/stats", getDashboardStats);

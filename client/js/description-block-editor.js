@@ -429,6 +429,7 @@
         blocks.forEach((b, i) => {
             const row = document.createElement("div");
             row.className = "lzbe-row";
+            row.dataset.blockIndex = String(i);
 
             const head = document.createElement("div");
             head.className = "lzbe-head";
@@ -880,59 +881,154 @@
         render();
     }
 
+    // ---- Validation (Ryan, Sept 2026) -----------------------------------
+    // A product used to save and its description blocks then fail (e.g. a
+    // grid with an empty column), losing that content. Forms now call
+    // validate() BEFORE saving the product:
+    //   - blocks that are completely empty are removed quietly (an optional
+    //     block nobody filled in),
+    //   - a block that is half filled in is a problem: it is outlined in red
+    //     with what to fix, scrolled into view, and nothing is saved.
+    const VIDEO_URL_RE = /^https?:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|vimeo\.com\/|player\.vimeo\.com\/video\/)|\.(mp4|webm|mov)(\?|$)/i;
+    const LINK_URL_RE = /^https?:\/\//i;
+    const txt = (v) => String(v == null ? "" : v).trim();
+
+    function itemHasContent(it) {
+        return !!(it && (txt(it.image_url) || txt(it.video_url) || txt(it.caption) || txt(textOf(it.body || ""))));
+    }
+
+    function blockIsEmpty(b) {
+        switch (b.type) {
+            case "image": return !txt(b.image_url);
+            case "video": return !txt(b.image_url) && !txt(b.body);
+            case "link": return !txt(b.image_url) && !txt(b.body);
+            case "table": {
+                const c = global.LzTable.normalize(b.payload);
+                return !c.ok || !global.LzTable.hasContent(c.model);
+            }
+            case "grid": {
+                const p = b.payload || {};
+                const items = Array.isArray(p.items) ? p.items : [];
+                return !txt(p.heading) && !items.some(itemHasContent);
+            }
+            default: return !txt(textOf(b.body || ""));
+        }
+    }
+
+    // Returns a list of { index, message } for a block that is partly filled.
+    function blockProblems(b, i) {
+        const n = i + 1;
+        const out = [];
+        if (b.type === "video") {
+            if (!txt(b.image_url)) out.push(`Block ${n} (video): add the video link, or remove the block`);
+            else if (!VIDEO_URL_RE.test(txt(b.image_url))) out.push(`Block ${n} (video): use a YouTube, Vimeo or direct .mp4/.webm/.mov link`);
+        } else if (b.type === "link") {
+            if (!txt(b.image_url)) out.push(`Block ${n} (link): add the web address, or remove the block`);
+            else if (!LINK_URL_RE.test(txt(b.image_url))) out.push(`Block ${n} (link): the address must start with http:// or https://`);
+            if (!txt(b.body)) out.push(`Block ${n} (link): add the link text customers will click`);
+        } else if (b.type === "table") {
+            const c = global.LzTable.normalize(b.payload);
+            if (!c.ok) out.push(`Block ${n} (table): ${c.error}`);
+        } else if (b.type === "grid") {
+            const items = (b.payload && Array.isArray(b.payload.items)) ? b.payload.items : [];
+            if (!items.length || !items.some(itemHasContent)) {
+                out.push(`Block ${n} (grid): the heading is filled in but there are no columns - add a column with an image or text, or remove the block`);
+            } else {
+                items.forEach((it, j) => {
+                    if (!itemHasContent(it)) out.push(`Block ${n} (grid), column ${j + 1} is empty - add an image or text, or remove that column`);
+                    if (it && txt(it.video_url) && !VIDEO_URL_RE.test(txt(it.video_url))) out.push(`Block ${n} (grid), column ${j + 1}: video must be a YouTube, Vimeo or .mp4/.webm/.mov link`);
+                    if (it && txt(it.link_url) && !LINK_URL_RE.test(txt(it.link_url))) out.push(`Block ${n} (grid), column ${j + 1}: link must start with http:// or https://`);
+                });
+            }
+        }
+        if (b.alt_text && String(b.alt_text).length > 255) out.push(`Block ${n}: alt text is over 255 characters`);
+        if ((b.type === "image" || b.type === "video") && b.body && String(b.body).length > 1000) out.push(`Block ${n}: caption is over 1000 characters`);
+        if (b.type === "link" && b.body && String(b.body).length > 200) out.push(`Block ${n}: link text is over 200 characters`);
+        return out.map((message) => ({ index: i, message }));
+    }
+
+    function ensureErrorStyles() {
+        if (document.getElementById("lzbe-error-styles")) return;
+        const st = document.createElement("style");
+        st.id = "lzbe-error-styles";
+        st.textContent = ".lzbe-row.lzbe-row-error{border:2px solid #d92d20!important;background:#fff5f5!important}" +
+            ".lzbe-row-msg{color:#b42318;font-size:13px;font-weight:600;margin:4px 0 8px;line-height:1.4}" +
+            ".lzbe-summary{background:#fdecec;border:1px solid #f5c2c0;color:#912018;border-radius:8px;padding:10px 12px;margin:0 0 10px;font-size:14px}";
+        document.head.appendChild(st);
+    }
+
+    function showProblems(problems) {
+        ensureErrorStyles();
+        const list = document.getElementById("lzbe-list");
+        if (!list) return;
+        const old = list.parentNode && list.parentNode.querySelector(".lzbe-summary");
+        if (old) old.remove();
+        list.querySelectorAll(".lzbe-row-msg").forEach((m) => m.remove());
+        list.querySelectorAll(".lzbe-row-error").forEach((r) => r.classList.remove("lzbe-row-error"));
+        if (!problems.length) return;
+        const byIndex = {};
+        problems.forEach((p) => { (byIndex[p.index] = byIndex[p.index] || []).push(p.message); });
+        let first = null;
+        Object.keys(byIndex).forEach((k) => {
+            const row = list.querySelector(`.lzbe-row[data-block-index="${k}"]`);
+            if (!row) return;
+            row.classList.add("lzbe-row-error");
+            const msg = document.createElement("div");
+            msg.className = "lzbe-row-msg";
+            msg.innerHTML = byIndex[k].map(esc).join("<br>");
+            const head = row.querySelector(".lzbe-head");
+            if (head && head.nextSibling) row.insertBefore(msg, head.nextSibling); else row.appendChild(msg);
+            if (!first) first = row;
+        });
+        const summary = document.createElement("div");
+        summary.className = "lzbe-summary";
+        summary.setAttribute("role", "alert");
+        summary.textContent = problems.length === 1
+            ? "One description block needs fixing before the product can be saved (outlined in red below)."
+            : `${Object.keys(byIndex).length} description blocks need fixing before the product can be saved (outlined in red below).`;
+        list.parentNode.insertBefore(summary, list);
+        if (first) first.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    // Call BEFORE saving the product. Removes completely empty blocks, and
+    // returns { ok, message, problems, removed }.
+    function validate() {
+        let removed = 0;
+        for (let i = blocks.length - 1; i >= 0; i--) {
+            const b = blocks[i];
+            if (b.type === "text") b.body = trimBreaks(sanitizeHtml(b.body || ""));
+            if (b.type === "grid" && b.payload && Array.isArray(b.payload.items)) {
+                b.payload.items.forEach((it) => { if (it && it.body) it.body = trimBreaks(sanitizeHtml(it.body)); });
+            }
+            if (blockIsEmpty(b)) { blocks.splice(i, 1); removed++; }
+        }
+        const problems = [];
+        blocks.forEach((b, i) => problems.push(...blockProblems(b, i)));
+        // Redraw so every row on screen matches the list being checked.
+        if (removed || problems.length) render();
+        showProblems(problems);
+        return {
+            ok: problems.length === 0,
+            removed,
+            problems,
+            message: problems.length ? problems[0].message + (problems.length > 1 ? ` (and ${problems.length - 1} more)` : "") : ""
+        };
+    }
+
     // Validates, then PUTs the whole array. Position comes from array order.
     async function save(productId) {
         const id = productId || (host && host.dataset.productId);
         if (!id) return { ok: false, message: "No product id" };
 
-        for (const [i, b] of blocks.entries()) {
-            if (b.type === "text") b.body = trimBreaks(sanitizeHtml(b.body || ""));
-
-            if (b.type === "video") {
-                if (!String(b.image_url || "").trim()) {
-                    return { ok: false, message: `Block ${i + 1} (video) needs a video URL` };
-                }
-                continue;
-            }
-
-            if (b.type === "link") {
-                if (!String(b.image_url || "").trim()) {
-                    return { ok: false, message: `Block ${i + 1} (link) needs a URL` };
-                }
-                if (!String(b.body || "").trim()) {
-                    return { ok: false, message: `Block ${i + 1} (link) needs label text` };
-                }
-                continue;
-            }
-
+        const v = validate();
+        if (!v.ok) return { ok: false, message: v.message, problems: v.problems };
+        for (const b of blocks) {
             if (b.type === "table") {
                 const checked = global.LzTable.normalize(b.payload);
-                if (!checked.ok) return { ok: false, message: `Block ${i + 1} (table): ${checked.error}` };
-                if (!global.LzTable.hasContent(checked.model)) {
-                    return { ok: false, message: `Block ${i + 1} (table) is empty - type into at least one cell or remove the block` };
-                }
                 b.payload = checked.model;
                 b.body = global.LzTable.plainText(checked.model);
-                continue;
             }
-
-            if (b.type === "grid") {
-                const items = (b.payload && Array.isArray(b.payload.items)) ? b.payload.items : [];
-                if (!items.length) {
-                    return { ok: false, message: `Block ${i + 1} (grid) needs at least one column` };
-                }
-                for (const [j, it] of items.entries()) {
-                    if (it.body) it.body = trimBreaks(sanitizeHtml(it.body));
-                    if (!it.image_url && !String(it.caption || "").trim() && !textOf(it.body || "").trim()) {
-                        return { ok: false, message: `Block ${i + 1} (grid), column ${j + 1} is empty` };
-                    }
-                }
-                continue;
-            }
-
-            if (b.type !== "image" && !textOf(b.body).trim()) {
-                return { ok: false, message: `Block ${i + 1} (${b.type}) is empty` };
-            }
+            if (b.type === "video" || b.type === "link") b.image_url = txt(b.image_url);
         }
 
         const res = await fetch(`${apiBase}/${id}/description-blocks`, {
@@ -951,5 +1047,5 @@
         return { ok: true };
     }
 
-    global.LzBlockEditor = { mount, save, get blocks() { return blocks; } };
+    global.LzBlockEditor = { mount, save, validate, get blocks() { return blocks; } };
 })(window);

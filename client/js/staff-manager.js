@@ -84,6 +84,10 @@ async function init() {
     await loadCategories();
     await loadSizeCatalog();
     await loadColorCatalog();
+    // Rich content editor (same one Product Staff and admin use).
+    if (window.LzBlockEditor && document.getElementById("desc-blocks-editor")) {
+        LzBlockEditor.mount(document.getElementById("desc-blocks-editor"), null, { tokenKey: "staffToken" });
+    }
     await loadMyProducts();
 }
 
@@ -412,10 +416,16 @@ function loadProductIntoForm(product) {
     document.getElementById("product-image-preview").innerHTML = "";
     document.getElementById("product-form-title").textContent = `Edit Product: ${product.name}`;
     document.getElementById("product-submit-btn").textContent = "Update Product";
+    if (window.LzBlockEditor && document.getElementById("desc-blocks-editor")) {
+        LzBlockEditor.mount(document.getElementById("desc-blocks-editor"), product.id, { tokenKey: "staffToken" });
+    }
     window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function resetProductForm() {
+    if (window.LzBlockEditor && document.getElementById("desc-blocks-editor")) {
+        LzBlockEditor.mount(document.getElementById("desc-blocks-editor"), null, { tokenKey: "staffToken" });
+    }
     document.getElementById("product-id").value = "";
     document.getElementById("product-name").value = "";
     document.getElementById("product-description").value = "";
@@ -464,6 +474,22 @@ async function submitProductForm() {
         return;
     }
 
+    // Checked before the button is locked, so a problem never leaves it
+    // stuck. Delivery size comes from the packed weight/dimensions; a half
+    // filled description block is outlined in red (empty ones are dropped).
+    const packError = window.LzPackage ? LzPackage.validate("product", !(document.getElementById("product-id") || {}).value) : null;
+    if (packError) {
+        statusEl.textContent = packError;
+        return;
+    }
+    if (window.LzBlockEditor && LzBlockEditor.validate) {
+        const blockCheck = LzBlockEditor.validate();
+        if (!blockCheck.ok) {
+            statusEl.textContent = "Fix the description block outlined in red: " + blockCheck.message;
+            return;
+        }
+    }
+
     const confirmMessage = id
         ? "Publish these changes now? They will go live immediately."
         : "Publish this product now? It will go live immediately.";
@@ -475,13 +501,6 @@ async function submitProductForm() {
     submitBtn.disabled = true;
     submitBtn.style.opacity = "0.6";
 
-    // Delivery size is worked out from the packed weight/dimensions (lz-package-size.js).
-    const packError = window.LzPackage ? LzPackage.validate("product", !(document.getElementById("product-id") || {}).value) : null;
-    if (packError) {
-        const packStatus = document.getElementById("product-form-status");
-        if (packStatus) packStatus.textContent = packError; else alert(packError);
-        return;
-    }
     const formData = new FormData();
     formData.append("name", name);
     formData.append("category_id", category_id);
@@ -517,6 +536,16 @@ async function submitProductForm() {
         }
 
         const savedProductId = data.product ? data.product.id : id;
+        let blockSaveWarning = "";
+        if (savedProductId && window.LzBlockEditor) {
+            try {
+                const blockRes = await LzBlockEditor.save(savedProductId);
+                if (!blockRes.ok) blockSaveWarning = "Product saved, but rich content failed: " + blockRes.message;
+            } catch (e) {
+                console.error("Description blocks save failed:", e);
+                blockSaveWarning = "Product saved, but rich content failed to save - open it again and re-save.";
+            }
+        }
         const returnedImages = data.images || [];
 
         const colorsPayload = Object.keys(pdSelectedColors)
@@ -543,6 +572,12 @@ async function submitProductForm() {
             }
         }
 
+        if (blockSaveWarning) {
+            statusEl.textContent = blockSaveWarning;
+            document.getElementById("product-id").value = savedProductId;
+            await loadMyProducts();
+            return;
+        }
         showToast(data.message || "Saved successfully.");
         resetProductForm();
         await loadMyProducts();

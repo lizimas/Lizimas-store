@@ -723,7 +723,7 @@ async function completeLogin(user, req, res, opts) {
             { expiresIn: TOKEN_EXPIRY }
         );
 
-        if (user.role === "admin") {
+        if (user.role === "admin" || user.role === "admin_staff") {
             sendAdminLoginAlert({
                 name: user.name,
                 email: user.email,
@@ -830,7 +830,7 @@ async function adminLogin(req, res) {
         }
 
         const result = await pool.query(
-            "SELECT id, name, email, password, role, two_factor_enabled, is_active, blocked_at, failed_admin_attempts, must_reset_password, security_locked_at, device_grace_until FROM users WHERE email = $1",
+            "SELECT id, name, email, password, role, two_factor_enabled, is_active, blocked_at, failed_admin_attempts, must_reset_password, security_locked_at, device_grace_until, deleted_at FROM users WHERE email = $1",
             [email]
         );
 
@@ -857,6 +857,15 @@ async function adminLogin(req, res) {
             return res.status(401).json({ error: "Invalid email or password." });
         }
 
+        if (user.deleted_at) {
+            await logLoginAttempt(user.id, req, false, {
+                surface: "admin",
+                failureReason: "deleted_account",
+                attemptedEmail: email
+            });
+            return res.status(401).json({ error: "Invalid email or password." });
+        }
+
         if (user.security_locked_at) {
             await logLoginAttempt(user.id, req, false, {
                 surface: "admin",
@@ -875,7 +884,18 @@ async function adminLogin(req, res) {
             return res.status(403).json({ error: "This account has been blocked due to repeated unauthorized admin access attempts." });
         }
 
-        if (user.role !== "admin") {
+        // Admin team members (migration 133) sign in here too; a disabled
+        // one is refused like a wrong password.
+        if (user.role === "admin_staff" && user.is_active === false) {
+            await logLoginAttempt(user.id, req, false, {
+                surface: "admin",
+                failureReason: "inactive",
+                attemptedEmail: email
+            });
+            return res.status(403).json({ error: "This account has been disabled. Please contact the store owner." });
+        }
+
+        if (user.role !== "admin" && user.role !== "admin_staff") {
             const newAttempts = (user.failed_admin_attempts || 0) + 1;
 
             if (newAttempts >= 3) {
@@ -978,7 +998,7 @@ async function adminLogin(req, res) {
             });
         }
 
-        const enforced2FARoles = ["admin", "store_manager", "product_staff", "customer_support"];
+        const enforced2FARoles = ["admin", "admin_staff", "store_manager", "product_staff", "customer_support"];
         if (enforced2FARoles.includes(user.role)) {
             const setupToken = jwt.sign(
                 { userId: user.id, email: user.email, role: user.role, pendingSetup: true },
@@ -1978,7 +1998,7 @@ async function verifyLogin2FA(req, res) {
             { expiresIn: TOKEN_EXPIRY }
         );
 
-        if (user.role === "admin") {
+        if (user.role === "admin" || user.role === "admin_staff") {
             sendAdminLoginAlert({
                 name: user.name,
                 email: user.email,

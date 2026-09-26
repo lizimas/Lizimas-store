@@ -74,6 +74,8 @@ window.LZ_GUIDE = { sections: [
     <tr><td>Set commission rates</td><td>Categories &rarr; Commission Engine</td></tr>
     <tr><td>Set listing limits per vendor</td><td>Product Tiers</td></tr>
     <tr><td>Homepage banners and tiles</td><td>Promotions (slots 1&ndash;6)</td></tr>
+    <tr><td>Give a team member their own admin login</td><td><a href="#a-admin-users">Users &amp; Permissions</a></td></tr>
+    <tr><td>% off on many products at once</td><td><a href="#a-discount-promotions">Discount Promotions</a></td></tr>
     <tr><td>Discount codes / flash sales</td><td>Discount Codes / Flash Sales</td></tr>
     <tr><td>Campaigns vendors can join</td><td>Vendors &rarr; Lizimas Promotion Campaigns</td></tr>
     <tr><td>Block items from being listed</td><td>Prohibited Items</td></tr>
@@ -175,6 +177,14 @@ window.LZ_GUIDE = { sections: [
     html: `<ul><li><strong>Promotions:</strong> homepage slots 1&ndash;6 (banners, announcement strip, category tiles including video, grids).</li>
     <li><strong>Discount Codes:</strong> percent or fixed amount, minimum order, usage limit, dates.</li>
     <li><strong>Flash Sales:</strong> "Grab Or Gone" with a countdown, optional auto re-run, share link, items at up to 20% off. A flash-sale price shows to vendors as the <em>Subsidy Price</em>.</li></ul>` },
+  { id: "a-discount-promotions", title: "Discount Promotions (% off many products)", keywords: "discount promotions percent off sale price final price bulk products end discount schedule", where: "Admin &rarr; Products &amp; Inventory &rarr; Discount Promotions",
+    html: `<p>Puts a % discount on one or many products, each with its own %. Only the % is saved, so the sale price always follows the product's current price: 30% off UGX 500,000 is UGX 350,000, and if the price becomes UGX 700,000 it is still 30% off (UGX 490,000).</p>
+<ol><li><strong>Find products</strong> - search by name, SKU, brand, seller or category, tick them (or <em>Tick all shown</em>) and press <em>Add to discount</em>.</li>
+<li><strong>Set the discount</strong> - per row, type the <em>% off</em> or type what the <em>customer pays</em>; the other box, the old price and the saving fill in. <em>Same % for all</em> sets every row at once.</li>
+<li><strong>When</strong> - optional name, start and end. Empty start = now, empty end = runs until you end it. Press <em>Save discounts</em>.</li></ol>
+<p>The list below shows Running &amp; scheduled or Ended discounts. <em>Edit</em> loads a row back into the table (at today's exact customer price); <em>End</em> or <em>End selected</em> stops it straight away. Saving a product that already has a discount replaces the old one.</p>
+<div class="g-tip">A running <strong>flash sale</strong> or an approved <strong>vendor promotion</strong> on the same product wins until it ends; the panel labels those rows. Products sold in options with their own prices are charged the option price.</div>
+<p>The discount shows on product cards, the product page (old price struck through, -% badge), the cart, checkout, and the vendor's Manage Products <em>Subsidy</em> column.</p>` },
   { id: "a-prohibited", title: "Prohibited Items", keywords: "prohibited items keywords rules block upload", where: "Admin &rarr; Prohibited Items",
     html: `<p>Keyword or category rules with a reason. Matching products are blocked when they're uploaded (by vendors, staff or import).</p>` },
   { id: "a-orders", title: "Orders", keywords: "orders status pending paid shipped delivered cancelled receipt", where: "Admin &rarr; Orders",
@@ -194,6 +204,22 @@ window.LZ_GUIDE = { sections: [
     html: `<p>Search customers. Watch the live chat queue. Turn staff Team Messages on or off. In Support Team (Support Control Center): live monitor, agents (department, skills, hours), queue rules (round robin, least busy or skill-based; max wait; overflow; offline message), canned responses, SLA targets, performance and audit log.</p>` },
   { id: "a-staff", title: "Staff & Approvals", keywords: "staff create product staff store manager customer support approvals pending products deletion requests trash sessions activity log", where: "Admin &rarr; Staff &amp; Approvals",
     html: `<p>Create staff accounts (Product Staff, Store Manager, Customer Support). Approve pending products, including vendor listings (the review card shows Seller SKU and Lizimas SKU). Handle deletion requests, the trash, staff login sessions and the activity log.</p>` },
+  { id: "a-admin-users", title: "Users & Permissions (admin team logins)", keywords: "admin users team members permissions assign roles invite disable remove access sub admin", where: "Admin &rarr; Admin &amp; Account &rarr; Users &amp; Permissions (owner only)",
+    html: `<p>Gives a team member their own admin login limited to the sections you tick - the admin twin of the Vendor Center's Manage Users.</p>
+<ol><li>Press <em>+ Create User</em>, enter their name and email, tick their permissions and press <em>Send Invite</em>.</li>
+<li>They get an email with a setup link (valid 15 minutes), choose a password, set up 2FA, then sign in on the admin page.</li>
+<li>They only see the menu items their permissions open; everyone can use their own Account settings and Notes.</li></ol>
+<table><tr><th>Permission</th><th>Opens</th></tr>
+<tr><td>Dashboard &amp; Analytics</td><td>Dashboard, Analytics, Performance Reports</td></tr>
+<tr><td>Products &amp; Inventory</td><td>Products, Categories, Product Tiers, Prohibited Items</td></tr>
+<tr><td>Promotions &amp; Discounts</td><td>Promotions, Discount Promotions, Discount Codes, Flash Sales</td></tr>
+<tr><td>Orders &amp; Returns</td><td>Orders, returns and refunds</td></tr>
+<tr><td>Vendors</td><td>Vendors hub, Brand Authorizations, Payment Instruments, Consignments, Ad Campaigns</td></tr>
+<tr><td>Customers &amp; Support</td><td>Customers, Live Support, Team Messages, Support Team</td></tr>
+<tr><td>Staff &amp; Approvals</td><td>Staff accounts, approvals, deletion requests, trash, sessions, activity log</td></tr>
+<tr><td>Security</td><td>Login attempts, account reports, unlocking accounts</td></tr></table>
+<p><em>Assign Permissions</em> changes apply on their very next click. <em>Disable</em> signs them out everywhere at once; <em>Enable</em> lets them back in. <em>Remove</em> ends the login for good (history is kept). <em>Resend invite</em> emails a fresh setup link.</p>
+<div class="g-warn">Only you (the owner) can open this screen. A team member can never manage admin users, and can never block, reset or delete your account or another admin user's, even with Staff &amp; Approvals or Security.</div>` },
   { id: "a-security", title: "Security, Account, Notes", keywords: "security login attempts account issue reports locked accounts unlock account password 2fa devices notes", where: "Admin &rarr; Security / Account / Notes",
     html: `<p><strong>Security:</strong> login attempts by portal, account-issue reports, and locked accounts (unlocking gives 15 minutes to register a device). <strong>Account:</strong> your username, email, password, 2FA and devices. <strong>Notes:</strong> private notes (pin, colour, search).</p>` }
 ]},
@@ -205,6 +231,8 @@ window.LZ_GUIDE = { sections: [
   { id: "product-live", title: "When a product is Live", keywords: "live visible buy qc approved active restricted stock holiday", html: `<p>It must be approved, active, not restricted, not deleted, and have stock above 0, and the vendor's shop must be active and not on holiday.</p>` },
   { id: "sessions", title: "Sessions and \"Keep me logged in\"", keywords: "keep me logged in session restart logout token 7 days", html: `<p>Customer and vendor logins last up to 7 days at most. <em>Keep me logged in</em> ticked: signed in through refreshes and closed tabs, signed out after a device restart (browser quit). Unticked: also signed out once all Lizimas tabs have been closed for about 45 seconds. A web page can't see the device itself restarting; it sees the browser having been quit, which a restart always does.</p>` },
   { id: "abandoned-signup", title: "Abandoned vendor sign-ups", keywords: "abandoned signup registration reminder alert email", html: `<p>If someone starts vendor registration and doesn't finish within 30 minutes, <strong>only admin</strong> gets an alert email (sent to ADMIN_ALERT_EMAIL). The applicant is <strong>not</strong> sent reminders.</p>` },
+  { id: "ended-accounts", title: "Deleted, blocked or disabled accounts", keywords: "deleted staff login blocked disabled signed out session", html: `<p>Deleting or blocking any account (customer, staff or admin team member) signs it out everywhere straight away - not only at its next login. Disabling an admin team member does the same.</p>` },
+  { id: "block-check", title: "Description blocks are checked before saving", keywords: "description blocks rich content empty column grid incomplete save red", html: `<p>On every product form (admin, Store Manager, Product Staff, vendor), description blocks are checked <strong>before</strong> the product is saved. A block that is completely empty is removed quietly. A block that is half filled in (e.g. a grid with an empty column, a link without a web address) is outlined in red with what to fix, and nothing is saved until it is fixed or removed.</p>` },
   { id: "descriptions", title: "Product descriptions", keywords: "description length limit words characters rich content caption", html: `<p>Product descriptions have no length limit (a word and character counter shows under the box). Rich-content captions can be up to 1000 characters, link labels up to 200.</p>` }
 ]},
 { id: "gaps", title: "7. Things without an admin screen (yet)", items: [
