@@ -1,5 +1,5 @@
 -- 129_vendor_transaction_exports.sql
--- Account Statements > Transactions Exports (Ryan, Sept 2026 - Jumia
+-- Account Statements > Transactions Exports (Ryan, Sept 2026 - Channel
 -- parity). One row each time a vendor exports transactions: a single
 -- statement (PDF or CSV) or all statements at once (CSV). Files are still
 -- generated on demand from the statement data, so "Download" on a row just

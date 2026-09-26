@@ -8,7 +8,7 @@
 //      copy-from-a-web-page shape where each label and value land on their
 //      own line (Os / iOS / Nfc / NFC with reader mode ...), which it pairs
 //      up alternately.
-//   2. Insert Table - the Jumia-style table (client/js/lz-table.js): pick a
+//   2. Insert Table - the table (client/js/lz-table.js): pick a
 //      size, type or paste into it, use the Column / Row / Merge tools, then
 //      Add to Specifications. First column = label, remaining columns =
 //      value; the header row (when switched on) is treated as column titles

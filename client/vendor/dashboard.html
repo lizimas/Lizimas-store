@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="/js/lz-session.js?v=1"></script>
 <script src="../js/lz-remember.js?v=2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
@@ -191,9 +192,9 @@
                 <span class="vm-list-row-label">Users</span>
                 <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
             </button>
-            <button class="vm-list-row" onclick="vmShowScreen('jumia')">
+            <button class="vm-list-row" onclick="vmShowScreen('channel')">
                 <span class="vm-list-row-label">Applications</span>
-                <span id="vm-jumia-status-sub" style="font-size:12px; color:#888; margin-right:6px;">Not connected</span>
+                <span id="vm-channel-status-sub" style="font-size:12px; color:#888; margin-right:6px;">Not connected</span>
                 <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
             </button>
             <button class="vm-list-row" onclick="vmShowScreen('pickers')">
@@ -219,7 +220,7 @@
         </div>
     </div>
 
-    <!-- Users (Settings > Users, matching Jumia Vendor Center) --------------- -->
+    <!-- Users (Settings > Users) --------------- -->
     <div class="vm-screen" id="vm-screen-users">
         <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Users</span></div>
         <div class="vc-page">
@@ -321,103 +322,103 @@
         </div>
     </div>
 
-    <!-- Applications: Jumia product linking ------------------------------- -->
-    <div class="vm-screen" id="vm-screen-jumia">
+    <!-- Applications: Channel product linking ------------------------------- -->
+    <div class="vm-screen" id="vm-screen-channel">
         <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Applications</span></div>
         <div class="vc-page">
             <h2 class="vc-page-title vc-page-title-grey">Manage Applications</h2>
-            <div id="vm-jumia-applications-list"><div class="vm-loading-state">Loading...</div></div>
-            <div class="vc-center" id="vm-jumia-create-actions"><button type="button" class="vc-btn vc-btn-gold vc-btn-caps vc-btn-big" onclick="vcOpenCreateAppSheet('vm')">Create Application <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+            <div id="vm-channel-applications-list"><div class="vm-loading-state">Loading...</div></div>
+            <div class="vc-center" id="vm-channel-create-actions"><button type="button" class="vc-btn vc-btn-gold vc-btn-caps vc-btn-big" onclick="vcOpenCreateAppSheet('vm')">Create Application <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
         </div>
-        <div class="vm-card" id="vm-jumia-sync-card" hidden>
+        <div class="vm-card" id="vm-channel-sync-card" hidden>
             <div class="vm-card-title" style="margin-bottom:12px;">Product Sync</div>
             <div class="vm-btn-row" style="margin:0 0 14px;">
-                <button class="vm-btn-primary" onclick="vmShowScreen('jumia-export')">Export to Jumia</button>
-                <button class="vm-btn-primary" style="background:#fff; border:1.5px solid var(--vm-navy); color:var(--vm-navy);" onclick="vmShowScreen('jumia-import')">Import from Jumia</button>
+                <button class="vm-btn-primary" onclick="vmShowScreen('channel-export')">Export to Sales Channel</button>
+                <button class="vm-btn-primary" style="background:#fff; border:1.5px solid var(--vm-navy); color:var(--vm-navy);" onclick="vmShowScreen('channel-import')">Import from Sales Channel</button>
             </div>
-            <div id="vm-jumia-links-list"></div>
+            <div id="vm-channel-links-list"></div>
         </div>
     </div>
 
-    <!-- Create/connect a Jumia Application ------------------------------------ -->
-    <div class="vm-screen" id="vm-screen-jumia-create">
-        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back onclick="vmResetJumiaCreateForm()"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Create Application</span></div>
-        <div class="vm-card" id="vm-jumia-create-step1">
+    <!-- Create/connect a Channel Application ------------------------------------ -->
+    <div class="vm-screen" id="vm-screen-channel-create">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back onclick="vmResetChannelCreateForm()"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Create Application</span></div>
+        <div class="vm-card" id="vm-channel-create-step1">
             <div class="vm-field">
                 <label class="vm-field-label">Application Name</label>
-                <input type="text" id="vm-jumia-new-app-name" class="vm-field-input" placeholder="e.g. Lizimas Sync">
+                <input type="text" id="vm-channel-new-app-name" class="vm-field-input" placeholder="e.g. Lizimas Sync">
             </div>
             <div class="vm-field">
                 <label class="vm-field-label">Application Type</label>
                 <label style="display:flex; align-items:flex-start; gap:8px; padding:10px; border:1px solid #ddd; border-radius:8px; margin-bottom:8px;">
-                    <input type="radio" name="vm-jumia-new-app-type" value="self_authorization" checked style="margin-top:3px;">
+                    <input type="radio" name="vm-channel-new-app-type" value="self_authorization" checked style="margin-top:3px;">
                     <span style="font-size:12.5px; color:#333;"><b>Self Authorization</b><br><span style="color:#888;">Paste a Client ID + Refresh Token. Confirmed working.</span></span>
                 </label>
                 <label style="display:flex; align-items:flex-start; gap:8px; padding:10px; border:1px solid #ddd; border-radius:8px;">
-                    <input type="radio" name="vm-jumia-new-app-type" value="web_application" style="margin-top:3px;">
-                    <span style="font-size:12.5px; color:#333;"><b>Web Application (OAuth)</b><br><span style="color:#888;">Sign in via Jumia's browser consent screen. Not yet fully tested.</span></span>
+                    <input type="radio" name="vm-channel-new-app-type" value="web_application" style="margin-top:3px;">
+                    <span style="font-size:12.5px; color:#333;"><b>Web Application (OAuth)</b><br><span style="color:#888;">Sign in via the channel's browser consent screen.</span></span>
                 </label>
             </div>
-            <div class="vm-btn-help" id="vm-jumia-new-app-error" style="color:#DC2626;"></div>
+            <div class="vm-btn-help" id="vm-channel-new-app-error" style="color:#DC2626;"></div>
         </div>
-        <div class="vm-card" id="vm-jumia-create-step2" hidden>
-            <div id="vm-jumia-create-step2-self">
+        <div class="vm-card" id="vm-channel-create-step2" hidden>
+            <div id="vm-channel-create-step2-self">
                 <div class="vm-field">
-                    <label class="vm-field-label">Jumia Client ID</label>
-                    <input type="text" id="vm-jumia-app-client-id" class="vm-field-input" autocomplete="off" spellcheck="false">
+                    <label class="vm-field-label">Sales Channel Client ID</label>
+                    <input type="text" id="vm-channel-app-client-id" class="vm-field-input" autocomplete="off" spellcheck="false">
                 </div>
                 <div class="vm-field">
-                    <label class="vm-field-label">Jumia Refresh Token</label>
-                    <input type="password" id="vm-jumia-app-refresh-token" class="vm-field-input" autocomplete="off" spellcheck="false">
+                    <label class="vm-field-label">Sales Channel Refresh Token</label>
+                    <input type="password" id="vm-channel-app-refresh-token" class="vm-field-input" autocomplete="off" spellcheck="false">
                 </div>
             </div>
-            <div id="vm-jumia-create-step2-web">
+            <div id="vm-channel-create-step2-web">
                 <div class="vm-field">
-                    <label class="vm-field-label">Redirect URI (paste into the Application on Jumia)</label>
-                    <input type="text" id="vm-jumia-app-redirect-uri" class="vm-field-input" readonly style="font-family:monospace; font-size:11.5px;">
+                    <label class="vm-field-label">Redirect URI (paste into the Application on the sales channel)</label>
+                    <input type="text" id="vm-channel-app-redirect-uri" class="vm-field-input" readonly style="font-family:monospace; font-size:11.5px;">
                 </div>
                 <div class="vm-field">
                     <label class="vm-field-label">Client ID</label>
-                    <input type="text" id="vm-jumia-app-web-client-id" class="vm-field-input" autocomplete="off" spellcheck="false">
+                    <input type="text" id="vm-channel-app-web-client-id" class="vm-field-input" autocomplete="off" spellcheck="false">
                 </div>
                 <div class="vm-field">
                     <label class="vm-field-label">Client Secret</label>
-                    <input type="password" id="vm-jumia-app-web-client-secret" class="vm-field-input" autocomplete="off" spellcheck="false">
+                    <input type="password" id="vm-channel-app-web-client-secret" class="vm-field-input" autocomplete="off" spellcheck="false">
                 </div>
                 <div style="font-size:11.5px; color:#B45309; background:#FFFBEB; border:1px solid #FDE68A; border-radius:6px; padding:8px;">Not yet tested end to end - Self Authorization is the confirmed flow.</div>
             </div>
-            <div class="vm-btn-help" id="vm-jumia-app-setup-error" style="color:#DC2626;"></div>
+            <div class="vm-btn-help" id="vm-channel-app-setup-error" style="color:#DC2626;"></div>
         </div>
         <div class="vm-btn-row">
-            <button class="vm-btn-primary" id="vm-jumia-create-continue-btn" onclick="vmCreateJumiaApplication()">Continue</button>
+            <button class="vm-btn-primary" id="vm-channel-create-continue-btn" onclick="vmCreateChannelApplication()">Continue</button>
         </div>
     </div>
 
-    <!-- Export to Jumia ------------------------------------------------------- -->
-    <div class="vm-screen" id="vm-screen-jumia-export">
-        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Export to Jumia</span></div>
+    <!-- Export to Sales Channel ------------------------------------------------------- -->
+    <div class="vm-screen" id="vm-screen-channel-export">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Export to Sales Channel</span></div>
         <div class="vm-card">
-            <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:10px;">Select the products to push to Jumia.</div>
-            <div id="vm-jumia-export-list"><div class="vm-loading-state">Loading...</div></div>
+            <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:10px;">Select the products to push to the sales channel.</div>
+            <div id="vm-channel-export-list"><div class="vm-loading-state">Loading...</div></div>
         </div>
-        <div class="vm-btn-row" id="vm-jumia-export-actions" hidden>
-            <button class="vm-btn-primary" onclick="vmExportSelectedToJumia()">Push Selected</button>
-            <div class="vm-btn-help" id="vm-jumia-export-help"></div>
+        <div class="vm-btn-row" id="vm-channel-export-actions" hidden>
+            <button class="vm-btn-primary" onclick="vmExportSelectedToChannel()">Push Selected</button>
+            <div class="vm-btn-help" id="vm-channel-export-help"></div>
         </div>
     </div>
 
-    <!-- Import products from Jumia ----------------------------------------- -->
-    <div class="vm-screen" id="vm-screen-jumia-import">
-        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Import from Jumia</span></div>
+    <!-- Import products from Channel ----------------------------------------- -->
+    <div class="vm-screen" id="vm-screen-channel-import">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Import from Sales Channel</span></div>
         <div class="vm-card">
             <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:10px;">
-                Select the Jumia products you want to bring into Lizimas. Imported products come in as pending, the same as any new listing, until approved.
+                Select the Channel products you want to bring into Lizimas. Imported products come in as pending, the same as any new listing, until approved.
             </div>
-            <div id="vm-jumia-import-list"><div class="vm-loading-state">Loading...</div></div>
+            <div id="vm-channel-import-list"><div class="vm-loading-state">Loading...</div></div>
         </div>
-        <div class="vm-btn-row" id="vm-jumia-import-actions" hidden>
-            <button class="vm-btn-primary" onclick="vmImportSelectedJumiaProducts()">Import Selected</button>
-            <div class="vm-btn-help" id="vm-jumia-import-help"></div>
+        <div class="vm-btn-row" id="vm-channel-import-actions" hidden>
+            <button class="vm-btn-primary" onclick="vmImportSelectedChannelProducts()">Import Selected</button>
+            <div class="vm-btn-help" id="vm-channel-import-help"></div>
         </div>
     </div>
 
@@ -926,7 +927,7 @@
 
                     <div id="vd-product-import-panel" hidden class="panel" style="margin-bottom:16px;">
                         <h3 style="margin:0 0 4px;">Import Products</h3>
-                        <p style="font-size:12.5px; color:#888; margin:0 0 10px; max-width:640px;">Upload a .csv, .xlsx, or .xls file to add or update several products at once - the bulk-upload equivalent of Jumia's "Add multiple products". Columns: <code>name</code>, <code>desired_payout</code> (what you want to earn per unit - required), <code>stock</code>, <code>description</code>, <code>category</code> (must match an existing category name), <code>sku</code>, <code>package_size</code>, <code>brand</code>, <code>gtin</code>, <code>mpn</code>, <code>material</code>, <code>color</code>, <code>sleeve</code>, <code>style</code>, <code>length</code>, <code>fit</code>, <code>pattern</code>, <code>care_instructions</code>, <code>occasion</code>, <code>warranty_months</code>, <code>image</code> (an already-hosted image URL). Give a row an <code>id</code> or a <code>sku</code> that matches one of your existing products to update it - everything else creates a new listing. Every new or changed row goes in as pending, same as adding or editing one product by hand.</p>
+                        <p style="font-size:12.5px; color:#888; margin:0 0 10px; max-width:640px;">Upload a .csv, .xlsx, or .xls file to add or update several products at once. Columns: <code>name</code>, <code>desired_payout</code> (what you want to earn per unit - required), <code>stock</code>, <code>description</code>, <code>category</code> (must match an existing category name), <code>sku</code>, <code>package_size</code>, <code>brand</code>, <code>gtin</code>, <code>mpn</code>, <code>material</code>, <code>color</code>, <code>sleeve</code>, <code>style</code>, <code>length</code>, <code>fit</code>, <code>pattern</code>, <code>care_instructions</code>, <code>occasion</code>, <code>warranty_months</code>, <code>image</code> (an already-hosted image URL). Give a row an <code>id</code> or a <code>sku</code> that matches one of your existing products to update it - everything else creates a new listing. Every new or changed row goes in as pending, same as adding or editing one product by hand.</p>
                         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                             <input type="file" id="vd-product-import-file" accept=".csv,.xlsx,.xls" style="font-size:13px;">
                             <button type="button" onclick="vdUploadProductsCsv()" id="vd-product-import-btn" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:9px 16px; cursor:pointer; font-weight:600; font-size:13px;">Upload &amp; Import</button>
@@ -1586,9 +1587,9 @@
                         </div>
                     </div>
 
-                    <!-- Shop ID (Jumia Vendor Center comparison, Sept 2026) -
-                         Jumia shows every seller a public Shop ID (e.g.
-                         UG140DI) on their own profile; read-only here,
+                    <!-- Shop ID (Sept 2026) -
+                         every seller has a public Shop ID (e.g. UG102AF)
+                         on their own profile; read-only here,
                          assigned once at approval - see vendorController.js's
                          approveVendor/generateShopId. -->
                     <div class="panel" id="vd-shop-id-panel">
@@ -1629,124 +1630,124 @@
                         </div>
                     </div>
 
-                    <div class="panel" id="vd-jumia-panel">
+                    <div class="panel" id="vd-channel-panel">
                         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:4px;">
                             <div>
                                 <h3 style="margin:0;">Manage Applications</h3>
                             </div>
-                            <button type="button" class="vc-btn vc-btn-gold vc-btn-caps" onclick="vdShowCreateJumiaApplication()">Create Application +</button>
+                            <button type="button" class="vc-btn vc-btn-gold vc-btn-caps" onclick="vdShowCreateChannelApplication()">Create Application +</button>
                         </div>
 
-                        <div id="vd-jumia-applications-table" style="margin-top:14px; overflow-x:auto;"></div>
+                        <div id="vd-channel-applications-table" style="margin-top:14px; overflow-x:auto;"></div>
 
-                        <div id="vd-jumia-create-application-view" hidden style="margin-top:16px; border-top:1px solid #eee; padding-top:16px; max-width:480px; display:none; flex-direction:column; gap:12px;">
+                        <div id="vd-channel-create-application-view" hidden style="margin-top:16px; border-top:1px solid #eee; padding-top:16px; max-width:480px; display:none; flex-direction:column; gap:12px;">
                             <div>
                                 <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Application Name</label>
-                                <input type="text" id="vd-jumia-new-app-name" placeholder="e.g. Lizimas Sync" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                <input type="text" id="vd-channel-new-app-name" placeholder="e.g. Lizimas Sync" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                             </div>
                             <div>
                                 <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:8px;">Application Type</label>
                                 <label style="display:flex; align-items:flex-start; gap:10px; padding:12px; border:1px solid #ddd; border-radius:8px; margin-bottom:8px; cursor:pointer;">
-                                    <input type="radio" name="vd-jumia-new-app-type" value="web_application" style="margin-top:3px;">
+                                    <input type="radio" name="vd-channel-new-app-type" value="web_application" style="margin-top:3px;">
                                     <span>
                                         <span style="display:block; font-weight:600; font-size:13.5px; color:#1a1a2e;">Web Application (OAuth - Authorization Code Flow)</span>
-                                        <span style="display:block; font-size:12px; color:#888; margin-top:2px;">Sign in to Jumia in a browser popup and approve access - no token to copy/paste. Newer, less tested here than Self Authorization.</span>
+                                        <span style="display:block; font-size:12px; color:#888; margin-top:2px;">Sign in to the sales channel in a browser popup and approve access - no token to copy/paste. </span>
                                     </span>
                                 </label>
                                 <label style="display:flex; align-items:flex-start; gap:10px; padding:12px; border:1px solid #ddd; border-radius:8px; cursor:pointer;">
-                                    <input type="radio" name="vd-jumia-new-app-type" value="self_authorization" checked style="margin-top:3px;">
+                                    <input type="radio" name="vd-channel-new-app-type" value="self_authorization" checked style="margin-top:3px;">
                                     <span>
                                         <span style="display:block; font-weight:600; font-size:13.5px; color:#1a1a2e;">Self Authorization (Integration without User interaction)</span>
-                                        <span style="display:block; font-size:12px; color:#888; margin-top:2px;">Paste the Client ID and Refresh Token from a Self Authorization Application on Jumia. The flow already confirmed working with a real Jumia account.</span>
+                                        <span style="display:block; font-size:12px; color:#888; margin-top:2px;">Paste the Client ID and Refresh Token from a Self Authorization Application on the sales channel. This is the recommended way to connect.</span>
                                     </span>
                                 </label>
                             </div>
-                            <p id="vd-jumia-new-app-error" style="font-size:12.5px; color:#DC2626; margin:0;"></p>
+                            <p id="vd-channel-new-app-error" style="font-size:12.5px; color:#DC2626; margin:0;"></p>
                             <div style="display:flex; gap:10px;">
-                                <button type="button" onclick="vdCreateJumiaApplication()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Create</button>
-                                <button type="button" onclick="vdHideCreateJumiaApplication()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                                <button type="button" onclick="vdCreateChannelApplication()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Create</button>
+                                <button type="button" onclick="vdHideCreateChannelApplication()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
                             </div>
                         </div>
 
-                        <div id="vd-jumia-app-setup-view" hidden style="margin-top:16px; border-top:1px solid #eee; padding-top:16px; max-width:480px; display:none; flex-direction:column; gap:10px;">
-                            <div style="font-size:13.5px; font-weight:600; color:var(--vd-navy);" id="vd-jumia-app-setup-title"></div>
+                        <div id="vd-channel-app-setup-view" hidden style="margin-top:16px; border-top:1px solid #eee; padding-top:16px; max-width:480px; display:none; flex-direction:column; gap:10px;">
+                            <div style="font-size:13.5px; font-weight:600; color:var(--vd-navy);" id="vd-channel-app-setup-title"></div>
 
-                            <div id="vd-jumia-app-setup-self" style="display:flex; flex-direction:column; gap:10px;">
+                            <div id="vd-channel-app-setup-self" style="display:flex; flex-direction:column; gap:10px;">
                                 <div>
                                     <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Client ID</label>
-                                    <input type="text" id="vd-jumia-app-client-id" placeholder="Client ID from Jumia Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                    <input type="text" id="vd-channel-app-client-id" placeholder="Client ID from Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                                 </div>
                                 <div>
                                     <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Refresh Token</label>
-                                    <input type="password" id="vd-jumia-app-refresh-token" placeholder="Refresh Token from Jumia Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                    <input type="password" id="vd-channel-app-refresh-token" placeholder="Refresh Token from Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                                 </div>
-                                <p style="font-size:12px; color:#888; margin:0;">Find these under Manage Applications in your Jumia Vendor Center, on this Self Authorization application.</p>
+                                <p style="font-size:12px; color:#888; margin:0;">Find these under Manage Applications in your Vendor Center, on this Self Authorization application.</p>
                                 <div style="display:flex; gap:10px;">
-                                    <button type="button" id="vd-jumia-app-connect-btn" onclick="vdConnectJumiaApp()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Connect</button>
-                                    <button type="button" onclick="vdHideJumiaAppSetup()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                                    <button type="button" id="vd-channel-app-connect-btn" onclick="vdConnectChannelApp()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Connect</button>
+                                    <button type="button" onclick="vdHideChannelAppSetup()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
                                 </div>
                             </div>
 
-                            <div id="vd-jumia-app-setup-web" style="display:flex; flex-direction:column; gap:10px;">
+                            <div id="vd-channel-app-setup-web" style="display:flex; flex-direction:column; gap:10px;">
                                 <div>
-                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Redirect URI <span style="font-weight:400; color:#888;">(paste this into the Application on Jumia)</span></label>
+                                    <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Redirect URI <span style="font-weight:400; color:#888;">(paste this into the Application on the sales channel)</span></label>
                                     <div style="display:flex; gap:8px;">
-                                        <input type="text" id="vd-jumia-app-redirect-uri" readonly style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box; font-family:monospace; font-size:12px; background:#f7f7f7;">
-                                        <button type="button" onclick="vdCopyJumiaRedirectUri()" style="padding:10px 14px; border:1px solid #ccc; border-radius:8px; background:#fff; cursor:pointer; white-space:nowrap;">Copy</button>
+                                        <input type="text" id="vd-channel-app-redirect-uri" readonly style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box; font-family:monospace; font-size:12px; background:#f7f7f7;">
+                                        <button type="button" onclick="vdCopyChannelRedirectUri()" style="padding:10px 14px; border:1px solid #ccc; border-radius:8px; background:#fff; cursor:pointer; white-space:nowrap;">Copy</button>
                                     </div>
                                 </div>
                                 <div>
                                     <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Client ID</label>
-                                    <input type="text" id="vd-jumia-app-web-client-id" placeholder="Client ID from Jumia Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                    <input type="text" id="vd-channel-app-web-client-id" placeholder="Client ID from Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                                 </div>
                                 <div>
                                     <label style="display:block; font-size:13px; font-weight:600; color:#333; margin-bottom:4px;">Client Secret</label>
-                                    <input type="password" id="vd-jumia-app-web-client-secret" placeholder="Client Secret from Jumia Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                    <input type="password" id="vd-channel-app-web-client-secret" placeholder="Client Secret from Vendor Center" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                                 </div>
-                                <p style="font-size:12px; color:#B45309; margin:0; background:#FFFBEB; border:1px solid #FDE68A; border-radius:6px; padding:8px;">This sign-in flow hasn't been tested end-to-end against a real Jumia account yet - Self Authorization above is the flow already confirmed working. Try this one if you'd rather not handle a Refresh Token, and tell us if it doesn't complete.</p>
+                                <p style="font-size:12px; color:#B45309; margin:0; background:#FFFBEB; border:1px solid #FDE68A; border-radius:6px; padding:8px;">Self Authorization above is the recommended way to connect. Try this one if you'd rather not handle a Refresh Token, and tell us if it doesn't complete.</p>
                                 <div style="display:flex; gap:10px;">
-                                    <button type="button" id="vd-jumia-app-signin-btn" onclick="vdSignInWithJumia()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Save &amp; Sign in with Jumia</button>
-                                    <button type="button" onclick="vdHideJumiaAppSetup()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                                    <button type="button" id="vd-channel-app-signin-btn" onclick="vdSignInWithChannel()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Save &amp; Sign in with Sales Channel</button>
+                                    <button type="button" onclick="vdHideChannelAppSetup()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
                                 </div>
                             </div>
 
-                            <p id="vd-jumia-app-setup-error" style="font-size:12.5px; color:#DC2626; margin:0;"></p>
+                            <p id="vd-channel-app-setup-error" style="font-size:12.5px; color:#DC2626; margin:0;"></p>
                         </div>
                     </div>
 
-                    <div class="panel" id="vd-jumia-export-panel" hidden>
+                    <div class="panel" id="vd-channel-export-panel" hidden>
                         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-                            <h3 style="margin:0;">Export to Jumia</h3>
-                            <span id="vd-jumia-export-help" style="font-size:12.5px; color:#666;"></span>
+                            <h3 style="margin:0;">Export to Sales Channel</h3>
+                            <span id="vd-channel-export-help" style="font-size:12.5px; color:#666;"></span>
                         </div>
-                        <div id="vd-jumia-export-list"></div>
+                        <div id="vd-channel-export-list"></div>
                         <div style="display:flex; gap:10px; margin-top:12px;">
-                            <button type="button" onclick="vdExportSelectedToJumia()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Push Selected</button>
-                            <button type="button" onclick="vdHideJumiaExport()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                            <button type="button" onclick="vdExportSelectedToChannel()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Push Selected</button>
+                            <button type="button" onclick="vdHideChannelExport()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
                         </div>
                     </div>
 
-                    <div class="panel" id="vd-jumia-sync-panel" hidden>
+                    <div class="panel" id="vd-channel-sync-panel" hidden>
                         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; gap:10px; flex-wrap:wrap;">
                             <h3 style="margin:0;">Product Sync</h3>
                             <div style="display:flex; gap:8px;">
-                                <button type="button" onclick="vdShowJumiaExport()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:8px 14px; cursor:pointer; font-size:12.5px; font-weight:600;">Export to Jumia</button>
-                                <button type="button" onclick="vdShowJumiaImport()" style="background:#fff; color:var(--vd-navy); border:1.5px solid var(--vd-navy); border-radius:8px; padding:8px 14px; cursor:pointer; font-size:12.5px; font-weight:600;">Import from Jumia</button>
+                                <button type="button" onclick="vdShowChannelExport()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:8px 14px; cursor:pointer; font-size:12.5px; font-weight:600;">Export to Sales Channel</button>
+                                <button type="button" onclick="vdShowChannelImport()" style="background:#fff; color:var(--vd-navy); border:1.5px solid var(--vd-navy); border-radius:8px; padding:8px 14px; cursor:pointer; font-size:12.5px; font-weight:600;">Import from Sales Channel</button>
                             </div>
                         </div>
-                        <p style="font-size:12.5px; color:#888; margin:-4px 0 12px;">Use Export to Jumia to push products from here.</p>
-                        <div id="vd-jumia-links-list"></div>
+                        <p style="font-size:12.5px; color:#888; margin:-4px 0 12px;">Use Export to Sales Channel to push products from here.</p>
+                        <div id="vd-channel-links-list"></div>
                     </div>
 
-                    <div class="panel" id="vd-jumia-import-panel" hidden>
+                    <div class="panel" id="vd-channel-import-panel" hidden>
                         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-                            <h3 style="margin:0;">Import from Jumia</h3>
-                            <span id="vd-jumia-import-help" style="font-size:12.5px; color:#666;"></span>
+                            <h3 style="margin:0;">Import from Sales Channel</h3>
+                            <span id="vd-channel-import-help" style="font-size:12.5px; color:#666;"></span>
                         </div>
-                        <div id="vd-jumia-import-list"></div>
+                        <div id="vd-channel-import-list"></div>
                         <div style="display:flex; gap:10px; margin-top:12px;">
-                            <button type="button" onclick="vdImportSelectedJumiaProducts()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Import Selected</button>
-                            <button type="button" onclick="vdHideJumiaImport()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
+                            <button type="button" onclick="vdImportSelectedChannelProducts()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600;">Import Selected</button>
+                            <button type="button" onclick="vdHideChannelImport()" style="background:#eee; color:#333; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;">Cancel</button>
                         </div>
                     </div>
 
@@ -1799,7 +1800,7 @@
                         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:4px;">
                             <div>
                                 <h3 style="margin:0 0 4px;">Manage Pickers</h3>
-                                <p style="font-size:12.5px; color:#888; margin:0;">People you've authorized to hand over packages on your behalf at a Lizimas drop-off point - matching Jumia Vendor Center's own Manage Pickers screen.</p>
+                                <p style="font-size:12.5px; color:#888; margin:0;">People you've authorized to hand over packages on your behalf at a Lizimas drop-off point -'s own Manage Pickers screen.</p>
                             </div>
                             <button type="button" onclick="vdShowCreatePickerForm()" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600; font-size:13px; white-space:nowrap;">+ Add Picker</button>
                         </div>

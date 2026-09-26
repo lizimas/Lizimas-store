@@ -65,7 +65,7 @@ const PATH_RULES = [
     ["/api/admin/vendor-messages", "ap_vendors"],
     ["/api/admin/vendor-payouts", "ap_vendors"],
     ["/api/admin/billing", "ap_vendors"],
-    ["/api/admin/jumia", "ap_vendors"],
+    ["/api/admin/channel", "ap_vendors"],
     ["/api/admin/brand-authorizations", "ap_vendors"],
     ["/api/admin/payment-instruments", "ap_vendors"],
     ["/api/admin/consignments", "ap_vendors"],

@@ -1,5 +1,5 @@
 // Promotion campaigns + vendor Promotions Management (Ryan, Sept 2026 -
-// Jumia Vendor Center parity). See migrations/124_promotion_campaigns.sql
+// Vendor Center parity). See migrations/124_promotion_campaigns.sql
 // for the design: a vendor "joins" a campaign by nominating products, and
 // each nomination is a normal pending vendor_promotions row (campaign_id
 // set, window = campaign period), so admin review, checkout price

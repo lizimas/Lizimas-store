@@ -1,7 +1,7 @@
 -- 111_vendor_pickers.sql
--- Manage Pickers (Jumia Vendor Center comparison, September 2026): a vendor
+-- Manage Pickers (September 2026): a vendor
 -- registers the people authorized to physically hand over their packages
--- at a Lizimas drop-off point/hub on their behalf - matching Jumia's
+-- at a Lizimas drop-off point/hub on their behalf -
 -- Account > Manage Pickers screen. This is a contact registry only: name,
 -- phone, and an optional national ID number for the hub desk to check
 -- against when someone shows up claiming to be that vendor's picker.

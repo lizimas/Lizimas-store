@@ -120,7 +120,9 @@
     agentName: null,
     escalating: false,
     escalated: false,
-    status: "open"
+    status: "open",
+    csatScore: null,   // the customer's rating once given (Support Phase 4)
+    csatDraft: 0
   };
 
   // ---------------------------------------------------------------------
@@ -268,7 +270,17 @@
     "}",
     "@media (prefers-reduced-motion:reduce){",
     ".lzc-launcher{transition:none}",
-    "}"
+    "}",
+    // "How did we do?" card after a closed chat
+    ".lzc-rate{margin:10px 6px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;text-align:center;font:14px system-ui,sans-serif}",
+    ".lzc-rate h4{margin:0 0 6px;font-size:15px;color:" + NAVY + "}",
+    ".lzc-stars{display:flex;justify-content:center;gap:4px;margin:4px 0 8px}",
+    ".lzc-star{border:none;background:none;font-size:28px;line-height:1;cursor:pointer;color:#d0d5dd;padding:2px}",
+    ".lzc-star.lzc-on{color:" + GOLD + "}",
+    ".lzc-rate textarea{width:100%;box-sizing:border-box;border:1px solid #d0d5dd;border-radius:8px;padding:7px 9px;font:13px system-ui,sans-serif;resize:vertical;min-height:44px}",
+    ".lzc-rate-send{margin-top:8px;border:none;border-radius:8px;padding:8px 16px;background:" + NAVY + ";color:#fff;font-weight:700;cursor:pointer}",
+    ".lzc-rate-send:disabled{opacity:.5;cursor:default}",
+    ".lzc-rate-done{color:#067647;font-weight:600}"
   ].join("");
 
   // ---------------------------------------------------------------------
@@ -447,6 +459,49 @@
     return d;
   }
 
+  function ratingCard() {
+    var card = document.createElement("div");
+    card.className = "lzc-rate";
+    if (state.csatScore != null) {
+      card.innerHTML = '<div class="lzc-rate-done">Thanks for your feedback!</div>';
+      return card;
+    }
+    var stars = "";
+    for (var i = 1; i <= 5; i++) {
+      stars += '<button type="button" class="lzc-star' + (i <= state.csatDraft ? " lzc-on" : "") + '" data-star="' + i + '" aria-label="' + i + ' star' + (i > 1 ? "s" : "") + '">\u2605</button>';
+    }
+    card.innerHTML = "<h4>How did we do?</h4>" +
+      '<div class="lzc-stars" role="radiogroup" aria-label="Rate this chat">' + stars + "</div>" +
+      '<textarea maxlength="1000" placeholder="Anything we could do better? (optional)"></textarea>' +
+      '<button type="button" class="lzc-rate-send"' + (state.csatDraft ? "" : " disabled") + ">Send rating</button>";
+    card.addEventListener("click", function (e) {
+      var st = e.target.closest("[data-star]");
+      if (st) {
+        state.csatDraft = Number(st.getAttribute("data-star"));
+        card.querySelectorAll(".lzc-star").forEach(function (b) {
+          b.classList.toggle("lzc-on", Number(b.getAttribute("data-star")) <= state.csatDraft);
+        });
+        card.querySelector(".lzc-rate-send").disabled = false;
+        return;
+      }
+      if (e.target.closest(".lzc-rate-send") && state.csatDraft) {
+        var btn = card.querySelector(".lzc-rate-send");
+        btn.disabled = true;
+        api("/" + state.conversationId + "/rating", {
+          method: "POST",
+          body: { score: state.csatDraft, comment: card.querySelector("textarea").value }
+        }).then(function () {
+          state.csatScore = state.csatDraft;
+          card.innerHTML = '<div class="lzc-rate-done">Thanks for your feedback!</div>';
+        }).catch(function (err) {
+          if (err && err.status === 409) { state.csatScore = state.csatDraft; card.innerHTML = '<div class="lzc-rate-done">Thanks for your feedback!</div>'; return; }
+          btn.disabled = false;
+        });
+      }
+    });
+    return card;
+  }
+
   function hasAgentReply() {
     return state.messages.some(function (m) {
       var t = String(m.sender_type || m.senderType || "").toLowerCase();
@@ -463,8 +518,13 @@
 
     // Nobody has answered yet, so keep the topic shortcuts reachable.
     // A system notice is not an answer. They go once an agent replies.
-    if (state.messages.length && !hasAgentReply() && !state.sending) {
+    if (state.messages.length && !hasAgentReply() && !state.sending && state.status !== "closed") {
       el.body.appendChild(topicMenu());
+    }
+
+    // Closed chat: ask "How did we do?" once.
+    if (state.status === "closed" && state.conversationId && hasAgentReply()) {
+      el.body.appendChild(ratingCard());
     }
 
     if (stick) toBottom();
@@ -929,6 +989,12 @@
 
         var prevStatus = state.status;
         if (conv.status) state.status = conv.status;
+        var prevCsat = state.csatScore;
+        if (conv.csat_score != null) state.csatScore = conv.csat_score;
+        // Show the rating card as soon as the chat is closed.
+        if ((prevStatus !== state.status && state.status === "closed") || prevCsat !== state.csatScore) {
+          renderThread();
+        }
 
         var pending = [];
 

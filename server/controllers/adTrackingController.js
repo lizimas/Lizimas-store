@@ -1,4 +1,4 @@
-// Advertise Your Products (Jumia Vendor Center comparison, Sept 2026) -
+// Advertise Your Products (Sept 2026) -
 // public read/tracking API for sponsored products. See migrations/
 // 112_vendor_ad_campaigns.sql's header. GET /sponsored-products backs the
 // homepage "Sponsored" row (client/js/products.js's loadSponsoredRow, see

@@ -1,11 +1,11 @@
-// Shop ID (Jumia Vendor Center comparison, September 2026) - Jumia assigns
-// every seller account a short public "Shop ID" (Ryan's own real Jumia
-// account is UG140DI) shown on the seller's own profile and used for
+// Shop ID (September 2026) - Lizimas assigns
+// every seller account a short public "Shop ID" shown on the seller's
+// own profile and used for
 // support-ticket/reference lookups. Lizimas had no equivalent - this
 // generates one in the same shape: 'UG' + a sequential number (from
 // vendor_shop_id_seq, migration 113) padded to at least 3 digits + 2 random
 // uppercase letters. The sequence alone already guarantees uniqueness
-// across concurrent approvals; the letters are cosmetic, matching Jumia's
+// across concurrent approvals; the letters are cosmetic
 // visual format rather than adding real entropy.
 const pool = require("../config/database");
 

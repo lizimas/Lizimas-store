@@ -1,11 +1,11 @@
 // Product Management - vendor desktop + mobile (Ryan, Sept 2026).
 //
-// Desktop follows Jumia Vendor Center's Product Management page: breadcrumb,
+// Desktop follows Vendor Center's Product Management page: breadcrumb,
 // Manage Columns / Add Product / Import-Export, grouped STATUS pills, search
 // by product name + Countries, bulk bar (Activate + More Actions), table
 // Name / Seller SKU / Price / Sale Price / Subsidy Price / Quantity /
 // Visible / Active / Actions.
-// Mobile follows the Jumia mobile Orders layout: STATUS pills with counts,
+// Mobile follows the mobile Orders layout: STATUS pills with counts,
 // COUNTRY chip, search by product name + search by Seller SKU, select-all
 // + "Product actions" + go button, list, pager + items per page, floating
 // Export + filter buttons.
@@ -59,7 +59,7 @@ const VP_TESTS = {
 };
 
 // Table columns in display order. `fixed` columns always show (Name,
-// Seller SKU, Visible, Active, Actions - as on Jumia); the rest are picked
+// Seller SKU, Visible, Active, Actions -); the rest are picked
 // in Manage Columns > Table Filters (list order = that panel's order).
 const VP_COLUMNS = [
     { key: "deletion", label: "Deletion", on: false },
@@ -618,7 +618,7 @@ function vpMobileGo() {
     bulkVendorProductAction(vpState.mAction);
 }
 
-// --- Mobile Filters page (Jumia mobile "Filters" layout) ---------------------
+// --- Mobile Filters page (mobile "Filters" layout) ---------------------
 
 function vpLocalDate(v) {
     if (!v) return "";

@@ -1,5 +1,5 @@
 // Vendor shop-setup onboarding (mobile Home "Let's take your shop live!",
-// Ryan Sept 2026, modelled on Jumia Vendor Center's seller onboarding).
+// Ryan Sept 2026's seller onboarding).
 //
 // One read endpoint that returns everything the Home checklist and its
 // five step forms need, plus one write endpoint per vendor-editable step:

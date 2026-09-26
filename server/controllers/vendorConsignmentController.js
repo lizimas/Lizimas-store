@@ -1,4 +1,4 @@
-// Fulfillment-by-Lizimas: vendor-side request flow (Jumia Vendor Center
+// Fulfillment-by-Lizimas: vendor-side request flow (Vendor Center
 // comparison, September 2026 - see migrations/110_vendor_consignments.sql's
 // header for the full design and what is deliberately NOT built here yet).
 

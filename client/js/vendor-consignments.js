@@ -1,6 +1,6 @@
 // Consignment Orders - vendor desktop (Ryan, Sept 2026).
 //
-// Follows Jumia Vendor Center's Products > Consignment page, in Lizimas
+// Follows Vendor Center's Products > Consignment page, in Lizimas
 // colours: breadcrumb, STATUS pills (All / Open / Closed / Received /
 // Received Incomplete / Cancelled / More), COUNTRY + DATE chips, Filters /
 // Export / Bulk Creation, a bulk-action select + go button, CO Number search,
@@ -37,7 +37,7 @@ const VCO_STATUS_TESTS = {
 };
 const VCO_MAIN_PILLS = [["all", "All"], ["open", "Open"], ["closed", "Closed"], ["received", "Received"], ["received_incomplete", "Received Incomplete"], ["cancelled", "Cancelled"]];
 const VCO_MORE_PILLS = [["requested", "Requested"], ["in_transit", "In Transit"], ["rejected", "Rejected"]];
-const VCO_COUNT_PILLS = new Set(["open", "received_incomplete"]); // counts shown on these, as on Jumia
+const VCO_COUNT_PILLS = new Set(["open", "received_incomplete"]); // counts shown on these
 const VCO_DATES = [["all", "All"], ["7", "Last 7 days"], ["30", "Last 30 days"], ["90", "Last 90 days"], ["year", "This year"]];
 const VCO_STATUS_LABEL = { requested: "Requested", in_transit: "In Transit", received: "Received", partially_received: "Received Incomplete", rejected: "Rejected", cancelled: "Cancelled" };
 const VCO_STATUS_CLASS = { requested: "vp-qc-wait", in_transit: "vp-qc-wait", received: "vp-qc-ok", partially_received: "vp-qc-warn", rejected: "vp-qc-bad", cancelled: "vp-qc-bad" };

@@ -2,7 +2,7 @@
 // (a compact box in the sidebar, sourced from the vendor's slug already on
 // the product) and the storefront page itself. Renders the seller score
 // badge, follower count + Follow button, and the Excellent/Good/Fair/Poor
-// performance checklist Jumia's seller box uses - all computed server-side
+// seller performance checklist - all computed server-side
 // by server/utils/sellerScore.js so nothing here ever shows a commission
 // rate or amount, which sellers must never see (Ryan, Sept 2026).
 

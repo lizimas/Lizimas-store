@@ -54,11 +54,11 @@ exports.trackCartAdd = async (req, res) => {
 
         const ip = req.headers["cf-connecting-ip"] || req.ip || null;
         let userId = null;
-        const authHeader = req.headers["authorization"];
-        if (authHeader && authHeader.startsWith("Bearer ")) {
+        const sessionToken = require("../utils/sessionCookie").tokenFrom(req);
+        if (sessionToken) {
             try {
                 const jwt = require("jsonwebtoken");
-                const decoded = jwt.verify(authHeader.split(" ")[1], process.env.JWT_SECRET);
+                const decoded = jwt.verify(sessionToken, process.env.JWT_SECRET);
                 userId = decoded.userId || decoded.id || null;
             } catch (e) {
                 // Not logged in, or an expired/guest token - log the event anonymously.

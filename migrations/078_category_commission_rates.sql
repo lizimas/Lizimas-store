@@ -1,6 +1,6 @@
 -- 078_category_commission_rates.sql
 -- Real per-category commission rates (Task #72, Ryan Sept 2026). Benchmarked
--- against Jumia Uganda's 2025 rate card, then adjusted into Lizimas' actual
+-- against Channel Uganda's 2025 rate card, then adjusted into Lizimas' actual
 -- launch rates for the categories that exist in Lizimas' live catalog.
 --
 -- commission_rules is resolved by walking UP the category tree from a
@@ -124,7 +124,7 @@ WHERE NOT EXISTS (
 INSERT INTO public.schema_migrations (filename, note)
 VALUES (
     '078_category_commission_rates.sql',
-    'Seeds real per-category commission_rules rates (Task #72) for every category Ryan''s Jumia-benchmarked rate card maps to - branch-level rules where a subtree shares one rate, leaf-level overrides for phones-vs-accessories, TVs-vs-accessories, computers-vs-accessories splits, and the scattered baby-product leaves. Categories with no match in Lizimas'' live catalog (Cameras, Tablets, Beauty Appliances, Sporting Goods, Musical Instruments, Auto & Moto, Luggage & Travel Gear) are left uncovered and fall through to the 15% marketplace default.'
+    'Seeds real per-category commission_rules rates (Task #72) for every category Ryan''s Channel-benchmarked rate card maps to - branch-level rules where a subtree shares one rate, leaf-level overrides for phones-vs-accessories, TVs-vs-accessories, computers-vs-accessories splits, and the scattered baby-product leaves. Categories with no match in Lizimas'' live catalog (Cameras, Tablets, Beauty Appliances, Sporting Goods, Musical Instruments, Auto & Moto, Luggage & Travel Gear) are left uncovered and fall through to the 15% marketplace default.'
 )
 ON CONFLICT (filename) DO NOTHING;
 

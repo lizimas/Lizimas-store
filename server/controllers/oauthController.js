@@ -1,4 +1,5 @@
 const bcrypt = require("bcryptjs");
+const { setSessionCookie, isFullSessionToken } = require("../utils/sessionCookie");
 const crypto = require("crypto");
 const { OAuth2Client } = require("google-auth-library");
 const pool = require("../config/database");
@@ -56,15 +57,18 @@ async function verifyFacebookAccessToken(accessToken) {
 // sharing code with it because the two providers' verification steps
 // (ID token vs access token + debug_token + /me) are different enough that a
 // shared abstraction would just be an if/else in disguise.
-async function facebookSignIn(req, res) {
+async function facebookSignIn(req, res, opts = {}) {
+    // opts.respond(status, body): used by the redirect callbacks below so
+    // they get the outcome directly (no fake request/response objects).
+    const send = (status, body) => opts.respond ? opts.respond(status, body) : res.status(status).json(body);
     const surface = "oauth_facebook";
-    const { accessToken } = req.body;
+    const accessToken = opts.accessToken !== undefined ? opts.accessToken : (req.body && req.body.accessToken);
 
     if (!FACEBOOK_CONFIGURED) {
-        return res.status(503).json({ error: "Facebook sign-in is not available yet." });
+        return send(503, { error: "Facebook sign-in is not available yet." });
     }
     if (!accessToken) {
-        return res.status(400).json({ error: "Sign-in failed. Please try again." });
+        return send(400, { error: "Sign-in failed. Please try again." });
     }
 
     try {
@@ -76,7 +80,7 @@ async function facebookSignIn(req, res) {
         }
         if (!tokenInfo) {
             await logLoginAttempt(null, req, false, { surface, failureReason: "token_invalid" });
-            return res.status(401).json({ error: "Sign-in failed. Please try again." });
+            return send(401, { error: "Sign-in failed. Please try again." });
         }
 
         const fbUserId = String(tokenInfo.user_id);
@@ -87,7 +91,7 @@ async function facebookSignIn(req, res) {
         const me = await meRes.json();
         if (!meRes.ok || !me || String(me.id) !== fbUserId) {
             await logLoginAttempt(null, req, false, { surface, failureReason: "profile_fetch_failed" });
-            return res.status(401).json({ error: "Sign-in failed. Please try again." });
+            return send(401, { error: "Sign-in failed. Please try again." });
         }
 
         const email = (me.email || "").toLowerCase();
@@ -109,6 +113,7 @@ async function facebookSignIn(req, res) {
             );
             return completeLogin(linked.rows[0], req, res, {
                 allowedRoles: CUSTOMER_LOGIN_ROLES,
+                respond: opts.respond,
                 surface,
                 attemptedEmail: email || undefined
             });
@@ -122,7 +127,7 @@ async function facebookSignIn(req, res) {
         // cleanly rather than inventing a placeholder address.
         if (!email) {
             await logLoginAttempt(null, req, false, { surface, failureReason: "no_email" });
-            return res.status(401).json({
+            return send(401, {
                 error: "Your Facebook account has no email address available. Please sign in with email/password or Google instead."
             });
         }
@@ -152,6 +157,7 @@ async function facebookSignIn(req, res) {
 
             return completeLogin(user, req, res, {
                 allowedRoles: CUSTOMER_LOGIN_ROLES,
+                respond: opts.respond,
                 surface,
                 attemptedEmail: email
             });
@@ -181,7 +187,7 @@ async function facebookSignIn(req, res) {
         }
 
         if (!created) {
-            return res.status(500).json({ error: "Could not create your account. Please try again." });
+            return send(500, { error: "Could not create your account. Please try again." });
         }
 
         await pool.query(
@@ -192,13 +198,14 @@ async function facebookSignIn(req, res) {
 
         return completeLogin(created, req, res, {
             allowedRoles: CUSTOMER_LOGIN_ROLES,
+                respond: opts.respond,
             surface,
             attemptedEmail: email
         });
 
     } catch (error) {
         console.error("Facebook sign-in error:", error);
-        res.status(500).json({ error: "Something went wrong while signing you in." });
+        send(500, { error: "Something went wrong while signing you in." });
     }
 }
 
@@ -216,6 +223,25 @@ async function facebookSignIn(req, res) {
 // redirect URL and a first-party cookie before leaving the page, and this
 // route requires the two to match on return. A forged redirect back to this
 // URL cannot supply the cookie, so it cannot forge the match.
+// Turns a sign-in outcome into the redirect the browser follows. A finished
+// login gets its session cookie here; the page only ever sees "cookie".
+function oauthRedirectResponder(req, res) {
+    return (status, body) => {
+        const out = body || {};
+        if (out.token && isFullSessionToken(out.token)) {
+            const keep = req.cookies && req.cookies.lz_keep_user === "1";
+            setSessionCookie(req, res, "user", out.token, keep);
+            const payload = encodeURIComponent(JSON.stringify({ t: "cookie", u: out.user }));
+            return res.redirect(`/oauth-complete.html#${payload}`);
+        }
+        if (out.requires2FA || out.requiresPasswordReset || out.requiresDeviceApproval) {
+            const payload = encodeURIComponent(JSON.stringify(out));
+            return res.redirect(`/oauth-complete.html#${payload}`);
+        }
+        return res.redirect("/login.html?e=oauth");
+    };
+}
+
 async function facebookCallback(req, res) {
     const { code, state } = req.query;
     const cookieState = req.cookies && req.cookies.fb_oauth_state;
@@ -251,42 +277,11 @@ async function facebookCallback(req, res) {
             return res.redirect("/login.html?e=oauth");
         }
 
-        // completeLogin (reached via facebookSignIn) answers with JSON.
-        // Capture it rather than letting it reach the browser, then translate
-        // to the redirect this flow needs - identical shim to googleCallback.
-        const captured = {};
-        const shim = {
-            status(code) { captured.code = code; return shim; },
-            json(body) { captured.body = body; return shim; },
-            redirect(url) { captured.redirect = url; return shim; },
-            cookie(...args) { return res.cookie(...args); },
-            clearCookie(...args) { return res.clearCookie(...args); },
-            set(...args) { return res.set(...args); },
-            setHeader(...args) { return res.setHeader(...args); },
-            getHeader(...args) { return res.getHeader(...args); }
-        };
-
-        const shapedReq = Object.create(req);
-        shapedReq.body = { accessToken: tokenBody.access_token };
-
-        await facebookSignIn(shapedReq, shim);
-
-        const out = captured.body || {};
-
-        if (out.token) {
-            // Fragment, not query: see googleCallback's identical comment -
-            // fragments never reach the server, so the token stays out of
-            // access logs and Referer headers.
-            const payload = encodeURIComponent(JSON.stringify({ t: out.token, u: out.user }));
-            return res.redirect(`/oauth-complete.html#${payload}`);
-        }
-
-        if (out.requires2FA || out.requiresPasswordReset || out.requiresDeviceApproval) {
-            const payload = encodeURIComponent(JSON.stringify(out));
-            return res.redirect(`/oauth-complete.html#${payload}`);
-        }
-
-        return res.redirect("/login.html?e=oauth");
+        await facebookSignIn(req, res, {
+            accessToken: tokenBody.access_token,
+            respond: oauthRedirectResponder(req, res)
+        });
+        return;
 
     } catch (error) {
         console.error("Facebook callback error:", error);
@@ -364,12 +359,15 @@ async function facebookDataDeletion(req, res) {
 // decides whether this account may hold a session — scope, deletion, lock,
 // block, activation, device, password reset, 2FA — runs in completeLogin,
 // exactly as it does for password login. This file must never issue a token.
-async function googleSignIn(req, res) {
+async function googleSignIn(req, res, opts = {}) {
+    // opts.respond(status, body): used by the redirect callbacks below so
+    // they get the outcome directly (no fake request/response objects).
+    const send = (status, body) => opts.respond ? opts.respond(status, body) : res.status(status).json(body);
     const surface = "oauth_google";
-    const { credential } = req.body;
+    const credential = opts.credential !== undefined ? opts.credential : (req.body && req.body.credential);
 
     if (!credential) {
-        return res.status(400).json({ error: "Sign-in failed. Please try again." });
+        return send(400, { error: "Sign-in failed. Please try again." });
     }
 
     try {
@@ -385,7 +383,7 @@ async function googleSignIn(req, res) {
                 surface: surface,
                 failureReason: "token_invalid"
             });
-            return res.status(401).json({ error: "Sign-in failed. Please try again." });
+            return send(401, { error: "Sign-in failed. Please try again." });
         }
 
         const sub = payload.sub;
@@ -398,7 +396,7 @@ async function googleSignIn(req, res) {
                 surface: surface,
                 failureReason: "no_email"
             });
-            return res.status(401).json({ error: "Your Google account has no email address available." });
+            return send(401, { error: "Your Google account has no email address available." });
         }
 
         // Linked already? The provider subject is the key, never the email:
@@ -417,6 +415,7 @@ async function googleSignIn(req, res) {
             );
             return completeLogin(linked.rows[0], req, res, {
                 allowedRoles: CUSTOMER_LOGIN_ROLES,
+                respond: opts.respond,
                 surface: surface,
                 attemptedEmail: email
             });
@@ -430,7 +429,7 @@ async function googleSignIn(req, res) {
                 failureReason: "email_unverified",
                 attemptedEmail: email
             });
-            return res.status(401).json({ error: "Your Google email address is not verified." });
+            return send(401, { error: "Your Google email address is not verified." });
         }
 
         const existing = await pool.query("SELECT * FROM users WHERE lower(email) = $1", [email]);
@@ -456,6 +455,7 @@ async function googleSignIn(req, res) {
 
             return completeLogin(user, req, res, {
                 allowedRoles: CUSTOMER_LOGIN_ROLES,
+                respond: opts.respond,
                 surface: surface,
                 attemptedEmail: email
             });
@@ -486,7 +486,7 @@ async function googleSignIn(req, res) {
         }
 
         if (!created) {
-            return res.status(500).json({ error: "Could not create your account. Please try again." });
+            return send(500, { error: "Could not create your account. Please try again." });
         }
 
         await pool.query(
@@ -497,13 +497,14 @@ async function googleSignIn(req, res) {
 
         return completeLogin(created, req, res, {
             allowedRoles: CUSTOMER_LOGIN_ROLES,
+                respond: opts.respond,
             surface: surface,
             attemptedEmail: email
         });
 
     } catch (error) {
         console.error("Google sign-in error:", error);
-        res.status(500).json({ error: "Something went wrong while signing you in." });
+        send(500, { error: "Something went wrong while signing you in." });
     }
 }
 
@@ -513,7 +514,7 @@ async function googleSignIn(req, res) {
 // mobile browsers turning the sign-in popup into a navigation.
 //
 // Identity handling is deliberately not duplicated: this verifies CSRF, then
-// falls through to the same googleSignIn body via a shaped request.
+// hands the credential to the same googleSignIn used by the popup flow.
 async function googleCallback(req, res) {
     const cookieToken = req.cookies && req.cookies.g_csrf_token;
     const bodyToken = req.body && req.body.g_csrf_token;
@@ -528,41 +529,12 @@ async function googleCallback(req, res) {
         return res.redirect("/login.html?e=csrf");
     }
 
-    // completeLogin answers with JSON. Capture it rather than letting it reach
-    // the browser, then translate to the redirect this flow needs.
-    const captured = {};
-    const shim = {
-        status(code) { captured.code = code; return shim; },
-        json(body) { captured.body = body; return shim; },
-        redirect(url) { captured.redirect = url; return shim; },
-        cookie(...args) { return res.cookie(...args); },
-        clearCookie(...args) { return res.clearCookie(...args); },
-        set(...args) { return res.set(...args); },
-        setHeader(...args) { return res.setHeader(...args); },
-        getHeader(...args) { return res.getHeader(...args); }
-    };
-
-    const shapedReq = Object.create(req);
-    shapedReq.body = { credential: req.body.credential };
-
-    await googleSignIn(shapedReq, shim);
-
-    const out = captured.body || {};
-
-    if (out.token) {
-        // Fragment, not query: fragments are never sent to a server, so the
-        // token stays out of access logs and Referer headers. It does land in
-        // browser history, which is why PENDING.md carries the cookie migration.
-        const payload = encodeURIComponent(JSON.stringify({ t: out.token, u: out.user }));
-        return res.redirect(`/oauth-complete.html#${payload}`);
-    }
-
-    if (out.requires2FA || out.requiresPasswordReset || out.requiresDeviceApproval) {
-        const payload = encodeURIComponent(JSON.stringify(out));
-        return res.redirect(`/oauth-complete.html#${payload}`);
-    }
-
-    return res.redirect("/login.html?e=oauth");
+    // Same sign-in as the popup flow; the outcome comes straight back as a
+    // redirect (see oauthRedirectResponder).
+    await googleSignIn(req, res, {
+        credential: req.body && req.body.credential,
+        respond: oauthRedirectResponder(req, res)
+    });
 }
 
 module.exports = {

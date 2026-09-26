@@ -178,7 +178,7 @@ function formatDateOnly(value) {
 // above) without touching products.is_active, which stays a per-product
 // decision the vendor keeps full control of underneath either switch.
 
-// Product-count limit tier (Jumia Vendor Center comparison, Sept 2026) -
+// Product-count limit tier (Sept 2026) -
 // the vendor's own read-only view of their tier, cap, and how many
 // listings they have left. See server/utils/vendorProductTier.js.
 exports.getMyProductTierStatus = async (req, res) => {
@@ -194,7 +194,7 @@ exports.getMyProductTierStatus = async (req, res) => {
     }
 };
 
-// Jumia-style Stock Recommendation page: summary tiles + per-SKU rows
+// Stock Recommendation page: summary tiles + per-SKU rows
 // with status (ok / out_of_stock / low_stock / sales_issue) and the
 // suggested replenish quantity. See computeReplenishment in
 // server/utils/stockRecommendation.js.
@@ -330,7 +330,7 @@ exports.updateVendorHolidayMode = async (req, res) => {
 // approval status - it never needs re-review.
 const BULK_PRODUCT_ACTIONS = ["activate", "deactivate", "delete"];
 
-// Cap mirrors Jumia's own Vendor Center bulk-action limit (Ryan referenced
+// Bulk-action limit (Ryan referenced
 // their "up to 100 products per operation" behaviour, Sept 2026) - keeps a
 // single request's classification loop and UPDATE bounded.
 const BULK_PRODUCT_MAX_IDS = 100;
@@ -362,7 +362,7 @@ exports.bulkUpdateVendorProducts = async (req, res) => {
         // ones, so those are reported as "already deleted" rather than a
         // bare "not found") - classification below happens in JS so the
         // vendor sees exactly why each product was or wasn't changed,
-        // matching the successful/failed/skipped breakdown Jumia's Vendor
+        // matching the successful/failed/skipped breakdown the Vendor
         // Center shows after a bulk action.
         const rowsResult = await pool.query(
             `SELECT id, name, status, is_active, admin_restricted, deleted_at
@@ -736,9 +736,9 @@ exports.approveVendor = async (req, res) => {
         if (!vendor.slug) {
             vendor = { ...vendor, slug: await ensureVendorSlug(vendor.id, vendor.business_name) };
         }
-        // Shop ID (Jumia Vendor Center comparison, migration 113): assigned
+        // Shop ID (migration 113): assigned
         // once, the moment a vendor first becomes approved - matching when
-        // Jumia itself hands a seller their Shop ID.
+        // Lizimas hands a seller their Shop ID.
         if (!vendor.shop_id) {
             const shopId = await generateShopId();
             await pool.query("UPDATE vendors SET shop_id = $1 WHERE id = $2", [shopId, vendor.id]);
@@ -784,8 +784,8 @@ exports.rejectVendor = async (req, res) => {
     }
 };
 
-// Admin-triggered Shop ID reissue (Jumia Vendor Center comparison) - not
-// something Jumia sellers can do themselves, but a rare admin escape hatch
+// Admin-triggered Shop ID reissue () - not
+// not something sellers can do themselves, but a rare admin escape hatch
 // for a vendor approved before migration 113 shipped, or if a shop_id ever
 // needs reissuing. Only allowed on an approved vendor with no shop_id yet,
 // same rule approveVendor itself follows - this never overwrites an
@@ -872,7 +872,7 @@ exports.getPublicStorefront = async (req, res) => {
                                       AND (ac.end_date IS NULL OR ac.end_date >= CURRENT_DATE)
                                 )
                             ) AS is_sponsored,
-                            -- Advertise Your Products (Jumia Vendor Center comparison, migration
+                            -- Advertise Your Products (migration
                             -- 112): distinguishes a CPC-billed ad placement from the older
                             -- vendor_promotions "sponsored" flag above, so the storefront knows
                             -- to fire a click-tracking beacon only for this kind of sponsorship.

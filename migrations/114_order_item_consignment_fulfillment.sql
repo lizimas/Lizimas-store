@@ -1,6 +1,5 @@
 -- 114_order_item_consignment_fulfillment.sql
--- Consignment order-routing integration (Jumia Vendor Center comparison,
--- September 2026) - the follow-up migration 110's header deliberately left
+-- Consignment order-routing integration (-- September 2026) - the follow-up migration 110's header deliberately left
 -- open: "routing a placed ORDER to fulfill straight from consigned_stock
 -- (skipping the vendor per-order handover step) ... is left as a clearly-
 -- flagged follow-up". checkoutController.js now does that: a plain

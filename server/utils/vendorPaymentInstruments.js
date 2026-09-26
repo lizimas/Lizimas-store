@@ -1,5 +1,5 @@
 // Pure logic for Phase 5 - Payment Instrument Approval (Ryan, Sept 2026 -
-// modelled on Jumia's Vendor Center: a payment instrument must belong to
+//: a payment instrument must belong to
 // the vendor under their own verified legal name before it can ever
 // receive a payout). No DB/network here - see
 // server/controllers/vendorPaymentInstrumentsController.js for the
@@ -80,7 +80,7 @@ function missingFieldsForMethod(method, fields) {
     return missing;
 }
 
-// --- Evidence document extension (Ryan, Sept 2026, Jumia-parity) -----------
+// --- Evidence document extension (Ryan, Sept 2026, parity) -----------
 // migration 122 adds evidence_cloudinary_public_id (+ resource_type/format/
 // filename/bytes/uploaded_at) directly on vendor_payment_instruments - one
 // document per INSTRUMENT, not per vendor, since a vendor can hold several

@@ -1,8 +1,8 @@
 -- 088_vendor_kyc_review_enhancements.sql
--- Closes 3 gaps vs Jumia's KYC flow:
+-- Closes 3 gaps vs the channel's KYC flow:
 --   1. Vendors get a notification when kyc_status changes.
 --   2. Each KYC document gets its own review status + rejection reason.
---   3. Expands document_type to Jumia-parity set.
+--   3. Expands document_type to parity set.
 
 BEGIN;
 
@@ -51,7 +51,7 @@ ALTER TABLE vendor_kyc_documents
 
 INSERT INTO schema_migrations (filename, note)
 VALUES ('088_vendor_kyc_review_enhancements.sql',
-        'Adds kyc_status_change notification, per-document review_status/rejection_reason, expands document_type to Jumia-parity set.')
+        'Adds kyc_status_change notification, per-document review_status/rejection_reason, expands document_type to parity set.')
 ON CONFLICT (filename) DO NOTHING;
 
 COMMIT;

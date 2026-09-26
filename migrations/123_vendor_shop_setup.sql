@@ -1,5 +1,5 @@
 -- 123_vendor_shop_setup.sql
--- Jumia-style "Let's take your shop live!" onboarding on the vendor mobile
+-- "Let's take your shop live!" onboarding on the vendor mobile
 -- Home screen (Ryan, Sept 2026). Adds the fields behind three of its five
 -- steps that had nowhere to live yet:
 --   * Shop Information - communication contact + customer-care details

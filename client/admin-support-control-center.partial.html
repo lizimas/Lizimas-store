@@ -70,6 +70,23 @@
       border-radius: 0 0 10px 10px;
     }
     #tab-support-team .scc-panel.active { display: block; }
+    #tab-support-team .scc-an-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
+    #tab-support-team .scc-an-card { background: #fff; border: 1px solid #eaecf0; border-radius: 10px; padding: 12px; }
+    #tab-support-team .scc-an-val { font-size: 22px; font-weight: 800; color: #1a1a2e; }
+    #tab-support-team .scc-an-lbl { font-size: 13px; color: #475467; }
+    #tab-support-team .scc-an-sub { font-size: 12px; color: #6b7280; }
+    #tab-support-team .scc-an-bars { display: flex; align-items: flex-end; gap: 3px; height: 130px; padding: 6px 0 18px; overflow-x: auto; }
+    #tab-support-team .scc-an-bar { flex: 1 0 14px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; position: relative; }
+    #tab-support-team .scc-an-bar span { display: block; background: #f4b400; border-radius: 3px 3px 0 0; min-height: 2px; }
+    #tab-support-team .scc-an-bar em { position: absolute; bottom: -16px; left: 0; right: 0; text-align: center; font-size: 10px; color: #6b7280; font-style: normal; }
+    #tab-support-team .scc-an-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+    #tab-support-team .scc-an-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 13px; }
+    #tab-support-team .scc-an-row span { width: 70px; color: #f4b400; }
+    #tab-support-team .scc-an-track { flex: 1; background: #f2f4f7; border-radius: 999px; height: 10px; overflow: hidden; }
+    #tab-support-team .scc-an-track div { background: #1a1a2e; height: 100%; }
+    #tab-support-team .scc-an-comment { background: #fff; border: 1px solid #eaecf0; border-radius: 8px; padding: 8px 10px; margin: 6px 0; font-size: 13px; }
+    #tab-support-team .scc-an-comment span { color: #f4b400; }
+    #tab-support-team .scc-an-comment small { color: #6b7280; }
     #tab-support-team table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
     #tab-support-team th, #tab-support-team td {
       text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--ls-border);
@@ -116,6 +133,7 @@
     <button class="scc-tab" data-tab="canned">Canned responses</button>
     <button class="scc-tab" data-tab="sla">SLA policies</button>
     <button class="scc-tab" data-tab="performance">Performance</button>
+    <button class="scc-tab" data-tab="analytics">Analytics &amp; ratings</button>
     <button class="scc-tab" data-tab="audit">Audit log</button>
   </div>
 
@@ -169,6 +187,28 @@
       <thead><tr><th>Agent</th><th>Chats</th><th>Avg 1st response</th><th>Avg resolution</th><th>Escalation rate</th><th>Avg CSAT</th></tr></thead>
       <tbody id="scc-perf-table"><tr><td colspan="6" class="scc-empty">Pick a date range and run the report.</td></tr></tbody>
     </table>
+  </div>
+
+  <div class="scc-panel" data-panel="analytics">
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <label for="scc-an-days" style="font-weight:600;">Period</label>
+      <select id="scc-an-days"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option></select>
+    </div>
+    <div id="scc-an-cards" class="scc-an-cards"></div>
+    <h4 style="margin:18px 0 6px;">Chats per day</h4>
+    <div id="scc-an-days-chart" class="scc-an-bars"></div>
+    <div class="scc-an-grid">
+      <div>
+        <h4 style="margin:18px 0 6px;">Customer ratings</h4>
+        <div id="scc-an-dist"></div>
+      </div>
+      <div>
+        <h4 style="margin:18px 0 6px;">By department</h4>
+        <table><thead><tr><th>Department</th><th>Chats</th><th>Escalated</th><th>Avg rating</th></tr></thead><tbody id="scc-an-dept"></tbody></table>
+      </div>
+    </div>
+    <h4 style="margin:18px 0 6px;">Latest customer comments</h4>
+    <div id="scc-an-comments"></div>
   </div>
 
   <div class="scc-panel" data-panel="audit">
@@ -674,7 +714,36 @@
         : '<tr><td colspan="4" class="scc-empty">No admin actions logged yet.</td></tr>';
     }
 
-    const loaders = { live: loadLive, agents: loadAgents, queue: loadQueueRules, canned: loadCanned, sla: loadSla, audit: loadAudit };
+    // ---- analytics & ratings (Support Phase 4) ----
+    async function loadAnalytics() {
+      const days = document.getElementById('scc-an-days').value;
+      const d = await api(`/analytics?days=${days}`);
+      const t = d.totals;
+      const pct = (x) => x == null ? '—' : Math.round(x * 100) + '%';
+      const card = (label, value, sub) => `<div class="scc-an-card"><div class="scc-an-val">${value}</div><div class="scc-an-lbl">${label}</div>${sub ? `<div class="scc-an-sub">${sub}</div>` : ''}</div>`;
+      document.getElementById('scc-an-cards').innerHTML =
+        card('Chats', t.chats, `${t.resolved} resolved`) +
+        card('Avg first reply', fmtSeconds(t.avg_first_response_s)) +
+        card('Avg time to close', fmtSeconds(t.avg_resolution_s)) +
+        card('Avg rating', t.avg_csat != null ? t.avg_csat + ' / 5' : '—', `${t.ratings} rating${t.ratings === 1 ? '' : 's'}`) +
+        card('Satisfied (4-5★)', pct(t.satisfaction_rate)) +
+        card('Escalated to senior', pct(t.escalation_rate), `${t.escalated} chat${t.escalated === 1 ? '' : 's'}`);
+      const max = Math.max(1, ...d.per_day.map((x) => x.chats));
+      document.getElementById('scc-an-days-chart').innerHTML = d.per_day.map((x) =>
+        `<div class="scc-an-bar" title="${x.day}: ${x.chats} chat${x.chats === 1 ? '' : 's'}${x.avg_csat != null ? ', rated ' + x.avg_csat : ''}"><span style="height:${Math.round((x.chats / max) * 100)}%"></span><em>${x.day.slice(8)}</em></div>`).join('');
+      const totalR = d.csat_distribution.reduce((a, b) => a + b.n, 0) || 1;
+      document.getElementById('scc-an-dist').innerHTML = d.csat_distribution.slice().reverse().map((r) =>
+        `<div class="scc-an-row"><span>${'★'.repeat(r.score)}</span><div class="scc-an-track"><div style="width:${Math.round(r.n / totalR * 100)}%"></div></div><b>${r.n}</b></div>`).join('');
+      document.getElementById('scc-an-dept').innerHTML = d.by_department.length
+        ? d.by_department.map((r) => `<tr><td>${esc((DEPARTMENTS.find((x) => x.key === r.department) || { label: r.department === 'uncategorized' ? 'Not categorised' : r.department }).label)}</td><td>${r.chats}</td><td>${r.escalated}</td><td>${r.avg_csat ?? '—'}</td></tr>`).join('')
+        : '<tr><td colspan="4" class="scc-empty">No chats in this period.</td></tr>';
+      document.getElementById('scc-an-comments').innerHTML = d.comments.length
+        ? d.comments.map((c) => `<div class="scc-an-comment"><span>${'★'.repeat(c.csat_score)}</span> ${esc(c.csat_comment)} <small>— chat #${c.id}${c.agent_name ? ' with ' + esc(c.agent_name) : ''}, ${new Date(c.csat_at).toLocaleDateString()}</small></div>`).join('')
+        : '<p class="scc-empty">No comments yet.</p>';
+    }
+    document.getElementById('scc-an-days').addEventListener('change', () => loadAnalytics().catch((e) => alert(e.message)));
+
+    const loaders = { live: loadLive, agents: loadAgents, queue: loadQueueRules, canned: loadCanned, sla: loadSla, audit: loadAudit, analytics: loadAnalytics };
 
     // Self-contained: no changes needed inside setupTabs() in admin.js.
     // The nav button for this tab (data-tab="support-team") already gets

@@ -1,12 +1,12 @@
 // Vendor mobile Home - "Welcome to Lizimas Store! Let's take your shop live!"
-// shop-setup onboarding (Ryan, Sept 2026 - modelled on Jumia Vendor
+// shop-setup onboarding (Ryan, Sept 2026 - Vendor
 // Center's mobile seller onboarding). Loaded after vendor-dashboard.js and
 // vendor-mobile.js (see client/vendor/dashboard.html) and reuses their
 // globals: vendorAuthorizedFetch, getVendorToken, API_URL, vendorEsc,
 // vmStatusCopy, vmRenderHomeKpi.
 //
 // Five steps, each a tile; tapping a tile shows that step's form in the
-// card underneath (same page, no navigation), exactly like Jumia:
+// card underneath (same page, no navigation):
 //   shop       Shop Information     -> PATCH /api/vendors/me/shop-setup/shop-info
 //   company    Company Information  -> PATCH /api/vendors/me/shop-setup/company
 //   shipping   Shipping Information -> PATCH /api/vendors/me/shop-setup/shipping
@@ -294,7 +294,7 @@ function vssCompanyForm() {
         : "";
     const taxDoc = (vssData.documents || []).find((d) => d.document_type === "tax_certificate");
 
-    // Shown for every account type (Jumia layout); required for companies.
+    // Shown for every account type ; required for companies.
     const tinUpload = true
         ? `<div class="vss-field"><div class="vss-label-row"><span class="vss-label">Upload Tax Identification Number (TIN)</span>${isCompany ? '<span class="vss-req">Required</span>' : ""}</div>
             <label class="vss-input vss-upload"><span id="vss-tin-file-label">${taxDoc ? vssV(taxDoc.original_filename || "Uploaded") : "Upload .jpg, .jpeg, .png or .pdf"}</span>

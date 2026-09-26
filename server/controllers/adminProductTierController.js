@@ -1,4 +1,4 @@
-// Admin control over Product-count limit tiers (Jumia Vendor Center
+// Admin control over Product-count limit tiers (Vendor Center
 // comparison, Sept 2026 - see migrations/109_vendor_product_tiers.sql and
 // server/utils/vendorProductTier.js). Mirrors commissionController.js's
 // shape (admin-only, no vendor-facing write path).

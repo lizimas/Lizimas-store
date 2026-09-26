@@ -1,7 +1,7 @@
 -- 110_vendor_consignments.sql
--- Fulfillment-by-Lizimas (Jumia Vendor Center comparison, September 2026 -
--- Jumia calls this "Fulfillment by Jumia"/FBJ: a seller ships stock to a
--- Jumia warehouse and Jumia picks/packs/delivers orders directly, instead
+-- Fulfillment-by-Lizimas (September 2026 -
+-- Channel calls this "Fulfillment by Lizimas"/FBJ: a seller ships stock to a
+-- Channel warehouse and Channel picks/packs/delivers orders directly, instead
 -- of the seller handing over each order one at a time). Lizimas has no
 -- warehouse network, so this reuses the existing dropoff_points hub
 -- concept (migrations/052_vendor_fulfilment.sql) as the anchor: a vendor
@@ -57,7 +57,7 @@ ALTER TABLE public.products
     ADD COLUMN IF NOT EXISTS consigned_stock INTEGER NOT NULL DEFAULT 0 CHECK (consigned_stock >= 0);
 
 COMMENT ON TABLE public.vendor_consignments IS
-    'A shipment of stock a vendor sends to a Lizimas hub for Lizimas to fulfill orders from directly (Fulfillment-by-Lizimas, Jumia FBJ comparison). See vendor_consignment_items for the line items and products.consigned_stock for the counted-in result.';
+    'A shipment of stock a vendor sends to a Lizimas hub for Lizimas to fulfill orders from directly (Fulfillment-by-Lizimas, Channel FBJ comparison). See vendor_consignment_items for the line items and products.consigned_stock for the counted-in result.';
 COMMENT ON COLUMN public.vendor_consignments.status IS
     'requested (vendor submitted, nothing shipped yet) -> in_transit (vendor marked it shipped) -> received/partially_received (admin counted it in - see vendor_consignment_items.quantity_received) or rejected. cancelled only from requested/in_transit, by the vendor.';
 COMMENT ON COLUMN public.products.fulfillment_type IS

@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const pool = require("../config/database");
 const { resolveVendorContext } = require("../utils/vendorContext");
 const { canAccessPath, targetUserId } = require("../utils/adminPermissions");
+const { tokenFrom } = require("../utils/sessionCookie");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -14,13 +15,12 @@ function isAccountEnded(row) {
 }
 
 async function requireAuth(req, res, next) {
-    const authHeader = req.headers["authorization"];
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    // Bearer JWT, or the httpOnly session cookie picked by X-LZ-Session
+    // (server/utils/sessionCookie.js).
+    const token = tokenFrom(req);
+    if (!token) {
         return res.status(401).json({ error: "No token provided. Please log in." });
     }
-
-    const token = authHeader.split(" ")[1];
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
@@ -76,13 +76,12 @@ async function requireAuth(req, res, next) {
 // Accepts a pendingSetup token OR a full session token.
 // Used only for the 2FA enrolment endpoints.
 async function requireAuthOrSetup(req, res, next) {
-    const authHeader = req.headers["authorization"];
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    // Bearer JWT, or the httpOnly session cookie picked by X-LZ-Session
+    // (server/utils/sessionCookie.js).
+    const token = tokenFrom(req);
+    if (!token) {
         return res.status(401).json({ error: "No token provided. Please log in." });
     }
-
-    const token = authHeader.split(" ")[1];
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
@@ -103,14 +102,11 @@ async function requireAuthOrSetup(req, res, next) {
 }
 
 async function optionalAuth(req, res, next) {
-    const authHeader = req.headers["authorization"];
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const token = tokenFrom(req);
+    if (!token) {
         req.user = null;
         return next();
     }
-
-    const token = authHeader.split(" ")[1];
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);

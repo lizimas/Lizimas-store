@@ -221,7 +221,7 @@ exports.getMessages = async (req, res) => {
         // Primary-key lookup plus a primary-key join, so this stays
         // cheap enough to sit on the poll path.
         const owner = await pool.query(
-            `SELECT c.status, u.name AS assigned_staff_name
+            `SELECT c.status, c.csat_score, u.name AS assigned_staff_name
              FROM chat_conversations c
              LEFT JOIN users u ON u.id = c.assigned_staff_id
              WHERE c.id = $1`,
@@ -230,6 +230,7 @@ exports.getMessages = async (req, res) => {
 
         res.json({
             status: owner.rows[0] ? owner.rows[0].status : conv.status,
+            csat_score: owner.rows[0] ? owner.rows[0].csat_score : null,
             customer_unread: conv.customer_unread,
             assigned_staff_name: owner.rows[0]
                 ? owner.rows[0].assigned_staff_name
@@ -951,5 +952,115 @@ exports.getTeam = async (req, res) => {
     } catch (error) {
         console.error("Get team error:", error);
         res.status(500).json({ message: "Failed to load the team" });
+    }
+};
+
+
+// ---------------------------------------------------------------------------
+// Support Phases 2-4 (Ryan, Sept 2026)
+// ---------------------------------------------------------------------------
+
+// Public: POST /api/chat/:id/rating { score 1-5, comment? } - the customer's
+// "How did we do?" after a closed chat. One rating per chat.
+exports.rateConversation = async (req, res) => {
+    try {
+        const conv = await loadOwnedConversation(req.params.id, req);
+        if (!conv) return res.status(404).json({ message: "Conversation not found" });
+        const score = Number(req.body && req.body.score);
+        if (!Number.isInteger(score) || score < 1 || score > 5) {
+            return res.status(400).json({ message: "Pick 1 to 5 stars." });
+        }
+        const comment = String((req.body && req.body.comment) || "").trim().slice(0, 1000) || null;
+        const r = await pool.query(
+            `UPDATE chat_conversations
+                SET csat_score = $2, csat_comment = $3, csat_at = CURRENT_TIMESTAMP
+              WHERE id = $1 AND status = 'closed' AND csat_score IS NULL
+              RETURNING id`,
+            [conv.id, score, comment]
+        );
+        if (!r.rows[0]) return res.status(409).json({ message: "This chat has already been rated, or is still open." });
+        try {
+            await logEvent(pool, { conversationId: conv.id, eventType: "csat", actorType: "customer", meta: { score, comment } });
+        } catch (e) { /* rating is saved; the event is a nice-to-have */ }
+        res.json({ message: "Thank you for your feedback!" });
+    } catch (error) {
+        console.error("Rate conversation error:", error);
+        res.status(500).json({ message: "Failed to save your rating" });
+    }
+};
+
+// Staff: GET /api/chat/conversations/:id/context - who the customer is and
+// their recent orders, so the agent doesn't have to ask.
+exports.getConversationContext = async (req, res) => {
+    try {
+        const c0 = await pool.query(
+            `SELECT c.id, c.assigned_staff_id, c.customer_id, c.guest_phone, c.guest_email, c.guest_name
+               FROM chat_conversations c WHERE c.id = $1`,
+            [req.params.id]
+        );
+        const conv = c0.rows[0];
+        if (!conv) return res.status(404).json({ message: "Conversation not found" });
+        if (!(await requireChatAccess(req, res, conv))) return;
+
+        let customer = null;
+        if (conv.customer_id) {
+            const u = await pool.query(
+                "SELECT id, name, email, phone, created_at FROM users WHERE id = $1",
+                [conv.customer_id]
+            );
+            customer = u.rows[0] || null;
+        }
+        const phone = (customer && customer.phone) || conv.guest_phone || null;
+        const email = (customer && customer.email) || conv.guest_email || null;
+        const digits = phone ? String(phone).replace(/\D/g, "").slice(-9) : null;
+
+        // Orders: the account's own, or a guest's matched on phone/email.
+        const params = [];
+        const where = [];
+        if (conv.customer_id) { params.push(conv.customer_id); where.push(`o.user_id = $${params.length}`); }
+        if (digits && digits.length >= 9) { params.push("%" + digits); where.push(`regexp_replace(COALESCE(o.phone, ''), '\\D', '', 'g') LIKE $${params.length}`); }
+        if (email) { params.push(String(email).toLowerCase()); where.push(`LOWER(COALESCE(o.customer_email, '')) = $${params.length}`); }
+
+        let orders = [];
+        let totals = { orders: 0, spent: 0 };
+        if (where.length) {
+            const o = await pool.query(
+                `SELECT o.id, o.status, o.total, o.payment_method, o.created_at,
+                        (SELECT COUNT(*)::int FROM order_items oi WHERE oi.order_id = o.id) AS items
+                   FROM orders o
+                  WHERE ${where.join(" OR ")}
+                  ORDER BY o.created_at DESC
+                  LIMIT 5`,
+                params
+            );
+            orders = o.rows;
+            const t = await pool.query(
+                `SELECT COUNT(*)::int AS orders,
+                        COALESCE(SUM(o.total) FILTER (WHERE o.status NOT IN ('cancelled')), 0)::numeric AS spent
+                   FROM orders o WHERE ${where.join(" OR ")}`,
+                params
+            );
+            totals = { orders: t.rows[0].orders, spent: Number(t.rows[0].spent) };
+        }
+
+        const prev = await pool.query(
+            `SELECT COUNT(*)::int AS chats, ROUND(AVG(csat_score)::numeric, 1) AS avg_csat
+               FROM chat_conversations
+              WHERE id <> $1 AND (($2::int IS NOT NULL AND customer_id = $2)
+                    OR ($3::text IS NOT NULL AND guest_phone = $3))`,
+            [conv.id, conv.customer_id, conv.guest_phone]
+        );
+
+        res.json({
+            customer: customer ? { name: customer.name, email: customer.email, phone: customer.phone, member_since: customer.created_at } : null,
+            guest: customer ? null : { name: conv.guest_name, phone: conv.guest_phone, email: conv.guest_email },
+            orders,
+            totals,
+            previous_chats: prev.rows[0].chats,
+            previous_avg_csat: prev.rows[0].avg_csat != null ? Number(prev.rows[0].avg_csat) : null
+        });
+    } catch (error) {
+        console.error("Conversation context error:", error);
+        res.status(500).json({ message: "Failed to load the customer details" });
     }
 };

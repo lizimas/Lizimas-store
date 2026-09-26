@@ -1,10 +1,10 @@
 const pool = require("../config/database");
 
 // Seller Score / Seller Performance (spec: "Seller Score - vendor sees it,
-// Lizimas calculates" + Ryan's Sept 2026 ask to show a Jumia-style seller
+// Lizimas calculates" + Ryan's Sept 2026 ask to show a seller
 // panel on product pages). Four independent signals, each turned into a
 // 0-100 sub-score and bucketed into the same Excellent/Good/Fair/Poor
-// labels Jumia uses, plus one weighted overall percentage.
+// labels Lizimas uses, plus one weighted overall percentage.
 //
 // Every threshold and weight below is a considered starting point, not a
 // business rule handed down in a spec - same spirit as the 15% default

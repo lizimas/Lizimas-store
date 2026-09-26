@@ -1,6 +1,6 @@
 -- 108_product_quality_score.sql
--- Per-listing Quality/Content Score + duplicate-listing detection (Jumia
--- Vendor Center comparison, September 2026). Jumia shows a content-quality
+-- Per-listing Quality/Content Score + duplicate-listing detection (Channel
+-- Vendor Center comparison, September 2026). Channel shows a content-quality
 -- indicator on every listing (image count, description length, identifiers
 -- filled in) and flags likely duplicate submissions during upload - this
 -- migration adds the columns that back both.

@@ -52,12 +52,18 @@ if (vendorSignupAbandonmentEnabled) {
     console.warn("Vendor signup abandonment alerts DISABLED (set ADMIN_ALERT_EMAIL, or VENDOR_SIGNUP_ABANDONMENT_ALERTS_ENABLED=false was set)");
 }
 
+// Flash sale auto-rerun (migration 136): restarts recurring campaigns when
+// their countdown ends. The public/admin endpoints also catch up on read.
+const flashSaleRecurrence = require("./utils/flashSaleRecurrence");
+flashSaleRecurrence.start(require("./config/database"));
+
 // Stop the timer before the process goes away, so a deploy cannot kill the
 // dyno mid-tick and leave a claimed payment row unresolved.
 function shutdown(signal) {
     console.log(`${signal} received, shutting down`);
     if (reconcilerEnabled) reconciler.stop();
     if (vendorSignupAbandonmentEnabled) vendorSignupAbandonment.stop();
+    flashSaleRecurrence.stop();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 10000).unref();
 }

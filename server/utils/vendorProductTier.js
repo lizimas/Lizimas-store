@@ -1,4 +1,4 @@
-// Product-count limit tiers (Jumia Vendor Center comparison, September
+// Product-count limit tiers (September
 // 2026 - see migrations/109_vendor_product_tiers.sql's header for the full
 // design). Computed on demand, same spirit as sellerScore.js - no caching
 // or background job until that becomes a real load problem.

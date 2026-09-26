@@ -409,12 +409,13 @@ function createSupportAdminController(db) {
 
     // escalated_at is the fairest "started" point for agent metrics — time
     // spent reading FAQ answers before escalation isn't the agent's to own.
-    // No csat_score column exists yet, so that's always null for now.
+    // escalated = passed up to a senior agent (Senior Agent role);
+    // csat_score = the customer's 1-5 rating (migration 137).
     const { rows } = await db.query(
       `SELECT c.assigned_staff_id AS agent_id, u.name AS agent_name,
               c.escalated_at AS started_at, c.first_response_at, c.closed_at,
-              (c.escalation_reason IS NOT NULL) AS escalated,
-              NULL::INTEGER AS csat_score
+              (COALESCE(c.escalation_level, 0) > 0) AS escalated,
+              c.csat_score
        FROM chat_conversations c
        LEFT JOIN users u ON u.id = c.assigned_staff_id
        WHERE c.status = 'closed' AND c.escalated_at IS NOT NULL
@@ -422,6 +423,66 @@ function createSupportAdminController(db) {
       [start, end]
     );
     res.json({ report: aggregatePerformance(rows) });
+  }
+
+  // ---------- Analytics (Support Phase 4) ----------
+  // GET /api/admin/support/analytics?days=7|30|90 - volume, speed,
+  // satisfaction and escalations over a period, overall, per day and per
+  // department, plus the latest customer comments.
+  async function getAnalytics(req, res) {
+    const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 30;
+    const since = `CURRENT_DATE - INTERVAL '${days - 1} days'`;
+    const totals = await db.query(
+      `SELECT COUNT(*)::int AS chats,
+              COUNT(*) FILTER (WHERE status = 'closed')::int AS closed,
+              COUNT(*) FILTER (WHERE resolved_at IS NOT NULL)::int AS resolved,
+              COUNT(*) FILTER (WHERE COALESCE(escalation_level, 0) > 0)::int AS escalated,
+              ROUND(AVG(EXTRACT(EPOCH FROM (first_response_at - COALESCE(escalated_at, created_at))))
+                    FILTER (WHERE first_response_at IS NOT NULL AND first_response_at >= COALESCE(escalated_at, created_at)))::int AS avg_first_response_s,
+              ROUND(AVG(EXTRACT(EPOCH FROM (closed_at - COALESCE(escalated_at, created_at))))
+                    FILTER (WHERE closed_at IS NOT NULL AND closed_at >= COALESCE(escalated_at, created_at)))::int AS avg_resolution_s,
+              COUNT(csat_score)::int AS ratings,
+              ROUND(AVG(csat_score)::numeric, 2) AS avg_csat,
+              COUNT(*) FILTER (WHERE csat_score >= 4)::int AS happy
+         FROM chat_conversations WHERE created_at >= ${since}`
+    );
+    const perDay = await db.query(
+      `SELECT to_char(d::date, 'YYYY-MM-DD') AS day,
+              COUNT(c.id)::int AS chats,
+              ROUND(AVG(c.csat_score)::numeric, 2) AS avg_csat
+         FROM generate_series(${since}, CURRENT_DATE, INTERVAL '1 day') d
+         LEFT JOIN chat_conversations c ON c.created_at::date = d::date
+        GROUP BY d ORDER BY d`
+    );
+    const byDept = await db.query(
+      `SELECT COALESCE(department, 'uncategorized') AS department,
+              COUNT(*)::int AS chats,
+              COUNT(*) FILTER (WHERE COALESCE(escalation_level, 0) > 0)::int AS escalated,
+              ROUND(AVG(csat_score)::numeric, 2) AS avg_csat
+         FROM chat_conversations WHERE created_at >= ${since}
+        GROUP BY 1 ORDER BY chats DESC`
+    );
+    const dist = await db.query(
+      `SELECT csat_score AS score, COUNT(*)::int AS n FROM chat_conversations
+        WHERE csat_score IS NOT NULL AND created_at >= ${since} GROUP BY 1 ORDER BY 1`
+    );
+    const comments = await db.query(
+      `SELECT c.id, c.csat_score, c.csat_comment, c.csat_at, u.name AS agent_name
+         FROM chat_conversations c LEFT JOIN users u ON u.id = c.assigned_staff_id
+        WHERE c.csat_comment IS NOT NULL AND c.created_at >= ${since}
+        ORDER BY c.csat_at DESC LIMIT 20`
+    );
+    const t = totals.rows[0];
+    res.json({
+      days,
+      totals: { ...t, avg_csat: t.avg_csat != null ? Number(t.avg_csat) : null,
+                escalation_rate: t.chats ? +(t.escalated / t.chats).toFixed(3) : 0,
+                satisfaction_rate: t.ratings ? +(t.happy / t.ratings).toFixed(3) : null },
+      per_day: perDay.rows.map((r) => ({ ...r, avg_csat: r.avg_csat != null ? Number(r.avg_csat) : null })),
+      by_department: byDept.rows.map((r) => ({ ...r, avg_csat: r.avg_csat != null ? Number(r.avg_csat) : null })),
+      csat_distribution: [1, 2, 3, 4, 5].map((n) => ({ score: n, n: (dist.rows.find((r) => r.score === n) || { n: 0 }).n })),
+      comments: comments.rows
+    });
   }
 
   // ---------- Audit log ----------
@@ -457,6 +518,7 @@ function createSupportAdminController(db) {
     getLiveOverview,
     listEscalations,
     getPerformanceReport,
+    getAnalytics,
     listAuditLog,
     _logAction: logAction,
   };

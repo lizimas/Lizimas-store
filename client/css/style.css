@@ -5547,8 +5547,7 @@ body.sheet-open {
 }
 
 /* ---------------------------------------------------------------------
-   Seller Information panel (client/js/seller-panel.js) - the Jumia-style
-   box shown on the product page sidebar and the storefront header: seller
+   Seller Information panel (client/js/seller-panel.js) - the box shown on the product page sidebar and the storefront header: seller
    score, followers + Follow button, and a performance checklist. Never
    shows a commission rate or amount - see productController.js's
    redactCommissionForVendor for why.

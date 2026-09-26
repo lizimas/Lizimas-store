@@ -1,9 +1,9 @@
 // Payment Instrument Approval (Phase 5, Ryan Sept 2026 - modelled on
-// Jumia's Vendor Center payout-account verification). See
+// Vendor Center payout-account verification). See
 // server/utils/vendorPaymentInstruments.js for the name-match/edit-lock
 // rules and migrations/103_vendor_payment_instruments.sql for the schema.
 //
-// Jumia-parity extension (migration 122): evidence document columns
+// parity extension (migration 122): evidence document columns
 // directly on vendor_payment_instruments (not vendor_kyc_documents - a
 // vendor can hold several instruments, each needing its own proof).
 // canApprovePaymentInstrument() (server/utils/vendorPaymentInstruments.js)
@@ -194,7 +194,7 @@ exports.updateMyPaymentInstrument = async (req, res) => {
 
 // Vendor uploads (or replaces) the supporting evidence document for one
 // of their own payment instruments - a bank certificate or MoMo
-// statement proving the account is really theirs (Jumia-parity, migration
+// statement proving the account is really theirs (parity, migration
 // 122). Allowed while the instrument is pending (the normal flow: create,
 // then add evidence) or rejected (fixing/resubmitting evidence along with
 // the account details); locked once approved, same as editing the
@@ -352,7 +352,7 @@ exports.listPaymentInstrumentsAdmin = async (req, res) => {
 };
 
 // Approve or reject one instrument, with a reason (required on reject).
-// Approving requires evidence on file (Jumia-parity, migration 122) -
+// Approving requires evidence on file (parity, migration 122) -
 // rejecting never does, since an admin can reject an instrument that
 // never got any evidence uploaded at all.
 exports.reviewPaymentInstrumentAdmin = async (req, res) => {

@@ -51,6 +51,7 @@ router.get('/escalations', wrapAsync(controller.listEscalations));
 
 // Reporting & audit
 router.get('/performance', wrapAsync(controller.getPerformanceReport));
+router.get('/analytics', wrapAsync(controller.getAnalytics));
 router.get('/audit-log', wrapAsync(controller.listAuditLog));
 
 module.exports = router;

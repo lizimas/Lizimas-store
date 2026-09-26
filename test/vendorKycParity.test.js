@@ -14,7 +14,7 @@ const {
 
 // --- isValidKycDocumentType -------------------------------------------------
 
-test("isValidKycDocumentType: accepts every type in the widened Jumia-parity set", () => {
+test("isValidKycDocumentType: accepts every type in the widened parity set", () => {
     for (const type of KYC_DOCUMENT_TYPES) {
         assert.equal(isValidKycDocumentType(type), true, `expected ${type} to be valid`);
     }

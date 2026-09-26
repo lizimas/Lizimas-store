@@ -1,5 +1,5 @@
 -- 127_products_lizimas_sku.sql
--- Lizimas Store SKU (Ryan, Sept 2026 - Jumia's "Jumia SKU" vs "Seller SKU").
+-- Lizimas Store SKU (Ryan, Sept 2026 - the channel's "Channel SKU" vs "Seller SKU").
 --
 --   products.sku          = Seller SKU: the vendor's own code (free text).
 --                           When a vendor leaves it blank the app still fills
@@ -11,7 +11,7 @@
 --                           products, LS for staff products / no brand.
 --
 -- Filled by a BEFORE INSERT trigger, so every insert path (vendor form,
--- staff form, CSV import, Jumia sync) gets one without code changes.
+-- staff form, CSV import, Channel sync) gets one without code changes.
 -- Existing products: a generated-looking Seller SKU (…LZMS, unique) is
 -- reused as the Lizimas Store SKU so codes vendors already see stay valid;
 -- everything else gets a new code.

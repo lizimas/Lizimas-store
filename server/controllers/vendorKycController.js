@@ -1,4 +1,4 @@
-// Vendor KYC & Compliance Profile (Ryan, Sept 2026 - modelled on Jumia's
+// Vendor KYC & Compliance Profile (Ryan, Sept 2026 -
 // KYC/verification approach: identity/business-registration data kept
 // separate from the normal vendor profile, encrypted at rest, reviewed
 // through an explicit status workflow with an audit trail). See
@@ -14,7 +14,7 @@
 // See scripts/backfill-vendor-kyc.js for the one-time move of existing
 // values into this encrypted table.
 //
-// Jumia-parity extension (migration 122): TIN/VAT number fields, a
+// parity extension (migration 122): TIN/VAT number fields, a
 // requires_work_permit flag, and Form 20/work permit document types.
 // requiredDocumentTypesForKyc() (server/utils/vendorKyc.js) is the single
 // source of truth for what's required per account_type - both the
@@ -290,7 +290,7 @@ exports.uploadMyKycDocument = async (req, res) => {
         const documentType = req.body.document_type;
         // tax_certificate is also accepted (optional) for individual accounts -
         // the shop-setup Company Information step shows the TIN upload to
-        // every vendor, as Jumia does.
+        // every vendor.
         const allowedTypes = [...new Set([...requiredDocumentTypesForKyc({ accountType: vendor.account_type, requiresWorkPermit: true }), "tax_certificate"])];
         if (!allowedTypes.includes(documentType)) {
             return res.status(400).json({

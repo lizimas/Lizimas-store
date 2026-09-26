@@ -1,5 +1,5 @@
 // Vendor Brand Authorization (Phase 7, Ryan Sept 2026 - modelled on
-// Jumia's brand authorization tiers: Official Brand Store vs Authorized
+// Lizimas brand authorization tiers: Official Brand Store vs Authorized
 // Distributor). Shape deliberately mirrors vendorKycController.js -
 // vendor self-service (list/submit/upload docs) plus admin review - see
 // server/utils/vendorBrandAuth.js for the tier/status rules used here and

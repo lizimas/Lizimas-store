@@ -1,7 +1,7 @@
 // Phase 4 - Vendor Billing Cycles controller.
 //
 // Weekly cycles (Mon-Sun) pay every vendor on a fixed schedule, matching
-// Jumia's Vendor Center. Instead of on-demand payout requests, admin (or
+// the Vendor Center. Instead of on-demand payout requests, admin (or
 // later, cron) closes each week to generate vendor_statements.
 // The current OPEN cycle accumulates earnings; admin closes it (manually here,
 // via cron in Phase 4B) to generate one vendor_statements row per vendor with
@@ -26,7 +26,7 @@ const { sendStatementReadyEmail, sendStatementPaidEmail } = require("../utils/ma
 
 // First day of a bi-weekly period. Given a date, returns the start of the
 // cycle that date falls into: 1st-15th or 16th-end-of-month.
-// Weekly cycle: Monday through Sunday, matching Jumia's Vendor Center.
+// Weekly cycle: Monday through Sunday.
 // Given any date, returns the ISO date strings for the Monday and Sunday
 // of the week it falls into.
 function cycleBoundsForDate(d) {
@@ -1001,7 +1001,7 @@ exports.serveSharedStatement = async (req, res) => {
 // Powers the vendor's Account Statements page. Returns:
 //   - currentCycle: the OPEN cycle right now (or null), with days remaining
 //   - statements:   ALL of this vendor's statements, newest first
-//   - metrics:      the 3 Jumia-style summary cards
+//   - metrics:      the 3 summary cards
 //     * due_and_unpaid         = sum of UNPAID statements (pending + approved + failed + rolled)
 //     * open_statement_estimated = current cycle's running total (not yet closed)
 //     * paid_last_3_months     = sum of paid statements in the last 90 days

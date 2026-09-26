@@ -1,6 +1,6 @@
 -- 079_vendor_kyc.sql
 -- Vendor KYC & Compliance Profile (Ryan, Sept 2026 - "give every vendor
--- a KYC status", modelled on Jumia's KYC/verification approach). Splits
+-- a KYC status" KYC/verification approach). Splits
 -- identity/business-registration data out of the vendors table into its
 -- own restricted table, encrypted at rest, with an explicit review
 -- workflow and audit trail - separate from vendors.status, which only

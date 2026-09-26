@@ -1,6 +1,6 @@
 -- 103_vendor_payment_instruments.sql
 -- Phase 5 - Payment Instrument Approval (Ryan, Sept 2026 - modelled on
--- Jumia's Vendor Center payout-account verification).
+-- the channel's Vendor Center payout-account verification).
 --
 -- Why: the existing payout guard (markStatementPaid) only checks KYC
 -- STATUS - whether this vendor's identity is verified - never WHERE the

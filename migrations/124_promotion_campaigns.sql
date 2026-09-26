@@ -1,6 +1,6 @@
 -- 124_promotion_campaigns.sql
 -- Lizimas-run promotion campaigns vendors can join (Ryan, Sept 2026 -
--- Jumia Vendor Center "Promotions Management" parity: e.g. "PAYWEEK DEALS",
+-- Vendor Center "Promotions Management" parity: e.g. "PAYWEEK DEALS",
 -- "BLACK FRIDAY - PHONES & TABLETS").
 --
 -- Admin creates a campaign with a registration deadline, a live period and

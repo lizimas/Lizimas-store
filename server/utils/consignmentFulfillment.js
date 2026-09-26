@@ -1,4 +1,4 @@
-// Consignment order-routing (Jumia "Fulfillment by Jumia" comparison,
+// Consignment order-routing ("Fulfillment by Lizimas",
 // migrations 110/114) - the single decision checkoutController.js needs at
 // checkout time: does this line item get fulfilled straight from stock
 // Lizimas is already physically holding at a hub (vendor_consignments/

@@ -1,5 +1,5 @@
 // Vendor shop-setup onboarding (mobile Home, Ryan Sept 2026) - the
-// Jumia-style "Let's take your shop live!" checklist. Pure helpers only
+// "Let's take your shop live!" checklist. Pure helpers only
 // (no DB), so the step rules are unit-testable and shared by the
 // controller (server/controllers/vendorShopSetupController.js).
 //
@@ -19,7 +19,7 @@ const LEGAL_REP_ID_TYPE_LABELS = {
 
 const DEFAULT_COUNTRY = "Uganda";
 
-// Additional Information options (Jumia seller onboarding parity).
+// Additional Information options (Lizimas seller onboarding).
 const SELLER_TYPES = ["manufacturer", "brand_owner", "distributor", "wholesaler", "retailer", "importer", "reseller"];
 const SELLER_TYPE_LABELS = {
     manufacturer: "Manufacturer",
@@ -204,7 +204,7 @@ function validateShippingInfo(body, { businessAddress }) {
     const ret = returnSame && businessAddress ? { ...businessAddress } : pickAddress(body, "return");
 
     errors.push(...validateAddress(ship, "Shipping Address"));
-    // Return address isn't marked Required in the Jumia flow; validate
+    // Return address isn't marked Required in this flow; validate
     // lengths only unless something was entered, in which case the core
     // fields must be complete (a half-filled return address is useless).
     const retTouched = Object.values(ret).some(filled);

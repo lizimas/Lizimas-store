@@ -13,7 +13,7 @@ function fakeRunner(nextval) {
     };
 }
 
-test("generateShopId matches Jumia's Shop ID shape: UG + digits + 2 uppercase letters", async () => {
+test("generateShopId matches the Shop ID shape: UG + digits + 2 uppercase letters", async () => {
     const shopId = await generateShopId(fakeRunner(140));
     assert.match(shopId, /^UG\d{3,}[A-Z]{2}$/);
     assert.equal(shopId.startsWith("UG140"), true);

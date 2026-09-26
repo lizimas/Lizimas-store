@@ -191,8 +191,8 @@ exports.checkout = async (req, res) => {
                     productId,
                     variantId: null,
                     vendorId: product.vendor_id,
-                    // Consignment order-routing (Jumia "Fulfillment by
-                    // Jumia" comparison, migration 110/114): only plain
+                    // Consignment order-routing (Fulfillment by Lizimas,
+                    // migration 110/114): only plain
                     // products carry fulfillment_type/consigned_stock -
                     // product_variants has no equivalent, so variant items
                     // above always take the normal vendor-handover path.
@@ -369,7 +369,7 @@ exports.checkout = async (req, res) => {
         }
 
         for (const item of validatedItems) {
-            // Consignment order-routing (Jumia "Fulfillment by Jumia"
+            // Consignment order-routing ("Fulfillment by Lizimas"
             // comparison, migration 110/114): when Lizimas is already
             // physically holding enough consigned_stock for a plain product,
             // skip the vendor handover step entirely - Lizimas already has

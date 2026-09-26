@@ -107,7 +107,7 @@ body {
 
 /* Primary "+ Add X" action button, reused across every tab (Products,
    Categories, Promotions, Discount Codes, Flash Sales, Notes) plus the
-   Products tab's Import/Export and Jumia toggles (which layer their own
+   Products tab's Import/Export and Sales Channel toggles (which layer their own
    inline background/color/border on top of this for an outline look).
    Never had a base size/style before - was rendering as a bare default
    button, hence "increase the size of these" reading small everywhere. */
@@ -856,7 +856,7 @@ select.status-select {
 }
 
 /* The category picker button replaces a plain <select> (Task: same
-   Jumia-style searchable modal the vendor form already has) - it isn't
+   searchable modal the vendor form already has) - it isn't
    covered by the input/select rule below since it's a <button>, so its
    text size is set to match explicitly. */
 #product-category-btn {
@@ -1544,9 +1544,9 @@ select.status-select {
 
 /* --- Specs "insert table" paste tool (Word-style: pick rows/columns, then
    paste Excel data straight into the grid) --- */
-/* Word/Jumia-style hover grid for picking a table size (replaces the
+/* Word/hover grid for picking a table size (replaces the
    earlier rows/columns number-input version per Ryan's screenshot of
-   Jumia's own "insert table" picker - hover highlights a block of cells
+   an "insert table" picker - hover highlights a block of cells
    and shows "cols x rows", click inserts a table that size). */
 .specs-table-grid-wrap { position: relative; display: inline-block; margin-bottom: 8px; }
 .specs-table-grid-trigger { padding: 7px 12px; border-radius: 6px; border: 1px solid #1a1a2e; background: #1a1a2e; color: #fff; cursor: pointer; font-size: 12.5px; }
@@ -2386,7 +2386,7 @@ table.lz-dr-cal td {
 }
 
 /* --- Table block editor (client/js/lz-table.js) ---------------------------
-   CKEditor/Jumia-style: a small toolbar (Column / Row / Merge menus) above
+   CKEditor/: a small toolbar (Column / Row / Merge menus) above
    the table; header rows/columns render bold on a grey band. */
 .lzbe-table-hint { font-size: 12px; color: #6b7280; margin: 2px 0 8px; }
 .lzt-editor { position: relative; }

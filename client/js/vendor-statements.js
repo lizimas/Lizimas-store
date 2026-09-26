@@ -2,11 +2,11 @@
 //
 // Mounted at #vendor-statements-root inside the Wallet tab when the
 // vendor clicks the "Statements" sub-tab. Replaces the standalone wallet
-// layout with the Jumia-style list + detail split.
+// layout with the list + detail split.
 //
 // Depends on:
 //   - vendorAuthorizedFetch() and vendorEsc() from vendor-dashboard.js
-//   - formatUgx() - local helper (Jumia-style currency suffix)
+//   - formatUgx() - local helper (currency suffix)
 
 let vendorStatementsState = {
     loaded: false,
@@ -16,7 +16,7 @@ let vendorStatementsState = {
     selectedStatementId: null
 };
 
-// Format: "561,060.00 UGX" - Jumia-style suffix, not prefix.
+// Format: "561,060.00 UGX" - suffix, not prefix.
 function vsFormatMoney(amount, currency) {
     const n = Number(amount) || 0;
     const abs = Math.abs(n).toLocaleString("en-UG", {

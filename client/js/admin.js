@@ -965,7 +965,7 @@ function adminParseSpecLine(line) {
     return { label: line.trim(), value: "" };
 }
 
-// --- Insert-table paste tool (Task: Word/Jumia-style hover grid - click
+// --- Insert-table paste tool (Task: Word/hover grid - click
 // the trigger, hover to pick a size (the grid highlights and shows
 // "cols x rows" as you move), click to insert a real table that size.
 // Click a cell and paste; the pasted range fills the grid starting at
@@ -1225,7 +1225,7 @@ function renderCategorySelect(selectedId) {
     syncAdminProductCategoryButtonLabel();
 }
 
-// Jumia-style searchable category picker (Task: swap the plain long
+// searchable category picker (Task: swap the plain long
 // <select> in the Add Product form for the same full-screen search +
 // drill-down modal the vendor Add Product form already uses -
 // client/js/category-picker.js, shared unchanged). The underlying
@@ -1562,125 +1562,125 @@ async function uploadProductsCsv() {
     }
 }
 
-// --- Admin Jumia Applications (store-level, Lizimas's own products only -
-// vendor_id IS NULL - migration 085 / jumiaAdminController.js). Mirrors
-// vendor-dashboard.js's vd* Jumia functions structurally, but talks to
-// /api/admin/jumia/* and has no vendor concept: there is only one store,
+// --- Admin Channel Applications (store-level, Lizimas's own products only -
+// vendor_id IS NULL - migration 085 / channelAdminController.js). Mirrors
+// vendor-dashboard.js's vd* Channel functions structurally, but talks to
+// /api/admin/channel/* and has no vendor concept: there is only one store,
 // so there is only one Applications list, and the OAuth callback lands
 // back on /admin.html#products instead of the vendor dashboard. ---
 
-let ajJumiaApplications = [];
-let ajJumiaSetupAppId = null;
-let ajJumiaExportCandidates = [];
-let ajJumiaExportSelected = new Set();
-let ajJumiaImportSelected = new Set();
-let ajJumiaRemoteProductsCache = new Map();
+let ajChannelApplications = [];
+let ajChannelSetupAppId = null;
+let ajChannelExportCandidates = [];
+let ajChannelExportSelected = new Set();
+let ajChannelImportSelected = new Set();
+let ajChannelRemoteProductsCache = new Map();
 
-function toggleAdminJumiaPanel() {
-    const panel = document.getElementById("admin-jumia-panel");
+function toggleAdminChannelPanel() {
+    const panel = document.getElementById("admin-channel-panel");
     if (!panel) return;
     const wasHidden = panel.classList.contains("hidden");
     panel.classList.toggle("hidden");
-    if (wasHidden) ajLoadJumia();
+    if (wasHidden) ajLoadChannel();
 }
 
-async function ajLoadJumia() {
+async function ajLoadChannel() {
     try {
-        const apps = await authorizedFetch("/api/admin/jumia/applications");
-        if (apps.error) { console.error("ajLoadJumia error:", apps.error); return; }
-        ajJumiaApplications = Array.isArray(apps) ? apps : [];
-        ajRenderJumiaApplicationsTable();
+        const apps = await authorizedFetch("/api/admin/channel/applications");
+        if (apps.error) { console.error("ajLoadChannel error:", apps.error); return; }
+        ajChannelApplications = Array.isArray(apps) ? apps : [];
+        ajRenderChannelApplicationsTable();
 
-        const activeApp = ajJumiaApplications.find(a => a.is_active);
-        const syncPanel = document.getElementById("aj-jumia-sync-panel");
+        const activeApp = ajChannelApplications.find(a => a.is_active);
+        const syncPanel = document.getElementById("aj-channel-sync-panel");
         if (activeApp && activeApp.connected) {
             syncPanel.classList.remove("hidden");
-            ajLoadJumiaLinks();
+            ajLoadChannelLinks();
         } else {
             syncPanel.classList.add("hidden");
-            document.getElementById("aj-jumia-import-panel").classList.add("hidden");
-            document.getElementById("aj-jumia-export-panel").classList.add("hidden");
+            document.getElementById("aj-channel-import-panel").classList.add("hidden");
+            document.getElementById("aj-channel-export-panel").classList.add("hidden");
         }
     } catch (error) {
-        console.error("ajLoadJumia error:", error);
+        console.error("ajLoadChannel error:", error);
     }
 }
 
-// Picked up once on page load - the query string Jumia's OAuth redirect
-// lands the admin back on after adminJumiaOAuthCallback finishes (see
-// jumiaAdminController.js). Switches to the Products tab and opens the
-// Jumia panel so the result is visible without extra clicks.
-let ajJumiaOAuthReturnHandled = false;
+// Picked up once on page load - the query string the channel's OAuth redirect
+// lands the admin back on after adminChannelOAuthCallback finishes (see
+// channelAdminController.js). Switches to the Products tab and opens the
+// Channel panel so the result is visible without extra clicks.
+let ajChannelOAuthReturnHandled = false;
 
-function ajCheckJumiaOAuthReturn() {
+function ajCheckChannelOAuthReturn() {
     const params = new URLSearchParams(window.location.search);
-    const result = params.get("jumia_oauth");
+    const result = params.get("channel_oauth");
     if (!result) return;
-    if (ajJumiaOAuthReturnHandled) return;
-    ajJumiaOAuthReturnHandled = true;
+    if (ajChannelOAuthReturnHandled) return;
+    ajChannelOAuthReturnHandled = true;
 
     const tabButton = document.querySelector('.tab-btn[data-tab="products"]');
     if (tabButton) tabButton.click();
-    const panel = document.getElementById("admin-jumia-panel");
-    if (panel) { panel.classList.remove("hidden"); ajLoadJumia(); }
+    const panel = document.getElementById("admin-channel-panel");
+    if (panel) { panel.classList.remove("hidden"); ajLoadChannel(); }
 
     if (result === "success") {
-        alert("Connected to Jumia.");
+        alert("Connected to the sales channel.");
     } else if (result === "error") {
-        alert("Could not connect to Jumia: " + (params.get("message") || "Please try again."));
+        alert("Could not connect to the sales channel: " + (params.get("message") || "Please try again."));
     }
-    params.delete("jumia_oauth");
+    params.delete("channel_oauth");
     params.delete("message");
     const newSearch = params.toString();
     const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : "") + window.location.hash;
     window.history.replaceState({}, "", newUrl);
 }
 
-const AJ_JUMIA_TYPE_LABEL = { self_authorization: "Self Authorization", web_application: "Web Application" };
-const AJ_JUMIA_STATUS_PILL = {
+const AJ_CHANNEL_TYPE_LABEL = { self_authorization: "Self Authorization", web_application: "Web Application" };
+const AJ_CHANNEL_STATUS_PILL = {
     connected: ["Connected", "#16A34A"],
     error: ["Error", "#DC2626"],
     token_expired: ["Reconnect", "#B45309"],
     disconnected: ["Not connected", "#888"]
 };
-const AJ_JUMIA_STATUS_LABEL = {
+const AJ_CHANNEL_STATUS_LABEL = {
     pending: ["Pending", "#888"],
     synced: ["Synced", "#16A34A"],
     failed: ["Failed", "#DC2626"],
     out_of_sync: ["Changed since last sync", "#B45309"]
 };
 
-function ajRenderJumiaApplicationsTable() {
-    const host = document.getElementById("aj-jumia-applications-table");
+function ajRenderChannelApplicationsTable() {
+    const host = document.getElementById("aj-channel-applications-table");
     if (!host) return;
-    if (ajJumiaApplications.length === 0) {
-        host.innerHTML = '<p style="font-size:13px; color:#888; padding:8px 0;">No Applications yet. Create one to connect Lizimas to your Jumia Vendor Center account.</p>';
+    if (ajChannelApplications.length === 0) {
+        host.innerHTML = '<p style="font-size:13px; color:#888; padding:8px 0;">No Applications yet. Create one to connect Lizimas to your Vendor Center account.</p>';
         return;
     }
-    const rows = ajJumiaApplications.map(app => {
-        const [statusLabel, statusColor] = AJ_JUMIA_STATUS_PILL[app.connection_status] || [app.connection_status, "#888"];
+    const rows = ajChannelApplications.map(app => {
+        const [statusLabel, statusColor] = AJ_CHANNEL_STATUS_PILL[app.connection_status] || [app.connection_status, "#888"];
         const created = app.created_at ? new Date(app.created_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "";
         const activeCell = app.is_active
             ? '<span style="font-size:11.5px; font-weight:700; color:#16A34A;">&bull; ACTIVE</span>'
             : (app.connected
-                ? `<button type="button" onclick="ajMakeJumiaAppActive(${app.id})" style="font-size:11.5px; padding:4px 8px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer;">Make Active</button>`
+                ? `<button type="button" onclick="ajMakeChannelAppActive(${app.id})" style="font-size:11.5px; padding:4px 8px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer;">Make Active</button>`
                 : '<span style="font-size:11.5px; color:#bbb;">&mdash;</span>');
         return `<tr>
             <td data-label="Name" style="font-weight:600; color:#1a1a2e;">${pdEsc(app.name)}</td>
-            <td data-label="Type" style="font-size:12.5px; color:#666;">${AJ_JUMIA_TYPE_LABEL[app.app_type] || app.app_type}</td>
+            <td data-label="Type" style="font-size:12.5px; color:#666;">${AJ_CHANNEL_TYPE_LABEL[app.app_type] || app.app_type}</td>
             <td data-label="Client ID" style="font-family:monospace; font-size:12px; color:#666;">${app.client_id ? pdEsc(app.client_id) : "&mdash;"}</td>
-            <td data-label="Status" title="${app.last_error ? pdEsc(app.last_error) : ""}" style="font-size:12.5px; font-weight:600; color:${statusColor};">${statusLabel}${app.jumia_shop_name ? `<div style="font-size:11px; font-weight:400; color:#999;">${pdEsc(app.jumia_shop_name)}</div>` : ""}</td>
+            <td data-label="Status" title="${app.last_error ? pdEsc(app.last_error) : ""}" style="font-size:12.5px; font-weight:600; color:${statusColor};">${statusLabel}${app.channel_shop_name ? `<div style="font-size:11px; font-weight:400; color:#999;">${pdEsc(app.channel_shop_name)}</div>` : ""}</td>
             <td data-label="Active">${activeCell}</td>
             <td data-label="Created At" style="font-size:12.5px; color:#888;">${created}</td>
             <td data-label="Actions">
                 <div style="display:flex; gap:6px;">
-                    <button type="button" title="${app.connected ? "Reconnect" : "Connect"}" onclick="ajShowJumiaAppSetup(${app.id})" style="background:none; border:1px solid #ccc; border-radius:6px; width:32px; height:32px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
+                    <button type="button" title="${app.connected ? "Reconnect" : "Connect"}" onclick="ajShowChannelAppSetup(${app.id})" style="background:none; border:1px solid #ccc; border-radius:6px; width:32px; height:32px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                     </button>
-                    ${app.is_active ? `<button type="button" title="Test Connection" onclick="ajTestJumiaApp(${app.id})" style="background:none; border:1px solid #ccc; border-radius:6px; width:32px; height:32px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
+                    ${app.is_active ? `<button type="button" title="Test Connection" onclick="ajTestChannelApp(${app.id})" style="background:none; border:1px solid #ccc; border-radius:6px; width:32px; height:32px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                     </button>` : ""}
-                    <button type="button" title="Delete" onclick="ajDeleteJumiaApp(${app.id})" style="background:none; border:1px solid #ccc; border-radius:6px; width:32px; height:32px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
+                    <button type="button" title="Delete" onclick="ajDeleteChannelApp(${app.id})" style="background:none; border:1px solid #ccc; border-radius:6px; width:32px; height:32px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                     </button>
                 </div>
@@ -1693,102 +1693,102 @@ function ajRenderJumiaApplicationsTable() {
     </table>`;
 }
 
-function ajShowCreateJumiaApplication() {
-    ajHideJumiaAppSetup();
-    const createViewEl = document.getElementById("aj-jumia-create-application-view");
+function ajShowCreateChannelApplication() {
+    ajHideChannelAppSetup();
+    const createViewEl = document.getElementById("aj-channel-create-application-view");
     createViewEl.classList.remove("hidden");
     createViewEl.style.display = "flex";
-    document.getElementById("aj-jumia-new-app-name").value = "";
-    document.getElementById("aj-jumia-new-app-error").textContent = "";
-    const selfRadio = document.querySelector('input[name="aj-jumia-new-app-type"][value="self_authorization"]');
+    document.getElementById("aj-channel-new-app-name").value = "";
+    document.getElementById("aj-channel-new-app-error").textContent = "";
+    const selfRadio = document.querySelector('input[name="aj-channel-new-app-type"][value="self_authorization"]');
     if (selfRadio) selfRadio.checked = true;
 }
 
-function ajHideCreateJumiaApplication() {
-    const createViewEl = document.getElementById("aj-jumia-create-application-view");
+function ajHideCreateChannelApplication() {
+    const createViewEl = document.getElementById("aj-channel-create-application-view");
     createViewEl.classList.add("hidden");
     createViewEl.style.display = "none";
 }
 
-async function ajCreateJumiaApplication() {
-    const name = document.getElementById("aj-jumia-new-app-name").value.trim();
-    const typeInput = document.querySelector('input[name="aj-jumia-new-app-type"]:checked');
-    const errorEl = document.getElementById("aj-jumia-new-app-error");
+async function ajCreateChannelApplication() {
+    const name = document.getElementById("aj-channel-new-app-name").value.trim();
+    const typeInput = document.querySelector('input[name="aj-channel-new-app-type"]:checked');
+    const errorEl = document.getElementById("aj-channel-new-app-error");
     if (!name) { errorEl.textContent = "Enter an Application Name."; return; }
     try {
-        const created = await authorizedFetch("/api/admin/jumia/applications", {
+        const created = await authorizedFetch("/api/admin/channel/applications", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name, app_type: typeInput ? typeInput.value : "self_authorization" })
         });
         if (created.error) { errorEl.textContent = created.error; return; }
-        ajHideCreateJumiaApplication();
-        await ajLoadJumia();
-        ajShowJumiaAppSetup(created.id);
+        ajHideCreateChannelApplication();
+        await ajLoadChannel();
+        ajShowChannelAppSetup(created.id);
     } catch (error) {
-        console.error("ajCreateJumiaApplication error:", error);
+        console.error("ajCreateChannelApplication error:", error);
         errorEl.textContent = "Could not connect to server.";
     }
 }
 
-function ajHideJumiaAppSetup() {
-    const setupViewEl = document.getElementById("aj-jumia-app-setup-view");
+function ajHideChannelAppSetup() {
+    const setupViewEl = document.getElementById("aj-channel-app-setup-view");
     setupViewEl.classList.add("hidden");
     setupViewEl.style.display = "none";
 }
 
-function ajShowJumiaAppSetup(applicationId) {
-    ajHideCreateJumiaApplication();
-    const app = ajJumiaApplications.find(a => Number(a.id) === Number(applicationId));
+function ajShowChannelAppSetup(applicationId) {
+    ajHideCreateChannelApplication();
+    const app = ajChannelApplications.find(a => Number(a.id) === Number(applicationId));
     if (!app) return;
-    ajJumiaSetupAppId = applicationId;
-    const setupViewEl = document.getElementById("aj-jumia-app-setup-view");
+    ajChannelSetupAppId = applicationId;
+    const setupViewEl = document.getElementById("aj-channel-app-setup-view");
     setupViewEl.classList.remove("hidden");
     setupViewEl.style.display = "flex";
-    document.getElementById("aj-jumia-app-setup-title").textContent = `${app.connected ? "Reconnect" : "Connect"} "${app.name}"`;
-    document.getElementById("aj-jumia-app-setup-error").textContent = "";
+    document.getElementById("aj-channel-app-setup-title").textContent = `${app.connected ? "Reconnect" : "Connect"} "${app.name}"`;
+    document.getElementById("aj-channel-app-setup-error").textContent = "";
 
     const isWeb = app.app_type === "web_application";
-    document.getElementById("aj-jumia-app-setup-self").style.display = isWeb ? "none" : "flex";
-    document.getElementById("aj-jumia-app-setup-web").style.display = isWeb ? "flex" : "none";
+    document.getElementById("aj-channel-app-setup-self").style.display = isWeb ? "none" : "flex";
+    document.getElementById("aj-channel-app-setup-web").style.display = isWeb ? "flex" : "none";
 
     if (isWeb) {
-        document.getElementById("aj-jumia-app-redirect-uri").value = app.redirect_uri || "";
-        document.getElementById("aj-jumia-app-web-client-id").value = app.client_id || "";
-        document.getElementById("aj-jumia-app-web-client-secret").value = "";
+        document.getElementById("aj-channel-app-redirect-uri").value = app.redirect_uri || "";
+        document.getElementById("aj-channel-app-web-client-id").value = app.client_id || "";
+        document.getElementById("aj-channel-app-web-client-secret").value = "";
     } else {
-        document.getElementById("aj-jumia-app-client-id").value = app.client_id || "";
-        document.getElementById("aj-jumia-app-refresh-token").value = "";
+        document.getElementById("aj-channel-app-client-id").value = app.client_id || "";
+        document.getElementById("aj-channel-app-refresh-token").value = "";
     }
 }
 
-async function ajConnectJumiaApp() {
-    if (!ajJumiaSetupAppId) return;
-    const clientId = document.getElementById("aj-jumia-app-client-id").value.trim();
-    const refreshToken = document.getElementById("aj-jumia-app-refresh-token").value.trim();
-    const errorEl = document.getElementById("aj-jumia-app-setup-error");
+async function ajConnectChannelApp() {
+    if (!ajChannelSetupAppId) return;
+    const clientId = document.getElementById("aj-channel-app-client-id").value.trim();
+    const refreshToken = document.getElementById("aj-channel-app-refresh-token").value.trim();
+    const errorEl = document.getElementById("aj-channel-app-setup-error");
     if (!clientId || !refreshToken) { errorEl.textContent = "Enter both the Client ID and Refresh Token."; return; }
-    const btn = document.getElementById("aj-jumia-app-connect-btn");
+    const btn = document.getElementById("aj-channel-app-connect-btn");
     if (btn) { btn.disabled = true; btn.textContent = "Connecting..."; }
     try {
-        const result = await authorizedFetch(`/api/admin/jumia/applications/${ajJumiaSetupAppId}/connect`, {
+        const result = await authorizedFetch(`/api/admin/channel/applications/${ajChannelSetupAppId}/connect`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ client_id: clientId, refresh_token: refreshToken })
         });
         if (result.error) { errorEl.textContent = result.error; return; }
-        ajHideJumiaAppSetup();
-        ajLoadJumia();
+        ajHideChannelAppSetup();
+        ajLoadChannel();
     } catch (error) {
-        console.error("ajConnectJumiaApp error:", error);
+        console.error("ajConnectChannelApp error:", error);
         errorEl.textContent = "Could not connect. Please try again.";
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = "Connect"; }
     }
 }
 
-function ajCopyJumiaRedirectUri() {
-    const input = document.getElementById("aj-jumia-app-redirect-uri");
+function ajCopyChannelRedirectUri() {
+    const input = document.getElementById("aj-channel-app-redirect-uri");
     if (!input) return;
     input.select();
     try {
@@ -1798,136 +1798,136 @@ function ajCopyJumiaRedirectUri() {
     }
 }
 
-async function ajSignInWithJumia() {
-    if (!ajJumiaSetupAppId) return;
-    const clientId = document.getElementById("aj-jumia-app-web-client-id").value.trim();
-    const clientSecret = document.getElementById("aj-jumia-app-web-client-secret").value.trim();
-    const errorEl = document.getElementById("aj-jumia-app-setup-error");
+async function ajSignInWithChannel() {
+    if (!ajChannelSetupAppId) return;
+    const clientId = document.getElementById("aj-channel-app-web-client-id").value.trim();
+    const clientSecret = document.getElementById("aj-channel-app-web-client-secret").value.trim();
+    const errorEl = document.getElementById("aj-channel-app-setup-error");
     if (!clientId) { errorEl.textContent = "Enter the Client ID first."; return; }
-    const btn = document.getElementById("aj-jumia-app-signin-btn");
+    const btn = document.getElementById("aj-channel-app-signin-btn");
     if (btn) { btn.disabled = true; btn.textContent = "Redirecting..."; }
     try {
-        const saved = await authorizedFetch(`/api/admin/jumia/applications/${ajJumiaSetupAppId}/credentials`, {
+        const saved = await authorizedFetch(`/api/admin/channel/applications/${ajChannelSetupAppId}/credentials`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ client_id: clientId, client_secret: clientSecret || undefined })
         });
         if (saved.error) { errorEl.textContent = saved.error; return; }
-        const auth = await authorizedFetch(`/api/admin/jumia/applications/${ajJumiaSetupAppId}/authorize`);
+        const auth = await authorizedFetch(`/api/admin/channel/applications/${ajChannelSetupAppId}/authorize`);
         if (auth.error) { errorEl.textContent = auth.error; return; }
         window.location.href = auth.authorize_url;
     } catch (error) {
-        console.error("ajSignInWithJumia error:", error);
-        errorEl.textContent = "Could not start Jumia sign-in.";
+        console.error("ajSignInWithChannel error:", error);
+        errorEl.textContent = "Could not start sales channel sign-in.";
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = "Save & Sign in with Jumia"; }
+        if (btn) { btn.disabled = false; btn.textContent = "Save & Sign in with Sales Channel"; }
     }
 }
 
-async function ajMakeJumiaAppActive(applicationId) {
+async function ajMakeChannelAppActive(applicationId) {
     try {
-        const result = await authorizedFetch(`/api/admin/jumia/applications/${applicationId}/activate`, { method: "POST" });
+        const result = await authorizedFetch(`/api/admin/channel/applications/${applicationId}/activate`, { method: "POST" });
         if (result.error) { alert(result.error); return; }
-        ajLoadJumia();
+        ajLoadChannel();
     } catch (error) {
-        console.error("ajMakeJumiaAppActive error:", error);
+        console.error("ajMakeChannelAppActive error:", error);
         alert("Could not activate this Application.");
     }
 }
 
-async function ajTestJumiaApp(applicationId) {
+async function ajTestChannelApp(applicationId) {
     try {
-        const result = await authorizedFetch(`/api/admin/jumia/applications/${applicationId}/test`, { method: "POST" });
-        if (result.error) { alert(result.error); ajLoadJumia(); return; }
+        const result = await authorizedFetch(`/api/admin/channel/applications/${applicationId}/test`, { method: "POST" });
+        if (result.error) { alert(result.error); ajLoadChannel(); return; }
         alert("Connection is working.");
-        ajLoadJumia();
+        ajLoadChannel();
     } catch (error) {
-        console.error("ajTestJumiaApp error:", error);
+        console.error("ajTestChannelApp error:", error);
         alert("Could not verify the connection.");
     }
 }
 
-async function ajDeleteJumiaApp(applicationId) {
-    const app = ajJumiaApplications.find(a => Number(a.id) === Number(applicationId));
+async function ajDeleteChannelApp(applicationId) {
+    const app = ajChannelApplications.find(a => Number(a.id) === Number(applicationId));
     if (!confirm(`Delete "${app ? app.name : "this Application"}"? This cannot be undone.`)) return;
     try {
-        const result = await authorizedFetch(`/api/admin/jumia/applications/${applicationId}`, { method: "DELETE" });
+        const result = await authorizedFetch(`/api/admin/channel/applications/${applicationId}`, { method: "DELETE" });
         if (result.error) { alert(result.error); return; }
-        ajLoadJumia();
+        ajLoadChannel();
     } catch (error) {
-        console.error("ajDeleteJumiaApp error:", error);
+        console.error("ajDeleteChannelApp error:", error);
         alert("Could not delete this Application.");
     }
 }
 
-async function ajLoadJumiaLinks() {
-    const list = document.getElementById("aj-jumia-links-list");
+async function ajLoadChannelLinks() {
+    const list = document.getElementById("aj-channel-links-list");
     if (!list) return;
     try {
-        const links = await authorizedFetch("/api/admin/jumia/links");
+        const links = await authorizedFetch("/api/admin/channel/links");
         if (links.error) return;
-        ajRenderJumiaLinks(links);
+        ajRenderChannelLinks(links);
     } catch (error) {
-        console.error("ajLoadJumiaLinks error:", error);
+        console.error("ajLoadChannelLinks error:", error);
     }
 }
 
-function ajRenderJumiaLinks(links) {
-    const list = document.getElementById("aj-jumia-links-list");
+function ajRenderChannelLinks(links) {
+    const list = document.getElementById("aj-channel-links-list");
     if (!links || links.length === 0) {
         list.innerHTML = '<div style="font-size:12.5px; color:#888; padding:8px 0;">No products linked yet.</div>';
         return;
     }
     list.innerHTML = links.map(link => {
         const status = link.locally_changed_since_sync ? "out_of_sync" : link.sync_status;
-        const [label, color] = AJ_JUMIA_STATUS_LABEL[status] || [status, "#888"];
+        const [label, color] = AJ_CHANNEL_STATUS_LABEL[status] || [status, "#888"];
         return `<div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee;">
             <div>
-                <div style="font-size:13px; font-weight:600; color:#1a1a2e;">${pdEsc(link.product_name || link.jumia_seller_sku)}</div>
-                <div style="font-size:11.5px; color:#999;">${link.sync_direction === "pull" ? "From Jumia" : "To Jumia"}${link.last_error ? " &bull; " + pdEsc(link.last_error) : ""}</div>
+                <div style="font-size:13px; font-weight:600; color:#1a1a2e;">${pdEsc(link.product_name || link.channel_seller_sku)}</div>
+                <div style="font-size:11.5px; color:#999;">${link.sync_direction === "pull" ? "From sales channel" : "To sales channel"}${link.last_error ? " &bull; " + pdEsc(link.last_error) : ""}</div>
             </div>
             <span style="font-size:12px; font-weight:600; color:${color};">${label}</span>
         </div>`;
     }).join("");
 }
 
-function ajShowJumiaImport() {
-    document.getElementById("aj-jumia-import-panel").classList.remove("hidden");
-    ajLoadJumiaImport();
+function ajShowChannelImport() {
+    document.getElementById("aj-channel-import-panel").classList.remove("hidden");
+    ajLoadChannelImport();
 }
 
-function ajHideJumiaImport() {
-    document.getElementById("aj-jumia-import-panel").classList.add("hidden");
+function ajHideChannelImport() {
+    document.getElementById("aj-channel-import-panel").classList.add("hidden");
 }
 
-async function ajLoadJumiaImport() {
-    const list = document.getElementById("aj-jumia-import-list");
+async function ajLoadChannelImport() {
+    const list = document.getElementById("aj-channel-import-list");
     list.innerHTML = '<div style="font-size:12.5px; color:#888;">Loading...</div>';
     try {
-        const result = await authorizedFetch("/api/admin/jumia/remote-products");
+        const result = await authorizedFetch("/api/admin/channel/remote-products");
         if (result.error) {
             list.innerHTML = `<div style="font-size:12.5px; color:#DC2626;">${pdEsc(result.error)}</div>`;
             return;
         }
-        ajJumiaRemoteProductsCache = new Map((result.items || []).map(item => [item.seller_sku, item]));
-        ajRenderJumiaImportList(result.items || []);
+        ajChannelRemoteProductsCache = new Map((result.items || []).map(item => [item.seller_sku, item]));
+        ajRenderChannelImportList(result.items || []);
     } catch (error) {
-        console.error("ajLoadJumiaImport error:", error);
-        list.innerHTML = '<div style="font-size:12.5px; color:#DC2626;">Could not load your Jumia products.</div>';
+        console.error("ajLoadChannelImport error:", error);
+        list.innerHTML = '<div style="font-size:12.5px; color:#DC2626;">Could not load your sales channel products.</div>';
     }
 }
 
-function ajRenderJumiaImportList(items) {
-    const list = document.getElementById("aj-jumia-import-list");
-    ajJumiaImportSelected = new Set();
+function ajRenderChannelImportList(items) {
+    const list = document.getElementById("aj-channel-import-list");
+    ajChannelImportSelected = new Set();
     if (!items || items.length === 0) {
-        list.innerHTML = '<div style="font-size:12.5px; color:#888; padding:8px 0;">No Jumia products found.</div>';
+        list.innerHTML = '<div style="font-size:12.5px; color:#888; padding:8px 0;">No sales channel products found.</div>';
         return;
     }
     list.innerHTML = items.map(item => {
         const disabled = item.already_linked;
         return `<label style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid #eee; ${disabled ? "opacity:.5;" : ""}">
-            <input type="checkbox" ${disabled ? "disabled" : ""} onchange="ajToggleJumiaImportSelect('${pdEsc(item.seller_sku)}', this.checked)">
+            <input type="checkbox" ${disabled ? "disabled" : ""} onchange="ajToggleChannelImportSelect('${pdEsc(item.seller_sku)}', this.checked)">
             <div style="flex:1;">
                 <div style="font-size:13px; font-weight:600; color:#1a1a2e;">${pdEsc(item.name || item.seller_sku)}</div>
                 <div style="font-size:11.5px; color:#999;">${disabled ? "Already imported" : (item.seller_sku || "")}</div>
@@ -1936,18 +1936,18 @@ function ajRenderJumiaImportList(items) {
     }).join("");
 }
 
-function ajToggleJumiaImportSelect(sellerSku, checked) {
-    if (checked) ajJumiaImportSelected.add(sellerSku);
-    else ajJumiaImportSelected.delete(sellerSku);
-    const help = document.getElementById("aj-jumia-import-help");
-    if (help) help.textContent = ajJumiaImportSelected.size > 0 ? `${ajJumiaImportSelected.size} selected` : "";
+function ajToggleChannelImportSelect(sellerSku, checked) {
+    if (checked) ajChannelImportSelected.add(sellerSku);
+    else ajChannelImportSelected.delete(sellerSku);
+    const help = document.getElementById("aj-channel-import-help");
+    if (help) help.textContent = ajChannelImportSelected.size > 0 ? `${ajChannelImportSelected.size} selected` : "";
 }
 
-async function ajImportSelectedJumiaProducts() {
-    if (ajJumiaImportSelected.size === 0) { alert("Select at least one product first."); return; }
-    const items = Array.from(ajJumiaImportSelected).map(sku => ajJumiaRemoteProductsCache.get(sku)).filter(Boolean);
+async function ajImportSelectedChannelProducts() {
+    if (ajChannelImportSelected.size === 0) { alert("Select at least one product first."); return; }
+    const items = Array.from(ajChannelImportSelected).map(sku => ajChannelRemoteProductsCache.get(sku)).filter(Boolean);
     try {
-        const result = await authorizedFetch("/api/admin/jumia/import", {
+        const result = await authorizedFetch("/api/admin/channel/import", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ items })
@@ -1956,29 +1956,29 @@ async function ajImportSelectedJumiaProducts() {
         const createdCount = (result.created || []).length;
         const skippedCount = (result.skipped || []).length;
         alert(`${createdCount} product(s) imported.` + (skippedCount > 0 ? ` ${skippedCount} skipped.` : ""));
-        ajHideJumiaImport();
-        ajLoadJumia();
+        ajHideChannelImport();
+        ajLoadChannel();
         if (typeof loadProducts === "function") loadProducts();
     } catch (error) {
-        console.error("ajImportSelectedJumiaProducts error:", error);
+        console.error("ajImportSelectedChannelProducts error:", error);
         alert("Could not import products.");
     }
 }
 
-function ajShowJumiaExport() {
-    document.getElementById("aj-jumia-export-panel").classList.remove("hidden");
-    ajLoadJumiaExport();
+function ajShowChannelExport() {
+    document.getElementById("aj-channel-export-panel").classList.remove("hidden");
+    ajLoadChannelExport();
 }
 
-function ajHideJumiaExport() {
-    document.getElementById("aj-jumia-export-panel").classList.add("hidden");
+function ajHideChannelExport() {
+    document.getElementById("aj-channel-export-panel").classList.add("hidden");
 }
 
-async function ajLoadJumiaExport() {
-    const list = document.getElementById("aj-jumia-export-list");
+async function ajLoadChannelExport() {
+    const list = document.getElementById("aj-channel-export-list");
     list.innerHTML = '<div style="font-size:12.5px; color:#888;">Loading...</div>';
     try {
-        const links = await authorizedFetch("/api/admin/jumia/links");
+        const links = await authorizedFetch("/api/admin/channel/links");
         const linkedIds = new Set((Array.isArray(links) ? links : []).map(l => Number(l.product_id)));
         // Reuse the already-loaded product table (adminProducts, from
         // loadProducts()) rather than a new endpoint - filtered to
@@ -1987,17 +1987,17 @@ async function ajLoadJumiaExport() {
         if (!Array.isArray(adminProducts) || adminProducts.length === 0) {
             await loadProducts();
         }
-        ajJumiaExportCandidates = (Array.isArray(adminProducts) ? adminProducts : []).filter(p => !p.vendor_id);
-        ajRenderJumiaExportList(ajJumiaExportCandidates, linkedIds);
+        ajChannelExportCandidates = (Array.isArray(adminProducts) ? adminProducts : []).filter(p => !p.vendor_id);
+        ajRenderChannelExportList(ajChannelExportCandidates, linkedIds);
     } catch (error) {
-        console.error("ajLoadJumiaExport error:", error);
+        console.error("ajLoadChannelExport error:", error);
         list.innerHTML = '<div style="font-size:12.5px; color:#DC2626;">Could not load products.</div>';
     }
 }
 
-function ajRenderJumiaExportList(products, linkedIds) {
-    const list = document.getElementById("aj-jumia-export-list");
-    ajJumiaExportSelected = new Set();
+function ajRenderChannelExportList(products, linkedIds) {
+    const list = document.getElementById("aj-channel-export-list");
+    ajChannelExportSelected = new Set();
     if (!products || products.length === 0) {
         list.innerHTML = '<div style="font-size:12.5px; color:#888; padding:8px 0;">No Lizimas-owned products to export yet.</div>';
         return;
@@ -2005,7 +2005,7 @@ function ajRenderJumiaExportList(products, linkedIds) {
     list.innerHTML = products.map(p => {
         const linked = linkedIds.has(Number(p.id));
         return `<label style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid #eee;">
-            <input type="checkbox" onchange="ajToggleJumiaExportSelect(${p.id}, this.checked)">
+            <input type="checkbox" onchange="ajToggleChannelExportSelect(${p.id}, this.checked)">
             <div style="flex:1;">
                 <div style="font-size:13px; font-weight:600; color:#1a1a2e;">${pdEsc(p.name)}</div>
                 <div style="font-size:11.5px; color:#999;">${linked ? "Already linked - pushing again re-syncs it" : (p.sku || `LZM-${p.id}`)}</div>
@@ -2014,19 +2014,19 @@ function ajRenderJumiaExportList(products, linkedIds) {
     }).join("");
 }
 
-function ajToggleJumiaExportSelect(productId, checked) {
-    if (checked) ajJumiaExportSelected.add(productId);
-    else ajJumiaExportSelected.delete(productId);
-    const help = document.getElementById("aj-jumia-export-help");
-    if (help) help.textContent = ajJumiaExportSelected.size > 0 ? `${ajJumiaExportSelected.size} selected` : "";
+function ajToggleChannelExportSelect(productId, checked) {
+    if (checked) ajChannelExportSelected.add(productId);
+    else ajChannelExportSelected.delete(productId);
+    const help = document.getElementById("aj-channel-export-help");
+    if (help) help.textContent = ajChannelExportSelected.size > 0 ? `${ajChannelExportSelected.size} selected` : "";
 }
 
-async function ajExportSelectedToJumia() {
-    if (ajJumiaExportSelected.size === 0) { alert("Select at least one product first."); return; }
-    const ids = Array.from(ajJumiaExportSelected);
-    if (!confirm(`Push ${ids.length} product(s) to Jumia?`)) return;
+async function ajExportSelectedToChannel() {
+    if (ajChannelExportSelected.size === 0) { alert("Select at least one product first."); return; }
+    const ids = Array.from(ajChannelExportSelected);
+    if (!confirm(`Push ${ids.length} product(s) to the sales channel?`)) return;
     try {
-        const result = await authorizedFetch("/api/admin/jumia/products/push-bulk", {
+        const result = await authorizedFetch("/api/admin/channel/products/push-bulk", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ productIds: ids })
@@ -2034,21 +2034,21 @@ async function ajExportSelectedToJumia() {
         if (result.error) { alert(result.error); return; }
         const successCount = (result.successful || []).length;
         const failedCount = (result.failed || []).length;
-        let message = `${successCount} product(s) pushed to Jumia.`;
+        let message = `${successCount} product(s) pushed to the sales channel.`;
         if (failedCount > 0) {
             message += `\n${failedCount} failed:\n` + result.failed.map(f => `- ${f.reason}`).join("\n");
         }
         alert(message);
-        ajHideJumiaExport();
-        ajLoadJumia();
+        ajHideChannelExport();
+        ajLoadChannel();
     } catch (error) {
-        console.error("ajExportSelectedToJumia error:", error);
-        alert("Could not push products to Jumia.");
+        console.error("ajExportSelectedToChannel error:", error);
+        alert("Could not push products to the sales channel.");
     }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    ajCheckJumiaOAuthReturn();
+    ajCheckChannelOAuthReturn();
 });
 
 function openProductForm() {
@@ -7100,7 +7100,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // --- Vendors tab: applications, drop-off points, handovers, returns ------
 
-// Product-count limit tiers (Jumia Vendor Center comparison, Sept 2026) -
+// Product-count limit tiers (Sept 2026) -
 // see adminProductTierController.js / migrations/109_vendor_product_tiers.sql.
 
 let adminProductTiersCache = [];
@@ -7212,7 +7212,7 @@ async function applyVendorTierOverride(vendorId) {
 }
 
 // --- Fulfillment by Lizimas (Consignments) ----------------------------
-// Jumia Vendor Center comparison, Sept 2026 - see
+// Sept 2026 - see
 // migrations/110_vendor_consignments.sql / adminConsignmentController.js.
 
 let adminConsignmentsCache = [];
@@ -7368,7 +7368,7 @@ async function rejectConsignmentAdmin() {
     }
 }
 
-// --- Manage Pickers Lookup (Jumia Vendor Center comparison, Sept 2026) ----
+// --- Manage Pickers Lookup (Sept 2026) ----
 // Hub-desk search across every vendor's picker list - see
 // adminPickerController.js. Read-only; vendors manage their own list.
 
@@ -7402,7 +7402,7 @@ async function searchPickersAdmin() {
     }
 }
 
-// --- Advertise Your Products (Jumia Vendor Center comparison, Sept 2026) --
+// --- Advertise Your Products (Sept 2026) --
 // Admin-side review + platform-wide settings. See
 // migrations/112_vendor_ad_campaigns.sql / adminAdController.js.
 
@@ -8219,7 +8219,7 @@ function renderVendorCompliancePanel() {
     }
 }
 
-// Shop ID (Jumia Vendor Center comparison) - rare admin escape hatch for a
+// Shop ID () - rare admin escape hatch for a
 // vendor approved before migration 113 shipped (regenerateVendorShopId
 // never overwrites an existing shop_id, so this is safe to offer whenever
 // one is missing).

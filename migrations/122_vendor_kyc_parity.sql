@@ -1,17 +1,17 @@
--- 122_vendor_kyc_jumia_parity.sql
--- Closes the remaining gaps vs Jumia's Uganda vendor KYC requirements
+-- 122_vendor_kyc_parity.sql
+-- Closes the remaining gaps for Uganda vendor KYC requirements
 -- (Ryan, Sept 2026 - decisions: VAT required for all company vendors;
 -- payment instruments get a supporting evidence document; build all of
 -- TIN/VAT/Form 20/work permit in one pass).
 --
 -- Migration 088 already widened vendor_kyc_documents.document_type to a
--- "Jumia-parity set" (tax_certificate, vat_certificate, bank_certificate,
+-- "parity set" (tax_certificate, vat_certificate, bank_certificate,
 -- momo_statement, certificate_of_incorporation) but the app layer never
--- used most of them, and two document types Jumia requires were never
+-- used most of them, and two document types Channel requires were never
 -- added at all (Form 20, work permit). This migration:
 --   1. Adds encrypted TIN/VAT number fields to vendor_kyc, same
 --      AES-256-GCM + blind-index-hash pattern as national_id/registration_number.
---   2. Adds a requires_work_permit flag - Jumia only asks for this from
+--   2. Adds a requires_work_permit flag - Channel only asks for this from
 --      non-Ugandan vendors, and there's currently no field anywhere that
 --      distinguishes them.
 --   3. Adds 'form_20' and 'work_permit' to document_type.
@@ -82,7 +82,7 @@ COMMENT ON COLUMN vendor_payment_instruments.evidence_cloudinary_public_id IS
 
 INSERT INTO schema_migrations (filename, note)
 VALUES (
-    '122_vendor_kyc_jumia_parity.sql',
+    '122_vendor_kyc_parity.sql',
     'Adds TIN/VAT encrypted fields + requires_work_permit to vendor_kyc; adds form_20/work_permit to vendor_kyc_documents.document_type; adds evidence document columns to vendor_payment_instruments.'
 )
 ON CONFLICT (filename) DO NOTHING;

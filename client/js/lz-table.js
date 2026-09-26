@@ -1,5 +1,5 @@
 // Lizimas table block - model, operations, renderer and editor (Ryan, Sept
-// 2026: "insert table" made fully functional, CKEditor/Jumia-style).
+// 2026: "insert table" made fully functional).
 //
 // Used by the description block editor (admin, staff and vendor product
 // upload - client/js/description-block-editor.js) and the storefront

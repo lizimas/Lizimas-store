@@ -1,5 +1,5 @@
 // Pure logic for the vendor Brand Authorization workflow (Phase 7,
-// Ryan Sept 2026 - modelled on Jumia's brand authorization tiers). No
+// Ryan Sept 2026 - brand authorization tiers). No
 // DB/network here - see server/controllers/vendorBrandAuthController.js
 // for the wrapper that reads/writes vendor_brand_authorizations and
 // vendor_brand_authorization_audit_log.
@@ -57,7 +57,7 @@ function isValidBrandAuthDocumentType(type) {
 }
 
 // The minimum bar each tier must clear before a vendor can submit for
-// review. Official Brand Store is Jumia's full documentary bar; Authorized
+// review. Official Brand Store is the full documentary bar; Authorized
 // Distributor is lighter - proof of the relationship plus that the
 // business itself is real, not the full manufacturer/warranty/sourcing set.
 const TIER_REQUIRED_DOCUMENTS = {

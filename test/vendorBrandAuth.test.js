@@ -79,7 +79,7 @@ test("canVendorEditBrandAuth: only not_started/action_required/rejected are vend
     assert.equal(canVendorEditBrandAuth("suspended"), false);
 });
 
-test("official_store requires the full Jumia-style documentary bar", () => {
+test("official_store requires the full documentary bar", () => {
     const required = requiredDocumentsForTier("official_store");
     assert.deepEqual(required.slice().sort(), [
         "authorization_letter",

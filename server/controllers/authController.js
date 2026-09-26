@@ -577,6 +577,11 @@ async function handleLogin(req, res, allowedRoles, surface) {
 // and for nothing else: scope, lock, block, activation, device, reset and 2FA
 // all run here, in this order, whatever the proof was.
 async function completeLogin(user, req, res, opts) {
+    // opts.respond(status, body) lets a redirect-based sign-in (Google /
+    // Facebook callbacks) receive the outcome directly instead of JSON.
+    const send = (status, body) => (opts && opts.respond)
+        ? opts.respond(status, body)
+        : res.status(status).json(body);
     const allowedRoles = opts.allowedRoles;
     const surface = opts.surface;
     const email = opts.attemptedEmail || user.email;
@@ -605,7 +610,7 @@ async function completeLogin(user, req, res, opts) {
             // Deliberately identical to a wrong-password response: same status,
             // same wording. Reveals nothing about whether the account exists,
             // whether the password was right, or which portal would work.
-            return res.status(401).json({ error: "Invalid email or password." });
+            return send(401, { error: "Invalid email or password." });
         }
 
         // A soft-deleted account is gone as far as sign-in is concerned. Checked
@@ -617,7 +622,7 @@ async function completeLogin(user, req, res, opts) {
                 failureReason: "deleted_account",
                 attemptedEmail: email
             });
-            return res.status(401).json({ error: "Invalid email or password." });
+            return send(401, { error: "Invalid email or password." });
         }
 
         if (user.security_locked_at) {
@@ -626,7 +631,7 @@ async function completeLogin(user, req, res, opts) {
                 failureReason: "security_locked",
                 attemptedEmail: email
             });
-            return res.status(403).json({ error: "This account is locked pending security review. Please contact the administrator." });
+            return send(403, { error: "This account is locked pending security review. Please contact the administrator." });
         }
 
         if (user.blocked_at) {
@@ -635,7 +640,7 @@ async function completeLogin(user, req, res, opts) {
                 failureReason: "blocked",
                 attemptedEmail: email
             });
-            return res.status(403).json({ error: "This account has been blocked. Please contact the administrator." });
+            return send(403, { error: "This account has been blocked. Please contact the administrator." });
         }
 
         if (!user.is_active) {
@@ -644,7 +649,7 @@ async function completeLogin(user, req, res, opts) {
                 failureReason: "inactive",
                 attemptedEmail: email
             });
-            return res.status(403).json({ error: "Your account is pending activation by the administrator." });
+            return send(403, { error: "Your account is pending activation by the administrator." });
         }
 
         // Before must_reset_password and before either 2FA branch, so an
@@ -664,7 +669,7 @@ async function completeLogin(user, req, res, opts) {
                 JWT_SECRET,
                 { expiresIn: "15m" }
             );
-            return res.status(202).json({
+            return send(202, {
                 requiresDeviceApproval: true,
                 requires2FASetup: needsSetup,
                 pendingToken,
@@ -680,7 +685,7 @@ async function completeLogin(user, req, res, opts) {
                 JWT_SECRET,
                 { expiresIn: "15m" }
             );
-            return res.json({
+            return send(200, {
                 message: "Password reset required before continuing.",
                 requiresPasswordReset: true,
                 pendingToken
@@ -694,7 +699,7 @@ async function completeLogin(user, req, res, opts) {
                 { expiresIn: "15m" }
             );
 
-            return res.json({
+            return send(200, {
                 message: "Password verified. Two-factor code required.",
                 requires2FA: true,
                 pendingToken
@@ -709,7 +714,7 @@ async function completeLogin(user, req, res, opts) {
                 { expiresIn: "15m" }
             );
 
-            return res.json({
+            return send(200, {
                 message: "Two-factor authentication setup is required before continuing.",
                 requires2FASetup: true,
                 pendingToken: setupToken
@@ -737,7 +742,7 @@ async function completeLogin(user, req, res, opts) {
             attemptedEmail: email
         });
 
-        res.json({
+        send(200, {
             message: "Login successful.",
             token,
             user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role }
@@ -745,7 +750,7 @@ async function completeLogin(user, req, res, opts) {
 
     } catch (error) {
         console.error("Login error:", error);
-        res.status(500).json({ error: "Something went wrong while logging in." });
+        send(500, { error: "Something went wrong while logging in." });
     }
 }
 
@@ -2088,3 +2093,42 @@ async function deleteSession(req, res) {
         res.status(500).json({ error: "Something went wrong." });
     }
 }
+
+// ---------------------------------------------------------------------------
+// Cookie sessions (Ryan, Sept 2026) - see server/utils/sessionCookie.js
+// ---------------------------------------------------------------------------
+
+// POST /api/auth/logout - ends this browser's session for the part of the
+// site named by X-LZ-Session: deletes the server session and the cookie.
+async function logoutSession(req, res) {
+    const { tokenFrom, portalOf, clearSessionCookie } = require("../utils/sessionCookie");
+    try {
+        const token = tokenFrom(req);
+        if (token) {
+            try {
+                const decoded = jwt.verify(token, JWT_SECRET);
+                if (decoded.sessionToken) {
+                    await pool.query("DELETE FROM sessions WHERE session_token = $1", [decoded.sessionToken]);
+                }
+            } catch (e) { /* expired or invalid - nothing to delete */ }
+        }
+        const portal = portalOf(req);
+        if (portal) clearSessionCookie(req, res, portal);
+        res.json({ message: "Signed out." });
+    } catch (error) {
+        console.error("Logout error:", error);
+        res.status(500).json({ error: "Something went wrong." });
+    }
+}
+
+// POST /api/auth/session/adopt - a page still holding an old-style token in
+// localStorage hands it over once; the answer moves it into the httpOnly
+// cookie (sessionCookieResponder) and returns the placeholder "cookie".
+async function adoptSession(req, res) {
+    const { tokenFrom, portalOf } = require("../utils/sessionCookie");
+    if (!portalOf(req)) return res.status(400).json({ error: "Missing X-LZ-Session." });
+    res.json({ token: tokenFrom(req) });
+}
+
+module.exports.logoutSession = logoutSession;
+module.exports.adoptSession = adoptSession;

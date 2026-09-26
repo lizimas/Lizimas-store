@@ -1,6 +1,6 @@
 // Monitor your promotions - vendor desktop page + mobile screen (Ryan, Sept 2026).
 //
-// Jumia Vendor Center "Promotions > Monitoring" layout in Lizimas colours:
+// Vendor Center "Promotions > Monitoring" layout in Lizimas colours:
 // breadcrumb, title, EXPORT, STATUS: ALL / ONGOING / EXPIRED, and a table
 // Product / Seller SKU / Page Views / Items Sold / Revenue / Period / Country.
 // Opened from "Monitor your promotions" on the Advertise your Products page
@@ -18,7 +18,7 @@ const vpmonDay = (v) => { const d = new Date(v); return isNaN(d) ? "" : `${d.get
 const vpmonKind = (r) => (r.kind === "flash_sale" ? `Lizimas flash sale${r.campaign_name ? `: ${r.campaign_name}` : ""}` : r.campaign_name ? `Campaign: ${r.campaign_name}` : "Your promotion");
 
 // Desktop: show the Monitoring page (a tab-content section with no sidebar
-// button of its own - Promotions stays highlighted, as on Jumia).
+// button of its own - Promotions stays highlighted).
 function vdOpenPromoMonitoring() {
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
     document.querySelectorAll(".tab-content").forEach((c) => c.classList.add("hidden"));

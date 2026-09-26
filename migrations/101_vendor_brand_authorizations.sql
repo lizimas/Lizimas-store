@@ -1,5 +1,5 @@
 -- 101_vendor_brand_authorizations.sql
--- Phase 7 - Brand Authorization (Ryan, Sept 2026 - modelled on Jumia's
+-- Phase 7 - Brand Authorization (Ryan, Sept 2026 -
 -- brand authorization tiers). A vendor requests authorization for ONE
 -- brand at a time, at one of two tiers:
 --   official_store         - presented AS the brand ("Samsung Official

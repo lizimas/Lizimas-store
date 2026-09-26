@@ -1,6 +1,6 @@
 -- 081_vendor_shop_status.sql
 -- Whole-shop visibility controls for the vendor mobile app (Menu > Settings
--- > Seller Settings), matching Jumia's "Shop Activation" and "Holiday
+-- > Seller Settings) "Shop Activation" and "Holiday
 -- Mode" screens. Both are new: the only is_active flag that existed before
 -- this was per-PRODUCT (products.is_active, set by the vendor per listing),
 -- never per-shop. shop_active is the vendor's own on/off switch for the

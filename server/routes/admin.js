@@ -197,7 +197,7 @@ const {
     endProductDiscounts
 } = require("../controllers/productDiscountController");
 const csvUpload = require("../middleware/csvUpload");
-const jumiaAdmin = require("../controllers/jumiaAdminController");
+const channelAdmin = require("../controllers/channelAdminController");
 const { getSecurityLogins, unlockAccount, getAccountReports, updateAccountReport } = require("../controllers/adminController");
 
 const {
@@ -220,9 +220,9 @@ router.patch("/vendor-messages/:id/reopen", requireAuth, requireSupportOrAdmin, 
 router.patch("/vendor-messages/:id/escalate", requireAuth, requireSupportOrAdmin, escalateVendorMessageAdmin);
 router.patch("/vendor-messages/:id/unescalate", requireAuth, requireSupportOrAdmin, unescalateVendorMessageAdmin);
 
-// Public - Jumia redirects here directly, no admin auth header on a
-// top-level browser redirect (see jumiaAdminController.js).
-router.get("/jumia/oauth/callback", jumiaAdmin.adminJumiaOAuthCallback);
+// Public - Channel redirects here directly, no admin auth header on a
+// top-level browser redirect (see channelAdminController.js).
+router.get("/channel/oauth/callback", channelAdmin.adminChannelOAuthCallback);
 
 router.use(requireAuth, requireAdmin);
 
@@ -249,25 +249,24 @@ router.patch("/notes/:id/pin", setNotePinned);
 router.patch("/notes/:id/reaction", setNoteReaction);
 router.delete("/notes/:id", deleteNote);
 
-// Product-count limit tiers (Jumia Vendor Center comparison, Sept 2026) -
+// Product-count limit tiers (Sept 2026) -
 // see adminProductTierController.js.
 router.get("/product-tiers", listProductTiers);
 router.patch("/product-tiers/:tierCode", updateProductTier);
 router.get("/vendors/:id/product-tier", getVendorTierStatus);
 router.patch("/vendors/:id/product-tier-override", setVendorTierOverride);
 
-// Fulfillment-by-Lizimas / Consignments (Jumia Vendor Center comparison,
-// Sept 2026) - see migrations/110_vendor_consignments.sql /
+// Fulfillment-by-Lizimas / Consignments (// Sept 2026) - see migrations/110_vendor_consignments.sql /
 // adminConsignmentController.js.
 router.get("/consignments", listConsignmentsAdmin);
 router.post("/consignments/:id/receive", receiveConsignment);
 router.post("/consignments/:id/reject", rejectConsignment);
 
-// Manage Pickers (Jumia Vendor Center comparison, Sept 2026) - hub-desk
+// Manage Pickers (Sept 2026) - hub-desk
 // lookup only, see adminPickerController.js.
 router.get("/pickers/search", searchPickersAdmin);
 
-// Advertise Your Products (Jumia Vendor Center comparison, Sept 2026) - see
+// Advertise Your Products (Sept 2026) - see
 // migrations/112_vendor_ad_campaigns.sql.
 router.get("/ad-campaigns", listCampaignsAdmin);
 router.post("/ad-campaigns/:id/approve", approveCampaign);
@@ -344,23 +343,23 @@ router.patch("/orders/:id/status", updateOrderStatus);
 router.post("/products/import", csvUpload.single("file"), require("../controllers/adminController").importProducts);
 router.get("/products/export", require("../controllers/adminController").exportProducts);
 
-// Store-level Jumia integration (migration 085) - same Applications
+// Store-level Channel integration (migration 085) - same Applications
 // concept vendors have, scoped to Lizimas's own products so Ryan can push
-// the store's own catalogue to Jumia independently of any vendor.
-router.get("/jumia/applications", jumiaAdmin.listAdminJumiaApplications);
-router.post("/jumia/applications", jumiaAdmin.createAdminJumiaApplication);
-router.delete("/jumia/applications/:id", jumiaAdmin.deleteAdminJumiaApplication);
-router.post("/jumia/applications/:id/activate", jumiaAdmin.activateAdminJumiaApplication);
-router.post("/jumia/applications/:id/connect", jumiaAdmin.connectAdminJumiaApplication);
-router.post("/jumia/applications/:id/disconnect", jumiaAdmin.disconnectAdminJumiaApplication);
-router.post("/jumia/applications/:id/test", jumiaAdmin.testAdminJumiaApplication);
-router.post("/jumia/applications/:id/credentials", jumiaAdmin.setAdminJumiaApplicationCredentials);
-router.get("/jumia/applications/:id/authorize", jumiaAdmin.getAdminJumiaAuthorizeUrl);
-router.get("/jumia/links", jumiaAdmin.getAdminJumiaLinks);
-router.post("/jumia/products/:id/push", jumiaAdmin.pushAdminProductToJumia);
-router.post("/jumia/products/push-bulk", jumiaAdmin.pushAdminProductsToJumiaBulk);
-router.get("/jumia/remote-products", jumiaAdmin.getAdminJumiaRemoteProducts);
-router.post("/jumia/import", jumiaAdmin.importAdminJumiaProducts);
+// the store's own catalogue to Channel independently of any vendor.
+router.get("/channel/applications", channelAdmin.listAdminChannelApplications);
+router.post("/channel/applications", channelAdmin.createAdminChannelApplication);
+router.delete("/channel/applications/:id", channelAdmin.deleteAdminChannelApplication);
+router.post("/channel/applications/:id/activate", channelAdmin.activateAdminChannelApplication);
+router.post("/channel/applications/:id/connect", channelAdmin.connectAdminChannelApplication);
+router.post("/channel/applications/:id/disconnect", channelAdmin.disconnectAdminChannelApplication);
+router.post("/channel/applications/:id/test", channelAdmin.testAdminChannelApplication);
+router.post("/channel/applications/:id/credentials", channelAdmin.setAdminChannelApplicationCredentials);
+router.get("/channel/applications/:id/authorize", channelAdmin.getAdminChannelAuthorizeUrl);
+router.get("/channel/links", channelAdmin.getAdminChannelLinks);
+router.post("/channel/products/:id/push", channelAdmin.pushAdminProductToChannel);
+router.post("/channel/products/push-bulk", channelAdmin.pushAdminProductsToChannelBulk);
+router.get("/channel/remote-products", channelAdmin.getAdminChannelRemoteProducts);
+router.post("/channel/import", channelAdmin.importAdminChannelProducts);
 
 // Vendor fulfilment: drop-off points, handover inspection, returns collection
 // Vendor KYC review

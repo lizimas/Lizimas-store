@@ -1,7 +1,7 @@
 -- 107_vendor_staff_users.sql
--- Vendor Users/Roles (Jumia Vendor Center comparison, September 2026):
+-- Vendor Users/Roles (September 2026):
 -- lets a vendor invite sub-accounts under their own shop with granular
--- permissions, matching Jumia's Settings > Users screen (11 "VC - <Role>"
+-- permissions Settings > Users screen (11 "VC - <Role>"
 -- checkboxes). A vendor_staff_users row is a one-way link from an existing
 -- `users` row (role='vendor_staff', created through the same staff
 -- invitation flow used for admin-side staff) to the vendor it belongs to.
@@ -12,7 +12,7 @@
 -- /toggleVendorStaffUserEnabled), so a compromised staff login can never
 -- escalate its own access.
 --
--- Permission codes (roles TEXT[]) mirror Jumia's naming, prefixed vc_ to
+-- Permission codes (roles TEXT[]) mirror the channel's naming, prefixed vc_ to
 -- read cleanly in code: vc_product_manager, vc_product_viewer,
 -- vc_product_update, vc_order_viewer, vc_order_manager, vc_order_report,
 -- vc_finance_viewer, vc_promotion_manager, vc_shop_viewer, vc_shop_manager,
@@ -55,11 +55,11 @@ CREATE INDEX IF NOT EXISTS idx_vendor_staff_users_audit_log_staff
     ON public.vendor_staff_users_audit_log (vendor_staff_user_id, created_at DESC);
 
 COMMENT ON TABLE public.vendor_staff_users IS
-    'Vendor sub-accounts (Settings > Users, matching Jumia Vendor Center). user_id is that staff member''s own users row (role=vendor_staff) - req.user.userId always stays their own true id, never the vendor owner''s; server/utils/vendorContext.js resolves which vendor_id they act on and what vc_* roles they hold. Only the vendor owner can write this table.';
+    'Vendor sub-accounts (Settings > Users). user_id is that staff member''s own users row (role=vendor_staff) - req.user.userId always stays their own true id, never the vendor owner''s; server/utils/vendorContext.js resolves which vendor_id they act on and what vc_* roles they hold. Only the vendor owner can write this table.';
 COMMENT ON COLUMN public.vendor_staff_users.roles IS
     'Array of vc_* permission codes (vc_product_manager, vc_product_viewer, vc_product_update, vc_order_viewer, vc_order_manager, vc_order_report, vc_finance_viewer, vc_promotion_manager, vc_shop_viewer, vc_shop_manager, vc_advertising_manager). Checked by hasVendorPermission() in server/utils/vendorContext.js, not a DB constraint.';
 COMMENT ON COLUMN public.vendor_staff_users.enabled IS
-    'Mirrors Jumia''s per-user enable/disable toggle. A disabled row blocks vendorContext resolution entirely (treated as no vendor profile), not just permission checks - a disabled staff login can authenticate but every vendor-scoped endpoint 404s.';
+    'Mirrors Channel''s per-user enable/disable toggle. A disabled row blocks vendorContext resolution entirely (treated as no vendor profile), not just permission checks - a disabled staff login can authenticate but every vendor-scoped endpoint 404s.';
 
 INSERT INTO public.schema_migrations (filename, note)
 VALUES (

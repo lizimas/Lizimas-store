@@ -1,10 +1,10 @@
-// Vendor Center screens rebuilt to match Jumia Vendor Center (Ryan, Sept
+// Vendor Center screens rebuilt to match Vendor Center (Ryan, Sept
 // 2026), shared by BOTH vendor dashboard shells (desktop sidebar/tabs and
 // the mobile app shell - client/vendor/dashboard.html). Loaded after
 // vendor-dashboard.js, vendor-mobile.js and vendor-shop-setup.js and reuses
 // their globals (vendorAuthorizedFetch, vendorEsc, getVendorToken, API_URL,
 // vmShowScreen, vdStaffCache, vdStaffAvailableRoles, vdRoleLabel,
-// vmJumiaApplications/vdJumiaApplications, vm/vdShowJumiaAppSetup, ...).
+// vmChannelApplications/vdChannelApplications, vm/vdShowChannelAppSetup, ...).
 //
 //   1. Shared UI: bottom-sheet / dialog, toast, kebab popup menu
 //   2. Stock Recommendation   (GET /api/vendors/me/stock-overview)
@@ -13,7 +13,7 @@
 //   5. Users                  (cards, kebab menu, Assign Permissions)
 //
 // Everything here is Lizimas-branded (navy #1a1a2e / gold #f4b400), in the
-// Jumia layout.
+// Lizimas layout.
 
 (function () {
 "use strict";
@@ -430,7 +430,7 @@ function renderPromoOverview(host, data) {
             ${highlights.length > 3 ? `<div class="vc-center"><button type="button" class="vc-link-gold" onclick="vcToggleHighlights()">${promo.highlightsOpen ? "collapse" : `expand (${highlights.length - 3} more)`}</button></div>` : ""}`;
 
     if (!isMobileShell()) {
-        // Desktop: Jumia "Promotions > Management" layout - campaigns on the
+        // Desktop: "Promotions > Management" layout - campaigns on the
         // left, revenue + highlight products on the right.
         host.innerHTML = `
         <div class="vc-crumb"><span class="vc-crumb-muted">Promotions</span> <span class="vc-crumb-sep">&gt;</span> <span class="vc-crumb-on">Management</span></div>
@@ -798,7 +798,7 @@ function refreshPromotionViews() {
 }
 
 // ===========================================================================
-// 4. Applications (Jumia API connections)
+// 4. Applications (sales channel API connections)
 // ===========================================================================
 
 const APP_TYPE_LABEL = { self_authorization: "Self Authorization", web_application: "Web Application" };
@@ -825,13 +825,13 @@ function renderAppCards(host, apps, prefix) {
             <div class="vc-kv"><span>Application Type</span><span>${APP_TYPE_LABEL[a.app_type] || esc(a.app_type)}</span></div>
             <div class="vc-kv"><span>Client ID</span><span class="vc-mono vc-ellipsis" title="${esc(a.client_id || "")}">${a.client_id ? esc(a.client_id) : ""}</span></div>
             <div class="vc-kv"><span>Redirect URI</span><span class="vc-mono vc-ellipsis" title="${esc(a.redirect_uri || "")}">${a.redirect_uri ? esc(a.redirect_uri) : ""}</span></div>
-            <div class="vc-kv"><span>Status</span><span><span class="vc-badge ${cls}" title="${esc(a.last_error || "")}">${label}</span>${a.jumia_shop_name ? `<div class="vc-prod-sku">${esc(a.jumia_shop_name)}</div>` : ""}</span></div>
+            <div class="vc-kv"><span>Status</span><span><span class="vc-badge ${cls}" title="${esc(a.last_error || "")}">${label}</span>${a.channel_shop_name ? `<div class="vc-prod-sku">${esc(a.channel_shop_name)}</div>` : ""}</span></div>
             <div class="vc-kv"><span>Created At</span><span>${created}</span></div>
             <div class="vc-kv vc-kv-actions"><span>Actions</span><span class="vc-icon-row">
-                ${a.connected && !a.is_active ? `<button type="button" class="vc-text-btn" onclick="${prefix}MakeJumiaAppActive(${Number(a.id)})">Make active</button>` : ""}
-                ${a.is_active ? `<button type="button" class="vc-text-btn" onclick="${prefix}TestJumiaApp(${Number(a.id)})">Test</button>` : ""}
-                <button type="button" class="vc-icon-btn" title="Delete" aria-label="Delete ${esc(a.name)}" onclick="${prefix}DeleteJumiaApp(${Number(a.id)})">${ICON.trash}</button>
-                <button type="button" class="vc-icon-btn vc-icon-gold" title="${a.connected ? "Credentials" : "Connect"}" aria-label="Credentials for ${esc(a.name)}" onclick="${prefix}ShowJumiaAppSetup(${Number(a.id)})">${ICON.lock}</button>
+                ${a.connected && !a.is_active ? `<button type="button" class="vc-text-btn" onclick="${prefix}MakeChannelAppActive(${Number(a.id)})">Make active</button>` : ""}
+                ${a.is_active ? `<button type="button" class="vc-text-btn" onclick="${prefix}TestChannelApp(${Number(a.id)})">Test</button>` : ""}
+                <button type="button" class="vc-icon-btn" title="Delete" aria-label="Delete ${esc(a.name)}" onclick="${prefix}DeleteChannelApp(${Number(a.id)})">${ICON.trash}</button>
+                <button type="button" class="vc-icon-btn vc-icon-gold" title="${a.connected ? "Credentials" : "Connect"}" aria-label="Credentials for ${esc(a.name)}" onclick="${prefix}ShowChannelAppSetup(${Number(a.id)})">${ICON.lock}</button>
             </span></div>
         </div>`;
     }).join("");
@@ -852,7 +852,7 @@ function openCreateAppSheet(prefix) {
             <div class="vc-app-type-title">Application Type</div>
             <label class="vc-radio-block"><input type="radio" name="vc-app-type" value="web_application"><span class="vc-radio-dot"></span>
                 <span><span class="vc-radio-title">Web Application (OAuth - Authorization Code Flow)</span>
-                <span class="vc-radio-desc">This flow is used if:<br>- You want to integrate with a Web Application<br>- You want your users to authenticate and consent before they consume the Jumia API<br>- You have the callback URL in order to exchange an Access Token by Authorization Code</span></span></label>
+                <span class="vc-radio-desc">This flow is used if:<br>- You want to integrate with a Web Application<br>- You want your users to authenticate and consent before they consume the Channel API<br>- You have the callback URL in order to exchange an Access Token by Authorization Code</span></span></label>
             <label class="vc-radio-block"><input type="radio" name="vc-app-type" value="self_authorization"><span class="vc-radio-dot"></span>
                 <span><span class="vc-radio-title">Self Authorization (Integration without User interaction)</span>
                 <span class="vc-radio-desc">This flow is used if:<br>- You do not have a Web Application<br>- You want to integrate Machine-to-machine without Users Authentication</span></span></label>`,
@@ -877,7 +877,7 @@ function openCreateAppSheet(prefix) {
         if (!validate() || !type()) return;
         create.disabled = true;
         try {
-            const created = await api("/api/vendors/me/jumia/applications", {
+            const created = await api("/api/vendors/me/channel/applications", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name: name.value.trim(), app_type: type() })
@@ -885,12 +885,12 @@ function openCreateAppSheet(prefix) {
             if (created.error) { toast(created.error); refresh(); return; }
             closeSheet();
             if (prefix === "vm") {
-                await vmLoadJumia();
-                vmShowJumiaAppSetup(created.id);
+                await vmLoadChannel();
+                vmShowChannelAppSetup(created.id);
             } else {
-                await vdLoadJumia();
-                vdShowJumiaAppSetup(created.id);
-                const setup = document.getElementById("vd-jumia-app-setup-view");
+                await vdLoadChannel();
+                vdShowChannelAppSetup(created.id);
+                const setup = document.getElementById("vd-channel-app-setup-view");
                 if (setup) setup.scrollIntoView({ behavior: "smooth", block: "center" });
             }
         } catch (e) {
@@ -906,7 +906,7 @@ function openCreateAppSheet(prefix) {
 // 5. Users + Assign Permissions
 // ===========================================================================
 
-// Jumia order and wording (Assign Permissions dialog).
+// Order and wording (Assign Permissions dialog).
 const ROLE_ORDER = [
     "vc_promotion_manager", "vc_product_manager", "vc_advertising_manager", "vc_finance_viewer",
     "vc_order_viewer", "vc_product_viewer", "vc_product_update", "vc_shop_viewer",
@@ -1091,7 +1091,7 @@ window.vcUserMenu = (id, anchor) => {
     ]);
 };
 
-// Each switch saves on its own, like Jumia - no separate Save button.
+// Each switch saves on its own - no separate Save button.
 window.vcOpenPermissions = (id) => {
     const s = vdStaffCache.find((x) => x.id === id);
     if (!s) return;

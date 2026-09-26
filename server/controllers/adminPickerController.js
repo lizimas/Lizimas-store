@@ -1,4 +1,4 @@
-// Manage Pickers (Jumia Vendor Center comparison, Sept 2026) - admin-side
+// Manage Pickers (Sept 2026) - admin-side
 // lookup for the hub desk: search a vendor's registered pickers by name or
 // phone to verify someone claiming to hand over a package on a vendor's
 // behalf. Read-only - only the vendor owner can add/edit/remove pickers

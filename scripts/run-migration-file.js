@@ -10,7 +10,7 @@
 // way the real app does.
 //
 // Usage:
-//   DATABASE_URL="$RENDER_DB" node scripts/run-migration-file.js migrations/122_vendor_kyc_jumia_parity.sql
+//   DATABASE_URL="$RENDER_DB" node scripts/run-migration-file.js migrations/122_vendor_kyc_parity.sql
 
 const fs = require("fs");
 const path = require("path");

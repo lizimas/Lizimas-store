@@ -95,6 +95,7 @@ const {
     saveProductOptions,
     generateProductVariants,
     updateVariantStock,
+    getVariantPrices,
     setVariantStockMode,
     importVendorProducts
 } = require("../controllers/productController");
@@ -112,13 +113,13 @@ const {
 const { previewPricing } = require("../controllers/commissionController");
 const { getVendorReviews, respondToReview } = require("../controllers/reviewController");
 const {
-    listJumiaApplications, createJumiaApplication, deleteJumiaApplication,
-    activateJumiaApplication, connectJumiaApplication, disconnectJumiaApplication,
-    testJumiaApplication, setJumiaApplicationCredentials, getJumiaAuthorizeUrl,
-    jumiaOAuthCallback,
-    getJumiaLinks, pushProductToJumia, pushProductsToJumiaBulk,
-    getJumiaRemoteProducts, importJumiaProducts
-} = require("../controllers/jumiaController");
+    listChannelApplications, createChannelApplication, deleteChannelApplication,
+    activateChannelApplication, connectChannelApplication, disconnectChannelApplication,
+    testChannelApplication, setChannelApplicationCredentials, getChannelAuthorizeUrl,
+    channelOAuthCallback,
+    getChannelLinks, pushProductToChannel, pushProductsToChannelBulk,
+    getChannelRemoteProducts, importChannelProducts
+} = require("../controllers/channelController");
 
 const { requireAuth, requireVendor } = require("../middleware/authMiddleware");
 const { otpLimiter } = require("../middleware/rateLimiter");
@@ -148,13 +149,13 @@ router.post("/:id/follow", requireAuth, followVendor);
 router.delete("/:id/follow", requireAuth, unfollowVendor);
 router.get("/:id/follow-status", requireAuth, getFollowStatus);
 
-// Public: Jumia redirects a vendor's browser straight here after OAuth
+// Public: Channel redirects a vendor's browser straight here after OAuth
 // consent (Web Application Applications only) - no auth header is
 // available on a top-level browser redirect, so this must sit before the
-// requireAuth/requireVendor gate below. See jumiaSyncService.js's
+// requireAuth/requireVendor gate below. See channelSyncService.js's
 // handleOAuthCallback for how the vendor/Application is identified
 // instead (the signed `state` param).
-router.get("/jumia/oauth/callback", jumiaOAuthCallback);
+router.get("/channel/oauth/callback", channelOAuthCallback);
 
 // Everything below is the vendor's own portal.
 router.use(requireAuth, requireVendor);
@@ -190,7 +191,7 @@ router.patch("/me/kyc", updateMyKyc);
 router.post("/me/kyc/documents", upload.kycDocument.single("document"), uploadMyKycDocument);
 router.get("/me/kyc/documents/url", getMyKycDocumentUrl);
 
-// Users/Roles (Settings > Users, matching Jumia Vendor Center) - owner-only,
+// Users/Roles (Settings > Users) - owner-only,
 // see vendorStaffController.js's header for why.
 router.get("/me/staff", listVendorStaff);
 router.post("/me/staff", createVendorStaffUser);
@@ -240,6 +241,7 @@ router.post("/products/:id/options", saveProductOptions);
 router.post("/products/:id/variants/generate", generateProductVariants);
 router.patch("/products/:id/variant-stock", setVariantStockMode);
 router.patch("/products/:id/variants/stock", updateVariantStock);
+router.get("/products/:id/variant-prices", getVariantPrices);
 
 router.get("/products/:id/description-blocks", getDescriptionBlocks);
 router.put("/products/:id/description-blocks", saveDescriptionBlocks);
@@ -251,14 +253,13 @@ router.post("/products/description-blocks/image", upload.single("image"), upload
 router.get("/dropoff-points", listActiveDropoffPoints);
 router.post("/order-items/:orderItemId/handover", requireVendorPermission("vc_order_manager"), vendorMarkHandedOver);
 
-// Fulfillment-by-Lizimas / Consignments (Jumia Vendor Center comparison,
-// Sept 2026) - see migrations/110_vendor_consignments.sql.
+// Fulfillment-by-Lizimas / Consignments (// Sept 2026) - see migrations/110_vendor_consignments.sql.
 router.get("/me/consignments", requireVendorPermission("vc_shop_manager", "vc_shop_viewer"), listMyConsignments);
 router.post("/me/consignments", requireVendorPermission("vc_shop_manager"), createConsignment);
 router.post("/me/consignments/:id/in-transit", requireVendorPermission("vc_shop_manager"), markConsignmentInTransit);
 router.post("/me/consignments/:id/cancel", requireVendorPermission("vc_shop_manager"), cancelConsignment);
 
-// Manage Pickers (Jumia Vendor Center comparison, Sept 2026) - see
+// Manage Pickers (Sept 2026) - see
 // migrations/111_vendor_pickers.sql.
 router.get("/me/pickers", requireVendorPermission("vc_shop_manager", "vc_shop_viewer"), listMyPickers);
 router.post("/me/pickers", requireVendorPermission("vc_shop_manager"), createMyPicker);
@@ -266,7 +267,7 @@ router.put("/me/pickers/:id", requireVendorPermission("vc_shop_manager"), update
 router.patch("/me/pickers/:id/active", requireVendorPermission("vc_shop_manager"), togglePickerActive);
 router.delete("/me/pickers/:id", requireVendorPermission("vc_shop_manager"), deleteMyPicker);
 
-// Advertise Your Products (Jumia Vendor Center comparison, Sept 2026) - see
+// Advertise Your Products (Sept 2026) - see
 // migrations/112_vendor_ad_campaigns.sql.
 router.get("/me/ad-rates", requireVendorPermission("vc_advertising_manager"), getAdRates);
 router.get("/me/ad-campaigns", requireVendorPermission("vc_advertising_manager"), listMyCampaigns);
@@ -292,7 +293,7 @@ router.get("/compliance-notices", getMyComplianceNotices);
 // your own products.
 router.post("/promotions", requireVendorPermission("vc_promotion_manager"), proposeVendorPromotion);
 router.get("/promotions", requireVendorPermission("vc_promotion_manager"), getMyVendorPromotions);
-// Promotions Management (Jumia parity, Sept 2026) - Lizimas campaigns
+// Promotions Management (parity, Sept 2026) - Lizimas campaigns
 // vendors join + revenue/highlights overview. See
 // server/controllers/promotionCampaignController.js.
 router.get("/me/promotions/overview", requireVendorPermission("vc_promotion_manager"), getPromotionsOverview);
@@ -321,24 +322,24 @@ router.post("/messages/:id/replies", replyToVendorMessage);
 // anything.
 router.post("/pricing/preview", previewPricing);
 
-// Jumia product linking (Settings > Applications on the vendor side):
-// connect/disconnect a vendor's Jumia Vendor Center Application, push
-// Lizimas listings out to Jumia, and pull existing Jumia listings in.
-// See jumiaClient.js for what is/isn't verified against Jumia's real API.
-router.get("/me/jumia/applications", requireVendorPermission("vc_shop_manager"), listJumiaApplications);
-router.post("/me/jumia/applications", requireVendorPermission("vc_shop_manager"), createJumiaApplication);
-router.delete("/me/jumia/applications/:id", deleteJumiaApplication);
-router.post("/me/jumia/applications/:id/activate", activateJumiaApplication);
-router.post("/me/jumia/applications/:id/connect", connectJumiaApplication);
-router.post("/me/jumia/applications/:id/disconnect", disconnectJumiaApplication);
-router.post("/me/jumia/applications/:id/test", testJumiaApplication);
-router.post("/me/jumia/applications/:id/credentials", setJumiaApplicationCredentials);
-router.get("/me/jumia/applications/:id/authorize", getJumiaAuthorizeUrl);
-router.get("/me/jumia/links", getJumiaLinks);
-router.post("/me/jumia/products/:id/push", pushProductToJumia);
-router.post("/me/jumia/products/push-bulk", pushProductsToJumiaBulk);
-router.get("/me/jumia/remote-products", getJumiaRemoteProducts);
-router.post("/me/jumia/import", importJumiaProducts);
+// Channel product linking (Settings > Applications on the vendor side):
+// connect/disconnect a vendor's Vendor Center Application, push
+// Lizimas listings out to Channel, and pull existing Channel listings in.
+// See channelClient.js for what is/isn't verified against the channel's real API.
+router.get("/me/channel/applications", requireVendorPermission("vc_shop_manager"), listChannelApplications);
+router.post("/me/channel/applications", requireVendorPermission("vc_shop_manager"), createChannelApplication);
+router.delete("/me/channel/applications/:id", deleteChannelApplication);
+router.post("/me/channel/applications/:id/activate", activateChannelApplication);
+router.post("/me/channel/applications/:id/connect", connectChannelApplication);
+router.post("/me/channel/applications/:id/disconnect", disconnectChannelApplication);
+router.post("/me/channel/applications/:id/test", testChannelApplication);
+router.post("/me/channel/applications/:id/credentials", setChannelApplicationCredentials);
+router.get("/me/channel/applications/:id/authorize", getChannelAuthorizeUrl);
+router.get("/me/channel/links", getChannelLinks);
+router.post("/me/channel/products/:id/push", pushProductToChannel);
+router.post("/me/channel/products/push-bulk", pushProductsToChannelBulk);
+router.get("/me/channel/remote-products", getChannelRemoteProducts);
+router.post("/me/channel/import", importChannelProducts);
 
 // --- Phase 4: vendor statement downloads + share (behind auth gate) ---
 router.get("/me/statements", requireVendorPermission("vc_finance_viewer"), listVendorStatements);

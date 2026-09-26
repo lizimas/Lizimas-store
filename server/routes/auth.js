@@ -120,4 +120,9 @@ router.post(
 );
 router.delete("/profile/photo", requireAuth, removeProfilePhoto);
 
+// Cookie sessions (server/utils/sessionCookie.js).
+const { logoutSession, adoptSession } = require("./../controllers/authController");
+router.post("/logout", logoutSession);
+router.post("/session/adopt", requireAuth, adoptSession);
+
 module.exports = router;

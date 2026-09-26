@@ -1,4 +1,4 @@
-// Reusable searchable category picker (Jumia Vendor Center style): a
+// Reusable searchable category picker (Vendor Center style): a
 // full-screen modal with a search box up top and a drill-down parent/child
 // list below, instead of one long <select> a vendor has to scroll through
 // hundreds of options in. Works against the same {id, name, parent_id,

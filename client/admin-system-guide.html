@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="/js/lz-session.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
@@ -153,8 +154,8 @@ window.LZ_GUIDE = { sections: [
     html: `<p>Vendors propose their own sale prices (admin approves, and can Feature or Sponsor them), join Lizimas campaigns, and track each promotion's page views, items sold and revenue under <em>Monitor your promotions</em>. Pay-per-click ads are approved in admin &rarr; Ad Campaigns. Admin sees each vendor's promotion results in the <strong>Vendor Center</strong> details panel.</p>` },
   { id: "v-money", title: "Account Statements and payouts (vendor side)", keywords: "statements weekly payout closing balance export transactions seller id", where: "Vendor Center &rarr; Account Statements",
     html: `<p>Weekly statements (Monday to Sunday) with opening balance, earnings, charges, refunds, closing balance and payout, filtered by Open, Paid or Unpaid, in USD or local currency. Downloads: PDF, CSV and Export Transactions (all statements). Each export is logged under <em>Transactions Exports</em>, which admin can also see in the Vendor Center details panel.</p>` },
-  { id: "v-account", title: "Vendor account settings", keywords: "vendor users permissions pickers payment instruments brand authorization holiday mode jumia notices", where: "Vendor Center &rarr; Account",
-    html: `<p>Payout accounts (reviewed in admin &rarr; Payment Instruments), brand authorization (admin &rarr; Brand Authorizations), shop active / holiday mode, Jumia applications, team users with permissions, pickers, and compliance notices sent from admin.</p>` }
+  { id: "v-account", title: "Vendor account settings", keywords: "vendor users permissions pickers payment instruments brand authorization holiday mode channel notices", where: "Vendor Center &rarr; Account",
+    html: `<p>Payout accounts (reviewed in admin &rarr; Payment Instruments), brand authorization (admin &rarr; Brand Authorizations), shop active / holiday mode, Channel applications, team users with permissions, pickers, and compliance notices sent from admin.</p>` }
 ]},
 { id: "staff", title: "4. Staff tools", items: [
   { id: "s-product", title: "Product Staff", keywords: "product staff submit approval my submissions", where: "<code>staff/product.html</code>",
@@ -167,8 +168,8 @@ window.LZ_GUIDE = { sections: [
 { id: "admin", title: "5. Admin panel, tab by tab", items: [
   { id: "a-dashboard", title: "Dashboard, Analytics, Performance Reports", keywords: "dashboard analytics visits engagement top searches performance reports csv", where: "Admin &rarr; Dashboard &amp; Analytics",
     html: `<p><strong>Dashboard:</strong> key stats, visitors, low-stock products, top searches. <strong>Analytics:</strong> visits over a date range, product engagement (views, add-to-cart, units, revenue) with CSV, top pages, countries, browsers and searches. <strong>Performance Reports:</strong> vendor and staff performance by week, month, year or a custom range, with CSV.</p>` },
-  { id: "a-products", title: "Products", keywords: "admin products add edit export import csv jumia lizimas sku weight", where: "Admin &rarr; Products",
-    html: `<p>Add or edit Lizimas-owned products (the same packed weight &amp; size fields; no manual package size), search by name, Seller SKU or Lizimas SKU, export CSV by status (includes Lizimas SKU and measurements), import CSV (columns <code>weight_kg</code>, <code>length_cm</code>, <code>width_cm</code>, <code>height_cm</code> set the delivery size), and the Jumia export/sync/import.</p>` },
+  { id: "a-products", title: "Products", keywords: "admin products add edit export import csv channel lizimas sku weight", where: "Admin &rarr; Products",
+    html: `<p>Add or edit Lizimas-owned products (the same packed weight &amp; size fields; no manual package size), search by name, Seller SKU or Lizimas SKU, export CSV by status (includes Lizimas SKU and measurements), import CSV (columns <code>weight_kg</code>, <code>length_cm</code>, <code>width_cm</code>, <code>height_cm</code> set the delivery size), and the Channel export/sync/import.</p>` },
   { id: "a-categories", title: "Categories and the Commission Engine", keywords: "categories commission engine rate default category tile image", where: "Admin &rarr; Categories",
     html: `<p>Manage the category tree and tile images. The <strong>Commission Engine</strong> sets the marketplace default rate plus a rate per category; it turns vendor payouts into customer prices.</p>` },
   { id: "a-tiers", title: "Product Tiers (listing limits)", keywords: "product tiers listing limit cap override 90 days", where: "Admin &rarr; Product Tiers",

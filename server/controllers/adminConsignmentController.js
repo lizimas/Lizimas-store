@@ -1,4 +1,4 @@
-// Fulfillment-by-Lizimas: admin-side receiving flow (Jumia Vendor Center
+// Fulfillment-by-Lizimas: admin-side receiving flow (Vendor Center
 // comparison, Sept 2026 - see migrations/110_vendor_consignments.sql).
 // This is where products.consigned_stock/fulfillment_type actually change -
 // a vendor's request alone never touches stock.

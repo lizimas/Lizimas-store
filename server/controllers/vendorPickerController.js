@@ -1,4 +1,4 @@
-// Manage Pickers (Jumia Vendor Center comparison, Sept 2026) - vendor-side
+// Manage Pickers (Sept 2026) - vendor-side
 // CRUD for the people authorized to hand over packages on their behalf.
 // See migrations/111_vendor_pickers.sql for what this is (and isn't).
 

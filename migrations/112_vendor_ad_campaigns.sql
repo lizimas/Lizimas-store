@@ -1,7 +1,7 @@
 -- 112_vendor_ad_campaigns.sql
--- Advertise Your Products (Jumia Vendor Center comparison, September 2026):
+-- Advertise Your Products (September 2026):
 -- vendor-funded, cost-per-click sponsored placements for their own
--- products, matching Jumia's "Advertise Your Products" tab and the
+-- products "Advertise Your Products" tab and the
 -- vc_advertising_manager permission code reserved for it since migration
 -- 107. A vendor creates a campaign (products + budget), submits it for
 -- admin review, and admin approves/rejects it - the same request/approve
@@ -69,7 +69,7 @@ CREATE INDEX IF NOT EXISTS idx_vendor_ad_campaign_products_campaign ON public.ve
 CREATE INDEX IF NOT EXISTS idx_vendor_ad_campaign_products_product ON public.vendor_ad_campaign_products (product_id);
 
 COMMENT ON TABLE public.vendor_ad_campaigns IS
-    'Vendor-funded cost-per-click ad campaigns (Advertise Your Products / Jumia Vendor Center comparison). draft -> pending_review (vendor submits) -> active (admin approves) or rejected. A vendor can pause/resume an active campaign themselves; budget_exhausted is set automatically when budget_spent reaches total_budget.';
+    'Vendor-funded cost-per-click ad campaigns (Advertise Your Products / ). draft -> pending_review (vendor submits) -> active (admin approves) or rejected. A vendor can pause/resume an active campaign themselves; budget_exhausted is set automatically when budget_spent reaches total_budget.';
 COMMENT ON COLUMN public.vendor_ad_campaigns.cpc_rate IS
     'Snapshot of ad_platform_settings.default_cpc_rate at submission time, so a later platform-wide rate change never retroactively changes a running campaign''s economics.';
 COMMENT ON TABLE public.vendor_ad_campaign_products IS

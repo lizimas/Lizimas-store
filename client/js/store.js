@@ -25,7 +25,7 @@ function stEscape(value) {
         .replace(/"/g, "&quot;");
 }
 
-// Advertise Your Products (Jumia Vendor Center comparison, Sept 2026):
+// Advertise Your Products (Sept 2026):
 // fire-and-forget click-billing beacon, same one products.js's
 // trackSponsoredAdClick sends - duplicated here rather than shared since
 // store.js deliberately doesn't load products.js (see file header).

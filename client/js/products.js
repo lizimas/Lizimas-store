@@ -211,7 +211,7 @@ function buildPriceHtml(product) {
     return `<p class="product-price">UGX ${priceFormatted}</p>`;
 }
 
-// Advertise Your Products (Jumia Vendor Center comparison, Sept 2026):
+// Advertise Your Products (Sept 2026):
 // fire-and-forget click-billing beacon for a CPC ad-sponsored product card.
 // `keepalive: true` lets the request finish even though the click also
 // navigates the page away immediately after. Never awaited/blocking - a
@@ -239,7 +239,7 @@ function buildProductCard(product) {
         if (event.target.closest(".add-to-cart-btn")) {
             return;
         }
-        // Advertise Your Products (Jumia Vendor Center comparison, Sept
+        // Advertise Your Products (Sept
         // 2026): a CPC-billed ad placement (ad_sponsored - see
         // adTrackingController.js/productController.js) fires a
         // click-tracking beacon before navigating away, so the vendor's
@@ -1809,7 +1809,10 @@ function renderFlashHeading(sale, count) {
     const row = document.getElementById("category-chips");
     if (!row) return;
     const title = (sale && sale.title) || "Grab Or Gone!";
-    const sub = (sale && sale.subtitle) || "Today's Top Deals";
+    let sub = (sale && sale.subtitle) || "Today's Top Deals";
+    // A shared link to a campaign that has ended or not started yet.
+    if (sale && sale.ended) sub = "This deal has ended - check the homepage for today's deals.";
+    else if (sale && sale.upcoming) sub = "This deal starts " + new Date(sale.starts_at).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) + ".";
     row.innerHTML = `
         <div class="ls-flash-page-banner">
             <h2 class="ls-flash-page-title">${title}</h2>
@@ -1905,7 +1908,6 @@ async function loadFlashSale() {
         sale.items.forEach(item => scroll.appendChild(flashSaleProductCard(item)));
 
         startFlashCountdown(sale.ends_at);
-        wireFlashShareButton(sale);
         section.hidden = false;
     } catch (error) {
         console.error("Load flash sale error:", error);
@@ -1960,7 +1962,7 @@ function wireFlashShareButton(sale) {
 
 document.addEventListener("DOMContentLoaded", loadFlashSale);
 
-// Sponsored Products row (Advertise Your Products / Jumia Vendor Center
+// Sponsored Products row (Advertise Your Products / Vendor Center
 // comparison, Sept 2026): the dedicated storefront showcase for vendor CPC
 // ad campaigns - see #ls-sponsored in index.html and
 // GET /api/ads/sponsored-products (adTrackingController.js). No-ops on any

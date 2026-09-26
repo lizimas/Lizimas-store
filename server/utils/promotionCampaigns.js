@@ -4,7 +4,7 @@
 
 const { computeDiscountPercent, MAX_VENDOR_DISCOUNT_PERCENT } = require("./vendorPromotions");
 
-// Campaign status, Jumia Vendor Center wording:
+// Campaign status, Vendor Center wording:
 //   open      - registration still open (vendors can join)
 //   idle      - registration closed, campaign not started yet
 //   ongoing   - campaign is live

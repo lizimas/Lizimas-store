@@ -1,5 +1,5 @@
 -- 118_description_block_video_link.sql
--- Adds "video" and "link" description block types (Ryan, Sept 2026 - Jumia
+-- Adds "video" and "link" description block types (Ryan, Sept 2026 - Channel
 -- parity: rich content should support embedding a product video and a
 -- plain link, same as the existing image/text/heading/grid blocks).
 --

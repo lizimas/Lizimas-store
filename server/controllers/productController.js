@@ -108,8 +108,7 @@ exports.addProduct = async (req, res) => {
             }
             vendorId = req.vendorId;
 
-            // Product-count limit tiers (Jumia Vendor Center comparison,
-            // Sept 2026 - migrations/109_vendor_product_tiers.sql). Checked
+            // Product-count limit tiers (Sept 2026 - migrations/109_vendor_product_tiers.sql). Checked
             // before any upload/pricing work, same spirit as the prohibited-
             // items check just above.
             const limitStatus = await getVendorProductLimitStatus(vendorId);
@@ -177,7 +176,7 @@ exports.addProduct = async (req, res) => {
             imageRecords.push(ins.rows[0]);
         }
 
-        // Per-listing Quality Score + advisory duplicate check (Jumia Vendor
+        // Per-listing Quality Score + advisory duplicate check (Vendor
         // Center comparison, Sept 2026 - migrations/108_product_quality_score.sql).
         // Cached on the row now rather than computed on every read.
         const quality = computeQualityScore(newProduct, imageRecords.length);
@@ -274,8 +273,7 @@ exports.getProducts = async (req, res) => {
                               AND (ac.end_date IS NULL OR ac.end_date >= CURRENT_DATE)
                         )
                     ) AS is_sponsored,
-                    -- Advertise Your Products (Jumia Vendor Center comparison,
-                    -- migration 112): distinguishes a CPC-billed ad placement
+                    -- Advertise Your Products (migration 112): distinguishes a CPC-billed ad placement
                     -- from the older vendor_promotions "sponsored" flag above,
                     -- so the storefront only fires the click-billing beacon
                     -- (POST /api/ads/track-click) for an actual ad campaign.
@@ -805,6 +803,51 @@ exports.generateProductVariants = async (req, res) => {
 
 // Bulk-update variant stock for one product. Single transaction so the grid
 // cannot half-save. Rows not belonging to this product are rejected outright.
+// Per-variant prices (migration 138). A variant's customer price comes from
+// its own vendor payout through the product's commission snapshot; with no
+// payout of its own it sells at the product's price.
+function variantPriceFromPayout(product, payout) {
+    const rate = product.commission_rate_applied;
+    if (rate == null) return null;
+    return computePricing({ vendorPayout: payout, rate: Number(rate), fixedFee: Number(product.fixed_fee_applied) || 0 }).customerPrice;
+}
+async function repriceVariants(db, product) {
+    await db.query(
+        `UPDATE product_variants SET price = $2 WHERE product_id = $1 AND vendor_payout IS NULL`,
+        [product.id, product.price]
+    );
+    if (product.commission_rate_applied == null) return;
+    const own = await db.query(
+        `SELECT id, vendor_payout FROM product_variants WHERE product_id = $1 AND vendor_payout IS NOT NULL`,
+        [product.id]
+    );
+    for (const v of own.rows) {
+        const price = variantPriceFromPayout(product, v.vendor_payout);
+        if (price) await db.query(`UPDATE product_variants SET price = $1 WHERE id = $2`, [price, v.id]);
+    }
+}
+exports.repriceVariants = repriceVariants;
+
+// GET /api/vendors/products/:id/variant-prices - the owner's own variant
+// payouts and customer prices (payouts are never shown publicly).
+exports.getVariantPrices = async (req, res) => {
+    try {
+        const permission = await canEditProduct(req.user, req.params.id);
+        if (!permission.allowed) return res.status(permission.status).json({ error: permission.error });
+        const r = await pool.query(
+            `SELECT v.id, v.price, v.vendor_payout, p.price AS product_price, p.vendor_desired_payout AS product_payout
+               FROM product_variants v JOIN products p ON p.id = v.product_id
+              WHERE v.product_id = $1 ORDER BY v.id`,
+            [req.params.id]
+        );
+        res.json({ variants: r.rows });
+    } catch (error) {
+        console.error("getVariantPrices error:", error.message);
+        res.status(500).json({ error: "Could not load variant prices." });
+    }
+};
+exports.variantPriceFromPayout = variantPriceFromPayout;
+
 exports.updateVariantStock = async (req, res) => {
     const client = await pool.connect();
     try {
@@ -829,7 +872,23 @@ exports.updateVariantStock = async (req, res) => {
                     error: "Each update needs an integer variant_id and a stock value of 0 or more."
                 });
             }
-            clean.push({ variantId, stock });
+            // Optional own payout (vendors) or own price (staff/admin);
+            // undefined = leave as is, "" / null = back to the product price.
+            let payout;
+            if (Object.prototype.hasOwnProperty.call(u, "payout")) {
+                payout = (u.payout === "" || u.payout === null) ? null : Number(u.payout);
+                if (payout !== null && !(payout > 0)) {
+                    return res.status(400).json({ error: "A variant payout must be more than 0, or left blank to use the product price." });
+                }
+            }
+            let price;
+            if (Object.prototype.hasOwnProperty.call(u, "price")) {
+                price = (u.price === "" || u.price === null) ? null : Number(u.price);
+                if (price !== null && !(price > 0)) {
+                    return res.status(400).json({ error: "A variant price must be more than 0, or left blank to use the product price." });
+                }
+            }
+            clean.push({ variantId, stock, payout, price });
         }
 
         await client.query("BEGIN");
@@ -850,11 +909,32 @@ exports.updateVariantStock = async (req, res) => {
             });
         }
 
+        const prod = (await client.query(
+            `SELECT id, price, vendor_id, commission_rate_applied, fixed_fee_applied FROM products WHERE id = $1`,
+            [id]
+        )).rows[0];
+        const isVendor = ["vendor", "vendor_staff"].includes(req.user.role);
         for (const u of clean) {
             await client.query(
                 `UPDATE product_variants SET stock = $1 WHERE id = $2 AND product_id = $3`,
                 [u.stock, u.variantId, id]
             );
+            if (isVendor && u.payout !== undefined) {
+                if (u.payout === null) {
+                    await client.query(`UPDATE product_variants SET vendor_payout = NULL, price = $1 WHERE id = $2`, [prod.price, u.variantId]);
+                } else {
+                    let vPrice;
+                    try { vPrice = variantPriceFromPayout(prod, u.payout); } catch (e) { vPrice = null; }
+                    if (!vPrice) {
+                        await client.query("ROLLBACK");
+                        return res.status(400).json({ error: "Save the product with its payout first, then set variant payouts." });
+                    }
+                    await client.query(`UPDATE product_variants SET vendor_payout = $1, price = $2 WHERE id = $3`, [u.payout, vPrice, u.variantId]);
+                }
+            } else if (!isVendor && u.price !== undefined) {
+                await client.query(`UPDATE product_variants SET vendor_payout = NULL, price = $1 WHERE id = $2`,
+                    [u.price === null ? prod.price : u.price, u.variantId]);
+            }
         }
 
         const totals = (await client.query(
@@ -865,10 +945,15 @@ exports.updateVariantStock = async (req, res) => {
             [id]
         )).rows[0];
 
+        const priced = (await client.query(
+            `SELECT id, price, vendor_payout FROM product_variants WHERE product_id = $1 ORDER BY id`, [id]
+        )).rows;
+
         await client.query("COMMIT");
 
         res.json({
-            message: "Variant stock updated.",
+            variants: priced,
+            message: "Variants saved.",
             updated: clean.length,
             total: totals.total,
             in_stock: totals.in_stock,
@@ -1111,6 +1196,12 @@ exports.updateProduct = async (req, res) => {
         }
 
         const product = await pool.query(updateQuery, params);
+        // Variants follow the product (migration 138): ones without their own
+        // payout sell at the product price; ones with a payout are re-priced
+        // with the product's (possibly new) commission rate.
+        if (product.rows[0]) {
+            await repriceVariants(pool, product.rows[0]).catch((e) => console.error("Variant re-price failed:", e.message));
+        }
         if (product.rows[0] && measured.provided) {
             await saveMeasurements(pool, product.rows[0].id, measured.value);
             Object.assign(product.rows[0], measured.value);
@@ -1167,7 +1258,7 @@ exports.updateProduct = async (req, res) => {
 // through the same rules a manual Add/Edit Product submission does
 // (checkProhibitedOrNull, the commission engine, forced-pending status on
 // every save - see addProduct/updateProduct above), none of which apply to
-// an admin import. Matches Jumia Vendor Center's "Add multiple products"
+// an admin import. Matches Vendor Center's "Add multiple products"
 // bulk-upload entry point; CSV/XLSX export of a vendor's own catalogue
 // already exists client-side (vmExportProductsCsv in vendor-mobile.js).
 //
@@ -1231,7 +1322,7 @@ exports.importVendorProducts = async (req, res) => {
     const byId = new Map(ownProducts.map(r => [r.id, r]));
     const bySku = new Map(ownProducts.filter(r => r.sku).map(r => [r.sku.toLowerCase(), r]));
 
-    // Product-count limit tiers (Jumia Vendor Center comparison, Sept 2026 -
+    // Product-count limit tiers (Sept 2026 -
     // migrations/109_vendor_product_tiers.sql). Counts how many rows in this
     // file would create a NEW listing (no matching id/sku among this
     // vendor's own products), using the same id-then-sku resolution the

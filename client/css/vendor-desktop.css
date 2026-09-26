@@ -619,9 +619,9 @@
     display: flex;
 }
 
-/* Jumia update-secret sub-form: same hidden/display:flex conflict class -
+/* Sales channel update-secret sub-form: same hidden/display:flex conflict class -
    display is driven purely by the `hidden` attribute. */
-.vendor-desktop-shell #vd-jumia-update-secret-view:not([hidden]) {
+.vendor-desktop-shell #vd-channel-update-secret-view:not([hidden]) {
     display: flex;
 }
 
@@ -629,7 +629,7 @@
     transform: rotate(90deg);
 }
 
-/* ===== Product Management (vendor-products.js) - Jumia layout, Lizimas colours ===== */
+/* ===== Product Management (vendor-products.js), Lizimas colours ===== */
 :root { --vp-gold: #f4b400; --vp-gold-ink: #946c00; --vp-gold-soft: #fdf3d6; --vp-navy: #1a1a2e; --vp-line: #e6e7eb; --vp-muted: #6b7280; }
 .vp-crumb { color: var(--vp-gold-ink); font-weight: 600; font-size: 14px; margin: 4px 0 10px; }
 .vp-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -917,7 +917,7 @@
 /* =====================================================================
    Full width + readability pass (Ryan, Sept 2026)
    Every vendor page now fills the space beside the sidebar, the way
-   Jumia Vendor Center does, instead of a 1000px centred column; and
+   Vendor Center does, instead of a 1000px centred column; and
    nothing is smaller than ~12.5px, body text ~14.5-15px. Desktop shell
    only - the phone layout, admin and staff panels are untouched.
    ===================================================================== */
@@ -1077,7 +1077,7 @@
 .vs-pg:disabled { color: #c3c6cc; cursor: default; }
 .vs-dl:focus-visible, .vs-pg:focus-visible { outline: 2px solid #1a1a2e; outline-offset: 2px; }
 
-/* ===== Account Statements (vendor-statements.js) - Jumia layout ===== */
+/* ===== Account Statements (vendor-statements.js) ===== */
 #tab-wallet.vs-statements-mode > .admin-page-title, #tab-wallet.vs-statements-mode > .admin-page-subtitle { display: none; }
 .vs-crumb { font-size: 15px; font-weight: 600; margin: 6px 0 10px; }
 .vs-crumb-muted, .vs-crumb-sep { color: #8a8f98; font-weight: 500; }

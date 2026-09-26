@@ -563,3 +563,13 @@
 .sc-dot.on { background: #12b76a; } .sc-dot.away { background: #f4b400; }
 .sc-team-tip { color: #6b7280; font-size: 12px; margin-top: 10px; }
 @media (max-width: 760px) { .sc-team-table { display: block; overflow-x: auto; white-space: nowrap; } }
+
+/* Support Phases 2-3 (Sept 2026) */
+.sc-context { margin-top: 14px; padding-top: 12px; border-top: 1px solid #eaecf0; font-size: 13px; }
+.sc-ctx-line { margin: 4px 0; color: #344054; }
+.sc-ctx-orders { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.sc-ctx-orders li { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: #f8f9fb; border-radius: 8px; padding: 6px 8px; }
+.sc-ctx-oid { font-weight: 700; color: #1a1a2e; }
+.sc-ctx-date { margin-left: auto; color: #6b7280; font-size: 12px; }
+.sc-toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: #1a1a2e; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 14px; z-index: 70; box-shadow: 0 6px 20px rgba(0,0,0,.25); max-width: 90vw; }
+.sc-toast[hidden] { display: none; }

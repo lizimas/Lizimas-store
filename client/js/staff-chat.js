@@ -124,6 +124,7 @@
             if (!rows) return;
             setOffline(false);
             state.conversations = rows;
+            checkAlerts(rows);
             renderList();
         } catch (error) {
             console.error("Load conversations error:", error);
@@ -383,15 +384,98 @@
         html += '<button class="sc-btn" data-action="note">Add note</button>';
         html += "</div>";
 
-        // Honest placeholder rather than fabricated data: there is no endpoint
-        // yet that returns a customer's orders, spend, or delivery address.
-        html += '<div class="sc-note">'
-              + "<strong>Orders &amp; notes</strong><br>"
-              + "Needs a customer summary endpoint before this panel can show "
-              + "order history, delivery address or staff notes."
-              + "</div>";
+        // Customer context (Support Phase 2): their account, recent orders
+        // and past chats, loaded just below.
+        html += '<div class="sc-context" id="sc-context"><strong>Customer history</strong><p class="sc-notes-empty">Loading\u2026</p></div>';
 
         $("sc-detail-body").innerHTML = html;
+        loadContext(c.id);
+    }
+
+    function money(n) { return "UGX " + Math.round(Number(n) || 0).toLocaleString(); }
+
+    async function loadContext(id) {
+        var box = $("sc-context");
+        if (!box) return;
+        try {
+            var d = await api("/api/chat/conversations/" + id + "/context");
+            if (!d || state.activeId !== id) return;
+            var who = d.customer
+                ? "Registered customer since " + new Date(d.customer.member_since).toLocaleDateString()
+                  + (d.customer.email ? " \u00b7 " + esc(d.customer.email) : "")
+                : "Guest" + (d.guest && d.guest.email ? " \u00b7 " + esc(d.guest.email) : "");
+            var html = "<strong>Customer history</strong>"
+                + '<p class="sc-ctx-line">' + who + "</p>"
+                + '<p class="sc-ctx-line"><b>' + d.totals.orders + "</b> order" + (d.totals.orders === 1 ? "" : "s")
+                + " \u00b7 " + money(d.totals.spent) + " spent \u00b7 <b>" + d.previous_chats + "</b> earlier chat"
+                + (d.previous_chats === 1 ? "" : "s")
+                + (d.previous_avg_csat != null ? " \u00b7 rated " + d.previous_avg_csat + "/5" : "") + "</p>";
+            if (d.orders.length) {
+                html += '<ul class="sc-ctx-orders">' + d.orders.map(function (o) {
+                    return '<li><span class="sc-ctx-oid">#' + o.id + "</span>"
+                        + '<span class="sc-tag sc-tag-' + esc(o.status) + '">' + esc(o.status) + "</span>"
+                        + "<span>" + money(o.total) + " \u00b7 " + o.items + " item" + (o.items === 1 ? "" : "s") + "</span>"
+                        + '<span class="sc-ctx-date">' + esc(new Date(o.created_at).toLocaleDateString()) + "</span></li>";
+                }).join("") + "</ul>";
+            } else {
+                html += '<p class="sc-notes-empty">No orders found for this customer.</p>';
+            }
+            box.innerHTML = html;
+        } catch (error) {
+            box.innerHTML = "<strong>Customer history</strong><p class=\"sc-notes-empty\">" + esc(error.message) + "</p>";
+        }
+    }
+
+    /* ------------------------------------------------ notifications */
+    // Support Phase 3: a sound, a flashing tab title and (if allowed) a
+    // desktop notification when a chat is assigned to you, a customer writes
+    // in one of your chats, or (senior agents) a new chat is escalated.
+    var seen = null; // id -> { unread, assigned, escalation_level }
+    var titleBase = document.title;
+    var titleTimer = null;
+    function beep() {
+        try {
+            var Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return;
+            var ctx = beep.ctx || (beep.ctx = new Ctx());
+            var o = ctx.createOscillator(), g = ctx.createGain();
+            o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+            g.gain.setValueAtTime(0.0001, ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+            o.start(); o.stop(ctx.currentTime + 0.4);
+        } catch (e) { /* sound is optional */ }
+    }
+    function flashTitle(text) {
+        if (titleTimer) clearInterval(titleTimer);
+        var on = false, n = 0;
+        titleTimer = setInterval(function () {
+            document.title = (on = !on) ? text : titleBase;
+            if (++n > 20 || !document.hidden) { clearInterval(titleTimer); titleTimer = null; document.title = titleBase; }
+        }, 1000);
+    }
+    function notify(title, body) {
+        beep();
+        if (document.hidden) flashTitle("\u25CF " + title);
+        if (window.Notification && Notification.permission === "granted" && document.hidden) {
+            try { new Notification(title, { body: body, tag: "lz-chat" }); } catch (e) { /* ignore */ }
+        }
+        var t = $("sc-toast");
+        if (t) { t.textContent = title + (body ? " \u2013 " + body : ""); t.hidden = false; clearTimeout(notify.t); notify.t = setTimeout(function () { t.hidden = true; }, 5000); }
+    }
+    function checkAlerts(rows) {
+        var myId = me && me.id;
+        var next = {};
+        rows.forEach(function (c) { next[c.id] = { unread: c.staff_unread || 0, assigned: c.assigned_staff_id, esc: c.escalation_level || 0, name: c.display_name || "Guest" }; });
+        if (seen) {
+            rows.forEach(function (c) {
+                var was = seen[c.id], now = next[c.id];
+                if (now.assigned === myId && (!was || was.assigned !== myId)) notify("New chat for you", now.name);
+                else if (now.assigned === myId && was && now.unread > was.unread && c.id !== state.activeId) notify("New message", now.name + ": " + (c.last_message || "").slice(0, 60));
+                else if (state.senior && now.esc > 0 && (!was || was.esc < now.esc) && now.assigned !== myId) notify("Chat escalated", now.name);
+            });
+        }
+        seen = Object.assign(seen || {}, next);
     }
 
     function field(label, value) {
@@ -738,6 +822,17 @@
         }
         var teamBtn = $("sc-team-btn");
         if (teamBtn) teamBtn.hidden = !state.senior;
+        var alertBtn = $("sc-alert-btn");
+        if (alertBtn && window.Notification) {
+            var paintAlert = function () {
+                alertBtn.textContent = Notification.permission === "granted" ? "Alerts on" : "Turn on alerts";
+                alertBtn.disabled = Notification.permission === "granted" || Notification.permission === "denied";
+                if (Notification.permission === "denied") alertBtn.textContent = "Alerts blocked";
+            };
+            paintAlert();
+            alertBtn.hidden = false;
+            alertBtn.addEventListener("click", function () { Notification.requestPermission().then(paintAlert); beep(); });
+        }
 
         wire();
         await loadList();

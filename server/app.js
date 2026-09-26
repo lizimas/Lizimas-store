@@ -71,6 +71,9 @@ app.use("/webhooks/payments", webhookLimiter, require("./routes/paymentWebhook")
 // 5mb (was the 100kb default): long product descriptions and rich-content
 // blocks (text, tables) are saved as JSON.
 app.use(express.json({ limit: "5mb" }));
+// Login responses: move the session token into an httpOnly cookie
+// (server/utils/sessionCookie.js).
+app.use(require("./utils/sessionCookie").sessionCookieResponder);
 app.use(morgan("dev"));
 app.use(generalLimiter);
 app.use(logVisitor);

@@ -1,22 +1,22 @@
 require('dotenv').config();
 const { pool } = require('../config/database');
-const jumiaService = require('../services/jumiaService');
+const channelService = require('../services/channelService');
 
-async function importJumiaProducts() {
+async function importChannelProducts() {
   try {
-    console.log('🚀 Starting Jumia product import...');
+    console.log('🚀 Starting Channel product import...');
     
-    // Get products from Jumia
-    const response = await jumiaService.getProducts({ limit: 50 });
+    // Get products from Channel
+    const response = await channelService.getProducts({ limit: 50 });
     const products = response?.products || [];
     
     if (products.length === 0) {
-      console.log('⚠️ No products found on Jumia');
+      console.log('⚠️ No products found on Channel');
       console.log('💡 Make sure you have products listed as a seller');
       process.exit(0);
     }
     
-    console.log(`📦 Found ${products.length} products on Jumia`);
+    console.log(`📦 Found ${products.length} products on Channel`);
     
     let imported = 0;
     let skipped = 0;
@@ -73,7 +73,7 @@ async function importJumiaProducts() {
     
     process.exit(0);
   } catch (error) {
-    console.error('❌ Error importing Jumia products:', error.message);
+    console.error('❌ Error importing Channel products:', error.message);
     if (error.response?.data) {
       console.error('   Details:', error.response.data);
     }
@@ -81,4 +81,4 @@ async function importJumiaProducts() {
   }
 }
 
-importJumiaProducts();
+importChannelProducts();

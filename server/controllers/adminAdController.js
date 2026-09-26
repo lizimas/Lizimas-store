@@ -1,4 +1,4 @@
-// Advertise Your Products (Jumia Vendor Center comparison, Sept 2026) -
+// Advertise Your Products (Sept 2026) -
 // admin-side review + platform-wide settings control. See
 // migrations/112_vendor_ad_campaigns.sql.
 

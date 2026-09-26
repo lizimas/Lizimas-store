@@ -1,18 +1,18 @@
 require('dotenv').config();
 const axios = require('axios');
 
-class JumiaService {
+class ChannelService {
   constructor() {
-    this.clientId = process.env.JUMIA_CLIENT_ID;
-    this.clientSecret = process.env.JUMIA_CLIENT_SECRET;
-    this.baseUrl = process.env.JUMIA_API_URL || 'https://api.jumia.com/ug/v1';
+    this.clientId = process.env.CHANNEL_CLIENT_ID;
+    this.clientSecret = process.env.CHANNEL_CLIENT_SECRET;
+    this.baseUrl = process.env.CHANNEL_API_URL || '';
     this.accessToken = null;
   }
 
   // Get OAuth token
   async getAccessToken() {
     try {
-      console.log('🔄 Getting Jumia access token...');
+      console.log('🔄 Getting Channel access token...');
       
       const response = await axios.post(
         `${this.baseUrl}/oauth/token`,
@@ -30,10 +30,10 @@ class JumiaService {
       );
 
       this.accessToken = response.data.access_token;
-      console.log('✅ Jumia access token obtained');
+      console.log('✅ Channel access token obtained');
       return this.accessToken;
     } catch (error) {
-      console.error('❌ Failed to get Jumia token:');
+      console.error('❌ Failed to get Channel token:');
       if (error.response) {
         console.error('   Status:', error.response.status);
         console.error('   Data:', error.response.data);
@@ -44,12 +44,12 @@ class JumiaService {
     }
   }
 
-  // Get products from your Jumia catalog
+  // Get products from your Channel catalog
   async getProducts(params = {}) {
     try {
       const token = await this.getAccessToken();
       
-      console.log('🔄 Fetching products from Jumia...');
+      console.log('🔄 Fetching products from Channel...');
       
       const response = await axios.get(`${this.baseUrl}/products`, {
         headers: {
@@ -78,4 +78,4 @@ class JumiaService {
   }
 }
 
-module.exports = new JumiaService();
+module.exports = new ChannelService();

@@ -1,4 +1,4 @@
-/* Vendor mobile app shell (client/vendor/dashboard.html), matching Jumia's
+/* Vendor mobile app shell (client/vendor/dashboard.html)
    real seller-center IA: a bottom-nav app (Home / Orders / Manage Products
    / Menu) shown below the ~768px breakpoint, replacing the desktop
    sidebar-and-tabs shell (.admin-shell) which stays for wider screens.
@@ -149,7 +149,7 @@
 
 /* --- Specs "insert table" paste tool (Word-style: pick rows/columns, then
    paste Excel data straight into the grid) --- */
-/* Word/Jumia-style grid for picking a table size (tap a cell to insert a
+/* Word/grid for picking a table size (tap a cell to insert a
    table that size; mouseover preview also runs on hybrid trackpad+touch
    devices, same idea as the desktop admin/vendor version). */
 .vm-specs-table-grid-wrap { position: relative; display: inline-block; margin-bottom: 8px; }
@@ -260,9 +260,9 @@
 .vm-fab-gold { background: var(--vm-gold); border: none; color: var(--vm-navy); }
 
 /* --- Home: shop-setup onboarding (client/js/vendor-shop-setup.js) ---------
-   Layout follows Jumia's mobile seller onboarding (section tiles, then the
+   Lizimas mobile seller onboarding layout (section tiles, then the
    selected section's form in a white card underneath), in Lizimas colours:
-   gold accent instead of Jumia orange, navy text. */
+   gold accent, navy text. */
 
 .vss-card {
     background: #fff; margin: 14px 12px; border-radius: 12px; padding: 20px 16px;
@@ -399,7 +399,7 @@ select.vss-select { appearance: none; -webkit-appearance: none; padding-right: 3
 .vss-radio input:checked + span::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--vm-gold); }
 
 /* --- Vendor Center shared components (client/js/vendor-center.js) --------
-   Jumia Vendor Center layouts in Lizimas colours: navy #1a1a2e, gold
+   Vendor Center layouts in Lizimas colours: navy #1a1a2e, gold
    #f4b400 (fills), darker gold #b07d00 (gold text on white - readable),
    used by BOTH the mobile shell and the desktop dashboard. */
 
@@ -474,7 +474,7 @@ select.vss-select { appearance: none; -webkit-appearance: none; padding-right: 3
 .vc-badge-grey { background: #eef0f3; color: #4b5563; }
 .vc-badge-gold { background: #fff4d6; color: #9a6b00; }
 
-/* Key/value cards (Jumia mobile list style) */
+/* Key/value cards (mobile list style) */
 .vc-kv { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; padding: 10px 0; font-size: 14px; }
 .vc-kv > span:first-child { color: #6b7280; flex-shrink: 0; max-width: 48%; }
 .vc-kv > span:last-child { text-align: right; color: #222; }
@@ -681,8 +681,7 @@ select.vss-select { appearance: none; -webkit-appearance: none; padding-right: 3
 }
 
 /* Keep Vendor Center tables real tables on phones (admin.css turns every
-   table into stacked cards under 600px) - they scroll sideways instead,
-   like Jumia's. */
+   table into stacked cards under 600px) - they scroll sideways instead. */
 table.vc-table { display: table; }
 .vc-table thead { display: table-header-group; }
 .vc-table tbody { display: table-row-group; }
@@ -705,7 +704,7 @@ table.vc-table { display: table; }
 .vss-field-error { color: #d93025; font-size: 12.5px; margin-top: 6px; }
 .vss-field-error[hidden] { display: none; }
 
-/* ===== Mobile Product Management (vendor-products.js) - Jumia mobile Orders layout ===== */
+/* ===== Mobile Product Management (vendor-products.js) - mobile Orders layout ===== */
 .vpm-filters { padding: 6px 16px 12px; }
 .vpm-label { font-size: 12.5px; font-weight: 600; color: #8a8f98; text-transform: uppercase; letter-spacing: .04em; }
 .vpm-pills { display: flex; gap: 10px; overflow-x: auto; padding: 8px 0 12px; scrollbar-width: none; }

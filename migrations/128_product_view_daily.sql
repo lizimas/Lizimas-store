@@ -1,6 +1,6 @@
 -- 128_product_view_daily.sql
 -- Product page views per day (Ryan, Sept 2026 - "Monitor your promotions"
--- Page Views column, Jumia parity). One row per product per UTC day,
+-- Page Views column, parity). One row per product per UTC day,
 -- bumped fire-and-forget by GET /api/products/:id (productController
 -- getProductById). Views before this migration are simply not counted.
 

@@ -17,7 +17,9 @@ const {
     getMyTier,
     escalateConversation,
     addInternalNote,
-    getTeam
+    getTeam,
+    rateConversation,
+    getConversationContext
 } = require("../controllers/chatController");
 
 const {
@@ -43,6 +45,8 @@ router.post("/start", chatStartLimiter, optionalAuth, startConversation);
 router.get("/:id/messages", chatPollLimiter, optionalAuth, getMessages);
 router.post("/:id/messages", chatMessageLimiter, optionalAuth, postMessage);
 router.post("/:id/read", chatPollLimiter, optionalAuth, markCustomerRead);
+// Public: the customer's rating after a closed chat (Support Phase 4).
+router.post("/:id/rating", chatMessageLimiter, optionalAuth, rateConversation);
 
 // Staff inbox. Declared after the public routes but on distinct paths, so
 // "/conversations" can never be swallowed by "/:id".
@@ -56,6 +60,7 @@ router.post("/conversations/:id/escalate", requireAuth, requireSupportOrAdmin, e
 router.post("/conversations/:id/notes", requireAuth, requireSupportOrAdmin, addInternalNote);
 router.get("/me", requireAuth, requireSupportOrAdmin, getMyTier);
 router.get("/team", requireAuth, requireSupportOrAdmin, getTeam);
+router.get("/conversations/:id/context", requireAuth, requireSupportOrAdmin, getConversationContext);
 
 // Presence. Distinct single-segment paths, so none of these collide with the
 // public "/:id" routes above.

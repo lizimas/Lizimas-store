@@ -53,7 +53,7 @@ function hasVendorPermission(staffRoles, ...anyOf) {
 // least one of the given vc_* permission codes. Use on top of requireVendor
 // for routes that should be narrower than "any active vendor login" - most
 // routes deliberately do NOT use this yet (see PENDING.md), only the ones
-// that map cleanly onto a Jumia role.
+// that map cleanly onto a Lizimas role.
 function requireVendorPermission(...anyOf) {
     return (req, res, next) => {
         if (!hasVendorPermission(req.vendorStaffRoles, ...anyOf)) {

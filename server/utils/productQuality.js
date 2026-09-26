@@ -1,5 +1,4 @@
-// Per-listing Quality/Content Score (Jumia Vendor Center comparison,
-// September 2026 - see migrations/108_product_quality_score.sql's header).
+// Per-listing Quality/Content Score (September 2026 - see migrations/108_product_quality_score.sql's header).
 // Pure/stateless: takes a product-shaped object plus its image count and
 // returns {score, maxScore, tips}. Called from addProduct/updateProduct in
 // productController.js right before the INSERT/UPDATE, so the score is

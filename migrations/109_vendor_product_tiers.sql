@@ -1,6 +1,6 @@
 -- 109_vendor_product_tiers.sql
--- Product-count limit tiers (Jumia Vendor Center comparison, September
--- 2026 - Jumia caps how many active listings a seller can carry, rising
+-- Product-count limit tiers (September
+-- 2026 - Channel caps how many active listings a seller can carry, rising
 -- with a GMV-based tier as they grow, roughly Tier A through G). This adds
 -- an admin-configurable tier ladder plus a per-vendor manual override.
 --
@@ -45,11 +45,11 @@ INSERT INTO public.vendor_product_tiers (tier_code, tier_name, min_gmv_90d, max_
 ON CONFLICT (tier_code) DO NOTHING;
 
 COMMENT ON TABLE public.vendor_product_tiers IS
-    'Admin-configurable GMV tier ladder capping how many active listings a vendor may carry (Jumia Vendor Center comparison). Managed from the admin Settings screen, not hand-edited - see adminProductTierController.js.';
+    'Admin-configurable GMV tier ladder capping how many active listings a vendor may carry (). Managed from the admin Settings screen, not hand-edited - see adminProductTierController.js.';
 COMMENT ON COLUMN public.vendor_product_tiers.min_gmv_90d IS
     'Trailing 90-day delivered GMV (UGX) a vendor needs to QUALIFY for this tier. A vendor''s effective tier is the highest one they qualify for, unless product_tier_override is set.';
 COMMENT ON COLUMN public.vendor_product_tiers.max_active_products IS
-    'Cap on this vendor''s total non-deleted listings (pending + approved + rejected + inactive all count, matching how Jumia counts a seller''s catalogue size, not just live ones). NULL = unlimited.';
+    'Cap on this vendor''s total non-deleted listings (pending + approved + rejected + inactive all count, matching how Channel counts a seller''s catalogue size, not just live ones). NULL = unlimited.';
 COMMENT ON COLUMN public.vendors.product_tier_override IS
     'Admin manual override of this vendor''s tier (e.g. a trusted new seller fast-tracked, or a seller capped early for a quality issue). NULL means "use the GMV ladder normally" - see server/utils/vendorProductTier.js.';
 

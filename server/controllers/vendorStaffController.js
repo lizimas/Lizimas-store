@@ -1,4 +1,4 @@
-// Vendor Users/Roles (Settings > Users, matching Jumia Vendor Center's
+// Vendor Users/Roles (Settings > Users's
 // screen of the same name - Ryan, Sept 2026). A vendor owner invites
 // staff sub-accounts scoped to their own shop, each holding an array of
 // vc_* permission codes (see server/utils/vendorContext.js). Deliberately

@@ -1,4 +1,4 @@
-// Stock Recommendation (Jumia Vendor Center comparison, Sept 2026): flags
+// Stock Recommendation (Sept 2026): flags
 // products likely to run out soon and suggests a reorder quantity, from
 // trailing 30-day delivered sales velocity. Computed on demand, same spirit
 // as vendorProductTier.js's GMV ladder - no caching, no new columns.
@@ -41,7 +41,7 @@ function computeStockRecommendation({ stock, unitsSoldWindow }) {
     };
 }
 
-// Fulfilment-view figures for the Jumia-style Stock Recommendation page
+// Fulfilment-view figures for the Stock Recommendation page
 // (Sept 2026). "Available" is everything sellable right now - the vendor's
 // own stock plus units Lizimas holds for them at a hub (consigned_stock).
 // "In transit" is units on consignment orders that are still open
