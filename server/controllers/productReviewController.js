@@ -298,8 +298,11 @@ async function applyDecision(user, productId, input, name) {
         // investigation note is internal.
         const vendorText = ["reject", "request_changes"].includes(v.action) ? v.vendorMessage : null;
         await client.query(
-            `UPDATE products SET status = $2, review_reason_code = $3,
-                    rejection_reason = CASE WHEN $2 IN ('rejected','changes_requested') THEN $4 WHEN $2 = 'approved' THEN NULL ELSE rejection_reason END,
+            // $2 is cast to text: products.status is VARCHAR on the live
+            // database and TEXT elsewhere, and Postgres refuses to guess one
+            // type for a parameter used both ways.
+            `UPDATE products SET status = $2::text, review_reason_code = $3::text,
+                    rejection_reason = CASE WHEN $2::text IN ('rejected','changes_requested') THEN $4::text WHEN $2::text = 'approved' THEN NULL ELSE rejection_reason END,
                     reviewed_at = now(), reviewed_by = $5
               WHERE id = $1`,
             [productId, v.to, v.reasonCode, vendorText, user.userId]);
