@@ -278,7 +278,7 @@
                 ${row("Brand", esc(p.brand || ""))}
                 ${row("Seller", r.seller.own ? "Lizimas Store (own product)" : esc(r.seller.business_name || p.vendor_business_name || "Vendor"))}
                 ${row("Submitted", esc(when(p.created_at)))}
-                ${row("Last updated", esc(when(p.updated_at)))}
+                ${row("Last reviewed", p.reviewed_at ? esc(when(p.reviewed_at)) : "Not yet")}
                 ${row("Product ID", esc(p.id))}
                 ${row("Status", badge(p.status, r.status_label))}
             </div>
@@ -423,7 +423,7 @@
     }
 
     const ACTION_WORD = { approve: "Approved", reject: "Rejected", request_changes: "Requested changes", investigate: "Put under investigation",
-        draft: "Saved as draft", resubmitted: "Seller resubmitted", edited: "Seller edited (back to review)", flags: "Flags" };
+        draft: "Saved as draft", resubmitted: "Seller resubmitted", edited: "Seller edited (back to review)", flags: "Flags", cost: "Cost price updated" };
     function history(r, m) {
         const reason = (code) => { const x = (m.reasons || []).find((y) => y.code === code); return x ? x.label : code; };
         const rows = r.history.map((h) => `<li>

@@ -77,7 +77,7 @@ exports.list = async (req, res) => {
 
         const [rows, total, counts, sellers, categories] = await Promise.all([
             pool.query(
-                `SELECT p.id, p.name, p.sku, p.lizimas_sku, p.price, p.status, p.image, p.created_at, p.updated_at,
+                `SELECT p.id, p.name, p.sku, p.lizimas_sku, p.price, p.status, p.image, p.created_at, p.reviewed_at,
                         p.vendor_id, p.category_id, p.review_flags, p.quality_score, p.stock,
                         c.name AS category_name, v.business_name AS vendor_business_name, u.name AS submitted_by_name,
                         (SELECT COUNT(*)::int FROM product_images pi WHERE pi.product_id = p.id) AS photo_count
@@ -300,7 +300,7 @@ async function applyDecision(user, productId, input, name) {
         await client.query(
             `UPDATE products SET status = $2, review_reason_code = $3,
                     rejection_reason = CASE WHEN $2 IN ('rejected','changes_requested') THEN $4 WHEN $2 = 'approved' THEN NULL ELSE rejection_reason END,
-                    reviewed_at = now(), reviewed_by = $5, updated_at = now()
+                    reviewed_at = now(), reviewed_by = $5
               WHERE id = $1`,
             [productId, v.to, v.reasonCode, vendorText, user.userId]);
         await recordEvent(client, productId, { action: v.action, from: product.status, to: v.to, reasonCode: v.reasonCode,

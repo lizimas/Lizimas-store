@@ -44,6 +44,7 @@ const PATH_RULES = [
     ["/api/search/stats", "ap_dashboard"],
 
     ["/api/admin/products/pending", ["ap_products", "ap_staff"]],
+    ["/api/admin/product-reviews", ["ap_products", "ap_staff"]],
     ["/api/admin/products", ["ap_products", "ap_staff"]],
     ["/api/admin/product-tiers", "ap_products"],
     ["/api/admin/prohibited-items", "ap_products"],
