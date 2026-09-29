@@ -389,10 +389,22 @@ exports.importProducts = async (req, res) => {
             // Resolve which existing row (if any) this line targets: an
             // explicit id wins, otherwise fall back to a sku match so a
             // re-imported export file updates by sku alone.
-            let targetId = existingId;
+            // Only Lizimas' own products (vendor_id IS NULL) can be targeted:
+            // a vendor's listing is view-only for admin (Sept 2026), so an id
+            // or sku that belongs to a vendor product is reported, not edited.
+            let targetId = null;
+            if (existingId) {
+                const own = await client.query("SELECT id, vendor_id FROM products WHERE id = $1 AND deleted_at IS NULL", [existingId]);
+                if (own.rows.length && own.rows[0].vendor_id) {
+                    results.skipped++;
+                    results.errors.push({ row: rowNum, name, errors: [`Product #${existingId} belongs to a vendor - admin can't change it by import.`] });
+                    continue;
+                }
+                targetId = own.rows.length ? existingId : null;
+            }
             if (!targetId && sku) {
                 const bySku = await client.query(
-                    "SELECT id FROM products WHERE sku = $1 AND deleted_at IS NULL",
+                    "SELECT id FROM products WHERE sku = $1 AND deleted_at IS NULL AND vendor_id IS NULL",
                     [sku]
                 );
                 if (bySku.rows.length) targetId = bySku.rows[0].id;
