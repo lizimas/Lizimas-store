@@ -9,7 +9,7 @@
 
 <meta name="description" content="Shop quality products at Lizimas Store with fast delivery across Uganda and Mobile Money payment options.">
 <link rel="stylesheet" href="/css/style.css?v=86">
-<link rel="stylesheet" href="/css/product-detail.css?v=33">
+<link rel="stylesheet" href="/css/product-detail.css?v=34">
 <link rel="stylesheet" href="/css/desc-blocks.css?v=1">
 </head>
 <body>
@@ -107,33 +107,34 @@
 
 <nav class="pd-breadcrumbs" id="pd-breadcrumbs" aria-label="Breadcrumb"></nav>
 
-<div class="pd-layout">
+<div class="pd-layout" id="pd-layout">
+<div class="pd-main">
+
+<div class="pd-top pd-box">
 <div class="pd-gallery-col">
-<div class="pd-thumbs" id="pd-thumbs"></div>
 <div class="pd-gallery">
     <div id="pd-gallery-scroll" class="pd-gallery-scroll"></div>
+    <button type="button" class="pd-gal-arrow pd-gal-prev" id="pd-gal-prev" aria-label="Previous photo" hidden>&#8249;</button>
+    <button type="button" class="pd-gal-arrow pd-gal-next" id="pd-gal-next" aria-label="Next photo" hidden>&#8250;</button>
     <div id="pd-gallery-counter" class="pd-gallery-counter">1/1</div>
 </div>
-</div>
-
-<div id="pd-fullscreen-viewer" class="pd-fullscreen-viewer hidden">
-    <button id="pd-fullscreen-close" class="pd-fullscreen-close">&times;</button>
-    <button id="pd-fullscreen-share" class="pd-fullscreen-share">&#8599;</button>
-    <div id="pd-fullscreen-counter" class="pd-fullscreen-counter">1/1</div>
-    <div id="pd-fullscreen-scroll" class="pd-fullscreen-scroll"></div>
+<div class="pd-thumbs" id="pd-thumbs"></div>
 </div>
 
 <div class="pd-info">
     <div id="pd-brand" class="pd-brand" hidden></div>
     <h1 id="pd-name"></h1>
-    <div id="pd-seller-panel" class="seller-panel" hidden></div>
     <div id="pd-item-id" class="pd-item-id"></div>
     <div id="pd-rating" class="pd-rating"></div>
-    <div class="pd-price-row">
-        <div id="pd-price" class="pd-price"></div>
-        <span id="pd-price-original" class="pd-price-original" hidden></span>
-        <span id="pd-discount-badge" class="pd-discount-badge" hidden></span>
-        <div id="pd-warranty" class="pd-warranty hidden"></div>
+
+    <div class="pd-price-box">
+        <div class="pd-price-row">
+            <div id="pd-price" class="pd-price"></div>
+            <span id="pd-price-original" class="pd-price-original" hidden></span>
+            <span id="pd-discount-badge" class="pd-discount-badge" hidden></span>
+            <div id="pd-warranty" class="pd-warranty hidden"></div>
+        </div>
+        <div id="pd-stock" class="pd-stock" hidden></div>
     </div>
 
     <div id="pd-selector-section" class="pd-selector-section hidden"></div>
@@ -144,34 +145,134 @@
 
     <div id="pd-details-card" class="pd-card"></div>
 </div>
-
-<div class="pd-tabs-col">
-
-    <section class="pd-section" id="pd-reviews-section">
-        <h2 class="pd-section-title">Customer Reviews</h2>
-        <div id="pd-reviews" class="pd-reviews"></div>
-    </section>
-
-    <section class="pd-section" id="pd-desc-section">
-        <h2 class="pd-section-title">Description</h2>
-        <div id="pd-desc-blocks" class="pd-desc-blocks"></div>
-        <p id="pd-description"></p>
-    </section>
-
-    <section class="pd-section" id="pd-specs-section">
-        <h2 class="pd-section-title">Specifications</h2>
-        <table id="pd-specs-table" class="pd-specs-table"></table>
-    </section>
-    <p id="pd-sku" class="pd-sku" hidden></p>
-
 </div>
+
+<!-- Details panel (Lulu-style): section menu on the left, the chosen
+     section on the right. The arrow shrinks the menu to icons or opens it
+     again; the choice is remembered. On a phone the menu is a row of tabs. -->
+<div class="pd-tabs-col pd-dpanel" id="pd-dpanel">
+    <div class="pd-dmenu" role="tablist" aria-label="Product information">
+        <button type="button" class="pd-dmenu-toggle" id="pd-dmenu-toggle" aria-label="Minimise menu" title="Minimise menu">
+            <span class="pd-dmenu-arrow" aria-hidden="true">&#8249;</span>
+        </button>
+        <button type="button" class="pd-dtab" role="tab" data-sec="pd-highlights-section" title="Product Highlights" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+            <span>Product Highlights</span></button>
+        <button type="button" class="pd-dtab" role="tab" data-sec="pd-specs-section" title="Specifications">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12" stroke="currentColor" stroke-width="1.7"/><circle cx="4" cy="6" r="1.2" fill="currentColor"/><circle cx="4" cy="12" r="1.2" fill="currentColor"/><circle cx="4" cy="18" r="1.2" fill="currentColor"/></svg>
+            <span>Specifications</span></button>
+        <button type="button" class="pd-dtab" role="tab" data-sec="pd-desc-section" title="Product Description">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 12h7M9 16h7" stroke="currentColor" stroke-width="1.7"/></svg>
+            <span>Product Description</span></button>
+        <button type="button" class="pd-dtab" role="tab" data-sec="pd-reviews-section" title="Customer Feedback">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 7v4M12 13.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <span>Customer Feedback</span></button>
+    </div>
+
+    <div class="pd-dbody">
+        <section class="pd-section" id="pd-highlights-section" role="tabpanel" hidden>
+            <h2 class="pd-section-title">Product Highlights</h2>
+            <ul id="pd-highlights" class="pd-highlights"></ul>
+        </section>
+
+        <section class="pd-section" id="pd-specs-section" role="tabpanel">
+            <h2 class="pd-section-title">Specifications</h2>
+            <table id="pd-specs-table" class="pd-specs-table"></table>
+            <p id="pd-sku" class="pd-sku" hidden></p>
+        </section>
+
+        <section class="pd-section" id="pd-desc-section" role="tabpanel">
+            <h2 class="pd-section-title">Product Description</h2>
+            <div id="pd-desc-blocks" class="pd-desc-blocks"></div>
+            <p id="pd-description"></p>
+        </section>
+
+        <section class="pd-section" id="pd-reviews-section" role="tabpanel">
+            <h2 class="pd-section-title">Customer Feedback</h2>
+            <div id="pd-reviews" class="pd-reviews"></div>
+        </section>
+    </div>
+</div>
+</div>
+
+<!-- Right column (desktop), Jumia-style: delivery & returns, seller, then a
+     section menu and a small buy card that stay in view while scrolling.
+     On a phone these stack under the buy box. -->
+<aside class="pd-side">
+
+    <div class="pd-box pd-side-box" id="pd-delivery-box">
+        <h3 class="pd-side-title">Delivery &amp; Returns</h3>
+        <label class="pd-side-label" for="pd-loc-zone">Choose your location</label>
+        <select id="pd-loc-zone" class="pd-loc-select"><option value="">Region</option></select>
+        <select id="pd-loc-district" class="pd-loc-select" disabled><option value="">District</option></select>
+
+        <div class="pd-del-row">
+            <span class="pd-del-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 10l1.2-5h13.6L20 10v10H4V10Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 20v-5h6v5" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+            </span>
+            <div>
+                <div class="pd-del-head">Pickup</div>
+                <div class="pd-del-text">Free &middot; collect from our Bugolobi store</div>
+            </div>
+        </div>
+
+        <div class="pd-del-row">
+            <span class="pd-del-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M2 6h11v10H2zM13 9h5l3 3v4h-8z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="6.5" cy="17.5" r="1.8" fill="#fff" stroke="currentColor" stroke-width="1.5"/><circle cx="17" cy="17.5" r="1.8" fill="#fff" stroke="currentColor" stroke-width="1.5"/></svg>
+            </span>
+            <div>
+                <div class="pd-del-head">Door Delivery</div>
+                <div class="pd-del-text" id="pd-del-door">Choose your location to see the delivery fee and time.</div>
+            </div>
+        </div>
+
+        <div class="pd-del-row">
+            <span class="pd-del-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M4 4v4h4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <div>
+                <div class="pd-del-head">Return Policy</div>
+                <div class="pd-del-text">Free return within 7 days for eligible items. <a href="/returns.html">Details</a></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="pd-box pd-side-box" id="pd-seller-box" hidden>
+        <h3 class="pd-side-title">Seller Information</h3>
+        <div id="pd-seller-panel" class="seller-panel" hidden></div>
+    </div>
+
+    <div class="pd-side-sticky">
+        <div class="pd-box pd-mini" id="pd-mini" hidden>
+            <img id="pd-mini-img" alt="">
+            <div class="pd-mini-body">
+                <div class="pd-mini-name" id="pd-mini-name"></div>
+                <div class="pd-mini-price" id="pd-mini-price"></div>
+                <div class="pd-mini-was" id="pd-mini-was" hidden></div>
+            </div>
+            <button type="button" class="pd-mini-btn" id="pd-mini-btn">Add to cart</button>
+        </div>
+
+        <div class="pd-box pd-ask">
+            <div>Questions about this product?</div>
+            <a id="pd-ask-link" href="https://wa.me/256792363104" target="_blank" rel="noopener">&#128172; Chat</a>
+        </div>
+    </div>
+</aside>
+</div>
+
+<div id="pd-fullscreen-viewer" class="pd-fullscreen-viewer hidden">
+    <button id="pd-fullscreen-close" class="pd-fullscreen-close">&times;</button>
+    <button id="pd-fullscreen-share" class="pd-fullscreen-share">&#8599;</button>
+    <div id="pd-fullscreen-counter" class="pd-fullscreen-counter">1/1</div>
+    <div id="pd-fullscreen-scroll" class="pd-fullscreen-scroll"></div>
 </div>
 
 <script src="/js/api.js?v=1"></script>
 <script src="/js/cart.js?v=7"></script>
 <script src="/js/categories.js?v=21"></script>
 <script src="/js/seller-panel.js?v=1"></script>
-<script src="/js/product-detail.js?v=27"></script>
+<script src="/js/product-detail.js?v=28"></script>
 <script src="/js/lz-table.js?v=6"></script>
 <script src="/js/description-blocks.js?v=12"></script>
 

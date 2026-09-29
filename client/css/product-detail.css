@@ -76,19 +76,7 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
         display: block;
     }
 
-    .pd-layout {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) 440px;
-        gap: 48px;
-        max-width: 1800px;
-        margin: 0 auto;
-        padding: 32px 48px 60px;
-        align-items: start;
-    }
-
     .pd-gallery {
-        position: sticky;
-        top: 132px;
         border: 1px solid #f0f0f0;
         border-radius: 12px;
         overflow: hidden;
@@ -124,14 +112,8 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
     .pd-color-swatch { width: 64px; height: 64px; }
 }
 
-@media (min-width: 1200px) {
-    .pd-layout { grid-template-columns: minmax(0, 1fr) 480px; }
-}
-
 @media (min-width: 1600px) {
-    .pd-layout { grid-template-columns: minmax(0, 1fr) 560px; gap: 64px; }
-    .pd-gallery-scroll img { max-height: 680px; }
-    .pd-thumbs { max-height: 680px; }
+    .pd-gallery-scroll img { max-height: 620px; }
 }
 
 /* Breadcrumbs and thumbnail rail: desktop only. On a phone the swipe gallery
@@ -157,19 +139,15 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
     .pd-breadcrumbs .pd-crumb-sep { color: #d1d5db; }
     .pd-breadcrumbs .pd-crumb-current { color: #111827; font-weight: 600; }
 
-    .pd-gallery-col {
-        display: grid;
-        grid-template-columns: 78px minmax(0, 1fr);
-        gap: 14px;
-        align-items: start;
-    }
+    .pd-gallery-col { min-width: 0; }
 
+    /* Thumbnails in a row under the main photo (Lulu-style). */
     .pd-thumbs {
         display: flex;
-        flex-direction: column;
         gap: 10px;
-        max-height: 560px;
-        overflow-y: auto;
+        margin-top: 14px;
+        padding: 2px;
+        overflow-x: auto;
         scrollbar-width: none;
     }
 
@@ -194,9 +172,7 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
         display: block;
     }
 
-    .pd-thumb.selected { border-color: #1a1a2e; }
-
-    .pd-gallery-col .pd-gallery { position: static; }
+    .pd-thumb.selected { border-color: #1a1a2e; box-shadow: 0 0 0 1px #1a1a2e; }
 }
 
 /* Descriptions are pasted with their own line breaks. textContent keeps the
@@ -244,13 +220,6 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 
 /* Description / Specifications tabs sit under the gallery in the left column
    on desktop. On mobile they stack in normal document order. */
-@media (min-width: 900px) {
-    .pd-tabs-col {
-        grid-column: 1 / -1;
-        min-width: 0;
-        margin-top: 36px;
-    }
-}
 
 
 /* Price and warranty share a line; the warranty badge is optional and simply
@@ -291,17 +260,7 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
    in one scroll instead of hiding behind tabs.
    ------------------------------------------------------------------ */
 
-.pd-section {
-    border-top: 1px solid #e5e7eb;
-    padding-top: 22px;
-    margin-top: 28px;
-}
-
-.pd-section:first-child {
-    border-top: 0;
-    padding-top: 0;
-    margin-top: 0;
-}
+.pd-section { margin: 0; }
 
 .pd-section-title {
     font-size: 17px;
@@ -457,3 +416,211 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 }
 
 /* Table description block (client/js/lz-table.js toHtml) */
+
+
+/* ==================================================================
+   Page layout (Sept 2026). Desktop: product card + details panel on the
+   left, Jumia-style column on the right (delivery & returns, seller, a
+   small buy card and chat that stay in view). Phone: one column - photos,
+   buy box, delivery & seller, then the details tabs.
+   ================================================================== */
+
+.pd-layout { display: flex; flex-direction: column; }
+.pd-main { display: contents; }
+.pd-top { order: 1; }
+.pd-side { order: 2; padding: 0 16px; }
+.pd-dpanel { order: 3; }
+
+.pd-box { background: #fff; }
+
+/* Price box: price, was-price, discount and warranty, then the stock line. */
+.pd-price-box { margin: 8px 0 4px; }
+.pd-price-original { color: #9ca3af; text-decoration: line-through; font-size: 15px; }
+.pd-discount-badge {
+    background: #fff4d6; color: #a86b00; font-weight: 700; font-size: 13px;
+    padding: 2px 8px; border-radius: 4px;
+}
+.pd-stock { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 6px; }
+.pd-stock-text { font-size: 13px; color: #4b5563; }
+.pd-stock-out { color: #c0392b; font-weight: 700; }
+.pd-stock-track { display: block; height: 6px; max-width: 360px; background: #e5e7eb; border-radius: 3px; overflow: hidden; }
+.pd-stock-fill { display: block; height: 100%; background: #f4b400; }
+
+/* Previous / next arrows on the main photo - desktop only. */
+.pd-gal-arrow { display: none; }
+
+/* ---- Right column boxes ---- */
+.pd-side-box { border: 1px solid #eceef1; border-radius: 10px; padding: 14px; margin-top: 14px; }
+.pd-side-title {
+    margin: 0 0 12px; font-size: 13px; font-weight: 700; letter-spacing: .03em;
+    text-transform: uppercase; color: #1a1a2e;
+}
+.pd-side-label { display: block; font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 8px; }
+.pd-loc-select {
+    display: block; width: 100%; box-sizing: border-box; margin-bottom: 10px;
+    padding: 10px 12px; font-size: 14px; border: 1px solid #d1d5db; border-radius: 6px;
+    background: #fff; color: #111827;
+}
+.pd-no-zones .pd-side-label, .pd-no-zones .pd-loc-select { display: none; }
+.pd-del-row { display: flex; gap: 12px; padding: 12px 0 0; margin-top: 12px; border-top: 1px solid #f0f0f0; }
+.pd-del-icon {
+    flex: 0 0 38px; height: 38px; border: 1px solid #e5e7eb; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center; color: #1a1a2e;
+}
+.pd-del-icon svg { width: 22px; height: 22px; }
+.pd-del-head { font-size: 14px; font-weight: 700; color: #111827; }
+.pd-del-text { font-size: 12.5px; line-height: 1.45; color: #4b5563; margin-top: 2px; }
+.pd-del-text a { color: #1a1a2e; font-weight: 600; }
+#pd-seller-box .seller-panel { margin: 0; }
+
+.pd-mini { display: none; }
+.pd-ask {
+    border: 1px solid #eceef1; border-radius: 10px; padding: 14px; margin-top: 14px;
+    text-align: center; font-size: 14px; color: #374151;
+}
+.pd-ask a {
+    display: inline-block; margin-top: 8px; color: #1a1a2e; font-weight: 700;
+    text-decoration: none; border-bottom: 2px solid #f4b400;
+}
+
+/* ---- Details panel (Lulu-style) ---- */
+.pd-dpanel { margin: 18px 16px 0; background: #f6f7f9; border-radius: 14px; overflow: hidden; }
+.pd-dmenu {
+    display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none;
+    padding: 6px 8px; border-bottom: 1px solid #e5e7eb; background: #fff;
+}
+.pd-dmenu::-webkit-scrollbar { display: none; }
+.pd-dmenu-toggle { display: none; }
+.pd-dtab {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; border: 0; background: none; cursor: pointer;
+    font-size: 14px; font-weight: 600; color: #6b7280; border-bottom: 2px solid transparent;
+    white-space: nowrap;
+}
+.pd-dtab svg { width: 18px; height: 18px; flex-shrink: 0; }
+.pd-dtab.active { color: #1a1a2e; border-bottom-color: #1a1a2e; }
+.pd-dtab[hidden] { display: none; }
+.pd-dbody { padding: 18px 16px 22px; min-width: 0; }
+.pd-dbody .pd-section-title {
+    border-left: 4px solid #1a1a2e; padding-left: 12px; font-size: 20px; margin-bottom: 18px;
+}
+
+.pd-highlights {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; grid-template-columns: 1fr; gap: 12px 32px;
+}
+.pd-highlights li { display: flex; align-items: center; gap: 12px; font-size: 15px; color: #1f2937; line-height: 1.4; }
+.pd-hl-icon {
+    flex: 0 0 38px; height: 38px; border-radius: 50%; background: #e8eaf0;
+    display: flex; align-items: center; justify-content: center;
+    color: #f4b400; font-size: 15px; box-shadow: inset 0 0 0 9px #e8eaf0, inset 0 0 0 20px #1a1a2e;
+}
+
+@media (min-width: 640px) {
+    .pd-highlights { grid-template-columns: 1fr 1fr; }
+}
+
+@media (min-width: 900px) {
+    body { background: #f1f2f4; }
+
+    .pd-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 300px;
+        gap: 20px;
+        max-width: 1500px;
+        margin: 0 auto;
+        padding: 18px 32px 60px;
+        align-items: start;
+    }
+    .pd-main { display: block; min-width: 0; }
+    .pd-breadcrumbs { max-width: 1500px; padding: 18px 32px 0; }
+
+    .pd-box { border-radius: 12px; box-shadow: 0 1px 3px rgba(16, 24, 40, .06); }
+
+    .pd-top {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+        gap: 32px;
+        padding: 22px;
+        align-items: start;
+    }
+
+    .pd-gal-arrow {
+        display: flex; align-items: center; justify-content: center;
+        position: absolute; top: 50%; transform: translateY(-50%);
+        width: 40px; height: 40px; border-radius: 50%; border: 1px solid #e5e7eb;
+        background: rgba(255, 255, 255, .92); color: #1a1a2e; font-size: 26px; line-height: 1;
+        cursor: pointer; box-shadow: 0 2px 6px rgba(0, 0, 0, .12);
+    }
+    .pd-gal-arrow[hidden] { display: none; }
+    .pd-gal-arrow:disabled { opacity: .3; cursor: default; }
+    .pd-gal-prev { left: 10px; }
+    .pd-gal-next { right: 10px; }
+
+    .pd-side { padding: 0; }
+    .pd-side-box:first-child { margin-top: 0; }
+    .pd-side-box, .pd-ask { border: 0; }
+    .pd-side-sticky { position: sticky; top: 140px; }
+
+    .pd-mini {
+        display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px 12px;
+        padding: 12px; margin-top: 14px;
+    }
+    .pd-mini[hidden] { display: none; }
+    .pd-mini img { width: 76px; height: 76px; object-fit: contain; background: #f6f7f9; border-radius: 6px; }
+    .pd-mini-name { font-size: 13px; color: #374151; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pd-mini-price { font-size: 16px; font-weight: 700; color: #111827; margin-top: 4px; }
+    .pd-mini-was { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+    .pd-mini-off { color: #a86b00; background: #fff4d6; padding: 0 5px; border-radius: 3px; font-weight: 700; }
+    .pd-mini-btn {
+        grid-column: 1 / -1; padding: 11px; border: 0; border-radius: 6px; cursor: pointer;
+        background: #f4b400; color: #1a1a2e; font-size: 14px; font-weight: 700;
+    }
+
+    /* Details panel: menu column on the left, section on the right. */
+    .pd-dpanel {
+        margin: 20px 0 0;
+        display: grid;
+        grid-template-columns: 250px minmax(0, 1fr);
+        background: #f6f7f9;
+        box-shadow: 0 1px 3px rgba(16, 24, 40, .06);
+        transition: grid-template-columns .2s ease;
+    }
+    .pd-dmenu {
+        flex-direction: column; gap: 0; overflow: visible;
+        padding: 18px 20px; border-bottom: 0; background: transparent;
+    }
+    .pd-dmenu-toggle {
+        display: flex; align-self: flex-end; align-items: center; justify-content: center;
+        width: 30px; height: 30px; margin-bottom: 6px; border-radius: 50%;
+        border: 1px solid #d1d5db; background: #fff; color: #1a1a2e; cursor: pointer;
+        font-size: 20px; line-height: 1;
+    }
+    .pd-dmenu-toggle:hover { border-color: #1a1a2e; }
+    .pd-dmenu-arrow { display: inline-block; transition: transform .2s ease; margin-top: -2px; }
+    .pd-dtab {
+        justify-content: center; padding: 18px 8px; font-size: 16px; color: #9ca3af;
+        border-bottom: 1px solid #dfe2e7; white-space: normal; text-align: center;
+    }
+    .pd-dtab svg { display: none; }
+    .pd-dtab:hover { color: #1a1a2e; }
+    .pd-dtab.active { color: #111827; border-bottom: 2px solid #1a1a2e; }
+    .pd-dbody { padding: 26px 30px 30px; border-left: 1px solid #dfe2e7; margin: 18px 0; }
+    .pd-dbody .pd-section-title { font-size: 26px; }
+
+    /* Minimised: the menu shrinks to icons, the section gets the room. */
+    .pd-dpanel.pd-dmenu-min { grid-template-columns: 64px minmax(0, 1fr); }
+    .pd-dmenu-min .pd-dmenu { padding: 18px 10px; }
+    .pd-dmenu-min .pd-dmenu-toggle { align-self: center; }
+    .pd-dmenu-min .pd-dmenu-arrow { transform: rotate(180deg); }
+    .pd-dmenu-min .pd-dtab { padding: 14px 0; }
+    .pd-dmenu-min .pd-dtab span { display: none; }
+    .pd-dmenu-min .pd-dtab svg { display: block; width: 22px; height: 22px; }
+}
+
+@media (min-width: 1200px) {
+    .pd-layout { grid-template-columns: minmax(0, 1fr) 320px; }
+}
+
+/* Nothing to show (no discount) - keep them out of the price row. */
+.pd-price-original[hidden], .pd-discount-badge[hidden], .pd-stock[hidden] { display: none; }

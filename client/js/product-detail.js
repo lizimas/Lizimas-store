@@ -22,6 +22,8 @@ async function loadSellerPanel(product) {
         if (!data) return;
         await renderSellerPanel(panel, data, { showVisitLink: true });
         panel.hidden = false;
+        var box = document.getElementById("pd-seller-box");
+        if (box) box.hidden = false;
     } catch (error) {
         console.error("Seller panel load error:", error);
     }
@@ -140,7 +142,17 @@ async function loadProductDetail() {
         const idEl = document.getElementById("pd-item-id");
         if (idEl) idEl.textContent = "Item ID: " + product.id;
 
+        pdRenderStock(product);
+        pdRenderMini(product, pdHasDiscount ? pdSalePrice : Number(product.price), pdHasDiscount ? pdOriginalPrice : null);
+        pdSetupAskLink(product);
+        pdSetupDelivery(product.id);
+        pdBuildHighlights(product);
+        pdSetupDetailsPanel();
 
+
+
+        const miniBtn = document.getElementById("pd-mini-btn");
+        if (miniBtn) miniBtn.onclick = () => document.getElementById("pd-add-to-cart-btn").click();
 
         document.getElementById("pd-add-to-cart-btn").onclick = () => {
             // Use the image for the selected colour, not the product default.
@@ -204,7 +216,34 @@ async function loadGallery(id, product) {
         const index = getCurrentGalleryIndex();
         counter.textContent = `${index + 1}/${pdGalleryImages.length}`;
         syncColorToIndex(index);
+        pdUpdateGalleryArrows();
     };
+
+    const go = step => {
+        const n = pdGalleryImages.length;
+        if (n < 2) return;
+        const next = Math.min(n - 1, Math.max(0, getCurrentGalleryIndex() + step));
+        scrollContainer.scrollTo({ left: next * scrollContainer.clientWidth, behavior: "smooth" });
+    };
+    const prev = document.getElementById("pd-gal-prev");
+    const nextBtn = document.getElementById("pd-gal-next");
+    if (prev) prev.onclick = () => go(-1);
+    if (nextBtn) nextBtn.onclick = () => go(1);
+    pdUpdateGalleryArrows();
+}
+
+// Previous / next arrows on the main photo (desktop). Hidden with a single
+// photo, and each one fades out at its end of the row.
+function pdUpdateGalleryArrows() {
+    const prev = document.getElementById("pd-gal-prev");
+    const next = document.getElementById("pd-gal-next");
+    if (!prev || !next) return;
+    const n = pdGalleryImages.length;
+    prev.hidden = next.hidden = n < 2;
+    if (n < 2) return;
+    const i = getCurrentGalleryIndex();
+    prev.disabled = i <= 0;
+    next.disabled = i >= n - 1;
 }
 
 function renderGallery() {
@@ -253,8 +292,15 @@ function renderThumbnails(imagePaths, scrollContainer) {
          </button>`
     ).join("");
 
-    const marks = i => rail.querySelectorAll(".pd-thumb").forEach((t, n) =>
-        t.classList.toggle("selected", n === i));
+    const marks = i => rail.querySelectorAll(".pd-thumb").forEach((t, n) => {
+        t.classList.toggle("selected", n === i);
+        if (n === i && rail.scrollWidth > rail.clientWidth) {
+            const left = t.offsetLeft - rail.offsetLeft;
+            if (left < rail.scrollLeft || left + t.offsetWidth > rail.scrollLeft + rail.clientWidth) {
+                rail.scrollTo({ left: Math.max(0, left - 8), behavior: "smooth" });
+            }
+        }
+    });
 
     rail.onclick = e => {
         const thumb = e.target.closest(".pd-thumb");
@@ -705,8 +751,9 @@ function renderSpecs(specs, sizes) {
 
     // Nothing to show is not worth a heading and an apology. Hide the whole
     // section rather than printing an empty-state row at the customer.
+    pdSpecRows = rows;
     var specsSection = document.getElementById("pd-specs-section");
-    if (specsSection) specsSection.style.display = rows.length ? "" : "none";
+    if (specsSection) specsSection.dataset.empty = rows.length ? "" : "1";
 
     if (table) {
         table.innerHTML = rows.map(function (r) {
@@ -757,8 +804,7 @@ function renderSpecs(specs, sizes) {
 }
 
 function openAllDetails() {
-    const panel = document.getElementById("pd-specs-section");
-    if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    pdOpenSection("pd-specs-section", true);
 }
 
 function pdEscapeHtml(value) {
@@ -906,6 +952,227 @@ function toggleSaveProduct() {
 
 function reportProduct() {
     alert("Thanks - this product has been flagged for review.");
+}
+
+
+
+/* ------------------------------------------------------------------
+   Page layout helpers (Sept 2026 redesign: Jumia-style right column,
+   Lulu-style details panel under the photos).
+   ------------------------------------------------------------------ */
+
+let pdSpecRows = [];
+
+function pdStore(key, value) {
+    try {
+        if (value === undefined) return localStorage.getItem(key);
+        localStorage.setItem(key, value);
+    } catch (e) { /* private mode - just don't remember */ }
+    return null;
+}
+
+// "8 items in stock" with a bar, like Jumia. Plenty of stock just says
+// "In stock"; none says "Out of stock".
+function pdRenderStock(product) {
+    const el = document.getElementById("pd-stock");
+    if (!el || product.stock === undefined || product.stock === null) return;
+    const n = Number(product.stock);
+    if (!Number.isFinite(n)) return;
+    if (n <= 0) {
+        el.innerHTML = '<span class="pd-stock-text pd-stock-out">Out of stock</span>';
+    } else if (n <= 20) {
+        const pct = Math.max(8, Math.round((n / 20) * 100));
+        el.innerHTML = '<span class="pd-stock-text">' + n + (n === 1 ? " item" : " items") + ' in stock</span>' +
+            '<span class="pd-stock-track"><span class="pd-stock-fill" style="width:' + pct + '%"></span></span>';
+    } else {
+        el.innerHTML = '<span class="pd-stock-text">In stock</span>';
+    }
+    el.hidden = false;
+}
+
+// Small buy card that stays in view in the right column while the shopper
+// reads the details (desktop only - phones have the fixed bottom button).
+function pdRenderMini(product, price, was) {
+    const box = document.getElementById("pd-mini");
+    if (!box) return;
+    const img = document.getElementById("pd-mini-img");
+    img.src = (pdGalleryImages && pdGalleryImages[0]) || product.image || "";
+    img.alt = product.name || "";
+    document.getElementById("pd-mini-name").textContent = product.name || "";
+    document.getElementById("pd-mini-price").textContent = price ? "UGX " + Number(price).toLocaleString() : "";
+    const wasEl = document.getElementById("pd-mini-was");
+    if (was && price && was > price) {
+        wasEl.innerHTML = '<s>UGX ' + Number(was).toLocaleString() + '</s> <span class="pd-mini-off">-' +
+            Math.round((1 - price / was) * 100) + '%</span>';
+        wasEl.hidden = false;
+    }
+    box.hidden = false;
+}
+
+function pdSetupAskLink(product) {
+    const a = document.getElementById("pd-ask-link");
+    if (!a) return;
+    const text = "Hello Lizimas Store, I have a question about: " + (product.name || "") +
+        " (Item ID " + product.id + ") " + window.location.href;
+    a.href = "https://wa.me/256792363104?text=" + encodeURIComponent(text);
+}
+
+// Delivery & Returns: region -> district from the same zones checkout uses,
+// then the door-delivery fee and time for this product. The last choice is
+// remembered so the next product page shows it straight away.
+async function pdSetupDelivery(productId) {
+    const zoneSel = document.getElementById("pd-loc-zone");
+    const distSel = document.getElementById("pd-loc-district");
+    const out = document.getElementById("pd-del-door");
+    if (!zoneSel || !distSel || !out) return;
+
+    let districts = [];
+    try {
+        const res = await fetch("/api/delivery/districts");
+        if (res.ok) districts = (await res.json()).districts || [];
+    } catch (e) { /* leave the prompt text */ }
+    if (!districts.length) {
+        zoneSel.closest(".pd-side-box").classList.add("pd-no-zones");
+        out.textContent = "Delivery fee and time are shown at checkout.";
+        return;
+    }
+
+    const zones = [];
+    districts.forEach(d => { if (d.zone && zones.indexOf(d.zone) === -1) zones.push(d.zone); });
+    zoneSel.innerHTML = '<option value="">Region</option>' +
+        zones.map(z => '<option>' + pdEscape(z) + '</option>').join("");
+
+    const fillDistricts = zone => {
+        const list = districts.filter(d => d.zone === zone);
+        distSel.innerHTML = '<option value="">District</option>' +
+            list.map(d => '<option>' + pdEscape(d.district) + '</option>').join("");
+        distSel.disabled = !list.length;
+    };
+
+    const showFee = async district => {
+        if (!district) {
+            out.textContent = "Choose your location to see the delivery fee and time.";
+            return;
+        }
+        out.textContent = "Checking...";
+        try {
+            const res = await fetch("/api/delivery/fee?method=delivery&district=" +
+                encodeURIComponent(district) + "&product_ids=" + encodeURIComponent(productId));
+            const d = await res.json();
+            if (!res.ok) { out.textContent = d.error || "Delivery is not yet available for that area."; return; }
+            if (d.quoteRequired) { out.textContent = d.message; return; }
+            out.innerHTML = 'Delivery fee <strong>UGX ' + Number(d.fee || 0).toLocaleString() + '</strong>' +
+                (d.eta ? '<br>Arrives in ' + pdEscape(d.eta) : '');
+        } catch (e) {
+            out.textContent = "Could not check delivery right now.";
+        }
+    };
+
+    zoneSel.onchange = () => {
+        fillDistricts(zoneSel.value);
+        showFee("");
+    };
+    distSel.onchange = () => {
+        pdStore("lzDelivery", JSON.stringify({ zone: zoneSel.value, district: distSel.value }));
+        showFee(distSel.value);
+    };
+
+    let saved = null;
+    try { saved = JSON.parse(pdStore("lzDelivery") || "null"); } catch (e) { saved = null; }
+    if (saved && zones.indexOf(saved.zone) !== -1) {
+        zoneSel.value = saved.zone;
+        fillDistricts(saved.zone);
+        if (districts.some(d => d.zone === saved.zone && d.district === saved.district)) {
+            distSel.value = saved.district;
+            showFee(saved.district);
+        }
+    }
+}
+
+// Product Highlights: bullet lines the seller wrote in the description
+// ("- ", "• ", "✓ " ...) come first; otherwise the first few specifications.
+// Nothing to show hides the tab.
+function pdBuildHighlights(product) {
+    const list = document.getElementById("pd-highlights");
+    if (!list) return;
+    const items = [];
+    String(product.description || "").split(/\r?\n/).forEach(line => {
+        const m = line.match(/^\s*(?:[-*\u2022\u2023\u25AA\u25CF\u2713\u2714\u2705]|\d+[.)])\s+(.{3,160})$/);
+        if (m) items.push(m[1].trim());
+    });
+    if (!items.length) {
+        pdSpecRows.slice(0, 6).forEach(r => items.push(r[0] + ": " + r[1]));
+    }
+    const tab = document.querySelector('.pd-dtab[data-sec="pd-highlights-section"]');
+    if (!items.length) {
+        if (tab) tab.hidden = true;
+        return;
+    }
+    list.innerHTML = items.slice(0, 10).map(t =>
+        '<li><span class="pd-hl-icon" aria-hidden="true">&#10022;</span><span>' + pdEscape(t) + '</span></li>'
+    ).join("");
+    if (tab) tab.hidden = false;
+    document.getElementById("pd-highlights-section").dataset.empty = "";
+}
+
+function pdOpenSection(id, scroll) {
+    const panel = document.getElementById("pd-dpanel");
+    if (!panel) return;
+    const tab = panel.querySelector('.pd-dtab[data-sec="' + id + '"]');
+    if (!tab || tab.hidden) return;
+    panel.querySelectorAll(".pd-dtab").forEach(t => {
+        const on = t === tab;
+        t.classList.toggle("active", on);
+        t.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    panel.querySelectorAll(".pd-dbody > .pd-section").forEach(sec => {
+        sec.hidden = sec.id !== id;
+    });
+    if (scroll) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// Details panel: tabs on the left, arrow to minimise the menu to icons
+// (remembered), empty sections drop their tab.
+function pdSetupDetailsPanel() {
+    const panel = document.getElementById("pd-dpanel");
+    if (!panel) return;
+
+    panel.querySelectorAll(".pd-dbody > .pd-section").forEach(sec => {
+        const tab = panel.querySelector('.pd-dtab[data-sec="' + sec.id + '"]');
+        if (tab && sec.dataset.empty === "1") tab.hidden = true;
+    });
+
+    panel.querySelectorAll(".pd-dtab").forEach(tab => {
+        tab.onclick = () => pdOpenSection(tab.dataset.sec, false);
+    });
+
+    const toggle = document.getElementById("pd-dmenu-toggle");
+    const setMin = min => {
+        panel.classList.toggle("pd-dmenu-min", min);
+        toggle.setAttribute("aria-label", min ? "Expand menu" : "Minimise menu");
+        toggle.title = min ? "Expand menu" : "Minimise menu";
+        toggle.setAttribute("aria-expanded", min ? "false" : "true");
+    };
+    setMin(pdStore("lzDetailsMenuMin") === "1");
+    toggle.onclick = () => {
+        const min = !panel.classList.contains("pd-dmenu-min");
+        setMin(min);
+        pdStore("lzDetailsMenuMin", min ? "1" : "0");
+    };
+
+    // Open the first section that has something in it.
+    const first = Array.from(panel.querySelectorAll(".pd-dtab")).find(t => !t.hidden);
+    if (first) pdOpenSection(first.dataset.sec, false);
+
+    // "3 reviews" under the title and any #section link open that tab.
+    document.addEventListener("click", e => {
+        const a = e.target.closest('a[href^="#pd-"]');
+        if (!a) return;
+        const id = a.getAttribute("href").slice(1);
+        if (!panel.querySelector('.pd-dtab[data-sec="' + id + '"]')) return;
+        e.preventDefault();
+        pdOpenSection(id, true);
+    });
 }
 
 document.addEventListener("DOMContentLoaded", loadProductDetail);
