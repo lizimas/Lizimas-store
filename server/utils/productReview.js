@@ -234,7 +234,20 @@ function validateMarketCheck(input) {
         source: String(input.source || "jumia.ug").slice(0, 50), search_term: String(input.search_term || "").slice(0, 255) || null } };
 }
 
+// A pasted list of SKUs ("YD-8203, YD-8209 YD-8210" or one per line) ->
+// the SKUs, or null when it's an ordinary name search. It's a list when
+// there are 2+ words and every word has a digit and no spaces inside
+// ("Thermal bottle 500ml" stays a name search).
+function parseSkuList(text) {
+    const parts = String(text || "").split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
+    if (parts.length < 2 || parts.length > 300) return null;
+    if (!parts.every((x) => /\d/.test(x) && /^[A-Za-z0-9][A-Za-z0-9._\-/]*$/.test(x))) return null;
+    const seen = new Set();
+    return parts.filter((x) => { const k = x.toUpperCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
 module.exports = {
+    parseSkuList,
     STATUS_LABELS, REASONS, REASON_BY_CODE, FLAGS, ACTIONS,
     validateDecision, priceFlag, priceStats, median, marketFlag, combinedVerdict, FLAG_INFO,
     MARKET_CHECK_THRESHOLD, MARKET_CHECK_MAX_AGE_DAYS, needsMarketCheck, parsePastedPrices, margin,

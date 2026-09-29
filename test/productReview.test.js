@@ -105,3 +105,12 @@ test("recorded market prices are checked", () => {
     const v = R.validateMarketCheck({ lowest_price: "UGX 25,000", typical_price: "38000", highest_price: "60,000", product_count: "12" });
     assert.deepEqual([v.value.lowest_price, v.value.typical_price, v.value.highest_price, v.value.product_count], [25000, 38000, 60000, 12]);
 });
+
+test("a pasted list of SKUs is recognised; ordinary searches are not", () => {
+    assert.deepEqual(R.parseSkuList("YD-8203, YD-8209\nyd-8210  YD-8203"), ["YD-8203", "YD-8209", "yd-8210"]);
+    assert.deepEqual(R.parseSkuList("YD-8203 YD-8209"), ["YD-8203", "YD-8209"]);
+    assert.equal(R.parseSkuList("YD-8203"), null);                       // one SKU: normal search
+    assert.equal(R.parseSkuList("Thermal bottle 500ml"), null);          // words: name search
+    assert.equal(R.parseSkuList("DUDU 350ml"), null);
+    assert.deepEqual(R.parseSkuList("LS8HNP5ME312LZMS LSFKG4PUQ8DHLZMS"), ["LS8HNP5ME312LZMS", "LSFKG4PUQ8DHLZMS"]);
+});

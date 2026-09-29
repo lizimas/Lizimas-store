@@ -66,11 +66,18 @@ exports.list = async (req, res) => {
         if (q.from && /^\d{4}-\d{2}-\d{2}$/.test(q.from)) add("p.created_at >= $?::date", q.from);
         if (q.to && /^\d{4}-\d{2}-\d{2}$/.test(q.to)) add("p.created_at < ($?::date + 1)", q.to);
         if (q.flag && R.FLAGS[q.flag]) add("$? = ANY(p.review_flags)", q.flag);
-        if (q.q && String(q.q).trim()) {
+        // Several SKUs pasted at once -> exactly those products, all on one page.
+        const skuList = R.parseSkuList(q.q);
+        if (skuList) {
+            params.push(skuList.map((x) => x.toUpperCase()));
+            const n = "$" + params.length;
+            where.push(`(UPPER(p.sku) = ANY(${n}::text[]) OR UPPER(p.lizimas_sku) = ANY(${n}::text[]))`);
+        } else if (q.q && String(q.q).trim()) {
             params.push("%" + String(q.q).trim() + "%");
             const n = "$" + params.length;
             where.push(`(p.name ILIKE ${n} OR p.sku ILIKE ${n} OR p.lizimas_sku ILIKE ${n})`);
         }
+        const pageSize = skuList ? 300 : PAGE_SIZE;
         const whereSql = where.join(" AND ");
         const page = Math.max(1, parseInt(q.page, 10) || 1);
         const sort = q.sort === "oldest" ? "p.created_at ASC" : q.sort === "price" ? "p.price DESC" : "p.created_at DESC";
@@ -87,7 +94,7 @@ exports.list = async (req, res) => {
                    LEFT JOIN users u ON u.id = p.created_by
                   WHERE ${whereSql}
                   ORDER BY ${sort}, p.id DESC
-                  LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`, params),
+                  LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`, params),
             pool.query(`SELECT COUNT(*)::int AS n FROM products p WHERE ${whereSql}`, params),
             pool.query(`SELECT status, COUNT(*)::int AS n FROM products WHERE deleted_at IS NULL
                          AND status IN ('pending','changes_requested','under_investigation','rejected','draft') GROUP BY status`),
@@ -98,7 +105,12 @@ exports.list = async (req, res) => {
         ]);
         const byStatus = {}; counts.rows.forEach((r) => { byStatus[r.status] = r.n; });
         res.json({
-            items: rows.rows, total: total.rows[0].n, page, page_size: PAGE_SIZE,
+            items: rows.rows, total: total.rows[0].n, page, page_size: pageSize,
+            sku_list: skuList ? {
+                asked: skuList.length,
+                // Not in this view: no such SKU, or it has a different status (try the All tab).
+                missing: skuList.filter((k) => !rows.rows.some((r) => String(r.sku || "").toUpperCase() === k.toUpperCase() || String(r.lizimas_sku || "").toUpperCase() === k.toUpperCase()))
+            } : null,
             counts: byStatus, sellers: sellers.rows, categories: categories.rows
         });
     } catch (e) {

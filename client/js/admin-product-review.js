@@ -76,7 +76,7 @@
         return `
         <div class="pr-tabs" role="tablist"></div>
         <div class="pr-filters">
-            <input type="search" class="pr-search" placeholder="Search by product name or SKU…" aria-label="Search by product name or SKU">
+            <input type="search" class="pr-search" placeholder="Search by name or SKU - or paste a list of SKUs" aria-label="Search by product name or SKU, or paste a list of SKUs">
             <select class="pr-f" data-f="category" aria-label="Category"><option value="">All categories</option></select>
             <select class="pr-f" data-f="seller" aria-label="Seller"><option value="">All sellers</option><option value="lizimas">Lizimas Store (own)</option></select>
             <select class="pr-f" data-f="flag" aria-label="Flag"><option value="">Any flag</option>${Object.entries(m.flags).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select>
@@ -151,7 +151,14 @@
         const items = d.items || [];
         const from = d.total ? (d.page - 1) * d.page_size + 1 : 0;
         const to = Math.min(d.total, d.page * d.page_size);
-        const head = `<p class="pr-count">Showing ${from}–${to} of ${d.total} ${st.status === "all" ? "products" : esc((m.statuses[st.status] || st.status).toLowerCase())} products</p>`;
+        let head = `<p class="pr-count">Showing ${from}–${to} of ${d.total} ${st.status === "all" ? "products" : esc((m.statuses[st.status] || st.status).toLowerCase())} products</p>`;
+        if (d.sku_list) {
+            const miss = d.sku_list.missing || [];
+            head = `<div class="pr-skulist">
+                <b>SKU list:</b> found ${d.sku_list.asked - miss.length} of ${d.sku_list.asked}${items.length ? ` - tick the box at the top of the table to select all ${items.length}, then Bulk Approve.` : "."}
+                ${miss.length ? `<div class="pr-skumiss">Not in ${esc(st.status === "all" ? "the list" : (m.statuses[st.status] || st.status))}: ${miss.map(esc).join(", ")} <small>(already decided - e.g. approved - or no such SKU. The All tab shows them all.)</small></div>` : ""}
+            </div>`;
+        }
         if (!items.length) {
             el.querySelector(".pr-results").innerHTML = head + '<p class="no-data">No products here.</p>';
             el.querySelector(".pr-pages").innerHTML = ""; syncBulk(); return;

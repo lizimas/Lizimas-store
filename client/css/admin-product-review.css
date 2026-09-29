@@ -178,3 +178,7 @@ kbd { font-family: inherit; font-size: 11px; border: 1px solid #cfd3dc; border-b
     .apv-images .apv-img img { width: 96px; height: 96px; }
 }
 @media (max-width: 380px) { .pr-kv-grid { grid-template-columns: 1fr; } }
+
+/* Pasted SKU list summary */
+.pr-skulist { background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E3A8A; border-radius: 8px; padding: 8px 12px; margin: 4px 0 10px; font-size: 13px; }
+.pr-skumiss { margin-top: 4px; color: #92400E; overflow-wrap: anywhere; }
