@@ -278,7 +278,9 @@ async function loadVendorKyc() {
             document.getElementById("vendor-kyc-regnum").value = k.registration_number || "";
             document.getElementById("vendor-kyc-tin").value = k.tin_number || "";
             document.getElementById("vendor-kyc-vat").value = k.vat_number || "";
-            document.getElementById("vendor-kyc-natid").value = k.national_id_number || "";
+            // Pre-filled from the uploaded identity document when empty.
+            const idDoc = (k.documents || []).find(d => d.document_type === "national_id" && d.id_number);
+            document.getElementById("vendor-kyc-natid").value = k.national_id_number || (idDoc ? idDoc.id_number : "");
             document.getElementById("vendor-kyc-work-permit-checkbox").checked = Boolean(k.requires_work_permit);
         } else {
             formEl.classList.add("hidden");
@@ -357,7 +359,7 @@ async function submitVendorKyc() {
 }
 
 const KYC_DOCUMENT_LABELS = {
-    national_id: "National ID",
+    national_id: "Identity Document (National ID, Passport or Driving Licence)",
     business_registration: "Business Registration",
     bank_certificate: "Bank Certificate",
     tax_certificate: "Tax Certificate (TIN)",
@@ -402,6 +404,10 @@ function renderVendorKycDocumentRows(k) {
         const label = KYC_DOCUMENT_LABELS[requiredType] || requiredType;
         const doc = (k.documents || []).find(d => d.document_type === requiredType);
 
+        // Identity document: a small form (type, number, expiry, photo with
+        // automatic checks) instead of an instant upload.
+        if (requiredType === "national_id") return vdIdDocumentRow(label, doc, canEdit);
+
         if (doc) {
             const docBadge = doc.review_status === "accepted" ? "status-paid"
                 : doc.review_status === "rejected" ? "status-cancelled"
@@ -428,6 +434,168 @@ function renderVendorKycDocumentRows(k) {
             </div>
         `;
     }).join("");
+}
+
+// --- Identity document upload (National ID, Passport or Driving Licence) ---
+// Checked in the browser with the same rules the server enforces
+// (client/js/lz-image-checks.js): the details (expiry must be in the
+// future) and the photo (colour, resolution, blur, brightness, glare).
+// Type, authenticity and all four corners are confirmed by admin.
+const VD_ID_KINDS = { national_id: "National ID", passport: "Passport", driving_license: "Driving Licence" };
+
+function vdIdDocumentRow(label, doc, canEdit) {
+    const esc = vendorEsc;
+    const badge = !doc ? '<span style="color:#DC2626;">Not uploaded</span>'
+        : `<span class="status-badge ${doc.review_status === "accepted" ? "status-paid" : doc.review_status === "rejected" ? "status-cancelled" : doc.review_status === "action_required" ? "status-pending" : "status-new"}">${(doc.review_status || "pending").replace(/_/g, " ")}</span>`;
+    const details = doc && doc.id_kind
+        ? `<div style="font-size:12px; color:#555; margin-top:4px;">${esc(VD_ID_KINDS[doc.id_kind] || doc.id_kind)} &middot; No. ${esc(doc.id_number || "-")} &middot; expires ${esc(doc.id_expires_on || "-")}</div>` : "";
+    const reason = doc && (doc.review_status === "rejected" ? doc.rejection_reason : doc.review_status === "action_required" ? doc.action_required_reason : "");
+    const today = new Date(); today.setDate(today.getDate() + 1);
+    const minDate = today.toISOString().slice(0, 10);
+    const form = canEdit ? `
+        <details class="vd-id-upload" ${doc ? "" : "open"} style="margin-top:8px;">
+            <summary style="cursor:pointer; color:#16264f; font-size:12.5px; font-weight:600;">${doc ? "Replace identity document" : "Upload identity document"}</summary>
+            <div style="display:grid; gap:10px; margin-top:10px; max-width:460px;">
+                <label style="font-size:12.5px; font-weight:600;">Document type
+                    <select id="vd-id-kind" style="display:block; width:100%; margin-top:4px; padding:8px; border:1px solid #ccc; border-radius:6px;">
+                        <option value="">Choose...</option>
+                        ${Object.entries(VD_ID_KINDS).map(([k, v]) => `<option value="${k}"${doc && doc.id_kind === k ? " selected" : ""}>${v}</option>`).join("")}
+                    </select></label>
+                <label style="font-size:12.5px; font-weight:600;">Document number <span style="font-weight:400; color:#888;">(exactly as printed)</span>
+                    <input id="vd-id-number" type="text" maxlength="30" autocomplete="off" value="${doc && doc.id_number ? esc(doc.id_number) : ""}" style="display:block; width:100%; box-sizing:border-box; margin-top:4px; padding:8px; border:1px solid #ccc; border-radius:6px; text-transform:uppercase;"></label>
+                <label style="font-size:12.5px; font-weight:600;">Expiry date
+                    <input id="vd-id-expires" type="date" min="${minDate}" value="${doc && doc.id_expires_on ? esc(doc.id_expires_on) : ""}" style="display:block; width:100%; box-sizing:border-box; margin-top:4px; padding:8px; border:1px solid #ccc; border-radius:6px;"></label>
+                <label style="font-size:12.5px; font-weight:600;">Photo of the document
+                    <span style="display:block; font-weight:400; color:#666; margin:2px 0 4px;">A clear colour photo of the whole document: all four corners visible, no glare, name, photo, number and expiry date readable.</span>
+                    <input id="vd-id-file" type="file" accept="image/jpeg,image/png,image/webp" onchange="vdCheckIdPhoto(this)" style="font-size:12px;"></label>
+                <div id="vd-id-check" style="font-size:12.5px;"></div>
+                <button type="button" id="vd-id-submit" onclick="vdSubmitIdDocument()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; justify-self:start;">Upload document</button>
+            </div>
+        </details>` : "";
+    return `
+        <div style="padding:6px 0 10px; border-bottom:1px solid #f0f0f0; font-size:12.5px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="min-width:170px;">${esc(label)}</span>${badge}<span style="color:#888;">${doc ? esc(doc.original_filename || "") : ""}</span></div>
+            ${details}
+            ${reason ? `<p style="background:#FEF3C7; color:#92400E; padding:8px 10px; border-radius:8px; font-size:12px; margin:6px 0;">${esc(reason)}</p>` : ""}
+            ${form}
+        </div>`;
+}
+
+let vdIdPhotoResult = null;
+let vdIdOcr = null;          // { text, confidence } read from the photo, or { unavailable: true }
+let vdIdWarnShownFor = "";   // details the vendor was already warned about
+function vdIdMessage(html, tone) {
+    const box = document.getElementById("vd-id-check");
+    if (!box) return;
+    const tones = { bad: "background:#FEF2F2; border:1px solid #FECACA; color:#991B1B;", warn: "background:#FFFBEB; border:1px solid #FDE68A; color:#92400E;", ok: "background:#F0FDF4; border:1px solid #BBF7D0; color:#166534;", info: "color:#666;" };
+    box.innerHTML = html ? `<div style="${tones[tone] || ""} border-radius:8px; padding:8px 10px; white-space:pre-line;">${html}</div>` : "";
+}
+function vdIdTyped() {
+    return {
+        kind: (document.getElementById("vd-id-kind") || {}).value,
+        number: (document.getElementById("vd-id-number") || {}).value,
+        expires: (document.getElementById("vd-id-expires") || {}).value
+    };
+}
+
+async function vdCheckIdPhoto(input) {
+    vdIdPhotoResult = null; vdIdOcr = null; vdIdWarnShownFor = "";
+    const file = input.files && input.files[0];
+    if (!file) { vdIdMessage(""); return; }
+    const btn = document.getElementById("vd-id-submit");
+    if (btn) btn.disabled = true;
+    try {
+        // 1. Photo quality (lz-image-checks.js)
+        if (window.LzImageChecks) {
+            vdIdMessage("Checking photo...", "info");
+            try {
+                const check = await LzImageChecks.analyzeFile(file, LzImageChecks.evaluateIdDocument);
+                vdIdPhotoResult = check.result;
+                if (!check.result.ok) { vdIdMessage(vendorEsc(check.result.message), "bad"); return; }
+            } catch (e) {
+                vdIdPhotoResult = { ok: false, message: "This photo could not be read. Take a new photo (JPG or PNG) and try again." };
+                vdIdMessage(vdIdPhotoResult.message, "bad");
+                return;
+            }
+        } else vdIdPhotoResult = { ok: true, warnings: [] };
+
+        // 2. Read the text (lz-id-ocr.js, self-hosted Tesseract)
+        if (window.LzIdOcr) {
+            vdIdMessage("Reading the document... (the first time can take a little while)", "info");
+            const read = await LzIdOcr.read(file, { onProgress: (m) => {
+                if (m.status === "recognizing text") vdIdMessage(`Reading the document... ${Math.round(m.progress * 100)}%`, "info");
+            } });
+            vdIdOcr = read || { unavailable: true };
+            if (read) {
+                const a = LzIdOcr.analyze(read.text, read.confidence, vdIdTyped());
+                const expInput = document.getElementById("vd-id-expires");
+                if (expInput && !expInput.value && a.summary.expiry_read && a.ok) expInput.value = a.summary.expiry_read;
+                // Only "not an ID" / "expired" reject the photo itself; a wrongly
+                // typed expiry is re-checked when Upload is pressed, after any fix.
+                const photoError = a.errors.find(e => e.code === "not_id" || e.code === "expired");
+                if (photoError) { vdIdPhotoResult = { ok: false, message: photoError.message }; vdIdMessage(vendorEsc(photoError.message), "bad"); return; }
+            }
+        }
+        const notes = (vdIdPhotoResult.warnings || []).map(w => w.text);
+        const readNote = vdIdOcr && !vdIdOcr.unavailable ? "Document read." : "The text couldn't be read automatically - the reviewer will check it.";
+        vdIdMessage("&#10003; Photo looks clear. " + readNote + (notes.length ? "\n" + notes.map(n => "• " + vendorEsc(n)).join("\n") : ""), notes.length ? "warn" : "ok");
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+async function vdSubmitIdDocument() {
+    const typed = vdIdTyped();
+    const file = document.getElementById("vd-id-file").files[0];
+    if (window.LzImageChecks) {
+        const fields = LzImageChecks.checkIdFields(typed);
+        if (!fields.ok) {
+            const expired = fields.errors.find(e => e.code === "expired");
+            vdIdMessage(vendorEsc(expired ? expired.message : fields.errors.map(e => e.text).join("\n")), "bad");
+            return;
+        }
+    }
+    if (!file) { vdIdMessage("Choose a photo of the document.", "bad"); return; }
+    if (vdIdPhotoResult && !vdIdPhotoResult.ok) { vdIdMessage(vendorEsc(vdIdPhotoResult.message), "bad"); return; }
+
+    // Compare what was typed with what the document says.
+    let ocrPayload = vdIdOcr && vdIdOcr.unavailable ? { unavailable: true } : null;
+    if (vdIdOcr && !vdIdOcr.unavailable && window.LzIdOcr) {
+        const a = LzIdOcr.analyze(vdIdOcr.text, vdIdOcr.confidence, typed);
+        if (!a.ok) { vdIdMessage(vendorEsc(a.errors[0].message), "bad"); return; }
+        ocrPayload = { summary: a.summary, warnings: a.warnings };
+        const mismatches = a.warnings.filter(w => /mismatch/.test(w.code));
+        const key = JSON.stringify([typed, mismatches.map(w => w.code)]);
+        if (mismatches.length && vdIdWarnShownFor !== key) {
+            vdIdWarnShownFor = key;
+            vdIdMessage("Please check these details against your document:\n" + mismatches.map(w => "• " + vendorEsc(w.text)).join("\n")
+                + "\n\nCorrect them, or press Upload document again to send it as it is - the reviewer will compare them.", "warn");
+            return;
+        }
+    }
+
+    const btn = document.getElementById("vd-id-submit");
+    btn.disabled = true; btn.textContent = "Uploading...";
+    const formData = new FormData();
+    formData.append("document_type", "national_id");
+    formData.append("id_kind", typed.kind);
+    formData.append("id_number", typed.number);
+    formData.append("id_expires_on", typed.expires);
+    if (ocrPayload) formData.append("ocr", JSON.stringify(ocrPayload));
+    formData.append("document", file);
+    try {
+        const response = await fetch(`${API_URL}/api/vendors/me/kyc/documents`, {
+            method: "POST", headers: { "Authorization": `Bearer ${getVendorToken()}` }, body: formData
+        });
+        const result = await response.json();
+        if (result.error) { vdIdMessage(vendorEsc(result.message || result.error), "bad"); return; }
+        loadVendorKyc();
+    } catch (error) {
+        console.error("vdSubmitIdDocument error:", error);
+        vdIdMessage("Could not upload this document. Please try again.", "bad");
+    } finally {
+        if (document.body.contains(btn)) { btn.disabled = false; btn.textContent = "Upload document"; }
+    }
 }
 
 async function vdUploadKycDocument(documentType, inputEl) {
@@ -1286,35 +1454,68 @@ async function renderVendorImagePreviews(fileList) {
     const preview = document.getElementById("product-image-preview");
     if (!preview) return;
     preview.innerHTML = "";
-    vdPickedFiles = [];
 
+    // Photos are added to the ones already picked (the product needs at
+    // least 3, so a vendor can pick them over several goes); the X on each
+    // thumbnail removes one.
     const submitBtn = document.getElementById("product-submit-btn");
-    const files = Array.from(fileList);
-    if (files.length === 0) {
-        vdLocalPreviews = [];
-        vdAllImages = vdAllImages.filter(im => im.key.startsWith("id:"));
-        renderVendorPhotoOrderList();
-        return;
-    }
+    const files = Array.from(fileList || []);
+    const input = document.getElementById("product-images");
+    if (files.length === 0) { renderVendorPhotoOrderList(); return; }
 
     // Block submit while reads are in flight, or a partial set can upload.
     if (submitBtn) submitBtn.disabled = true;
     const status = document.createElement("div");
     status.style.cssText = "font-size:12px; color:#666; width:100%;";
-    status.textContent = "Preparing " + files.length + " photo(s)...";
     preview.appendChild(status);
 
-    const failures = [];
+    const failures = [], rejected = [], notes = [];
     for (let i = 0; i < files.length; i++) {
-        status.textContent = "Preparing photo " + (i + 1) + " of " + files.length + "...";
+        status.textContent = "Checking photo " + (i + 1) + " of " + files.length + "...";
         const res = await preparePickedFile(files[i]);
-        if (res.ok) vdPickedFiles.push(res.file);
-        else failures.push(res);
+        if (!res.ok) { failures.push(res); continue; }
+        // Automatic photo checks (client/js/lz-image-checks.js) - the server
+        // runs the same rules again on upload.
+        if (window.LzImageChecks) {
+            let check = null;
+            try { check = await LzImageChecks.analyzeFile(res.file); } catch (e) { console.warn("Photo check skipped:", e); }
+            if (check) {
+                if (!check.result.ok) { rejected.push({ name: files[i].name, reasons: check.result.errors }); continue; }
+                const fileNotes = check.result.warnings.map(w => w.text);
+                const dup = LzImageChecks.findDuplicate(check.metrics.hash,
+                    vdPickedFiles.map(f => ({ hash: f._lzHash, label: f.name })));
+                if (dup) fileNotes.push("Looks the same as " + dup.label + " - each photo should show something new");
+                res.file._lzHash = check.metrics.hash;
+                if (fileNotes.length) notes.push({ name: files[i].name, notes: fileNotes });
+            }
+        }
+        vdPickedFiles.push(res.file);
+        vdLocalPreviews.push(URL.createObjectURL(res.file));
     }
+    if (input) input.value = "";
 
     if (submitBtn) submitBtn.disabled = false;
     preview.innerHTML = "";
+    const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+    if (rejected.length > 0) {
+        const card = document.createElement("div");
+        card.className = "vd-photo-reject";
+        card.style.cssText = "width:100%; box-sizing:border-box; background:#FEF2F2; border:1px solid #FECACA; color:#991B1B; border-radius:8px; padding:10px 12px; margin-bottom:8px; font-size:13px;";
+        card.innerHTML = '<div style="font-weight:700; margin-bottom:4px;">&#10060; Image not accepted</div>' +
+            rejected.map(r => '<div style="margin-top:6px;"><strong>' + esc(r.name) + '</strong> &mdash; Reasons:<ul style="margin:4px 0 0 18px; padding:0;">' +
+                r.reasons.map(x => "<li>" + esc(x.text) + "</li>").join("") + "</ul></div>").join("") +
+            '<div style="margin-top:8px;">Please upload a clear, high-quality photo to keep quality high on Lizimas Store.</div>';
+        preview.appendChild(card);
+    }
+    if (notes.length > 0) {
+        const card = document.createElement("div");
+        card.className = "vd-photo-notes";
+        card.style.cssText = "width:100%; box-sizing:border-box; background:#FFFBEB; border:1px solid #FDE68A; color:#92400E; border-radius:8px; padding:10px 12px; margin-bottom:8px; font-size:13px;";
+        card.innerHTML = '<div style="font-weight:700;">Accepted, but could be better:</div>' +
+            notes.map(n => '<div style="margin-top:4px;"><strong>' + esc(n.name) + ':</strong> ' + n.notes.map(esc).join("; ") + "</div>").join("");
+        preview.appendChild(card);
+    }
     if (failures.length > 0) {
         const warn = document.createElement("div");
         warn.style.cssText = "color:#c0392b; font-size:12px; width:100%; margin-bottom:6px;";
@@ -1324,14 +1525,19 @@ async function renderVendorImagePreviews(fileList) {
         preview.appendChild(warn);
     }
 
-    vdLocalPreviews = vdPickedFiles.map(f => URL.createObjectURL(f));
-    vdAllImages = vdAllImages.filter(im => im.key.startsWith("id:"))
-        .concat(vdPickedFiles.map((f, i) => ({ key: "new:" + i, url: vdLocalPreviews[i] })));
-
+    vdRebuildAllImages();
     renderVendorPhotoOrderList();
 }
 
 function vdIsNew(key) { return key.startsWith("new:"); }
+
+function vdPhotoMin() { return window.LzImageChecks ? LzImageChecks.RULES.MIN_IMAGES : 3; }
+function vdPhotoCountLine(n) {
+    const min = vdPhotoMin();
+    return n >= min
+        ? '<div style="font-size:12px;color:#166534;margin-bottom:8px;">&#10003; ' + n + ' photos (minimum ' + min + ')</div>'
+        : '<div style="font-size:12px;color:#B45309;margin-bottom:8px;">' + n + ' of ' + min + ' photos minimum - add ' + (min - n) + ' more</div>';
+}
 
 function vdRebuildAllImages() {
     const stored = vdAllImages.filter(im => im.key.startsWith("id:"));
@@ -1357,6 +1563,7 @@ function renderVendorPhotoOrderList() {
 
     block.innerHTML =
         '<div style="font-size:12px;font-weight:700;color:#444;margin-bottom:8px;">Photos (first photo is the main one shown on the storefront)</div>' +
+        vdPhotoCountLine(all.length) +
         all.map((im, i) => {
             const isNew = vdIsNew(im.key);
             const prev = all[i - 1];
@@ -2218,6 +2425,16 @@ async function submitVendorProductForm() {
             return;
         }
     }
+    // Photo checks: at least the minimum number of photos (stored + new).
+    if (window.LzImageChecks) {
+        const countError = LzImageChecks.countMessage(vdAllImages.length);
+        if (countError) {
+            statusEl.textContent = countError;
+            const zone = document.getElementById("product-image-dropzone");
+            if (zone && zone.scrollIntoView) zone.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+        }
+    }
 
     submitBtn.disabled = true;
     submitBtn.style.opacity = "0.6";
@@ -2257,11 +2474,15 @@ async function submitVendorProductForm() {
         submitBtn.style.opacity = "1";
 
         if (!response.ok) {
-            statusEl.textContent = data.error || "Could not save product.";
+            statusEl.style.whiteSpace = "pre-line";
+            statusEl.textContent = data.error === "image_rejected" ? data.message : (data.error || "Could not save product.");
             return;
         }
 
         statusEl.textContent = data.message || "Saved.";
+        if (Array.isArray(data.image_warnings) && data.image_warnings.length) {
+            alert("Saved. Notes on your photos:\n\n" + data.image_warnings.map(w => "• " + w.name + ": " + w.notes.map(n => n.text).join("; ")).join("\n"));
+        }
 
         const savedProductId = data.product ? data.product.id : id;
         const specsPayload = collectVendorSpecRows();

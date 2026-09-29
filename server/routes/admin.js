@@ -130,7 +130,7 @@ const {
 const {
     listVendorKycAdmin, getVendorKycAdminDetail, reviewVendorKycAdmin,
     updateVendorUrsbVerification,
-    reviewVendorKycDocumentAdmin, getVendorKycDocumentAdmin
+    reviewVendorKycDocumentAdmin, getVendorKycDocumentAdmin, getVendorKycDocumentFileAdmin
 } = require("../controllers/vendorKycController");
 const {
     listBrandAuthorizationsAdmin,
@@ -382,6 +382,7 @@ router.patch("/vendors/:id/kyc/review", reviewVendorKycAdmin);
 router.patch("/vendors/:id/kyc/ursb", updateVendorUrsbVerification);
 router.patch("/vendors/:id/kyc/documents/:documentType/review", reviewVendorKycDocumentAdmin);
 router.get("/vendors/:id/kyc/documents/url", getVendorKycDocumentAdmin);
+router.get("/vendors/:id/kyc/documents/file", getVendorKycDocumentFileAdmin);
 
 router.get("/brand-authorizations", listBrandAuthorizationsAdmin);
 router.get("/brand-authorizations/:id", getBrandAuthorizationAdminDetail);

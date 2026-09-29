@@ -26,6 +26,21 @@ const { isValidAdminKycTransition, canVendorEditKyc, requiredDocumentTypesForKyc
 const { logActivity } = require("../utils/activityLog");
 const { uploadPrivateDocument, privateDocumentViewUrl, destroyPrivateDocument } = require("../utils/cloudinaryUpload");
 const { createVendorNotification } = require("./vendorController");
+const cloudinary = require("../config/cloudinary");
+const ImageChecks = require("../utils/imageChecks");
+const { ID_DOCUMENT_TYPE, checkAndUploadIdDocument, checkIdAcceptance } = require("../utils/idDocumentChecks");
+
+// Identity document photo checks (Sept 2026): the private upload gets a
+// signed URL to a small PNG copy, which the checks measure.
+const idDocumentDeps = {
+    upload: (buffer, name) => uploadPrivateDocument(buffer, name),
+    previewUrl: (publicId) => cloudinary.url(publicId, {
+        type: "private", resource_type: "image", sign_url: true, secure: true,
+        transformation: [ImageChecks.PREVIEW_TRANSFORM]
+    }),
+    fetchBuffer: (url) => ImageChecks.fetchBuffer(url),
+    destroy: (publicId, resourceType) => destroyPrivateDocument(publicId, resourceType)
+};
 
 // --- Vendor-self ------------------------------------------------------------
 
@@ -52,7 +67,8 @@ exports.getMyKyc = async (req, res) => {
         );
 
         const docRows = await pool.query(
-            `SELECT document_type, original_filename, uploaded_at, review_status, rejection_reason, action_required_reason
+            `SELECT document_type, original_filename, uploaded_at, review_status, rejection_reason, action_required_reason,
+                    id_kind, id_number, id_expires_on::text AS id_expires_on
              FROM vendor_kyc_documents WHERE vendor_id = $1`,
             [vendor.id]
         );
@@ -303,24 +319,40 @@ exports.uploadMyKycDocument = async (req, res) => {
             [vendor.id, documentType]
         );
 
-        const uploaded = await uploadPrivateDocument(req.file.buffer, req.file.originalname);
+        // Identity document: National ID, Passport or Driving Licence, with
+        // its type, number and expiry, and automatic photo checks.
+        let uploaded, idFields = { kind: null, number: null, expires: null }, autoChecks = null;
+        if (documentType === ID_DOCUMENT_TYPE) {
+            const checked = await checkAndUploadIdDocument(req.file, req.body, idDocumentDeps);
+            if (!checked.ok) return res.status(checked.status).json(checked.body);
+            uploaded = checked.uploaded; idFields = checked.fields; autoChecks = checked.autoChecks;
+        } else {
+            uploaded = await uploadPrivateDocument(req.file.buffer, req.file.originalname);
+        }
 
         await pool.query(
-            `INSERT INTO vendor_kyc_documents (vendor_id, document_type, cloudinary_public_id, resource_type, format, original_filename, bytes)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `INSERT INTO vendor_kyc_documents (vendor_id, document_type, cloudinary_public_id, resource_type, format, original_filename, bytes,
+                                               id_kind, id_number, id_expires_on, auto_checks)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
              ON CONFLICT (vendor_id, document_type) DO UPDATE SET
                 cloudinary_public_id = $3,
                 resource_type = $4,
                 format = $5,
                 original_filename = $6,
                 bytes = $7,
+                id_kind = $8,
+                id_number = $9,
+                id_expires_on = $10,
+                auto_checks = $11,
+                review_checks_confirmed = false,
                 uploaded_at = now(),
                 review_status = 'pending',
                 rejection_reason = NULL,
                 action_required_reason = NULL,
                 reviewed_by = NULL,
                 reviewed_at = NULL`,
-            [vendor.id, documentType, uploaded.public_id, uploaded.resource_type, uploaded.format, req.file.originalname, uploaded.bytes]
+            [vendor.id, documentType, uploaded.public_id, uploaded.resource_type, uploaded.format, req.file.originalname, uploaded.bytes,
+                idFields.kind, idFields.number, idFields.expires, autoChecks ? JSON.stringify(autoChecks) : null]
         );
 
         // Best-effort cleanup of the replaced asset - never let a Cloudinary
@@ -330,7 +362,7 @@ exports.uploadMyKycDocument = async (req, res) => {
                 .catch((err) => console.error("Failed to clean up replaced KYC document:", err.message));
         }
 
-        res.json({ message: "Document uploaded.", document_type: documentType });
+        res.json({ message: "Document uploaded.", document_type: documentType, warnings: autoChecks ? autoChecks.warnings : [] });
     } catch (error) {
         if (error.code === "INVALID_FILE_TYPE") {
             return res.status(400).json({ error: error.message });
@@ -436,7 +468,8 @@ exports.getVendorKycAdminDetail = async (req, res) => {
             [id]
         );
         const docRows = await pool.query(
-            `SELECT document_type, original_filename, uploaded_at
+            `SELECT document_type, original_filename, uploaded_at, review_status, rejection_reason, action_required_reason,
+                    id_kind, id_number, id_expires_on::text AS id_expires_on, auto_checks, review_checks_confirmed, resource_type
              FROM vendor_kyc_documents WHERE vendor_id = $1`,
             [id]
         );
@@ -576,6 +609,29 @@ exports.getVendorKycDocumentAdmin = async (req, res) => {
     }
 };
 
+// The identity document's image bytes, passed through from Cloudinary so
+// the admin panel can read its text (OCR) in the browser - same origin,
+// admin only, images only, never cached.
+exports.getVendorKycDocumentFileAdmin = async (req, res) => {
+    try {
+        const docRow = await pool.query(
+            "SELECT cloudinary_public_id, resource_type, format FROM vendor_kyc_documents WHERE vendor_id = $1 AND document_type = $2",
+            [req.params.id, req.query.document_type]
+        );
+        const doc = docRow.rows[0];
+        if (!doc) return res.status(404).json({ error: "No document on file." });
+        if (doc.resource_type !== "image") return res.status(400).json({ error: "Only photos can be read automatically." });
+        const url = privateDocumentViewUrl(doc.cloudinary_public_id, doc.resource_type, doc.format, false);
+        const buf = await ImageChecks.fetchBuffer(url, 15000);
+        const size = ImageChecks.readImageSize(buf);
+        res.set("Cache-Control", "no-store");
+        res.type(size ? size.type : "application/octet-stream").send(buf);
+    } catch (error) {
+        console.error("getVendorKycDocumentFileAdmin error:", error.message);
+        res.status(502).json({ error: "Could not fetch the document." });
+    }
+};
+
 // Record the outcome of a manual URSB eRegistry lookup for a company
 // vendor. Required before kyc_status can become 'verified' when the
 // vendor's account_type is 'company'. Individual vendors are unaffected.
@@ -651,11 +707,18 @@ exports.reviewVendorKycDocumentAdmin = async (req, res) => {
         }
 
         const docRow = await pool.query(
-            "SELECT id FROM vendor_kyc_documents WHERE vendor_id = $1 AND document_type = $2",
+            "SELECT id, id_expires_on::text AS id_expires_on FROM vendor_kyc_documents WHERE vendor_id = $1 AND document_type = $2",
             [id, documentType]
         );
         if (docRow.rows.length === 0) {
             return res.status(404).json({ error: "No document on file for this vendor and type." });
+        }
+        // Identity document: admin confirms what can't be checked
+        // automatically, and an expired document can't be accepted.
+        const confirmed = req.body.checks_confirmed === true;
+        if (decision === "accepted" && documentType === ID_DOCUMENT_TYPE) {
+            const acceptance = checkIdAcceptance(docRow.rows[0], confirmed);
+            if (!acceptance.ok) return res.status(400).json({ error: acceptance.error });
         }
 
         await pool.query(
@@ -664,7 +727,8 @@ exports.reviewVendorKycDocumentAdmin = async (req, res) => {
                  rejection_reason = $2,
                  action_required_reason = $3,
                  reviewed_by = $4,
-                 reviewed_at = now()
+                 reviewed_at = now(),
+                 review_checks_confirmed = $7
              WHERE vendor_id = $5 AND document_type = $6`,
             [
                 decision,
@@ -672,7 +736,8 @@ exports.reviewVendorKycDocumentAdmin = async (req, res) => {
                 decision === "action_required" ? reason : null,
                 req.user.userId,
                 id,
-                documentType
+                documentType,
+                decision === "accepted" && documentType === ID_DOCUMENT_TYPE && confirmed
             ]
         );
 

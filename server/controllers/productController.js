@@ -43,6 +43,33 @@ function uploadBufferToCloudinary(fileBuffer) {
     });
 }
 
+// Vendor photo checks (Sept 2026): upload with a small PNG preview made by
+// Cloudinary during the upload, which the checks measure (imageChecks.js).
+const ImageChecks = require("../utils/imageChecks");
+const { uploadCheckedPhotos } = require("../utils/vendorPhotos");
+const isVendorRole = (role) => ["vendor", "vendor_staff"].includes(role);
+function uploadBufferWithPreview(fileBuffer) {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            { folder: "lizimas-store/products", eager: [ImageChecks.PREVIEW_TRANSFORM] },
+            (error, result) => {
+                if (error) return reject(error);
+                resolve({
+                    url: result.secure_url, publicId: result.public_id,
+                    width: result.width, height: result.height, bytes: result.bytes,
+                    previewUrl: result.eager && result.eager[0] ? result.eager[0].secure_url : null
+                });
+            }
+        );
+        stream.end(fileBuffer);
+    });
+}
+const photoDeps = {
+    upload: uploadBufferWithPreview,
+    destroy: (publicId) => cloudinary.uploader.destroy(publicId),
+    query: (sql, params) => pool.query(sql, params)
+};
+
 const { SIZE_RANK } = require("../utils/deliveryPricing");
 const { ACTIVE_DISCOUNT_LATERAL } = require("../utils/productDiscounts");
 const { readMeasurements, saveMeasurements } = require("../utils/packageMeasurements");
@@ -141,9 +168,14 @@ exports.addProduct = async (req, res) => {
         }
 
         const uploadedFiles = req.files || [];
-        const imagePaths = await Promise.all(
-            uploadedFiles.map(f => uploadBufferToCloudinary(f.buffer))
-        );
+        let imagePaths, imageHashes = [], imageWarnings = [];
+        if (isVendorRole(req.user.role)) {
+            const checked = await uploadCheckedPhotos(uploadedFiles, { existingCount: 0, vendorId }, photoDeps);
+            if (!checked.ok) return res.status(checked.status).json(checked.body);
+            imagePaths = checked.urls; imageHashes = checked.hashes; imageWarnings = checked.warnings;
+        } else {
+            imagePaths = await Promise.all(uploadedFiles.map(f => uploadBufferToCloudinary(f.buffer)));
+        }
         const mainImage = imagePaths.length > 0 ? imagePaths[0] : (req.body.image || null);
 
         const product = await pool.query(
@@ -170,8 +202,8 @@ exports.addProduct = async (req, res) => {
         const imageRecords = [];
         for (const [imgIndex, imgPath] of imagePaths.entries()) {
             const ins = await pool.query(
-                `INSERT INTO product_images (product_id, image_path, display_order) VALUES ($1, $2, $3) RETURNING id, image_path`,
-                [newProduct.id, imgPath, imgIndex]
+                `INSERT INTO product_images (product_id, image_path, display_order, phash) VALUES ($1, $2, $3, $4) RETURNING id, image_path`,
+                [newProduct.id, imgPath, imgIndex, imageHashes[imgIndex] || null]
             );
             imageRecords.push(ins.rows[0]);
         }
@@ -198,7 +230,7 @@ exports.addProduct = async (req, res) => {
             ? "Product submitted and is pending admin approval."
             : "Product added successfully";
 
-        res.json({ message, product: redactCommissionForVendor(req.user.role, newProduct), images: imagePaths, image_records: imageRecords });
+        res.json({ message, product: redactCommissionForVendor(req.user.role, newProduct), images: imagePaths, image_records: imageRecords, image_warnings: imageWarnings });
 
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -329,12 +361,20 @@ exports.getProducts = async (req, res) => {
 // Get the logged-in staff member's own products, with pending deletion request status
 // Capability check rather than a role test, so new roles need no handler changes.
 exports.canEditProduct = canEditProduct;
+// Admin can change staff listings but never a vendor's product (Ryan, Sept
+// 2026): a vendor's listing stays exactly as the vendor submitted it; admin
+// views it read-only and approves, rejects or restricts it instead.
+const VENDOR_PRODUCT_READ_ONLY = "This is a vendor's product - admin can view it (and approve, reject or restrict it) but not change it. Ask the vendor to make changes.";
 async function canEditProduct(user, productId) {
-    if (user.role === "admin") return { allowed: true };
     const row = (await pool.query(
-        `SELECT created_by FROM products WHERE id = $1 AND deleted_at IS NULL`,
+        `SELECT created_by, vendor_id FROM products WHERE id = $1 AND deleted_at IS NULL`,
         [productId]
     )).rows[0];
+    if (["admin", "admin_staff"].includes(user.role)) {
+        if (!row) return user.role === "admin" ? { allowed: true } : { allowed: false, status: 404, error: "Product not found." };
+        if (row.vendor_id) return { allowed: false, status: 403, error: VENDOR_PRODUCT_READ_ONLY };
+        if (user.role === "admin") return { allowed: true };
+    }
     if (!row) return { allowed: false, status: 404, error: "Product not found." };
     if (Number(row.created_by) !== Number(user.userId)) {
         return { allowed: false, status: 403,
@@ -1120,9 +1160,18 @@ exports.updateProduct = async (req, res) => {
         if (prohibitedError) return res.status(400).json(prohibitedError);
 
         const uploadedFiles = req.files || [];
-        const newImagePaths = await Promise.all(
-            uploadedFiles.map(f => uploadBufferToCloudinary(f.buffer))
-        );
+        let newImagePaths, newImageHashes = [], imageWarnings = [];
+        if (isVendorRole(req.user.role)) {
+            const owned = (await pool.query(
+                `SELECT p.vendor_id, (SELECT COUNT(*)::int FROM product_images WHERE product_id = p.id) AS n
+                   FROM products p WHERE p.id = $1`, [id])).rows[0] || {};
+            const checked = await uploadCheckedPhotos(uploadedFiles,
+                { existingCount: owned.n || 0, vendorId: owned.vendor_id || req.vendorId, productId: Number(id) }, photoDeps);
+            if (!checked.ok) return res.status(checked.status).json(checked.body);
+            newImagePaths = checked.urls; newImageHashes = checked.hashes; imageWarnings = checked.warnings;
+        } else {
+            newImagePaths = await Promise.all(uploadedFiles.map(f => uploadBufferToCloudinary(f.buffer)));
+        }
 
         const statusClause = ["product_staff", "vendor"].includes(req.user.role) ? `, status='pending'` : "";
 
@@ -1197,8 +1246,8 @@ exports.updateProduct = async (req, res) => {
         const imageRecords = [];
         for (const [imgIndex, imgPath] of newImagePaths.entries()) {
             const ins = await pool.query(
-                `INSERT INTO product_images (product_id, image_path, display_order) VALUES ($1, $2, $3) RETURNING id, image_path`,
-                [id, imgPath, startAt + imgIndex]
+                `INSERT INTO product_images (product_id, image_path, display_order, phash) VALUES ($1, $2, $3, $4) RETURNING id, image_path`,
+                [id, imgPath, startAt + imgIndex, newImageHashes[imgIndex] || null]
             );
             imageRecords.push(ins.rows[0]);
         }
@@ -1226,7 +1275,7 @@ exports.updateProduct = async (req, res) => {
             ? "Product updated and is pending admin approval."
             : "Product updated successfully";
 
-        res.json({ message, product: redactCommissionForVendor(req.user.role, product.rows[0]), images: newImagePaths, image_records: imageRecords });
+        res.json({ message, product: redactCommissionForVendor(req.user.role, product.rows[0]), images: newImagePaths, image_records: imageRecords, image_warnings: imageWarnings });
 
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -1557,6 +1606,14 @@ exports.deleteProductImage = async (req, res) => {
         const permission = await canEditProduct(req.user, owner.rows[0].product_id);
         if (!permission.allowed) {
             return res.status(permission.status).json({ error: permission.error });
+        }
+        // Vendors keep at least the minimum number of photos (photo checks).
+        if (isVendorRole(req.user.role)) {
+            const left = (await pool.query(`SELECT COUNT(*)::int AS n FROM product_images WHERE product_id = $1`,
+                [owner.rows[0].product_id])).rows[0].n - 1;
+            if (left < ImageChecks.Checks.RULES.MIN_IMAGES) {
+                return res.status(400).json({ error: `A product needs at least ${ImageChecks.Checks.RULES.MIN_IMAGES} photos. Add the new photo first, then remove this one.` });
+            }
         }
 
         const client = await pool.connect();

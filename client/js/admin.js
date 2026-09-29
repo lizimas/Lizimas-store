@@ -1373,8 +1373,10 @@ function renderProductsTable() {
                         <td data-label="Quality">${adminQualityScoreBadge(p)}</td>
                         <td data-label="Actions">
                             <button onclick="openAdminProductView(${p.id})" title="See the product exactly as submitted (read-only)">View</button>
-                            <button onclick="editProduct(${p.id})">Edit</button>
-                            <button onclick="openManageStock(${p.id})" data-pname="${String(p.name || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;")}">Stock</button>
+                            ${p.vendor_id
+                                ? `<button disabled title="Vendor product - view only for admin">Edit</button>`
+                                : `<button onclick="editProduct(${p.id})">Edit</button>`}
+                            <button onclick="openManageStock(${p.id})" ${p.vendor_id ? 'disabled title="Vendor product - view only for admin"' : ""} data-pname="${String(p.name || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;")}">Stock</button>
                             <button onclick="removeProduct(${p.id})">Delete</button>
                         </td>
                     </tr>
@@ -2090,6 +2092,11 @@ function editProduct(id) {
     const product = adminProducts.find(p => p.id === id);
     if (!product) {
         console.error("Product not found:", id);
+        return;
+    }
+    // Vendor products are view-only for admin (the server refuses the save too).
+    if (product.vendor_id) {
+        if (typeof openAdminProductView === "function") openAdminProductView(id);
         return;
     }
     document.getElementById("product-form-title").textContent = "Edit Product";
@@ -9391,7 +9398,7 @@ async function openVendorKycReviewModal(vendorId) {
         const detail = await authorizedFetch(`/api/admin/vendors/${vendorId}/kyc`);
         const info = VENDOR_KYC_ADMIN_BADGE[detail.kyc_status] || VENDOR_KYC_ADMIN_BADGE.not_started;
 
-        const idLabel = detail.account_type === "company" ? "Registration Number" : "National ID Number";
+        const idLabel = detail.account_type === "company" ? "Registration Number" : "ID Document Number";
         const idValue = detail.account_type === "company" ? detail.registration_number : detail.national_id_number;
 
         const transitionButtons = VENDOR_KYC_ADMIN_TRANSITIONS[detail.kyc_status] || [];
@@ -9491,7 +9498,9 @@ function renderDocumentsSection(detail, vendorId) {
         }[status] || { cls: "status-pending", label: status };
 
         const reason = d.rejection_reason || d.action_required_reason || "";
-        const label = (d.document_type || "").replace(/_/g, " ");
+        const isId = d.document_type === "national_id";
+        const label = isId ? "Identity document" : (d.document_type || "").replace(/_/g, " ");
+        const idBlock = isId ? kycIdDocumentReview(d, vendorId) : "";
 
         return `
             <div style="border:1px solid #e5e7eb; border-radius:6px; padding:10px; margin-bottom:8px;">
@@ -9499,11 +9508,12 @@ function renderDocumentsSection(detail, vendorId) {
                     <strong>${label}</strong>
                     <span class="status-badge ${statusInfo.cls}" style="margin-left:8px;">${statusInfo.label}</span>
                 </div>
-                ${reason ? `<div style="font-size:12px; color:#666; margin-bottom:6px;"><em>${reason}</em></div>` : ""}
+                ${reason ? `<div style="font-size:12px; color:#666; margin-bottom:6px;"><em>${adminEsc(reason)}</em></div>` : ""}
+                ${idBlock}
                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
                     <button onclick="viewVendorKycDocument(${vendorId}, '${d.document_type}')" style="background:#16264f; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">View</button>
                     <button onclick="downloadVendorKycDocument(${vendorId}, '${d.document_type}')" style="background:#fff; color:#16264f; border:1px solid #16264f; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Download</button>
-                    <button onclick="reviewDocument(${vendorId}, '${d.document_type}', 'accepted')" style="background:#059669; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Accept</button>
+                    <button ${isId ? 'id="kyc-id-accept" disabled title="Tick every identity check first"' : ""} onclick="reviewDocument(${vendorId}, '${d.document_type}', 'accepted')" style="background:#059669; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Accept</button>
                     <button onclick="reviewDocument(${vendorId}, '${d.document_type}', 'action_required')" style="background:#d97706; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Needs better</button>
                     <button onclick="reviewDocument(${vendorId}, '${d.document_type}', 'rejected')" style="background:#dc2626; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Reject</button>
                 </div>
@@ -9550,6 +9560,86 @@ async function downloadVendorKycDocument(vendorId, documentType) {
     }
 }
 
+// Identity document (National ID, Passport or Driving Licence): what the
+// vendor typed, what the automatic photo checks found, and the checks only
+// a person can do - all ticked before Accept (the server insists too).
+const KYC_ID_KINDS = { national_id: "National ID", passport: "Passport", driving_license: "Driving Licence" };
+const KYC_ID_CHECKS = [
+    "It is a National ID, Passport or Driving Licence of the type stated",
+    "Name matches the legal representative; document number and expiry date match what the vendor typed",
+    "Photo, name, number and expiry date are clearly readable (no glare over details)",
+    "All four corners visible - not cropped, not a photo of a screen or a photocopy",
+    "No signs of editing or tampering"
+];
+const KYC_OCR_LABELS = { national_id: "National ID", passport: "Passport", driving_license: "Driving Licence" };
+function kycOcrSummaryHtml(sm, warnings, source) {
+    if (!sm) return "";
+    const yes = (v) => v === true ? '<span style="color:#166534;">yes</span>' : v === false ? '<span style="color:#dc2626; font-weight:600;">NO</span>' : "-";
+    return `<div style="font-size:12px; color:#333; margin:2px 0 6px;">${source}: expiry ${sm.expiry_read ? `<strong>${adminEsc(sm.expiry_read)}</strong>${sm.expiry_from ? ` (${adminEsc(sm.expiry_from)})` : ""}` : "not read"}
+        &middot; number on document: ${yes(sm.number_found)} &middot; looks like: ${sm.kind_detected ? adminEsc(KYC_OCR_LABELS[sm.kind_detected] || sm.kind_detected) : "not detected"}${sm.confidence != null ? ` &middot; text confidence ${sm.confidence}%` : ""}
+        ${(warnings || []).length ? `<br><span style="color:#b45309;">${warnings.map(w => adminEsc(w.text || w)).join("<br>")}</span>` : ""}</div>`;
+}
+
+// Admin reads the document text themselves (self-hosted Tesseract), from the
+// stored photo - not relying on the vendor's browser.
+async function kycReadIdDocument(vendorId, btn) {
+    const d = window.kycIdDocForReview;
+    const out = document.getElementById("kyc-id-ocr-admin");
+    if (!d || !out || !window.LzIdOcr) return;
+    btn.disabled = true;
+    out.innerHTML = '<div style="font-size:12px; color:#666;">Reading the document...</div>';
+    try {
+        const res = await fetch(`${API_URL}/api/admin/vendors/${vendorId}/kyc/documents/file?document_type=national_id`, { headers: { "Authorization": `Bearer ${getToken()}` } });
+        if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || "Could not fetch the document"); }
+        const read = await LzIdOcr.read(await res.blob(), { onProgress: (m) => {
+            if (m.status === "recognizing text") out.innerHTML = `<div style="font-size:12px; color:#666;">Reading the document... ${Math.round(m.progress * 100)}%</div>`;
+        } });
+        if (!read) throw new Error("The OCR engine could not run in this browser");
+        const a = LzIdOcr.analyze(read.text, read.confidence, { kind: d.id_kind, number: d.id_number, expires: d.id_expires_on });
+        out.innerHTML = kycOcrSummaryHtml(a.summary, a.errors.concat(a.warnings), "Admin read")
+            + `<details style="font-size:12px; margin-bottom:6px;"><summary style="cursor:pointer;">Text found on the document</summary><pre style="white-space:pre-wrap; background:#f8f9fb; padding:8px; border-radius:6px; max-height:220px; overflow:auto;">${adminEsc(read.text)}</pre></details>`;
+    } catch (e) {
+        out.innerHTML = `<div style="font-size:12px; color:#dc2626;">${adminEsc(e.message)}</div>`;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function kycIdDocumentReview(d, vendorId) {
+    window.kycIdDocForReview = d;
+    let checks = d.auto_checks;
+    if (typeof checks === "string") { try { checks = JSON.parse(checks); } catch (e) { checks = null; } }
+    const today = new Date().toISOString().slice(0, 10);
+    const expired = d.id_expires_on && d.id_expires_on <= today;
+    const facts = d.id_kind
+        ? `<div style="font-size:12.5px; margin:4px 0 6px;">${adminEsc(KYC_ID_KINDS[d.id_kind] || d.id_kind)} &middot; No. <strong>${adminEsc(d.id_number || "-")}</strong> &middot; expires <strong style="color:${expired ? "#dc2626" : "inherit"};">${adminEsc(d.id_expires_on || "-")}${expired ? " (EXPIRED)" : ""}</strong></div>`
+        : `<div style="font-size:12px; color:#b45309; margin:4px 0 6px;">Uploaded before the ID checks existed - no type, number or expiry on file. Use "Needs better" to ask for a new upload.</div>`;
+    const auto = checks
+        ? `<div style="font-size:12px; color:#555; margin-bottom:6px;">Automatic checks: ${checks.photo_checked ? "photo passed" : "size checked (photo preview unavailable)"}${checks.width ? ` &middot; ${checks.width}×${checks.height}` : ""}${(checks.warnings || []).length ? `<br><span style="color:#b45309;">Notes: ${checks.warnings.map(adminEsc).join("; ")}</span>` : ""}</div>`
+        : "";
+    const done = d.review_status === "accepted" && d.review_checks_confirmed;
+    const vendorOcr = checks && checks.ocr
+        ? (checks.ocr.unavailable ? '<div style="font-size:12px; color:#666; margin-bottom:4px;">Vendor\'s browser could not read the text.</div>'
+            : kycOcrSummaryHtml(checks.ocr.summary, checks.ocr.warnings, "Read on upload"))
+        : "";
+    const readBtn = d.id_kind && window.LzIdOcr
+        ? `<div style="margin-bottom:6px;"><button type="button" onclick="kycReadIdDocument(${Number(vendorId)}, this)" style="background:#fff; color:#16264f; border:1px solid #16264f; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer;">Read document text</button></div><div id="kyc-id-ocr-admin"></div>`
+        : "";
+    return facts + auto + vendorOcr + readBtn + `
+        <div style="border:1px solid #FDE68A; background:#FFFBEB; border-radius:6px; padding:8px 10px; margin-bottom:8px; font-size:12.5px;">
+            <div style="font-weight:700; margin-bottom:4px;">Identity checks (tick all before accepting)</div>
+            ${KYC_ID_CHECKS.map(t => `<label style="display:flex; gap:6px; align-items:flex-start; padding:2px 0; cursor:pointer;"><input type="checkbox" class="kyc-id-check" ${done ? "checked" : ""} onchange="kycIdChecksChanged()" style="margin-top:2px;"> ${adminEsc(t)}</label>`).join("")}
+            ${expired ? '<div style="color:#dc2626; font-weight:600; margin-top:4px;">This document has expired and cannot be accepted.</div>' : ""}
+        </div>`;
+}
+function kycIdChecksChanged() {
+    const btn = document.getElementById("kyc-id-accept");
+    if (!btn) return;
+    const all = [...document.querySelectorAll(".kyc-id-check")];
+    btn.disabled = !(all.length && all.every(c => c.checked));
+    btn.title = btn.disabled ? "Tick every identity check first" : "";
+}
+
 async function reviewDocument(vendorId, documentType, decision) {
     let reason = "";
     if (decision === "rejected" || decision === "action_required") {
@@ -9561,7 +9651,9 @@ async function reviewDocument(vendorId, documentType, decision) {
         const res = await fetch(`${API_URL}/api/admin/vendors/${vendorId}/kyc/documents/${documentType}/review`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-            body: JSON.stringify({ decision, reason: reason || null })
+            body: JSON.stringify({ decision, reason: reason || null,
+                checks_confirmed: documentType === "national_id" && decision === "accepted"
+                    ? [...document.querySelectorAll(".kyc-id-check")].every(c => c.checked) : undefined })
         });
         const data = await res.json();
         if (data.error) {

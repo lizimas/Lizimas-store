@@ -1,4 +1,37 @@
 
+## DONE (Sept 2026): automatic photo checks (products + ID documents), admin photo viewer
+
+**Product photos (vendors)** - `client/js/lz-image-checks.js` holds the rules, used by the upload
+form (instant "Image not accepted" card) and the server (`server/utils/imageChecks.js`,
+`vendorPhotos.js`). Rejected: blurry, under 800x800, over 5MB, too dark / washed out, same file
+twice, fewer than 3 photos (also enforced when deleting a photo). Warned: slightly soft, dark,
+busy background, odd shape, near-duplicate photo (also across the vendor's other listings via
+`product_images.phash`, migration 139). The server measures a small PNG copy Cloudinary makes
+during upload (eager), decoded with zlib - no image libraries. If that copy can't be fetched the
+server skips the pixel checks (the browser already ran them) rather than block the vendor.
+Watermarks and people in photos: admin ticks two checks before Approve.
+
+**ID documents (KYC identity slot)** - National ID, Passport or Driving Licence. Vendor picks the
+type and types number + expiry (expired = rejected); photo only (no PDF), colour, at least
+1000x600, not blurry/dark/washed out/low contrast, no big glare. Stored in vendor_kyc_documents
+(id_kind, id_number, id_expires_on, auto_checks; migration 140). Admin must tick 5 identity
+checks (type, details match, readable, corners/not a screen or copy, no tampering) before Accept;
+the server refuses otherwise and never accepts an expired document. Phones reach it via
+Account > Identity & Business Verification.
+
+**Admin product view** - photos open in a viewer (arrows/keys/swipe) with Download and Share;
+Download all photos. Vendor products are view-only for admin (server `canEditProduct` refuses;
+Edit/Stock greyed out; Save shown disabled). Staff products keep Edit.
+
+**OCR on ID documents (done)** - Tesseract.js 5.1.1 self-hosted in `client/vendor-lib/tesseract`
+(no outside CDN), run in the browser by `client/js/lz-id-ocr.js`. Reads the document type, the
+expiry date (machine-readable zone, trusted only when its check digit adds up; otherwise the date
+after an "expiry" label) and looks for the typed number; sideways photos are turned and re-read.
+Rejects: not an ID / unreadable, expired, typed expiry that contradicts the verified MRZ (server
+enforces the last two from the summary too). Softer mismatches go to admin as notes. Admin can
+re-read the stored photo ("Read document text", `/api/admin/vendors/:id/kyc/documents/file`).
+If OCR can't run on a device, upload continues with the photo checks + admin review.
+
 ## DONE (Sept 2026): per-variant prices, phone layout on computers, admin read-only product view
 
 **Per-variant prices** (migration 138, `product_variants.vendor_payout`): vendors enter an

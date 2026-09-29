@@ -48,7 +48,8 @@ const VM_NAV_FALLBACK = {
     "ads": "account",
     "ads-create": "account",
     "promo-monitoring": "account",
-    "desk": "account"
+    "desk": "account",
+    "verification": "account"
 };
 
 // --- More tools (computers) -------------------------------------------------
@@ -82,6 +83,13 @@ function vmOpenDeskTab(tab) {
 }
 window.vmOpenDeskTab = vmOpenDeskTab;
 
+function vmLoadVerification() {
+    const panel = document.getElementById("vendor-kyc-panel");
+    const host = document.getElementById("vm-verification-host");
+    if (panel && host && panel.parentElement !== host) host.appendChild(panel);
+    if (typeof loadVendorKyc === "function") loadVendorKyc();
+}
+
 function vmDeskToolsCard() {
     const chev = '<span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>';
     const rows = Object.keys(VM_DESK_TABS).filter(t => document.getElementById(`tab-${t}`)).map(t =>
@@ -110,6 +118,7 @@ function vmShowScreen(name, opts) {
         vmNavStack = [name];
     }
 
+    if (name === "verification") vmLoadVerification();
     if (name === "home") vmLoadHome();
     if (name === "orders") vmLoadOrders();
     if (name === "products") vmLoadProducts();
@@ -2306,6 +2315,11 @@ function vmRenderProfile(v, notices) {
     const noticesCard = `<div class="vm-card"><div class="vm-card-title">Notices</div>${notices.length === 0 ? '<div style="font-size:12.5px; color:#888;">No notices on your account.</div>' : notices.map(vmNoticeCard).join("")}</div>`;
 
     const moreCard = `<div class="vm-card" style="padding:4px 16px;">
+        <button class="vm-list-row" onclick="vmShowScreen('verification')">
+            <span class="vm-list-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="12" r="2.5"/><path d="M14 10h4M14 14h3"/></svg></span>
+            <span class="vm-list-row-label">Identity &amp; Business Verification</span>
+            <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
+        </button>
         <button class="vm-list-row" onclick="vmShowScreen('promotions')">
             <span class="vm-list-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 13v-2Z"/><path d="M11.6 16.8 13 21h-3l-1.4-4.8"/></svg></span>
             <span class="vm-list-row-label">Promotions</span>

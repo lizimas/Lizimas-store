@@ -556,6 +556,13 @@
         <div id="vm-profile-body"><div class="vm-loading-state">Loading...</div></div>
     </div>
 
+    <!-- Identity & Business Verification (phones and computers): the KYC
+         panel from the overview is moved in here when this screen opens. -->
+    <div class="vm-screen" id="vm-screen-verification">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Identity &amp; Business Verification</span></div>
+        <div class="vendor-desktop-shell vm-desk-frame"><main id="vm-verification-host" class="admin-main vm-desk-host"></main></div>
+    </div>
+
     <!-- More tools (computers): sections the phone app has no screen for,
          shown inside the same phone-style frame (vmOpenDeskTab). -->
     <div class="vm-screen" id="vm-screen-desk">
@@ -864,8 +871,8 @@
                             </div>
 
                             <div class="hidden" id="vendor-kyc-natid-group">
-                                <label style="font-size:13px; font-weight:600; color:#333;">National ID Number</label>
-                                <input type="text" id="vendor-kyc-natid" placeholder="For identity verification (KYC)" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                <label style="font-size:13px; font-weight:600; color:#333;">Identity Document Number <span style="font-weight:400; color:#888;">(filled in from your uploaded document)</span></label>
+                                <input type="text" id="vendor-kyc-natid" placeholder="As printed on your National ID, Passport or Driving Licence" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                             </div>
 
                             <label style="font-size:13px; display:flex; align-items:center; gap:8px;">
@@ -1154,7 +1161,7 @@
                                 <h4>Images</h4>
                                 <div class="field-row">
                                     <div>
-                                        <label style="font-size:13px; font-weight:600; color:#333;">Photos <span style="font-weight:400; color:#888;">(at least 3 recommended — clear, well lit, no watermarks)</span></label>
+                                        <label style="font-size:13px; font-weight:600; color:#333;">Photos <span style="font-weight:400; color:#888;">(at least 3 required — each at least 800×800 pixels and under 5MB; sharp, well lit, plain background, no watermarks)</span></label>
                                         <div class="drag-drop-zone" id="product-image-dropzone">
                                             Drag &amp; drop images here, or click to browse
                                         </div>
@@ -1889,14 +1896,16 @@
     <script src="../js/seller-panel.js?v=1"></script>
     <script src="../js/photo-crop.js?v=1"></script>
     <script src="../js/prepare-picked-file.js?v=10"></script>
+    <script src="../js/lz-image-checks.js?v=2"></script>
+    <script src="../js/lz-id-ocr.js?v=2"></script>
     <script src="../js/lz-table.js?v=6"></script>
     <script src="../js/lz-spec-tools.js?v=2"></script>
     <script src="../js/description-block-editor.js?v=20"></script>
     <script src="../js/lz-package-size.js?v=3"></script>
     <script src="../js/lz-text-counter.js?v=1"></script>
-    <script src="../js/vendor-dashboard.js?v=30"></script>
+    <script src="../js/vendor-dashboard.js?v=33"></script>
     <script src="../js/vendor-statements.js?v=4"></script>
-<script src="../js/vendor-mobile.js?v=14"></script>
+<script src="../js/vendor-mobile.js?v=15"></script>
 <script src="../js/vendor-products.js?v=3"></script>
 <script src="../js/vendor-consignments.js?v=1"></script>
 <script src="../js/vendor-promo-monitor.js?v=2"></script>

@@ -83,7 +83,7 @@ function isValidKycDocumentType(type) {
 }
 
 const KYC_DOCUMENT_LABELS = {
-    national_id: "National ID",
+    national_id: "Identity Document (National ID, Passport or Driving Licence)",
     business_registration: "Business Registration",
     bank_certificate: "Bank Certificate",
     tax_certificate: "Tax Certificate (TIN)",

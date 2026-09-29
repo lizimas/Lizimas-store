@@ -110,20 +110,22 @@
         let imgs = d.images.map((im) => ({ src: im.image_path, colour: colourName[im.color_id] }));
         if (!imgs.length) imgs = [p.image, p.card_image, p.hover_image].filter(Boolean)
             .filter((v, i, a) => a.indexOf(v) === i).map((src) => ({ src }));
+        d._photos = imgs.map((im, i) => ({ type: "image", src: im.src, label: `Photo ${i + 1}${i === 0 ? " (main)" : ""}${im.colour ? " - " + im.colour : ""}` }));
         const grid = imgs.length
             ? `<div class="drag-drop-preview-grid apv-images">${imgs.map((im, i) => `
-                <a href="${esc(im.src)}" target="_blank" rel="noopener" class="apv-img" title="Open full size">
+                <button type="button" class="apv-img" data-apv-open="${i}" title="View photo ${i + 1}">
                     <img src="${esc(im.src)}" alt="Photo ${i + 1}" loading="lazy">
                     ${i === 0 ? '<span class="apv-img-tag">Main</span>' : ""}
                     ${im.colour ? `<span class="apv-img-colour">${esc(im.colour)}</span>` : ""}
-                </a>`).join("")}</div>`
+                </button>`).join("")}</div>`
             : '<div class="apv-value apv-empty">No photos uploaded</div>';
         return `<div class="product-form-section">
             <h4>Images</h4>
             <div class="field-row">
                 <div>
-                    <label style="${LABEL}">Photos <span style="${HINT}">(${imgs.length} uploaded)</span></label>
+                    <label style="${LABEL}">Photos <span style="${HINT}">(${imgs.length} uploaded &middot; click a photo to view, download or share it)</span></label>
                     ${grid}
+                    ${imgs.length ? '<div class="apv-media-actions"><button type="button" class="apv-btn apv-plain" data-apv-dlall>Download all photos</button></div>' : ""}
                 </div>
             </div>
         </div>`;
@@ -183,9 +185,131 @@
         </label>`;
     }
 
+    // Watermarks and people in photos need a human eye (no AI service yet):
+    // admin ticks both before a vendor product can be approved.
+    function manualChecks(d) {
+        const p = d.product;
+        if (!p.vendor_id || p.status !== "pending") return "";
+        return `<div class="apv-manual" id="apv-manual">
+            <div class="apv-manual-title">Manual photo checks <span>(the system can't detect these automatically - tick both before approving)</span></div>
+            <label><input type="checkbox" data-apv-check> No watermarks, logos or text stamped on any photo</label>
+            <label><input type="checkbox" data-apv-check> Any person in the photos suits the product (e.g. a model wearing clothing) - otherwise no people</label>
+        </div>`;
+    }
+
+    function footer(d) {
+        const p = d.product;
+        if (p.vendor_id) {
+            return `<div class="apv-edit-row">
+                <button type="button" class="apv-btn apv-save" disabled title="Vendor products are view-only for admin">Save changes</button>
+                <span class="apv-muted">Vendor products are view-only - admin can approve, reject or restrict them, but only the vendor can change them.</span>
+            </div>`;
+        }
+        return `<div class="apv-edit-row">
+            <button type="button" class="apv-btn apv-edit" data-apv-edit>Edit product</button>
+            <span class="apv-muted">Staff product - you can edit and save it.</span>
+        </div>`;
+    }
+
+    // --- Photo viewer ------------------------------------------------------
+    function cloudinaryAttachment(url) {
+        return /res\.cloudinary\.com\/.+\/upload\//.test(url) ? url.replace("/upload/", "/upload/fl_attachment/") : null;
+    }
+    function fileName(item, i, productName) {
+        const base = String(productName || "product").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").slice(0, 40) || "product";
+        const ext = (String(item.src).split("?")[0].match(/\.(jpe?g|png|webp|gif|mp4|webm|mov)$/i) || [, item.type === "video" ? "mp4" : "jpg"])[1];
+        return `${base}-${item.type === "video" ? "video" : "photo"}-${i + 1}.${ext}`;
+    }
+    async function downloadItem(item, i, productName) {
+        const name = fileName(item, i, productName);
+        const direct = cloudinaryAttachment(item.src);
+        try {
+            if (direct) {
+                const a = document.createElement("a"); a.href = direct; a.download = name; a.rel = "noopener";
+                document.body.appendChild(a); a.click(); a.remove(); return;
+            }
+            const r = await fetch(item.src, { mode: "cors" });
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            const url = URL.createObjectURL(await r.blob());
+            const a = document.createElement("a"); a.href = url; a.download = name;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 4000);
+        } catch (e) {
+            window.open(item.src, "_blank", "noopener");
+        }
+    }
+    async function shareItem(item, title, note) {
+        try {
+            if (navigator.share) { await navigator.share({ title, text: title, url: item.src }); return; }
+        } catch (e) { if (e && e.name === "AbortError") return; }
+        try { await navigator.clipboard.writeText(item.src); note("Link copied - paste it wherever you need it."); }
+        catch (e) { window.prompt("Copy this link:", item.src); }
+    }
+
+    function openViewer(items, start, productName) {
+        if (!items.length) return;
+        let i = Math.max(0, Math.min(items.length - 1, start));
+        const v = document.createElement("div");
+        v.className = "apv-viewer"; v.setAttribute("role", "dialog"); v.setAttribute("aria-label", "Photo viewer");
+        v.innerHTML = `
+            <div class="apv-viewer-top">
+                <span class="apv-viewer-count"></span>
+                <div class="apv-viewer-actions">
+                    <button type="button" class="apv-btn apv-plain" data-v="download">Download</button>
+                    <button type="button" class="apv-btn apv-plain" data-v="share">Share</button>
+                    <button type="button" class="apv-close" data-v="close" aria-label="Close viewer">&times;</button>
+                </div>
+            </div>
+            <div class="apv-viewer-stage">
+                <button type="button" class="apv-nav apv-prev" data-v="prev" aria-label="Previous">&#8249;</button>
+                <div class="apv-viewer-media"></div>
+                <button type="button" class="apv-nav apv-next" data-v="next" aria-label="Next">&#8250;</button>
+            </div>
+            <div class="apv-viewer-caption"></div>
+            <div class="apv-viewer-note" aria-live="polite"></div>`;
+        document.body.appendChild(v);
+        const media = v.querySelector(".apv-viewer-media");
+        const note = (t) => { const n = v.querySelector(".apv-viewer-note"); n.textContent = t; setTimeout(() => { n.textContent = ""; }, 3000); };
+        function show() {
+            const it = items[i];
+            media.innerHTML = it.type === "video"
+                ? `<video src="${esc(it.src)}" controls playsinline></video>`
+                : `<img src="${esc(it.src)}" alt="${esc(it.label)}">`;
+            v.querySelector(".apv-viewer-count").textContent = `${i + 1} / ${items.length}`;
+            v.querySelector(".apv-viewer-caption").textContent = it.label || "";
+            v.querySelector(".apv-prev").disabled = items.length < 2;
+            v.querySelector(".apv-next").disabled = items.length < 2;
+        }
+        const go = (step) => { i = (i + step + items.length) % items.length; show(); };
+        const shut = () => { v.remove(); document.removeEventListener("keydown", key, true); };
+        function key(e) {
+            if (e.key === "ArrowRight") { go(1); e.preventDefault(); }
+            else if (e.key === "ArrowLeft") { go(-1); e.preventDefault(); }
+            else if (e.key === "Escape") { shut(); e.stopPropagation(); e.preventDefault(); }
+        }
+        document.addEventListener("keydown", key, true);
+        v.addEventListener("click", (e) => {
+            const b = e.target.closest("[data-v]");
+            if (!b) { if (e.target === v || e.target.classList.contains("apv-viewer-stage")) shut(); return; }
+            const a = b.dataset.v;
+            if (a === "next") go(1); else if (a === "prev") go(-1); else if (a === "close") shut();
+            else if (a === "download") downloadItem(items[i], i, productName);
+            else if (a === "share") shareItem(items[i], `${productName} - ${items[i].label}`, note);
+        });
+        let x0 = null;
+        v.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+        v.addEventListener("touchend", (e) => {
+            if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null;
+            if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
+        });
+        show();
+        v.querySelector('[data-v="next"]').focus();
+    }
+
     function close() {
         const el = document.getElementById("apv-overlay");
         if (el) el.remove();
+        document.querySelectorAll(".apv-viewer").forEach((x) => x.remove());
         document.body.classList.remove("apv-open");
         document.removeEventListener("keydown", onKey);
     }
@@ -243,6 +367,8 @@
                 </div>
                 <div class="panel apv-panel">${variantsSection(d)}</div>
                 ${p.rejection_reason ? `<div class="panel apv-panel"><h4 style="margin-top:0;">Rejection reason</h4><div class="apv-value apv-multiline">${esc(p.rejection_reason)}</div></div>` : ""}
+                <div class="panel apv-panel">${footer(d)}</div>
+                ${manualChecks(d)}
                 ${canDecide ? `<div class="apv-foot">${actions}</div>` : ""}
             </div>`;
         overlay.querySelectorAll(".apv-close").forEach((b) => { b.onclick = close; });
@@ -255,6 +381,49 @@
             };
         });
 
+        // Photo viewer: product photos, then any photos/videos in the description blocks.
+        const blockMedia = [];
+        const isEmbed = (u) => /youtube\.com|youtu\.be|vimeo\.com/i.test(u || "");
+        d.blocks.forEach((b) => {
+            if (b.type === "image" && b.image_url) blockMedia.push({ type: "image", src: b.image_url, label: "Description photo" });
+            if (b.type === "video" && b.image_url && !isEmbed(b.image_url)) blockMedia.push({ type: "video", src: b.image_url, label: "Description video" });
+            if (b.type === "grid") {
+                let pl = b.payload; if (typeof pl === "string") { try { pl = JSON.parse(pl); } catch (e) { pl = {}; } }
+                ((pl && pl.items) || []).forEach((it) => {
+                    if (it.image_url) blockMedia.push({ type: "image", src: it.image_url, label: "Description photo" });
+                    if (it.video_url && !isEmbed(it.video_url)) blockMedia.push({ type: "video", src: it.video_url, label: "Description video" });
+                });
+            }
+        });
+        const media = (d._photos || []).concat(blockMedia);
+        overlay.querySelectorAll("[data-apv-open]").forEach((b) => {
+            b.onclick = () => openViewer(media, Number(b.dataset.apvOpen), p.name);
+        });
+        const dlAll = overlay.querySelector("[data-apv-dlall]");
+        if (dlAll) dlAll.onclick = async () => {
+            dlAll.disabled = true;
+            for (let k = 0; k < (d._photos || []).length; k++) { await downloadItem(d._photos[k], k, p.name); await new Promise((r) => setTimeout(r, 600)); }
+            dlAll.disabled = false;
+        };
+        const editBtn = overlay.querySelector("[data-apv-edit]");
+        if (editBtn) editBtn.onclick = () => {
+            close();
+            if (typeof adminProducts !== "undefined" && !adminProducts.find((x) => x.id === p.id)) adminProducts.push(p);
+            const tab = document.querySelector('.tab-btn[data-tab="products"]');
+            if (tab) tab.click();
+            if (typeof editProduct === "function") editProduct(p.id);
+            const form = document.getElementById("product-form-container");
+            if (form && form.scrollIntoView) form.scrollIntoView({ behavior: "smooth", block: "start" });
+        };
+        // Approve waits for the manual photo checks.
+        const checks = overlay.querySelectorAll("[data-apv-check]");
+        const approveBtns = overlay.querySelectorAll('[data-apv="approve"]');
+        const syncApprove = () => {
+            const done = [...checks].every((c) => c.checked);
+            approveBtns.forEach((b) => { b.disabled = !done; b.title = done ? "" : "Tick the manual photo checks first"; });
+        };
+        if (checks.length) { checks.forEach((c) => { c.onchange = syncApprove; }); syncApprove(); }
+
         const blocksHost = document.getElementById("apv-blocks");
         if (blocksHost && d.blocks.length) {
             const mount = document.createElement("div");
@@ -266,5 +435,6 @@
     }
 
     window.openAdminProductView = open;
+    window.openAdminMediaViewer = openViewer;
     window.closeAdminProductView = close;
 })();
