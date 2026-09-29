@@ -371,7 +371,7 @@ exports.canEditProduct = canEditProduct;
 const VENDOR_PRODUCT_READ_ONLY = "This is a vendor's product - admin can view it (and approve, reject or restrict it) but not change it. Ask the vendor to make changes.";
 async function canEditProduct(user, productId) {
     const row = (await pool.query(
-        `SELECT created_by, vendor_id FROM products WHERE id = $1 AND deleted_at IS NULL`,
+        `SELECT created_by, vendor_id, status FROM products WHERE id = $1 AND deleted_at IS NULL`,
         [productId]
     )).rows[0];
     if (["admin", "admin_staff"].includes(user.role)) {
@@ -380,6 +380,10 @@ async function canEditProduct(user, productId) {
         if (user.role === "admin") return { allowed: true };
     }
     if (!row) return { allowed: false, status: 404, error: "Product not found." };
+    if (row.status === "under_investigation") {
+        return { allowed: false, status: 403,
+            error: "This product is under review by Lizimas Store and can't be changed right now. We'll contact you if we need anything." };
+    }
     if (Number(row.created_by) !== Number(user.userId)) {
         return { allowed: false, status: 403,
             error: "You can only edit products you created. Ask the owner or an admin." };
@@ -1178,6 +1182,9 @@ exports.updateProduct = async (req, res) => {
         }
 
         const statusClause = ["product_staff", "vendor", "vendor_staff"].includes(req.user.role) ? `, status='pending'` : "";
+        const prevStatus = statusClause
+            ? ((await pool.query("SELECT status FROM products WHERE id = $1", [id])).rows[0] || {}).status
+            : null;
 
         // Only a vendor re-running the commission engine touches the pricing
         // snapshot columns - a staff/admin edit (even of a vendor's product)
@@ -1230,6 +1237,13 @@ exports.updateProduct = async (req, res) => {
         }
 
         const product = await pool.query(updateQuery, params);
+        // Approval history: a seller's edit sends it back for review.
+        if (product.rows[0] && prevStatus && prevStatus !== "pending" && prevStatus !== "draft") {
+            require("./productReviewController").recordEvent(pool, Number(id), {
+                action: prevStatus === "changes_requested" ? "resubmitted" : "edited", from: prevStatus, to: "pending",
+                actorId: req.user.userId, actorName: req.user.name || null, actorRole: req.user.role
+            }).catch((e) => console.warn("review history:", e.message));
+        }
         // Variants follow the product (migration 138): ones without their own
         // payout sell at the product price; ones with a payout are re-priced
         // with the product's (possibly new) commission rate.
@@ -1891,6 +1905,8 @@ exports.approveProduct = async (req, res) => {
             return res.status(404).json({ error: "Product not found." });
         }
         logActivity(req.user.userId, "approved_product", "product", Number(id), `Approved "${result.rows[0].name}"`);
+        require("./productReviewController").recordEvent(pool, Number(id), { action: "approve", to: "approved",
+            actorId: req.user.userId, actorRole: req.user.role }).catch(() => {});
         if (result.rows[0].vendor_id) {
             await createVendorNotification(result.rows[0].vendor_id, "product_approved", {
                 productName: result.rows[0].name
@@ -1918,6 +1934,8 @@ exports.rejectProduct = async (req, res) => {
             return res.status(404).json({ error: "Product not found." });
         }
         logActivity(req.user.userId, "rejected_product", "product", Number(id), `Rejected "${result.rows[0].name}"${reason ? `: ${reason}` : ""}`);
+        require("./productReviewController").recordEvent(pool, Number(id), { action: "reject", to: "rejected", reasonText: reason,
+            actorId: req.user.userId, actorRole: req.user.role }).catch(() => {});
         if (result.rows[0].vendor_id) {
             await createVendorNotification(result.rows[0].vendor_id, "product_rejected", {
                 productName: result.rows[0].name,

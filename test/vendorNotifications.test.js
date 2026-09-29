@@ -7,17 +7,19 @@ const {
     buildNotification
 } = require("../server/utils/vendorNotifications.js");
 
-test("NOTIFICATION_TYPES has exactly the eleven known types", () => {
+test("NOTIFICATION_TYPES has exactly the twelve known types", () => {
     // Pre-existing drift found while running the full suite for Phase 5-8/
     // Beat 2-3 (Sept 2026): kyc_status_change was added to the source list
     // when vendor KYC Stage 2 shipped (migration 088) but this test was
     // never updated to match - unrelated to that work, fixed here.
     // consignment_status added with Fulfillment-by-Lizimas (migration 110).
     // ad_campaign_status added with Advertise Your Products (migration 112).
+    // product_review (changes requested / under investigation) added with the
+    // Product Approval page (migration 141, which also fixes the DB CHECK).
     assert.deepEqual(NOTIFICATION_TYPES, [
         "new_order", "low_stock", "product_approved", "product_rejected",
         "compliance_action", "payout_update", "refund_decision", "admin_message",
-        "kyc_status_change", "consignment_status", "ad_campaign_status"
+        "kyc_status_change", "consignment_status", "ad_campaign_status", "product_review"
     ]);
 });
 
@@ -98,4 +100,14 @@ test("buildNotification: admin_message includes the thread subject when given", 
 
 test("buildNotification: unknown type returns null", () => {
     assert.equal(buildNotification("not_a_real_type", {}), null);
+});
+
+test("product_review: changes requested and under investigation", () => {
+    const { buildNotification } = require("../server/utils/vendorNotifications");
+    const c = buildNotification("product_review", { productName: "Flask", kind: "changes", reason: "Upload bigger photos." });
+    assert.equal(c.title, "Changes requested");
+    assert.match(c.message, /Flask needs changes.*Upload bigger photos\..*resubmit/);
+    const i = buildNotification("product_review", { productName: "Flask", kind: "investigation" });
+    assert.equal(i.title, "Product under review");
+    assert.equal(i.linkTab, "products");
 });

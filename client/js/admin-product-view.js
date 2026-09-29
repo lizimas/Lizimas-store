@@ -185,18 +185,6 @@
         </label>`;
     }
 
-    // Watermarks and people in photos need a human eye (no AI service yet):
-    // admin ticks both before a vendor product can be approved.
-    function manualChecks(d) {
-        const p = d.product;
-        if (!p.vendor_id || p.status !== "pending") return "";
-        return `<div class="apv-manual" id="apv-manual">
-            <div class="apv-manual-title">Manual photo checks <span>(the system can't detect these automatically - tick both before approving)</span></div>
-            <label><input type="checkbox" data-apv-check> No watermarks, logos or text stamped on any photo</label>
-            <label><input type="checkbox" data-apv-check> Any person in the photos suits the product (e.g. a model wearing clothing) - otherwise no people</label>
-        </div>`;
-    }
-
     function footer(d) {
         const p = d.product;
         if (p.vendor_id) {
@@ -209,6 +197,61 @@
             <button type="button" class="apv-btn apv-edit" data-apv-edit>Edit product</button>
             <span class="apv-muted">Staff product - you can edit and save it.</span>
         </div>`;
+    }
+
+
+    // --- Product Approval layout (Sept 2026) -------------------------------
+    function descriptionSection(d) {
+        const p = d.product;
+        return `<section class="pr-sec" id="pr-description">
+            <h4>4. Description</h4>
+            ${field("Description", p.description, { multiline: true, empty: "No description provided" })}
+            <div style="margin-top:14px;">
+                <label style="${LABEL} display:block; margin-bottom:4px;">Rich content <span style="${HINT}">(blocks shown below the description on the product page)</span></label>
+                <div id="apv-blocks" class="apv-blocks-frame">${d.blocks.length ? "" : '<div class="apv-value apv-empty">No description blocks added</div>'}</div>
+            </div>
+        </section>`;
+    }
+
+    function specsReview(d) {
+        const p = d.product;
+        const attrs = [["Brand", p.brand], ["Material", p.material], ["Colour", p.color], ["Model", p.model], ["Origin", p.origin],
+            ["Product weight", has(p.product_weight_kg) ? num(p.product_weight_kg) + " kg" : ""],
+            ["Warranty", has(p.warranty_months) ? p.warranty_months + " months" : ""], ["GTIN / barcode", p.gtin], ["MPN", p.mpn]]
+            .filter(([, v]) => has(v));
+        const rows = attrs.map(([k, v]) => ({ label: k, value: v })).concat(d.specs.filter((x) => has(x.label) || has(x.value)));
+        const missing = ["Material", "Colour"].filter((k) => !attrs.some(([a]) => a === k) && !d.specs.some((x) => String(x.label).toLowerCase() === k.toLowerCase()));
+        return `<section class="pr-sec" id="pr-specs">
+            <h4>5. Specifications</h4>
+            ${rows.length ? `<div class="apv-specs">${rows.map((x) => `
+                <div class="apv-spec-row"><div class="apv-value">${esc(x.label)}</div><div class="apv-value">${esc(x.value)}</div></div>`).join("")}</div>`
+                : '<div class="apv-value apv-empty">No specifications added</div>'}
+            ${missing.length ? `<p class="apv-note" style="margin-top:8px;">Not filled in: ${esc(missing.join(", "))}</p>` : ""}
+        </section>`;
+    }
+
+    function stockSection(d) {
+        const p = d.product;
+        const packVal = (v) => has(v) ? `<div class="apv-value">${esc(num(v))}</div>` : `<div class="apv-value apv-empty">-</div>`;
+        const v = variantsSection(d).replace('<div class="product-form-section">', "<div>").replace(/<h4>Variants[\s\S]*?<\/h4>/, "");
+        return `<section class="pr-sec" id="pr-stock">
+            <h4>6. Stock &amp; variants</h4>
+            <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                ${field("Quantity available", has(p.stock) ? String(p.stock) : "", { flex: true })}
+                ${field("Fulfilment", p.fulfillment_type ? String(p.fulfillment_type).replace(/_/g, " ") : "", { flex: true })}
+            </div>
+            <div class="lz-pack" style="margin-top:12px;">
+                <div class="lz-pack-title">Packed weight &amp; size</div>
+                <div class="lz-pack-grid">
+                    <label class="lz-pack-field"><span>Weight (kg)</span>${packVal(p.weight_kg)}</label>
+                    <label class="lz-pack-field"><span>Length (cm)</span>${packVal(p.length_cm)}</label>
+                    <label class="lz-pack-field"><span>Width (cm)</span>${packVal(p.width_cm)}</label>
+                    <label class="lz-pack-field"><span>Height (cm)</span>${packVal(p.height_cm)}</label>
+                </div>
+                ${has(p.package_size) ? `<p class="lz-pack-note">Delivery size: <strong>${esc(p.package_size)}</strong></p>` : ""}
+            </div>
+            <div style="margin-top:12px;">${v}</div>
+        </section>`;
     }
 
     // --- Photo viewer ------------------------------------------------------
@@ -339,47 +382,81 @@
             return;
         }
         const p = d.product;
-        const who = p.vendor_id
-            ? `<span class="apv-badge" style="background:#EEF2FF; color:#3730A3;">VENDOR</span> ${esc(p.vendor_business_name || p.submitted_by_name || "Vendor")}`
-            : `${esc(p.submitted_by_name || "Staff")} (staff)`;
-        const when = p.created_at ? new Date(p.created_at).toLocaleString() : "";
-        const canDecide = p.status === "pending" && opts.actions !== false;
-        const actions = canDecide ? `
-            <button type="button" class="apv-btn apv-approve" data-apv="approve">Approve</button>
-            <button type="button" class="apv-btn apv-reject" data-apv="reject">Reject</button>` : "";
+        let r = null, m = null;
+        if (window.LzReview) {
+            try { [r, m] = await Promise.all([authorizedFetch(`/api/admin/product-reviews/${encodeURIComponent(id)}`), window.LzReview.meta()]); }
+            catch (e) { r = null; }
+            if (r && r.error) r = null;
+            if (!document.getElementById("apv-overlay")) return;
+        }
+        const reopen = (anchor) => open(id, Object.assign({}, opts, { anchor }));
 
-        overlay.innerHTML = `
-            <div class="apv-bar">
-                <div class="apv-bar-title">${esc(p.name)} ${statusBadge(p)}</div>
-                <div class="apv-bar-actions">${actions}<button type="button" class="apv-close" aria-label="Close">&times;</button></div>
-            </div>
-            <div class="apv-body">
-                <div class="apv-sub">Submitted by ${who}${when ? ` &middot; ${esc(when)}` : ""} &middot; Product ID ${esc(p.id)}${p.lizimas_sku ? ` &middot; Lizimas SKU ${esc(p.lizimas_sku)}` : ""}</div>
-                <div class="apv-readonly-note">View only &mdash; this is the product exactly as it was submitted. Nothing here can be edited.</div>
-                <div class="panel apv-panel">
-                    <div class="product-form-sections">
-                        ${basicSection(d)}
-                        ${pricingSection(d)}
-                        ${imagesSection(d)}
-                        ${specsSection(d)}
-                    </div>
-                    ${authenticity(d)}
+        if (r && m) {
+            r._created = p.created_at;
+            const L = window.LzReview;
+            const nav = [["pr-overview", "Overview"], ["pr-images", "Images"], ["pr-pricing", "Pricing"], ["pr-description", "Description"],
+                ["pr-specs", "Specs"], ["pr-stock", "Stock"], ["pr-seller", "Seller"], ["pr-compliance", "Checks"], ["pr-notes", "Notes"],
+                ["pr-history", "History"], ["pr-decide", "Decision"]];
+            overlay.innerHTML = `
+                <div class="apv-bar">
+                    <div class="apv-bar-title"><span class="pr-bar-label">Product Approval</span> ${L.badge(p.status, r.status_label)}</div>
+                    <div class="apv-bar-actions"><a href="#pr-decide" class="pr-btn pr-gold pr-jump">Decide</a><button type="button" class="apv-close" aria-label="Close">&times;</button></div>
                 </div>
-                <div class="panel apv-panel">${variantsSection(d)}</div>
-                ${p.rejection_reason ? `<div class="panel apv-panel"><h4 style="margin-top:0;">Rejection reason</h4><div class="apv-value apv-multiline">${esc(p.rejection_reason)}</div></div>` : ""}
-                <div class="panel apv-panel">${footer(d)}</div>
-                ${manualChecks(d)}
-                ${canDecide ? `<div class="apv-foot">${actions}</div>` : ""}
-            </div>`;
-        overlay.querySelectorAll(".apv-close").forEach((b) => { b.onclick = close; });
-        overlay.querySelectorAll("[data-apv]").forEach((b) => {
-            b.onclick = () => {
-                const act = b.dataset.apv;
-                close();
-                if (act === "approve" && typeof approvePendingProduct === "function") approvePendingProduct(p.id);
-                if (act === "reject" && typeof rejectPendingProduct === "function") rejectPendingProduct(p.id);
-            };
-        });
+                <nav class="pr-nav" aria-label="Review sections">${nav.map(([a, t]) => `<a href="#${a}">${t}</a>`).join("")}</nav>
+                <div class="apv-body pr-body">
+                    <div class="pr-layout">
+                        <div class="pr-main">
+                            ${L.overview(d, r, m)}
+                            <section class="pr-sec" id="pr-images">${imagesSection(d).replace('<div class="product-form-section">', "<div>").replace("<h4>Images</h4>", "<h4>2. Product images</h4>")}</section>
+                            ${L.pricing(d, r)}
+                            ${descriptionSection(d)}
+                            ${specsReview(d)}
+                            ${stockSection(d)}
+                            ${L.seller(r)}
+                            ${L.compliance(d, r, m)}
+                            ${authenticity(d)}
+                            <section class="pr-sec">${footer(d)}</section>
+                        </div>
+                        <aside class="pr-side">
+                            ${L.decision(d, r, m)}
+                            ${L.notes(r)}
+                            ${L.history(r, m)}
+                        </aside>
+                    </div>
+                </div>`;
+            overlay.querySelectorAll(".apv-close").forEach((b) => { b.onclick = close; });
+            overlay.querySelectorAll(".pr-nav a, .pr-jump").forEach((a) => {
+                a.onclick = (e) => { e.preventDefault(); const t = overlay.querySelector(a.getAttribute("href")); if (t) t.scrollIntoView({ behavior: "smooth", block: "start" }); };
+            });
+            L.wire(overlay, d, r, m, reopen);
+        } else {
+            const who = p.vendor_id
+                ? `<span class="apv-badge" style="background:#EEF2FF; color:#3730A3;">VENDOR</span> ${esc(p.vendor_business_name || p.submitted_by_name || "Vendor")}`
+                : `${esc(p.submitted_by_name || "Staff")} (staff)`;
+            const whenTxt = p.created_at ? new Date(p.created_at).toLocaleString() : "";
+            overlay.innerHTML = `
+                <div class="apv-bar">
+                    <div class="apv-bar-title">${esc(p.name)} ${statusBadge(p)}</div>
+                    <div class="apv-bar-actions"><button type="button" class="apv-close" aria-label="Close">&times;</button></div>
+                </div>
+                <div class="apv-body">
+                    <div class="apv-sub">Submitted by ${who}${whenTxt ? ` &middot; ${esc(whenTxt)}` : ""} &middot; Product ID ${esc(p.id)}${p.lizimas_sku ? ` &middot; Lizimas SKU ${esc(p.lizimas_sku)}` : ""}</div>
+                    <div class="apv-readonly-note">View only &mdash; this is the product exactly as it was submitted. Nothing here can be edited.</div>
+                    <div class="panel apv-panel">
+                        <div class="product-form-sections">
+                            ${basicSection(d)}
+                            ${pricingSection(d)}
+                            ${imagesSection(d)}
+                            ${specsSection(d)}
+                        </div>
+                        ${authenticity(d)}
+                    </div>
+                    <div class="panel apv-panel">${variantsSection(d)}</div>
+                    ${p.rejection_reason ? `<div class="panel apv-panel"><h4 style="margin-top:0;">Rejection reason</h4><div class="apv-value apv-multiline">${esc(p.rejection_reason)}</div></div>` : ""}
+                    <div class="panel apv-panel">${footer(d)}</div>
+                </div>`;
+            overlay.querySelectorAll(".apv-close").forEach((b) => { b.onclick = close; });
+        }
 
         // Photo viewer: product photos, then any photos/videos in the description blocks.
         const blockMedia = [];
@@ -415,15 +492,6 @@
             const form = document.getElementById("product-form-container");
             if (form && form.scrollIntoView) form.scrollIntoView({ behavior: "smooth", block: "start" });
         };
-        // Approve waits for the manual photo checks.
-        const checks = overlay.querySelectorAll("[data-apv-check]");
-        const approveBtns = overlay.querySelectorAll('[data-apv="approve"]');
-        const syncApprove = () => {
-            const done = [...checks].every((c) => c.checked);
-            approveBtns.forEach((b) => { b.disabled = !done; b.title = done ? "" : "Tick the manual photo checks first"; });
-        };
-        if (checks.length) { checks.forEach((c) => { c.onchange = syncApprove; }); syncApprove(); }
-
         const blocksHost = document.getElementById("apv-blocks");
         if (blocksHost && d.blocks.length) {
             const mount = document.createElement("div");
@@ -432,6 +500,7 @@
             if (window.LzDescBlocks) window.LzDescBlocks.render(mount, d.blocks);
             else mount.innerHTML = '<div class="apv-value apv-empty">Description blocks could not be displayed.</div>';
         }
+        if (opts.anchor) { const t = document.getElementById(opts.anchor); if (t) t.scrollIntoView({ block: "start" }); }
     }
 
     window.openAdminProductView = open;

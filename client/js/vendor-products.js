@@ -36,7 +36,7 @@ let vpUsdRate = null; // UGX per USD, fetched when the vendor picks USD
 
 const VP_FILTER_GROUPS = [
     [["all", "All"]],
-    [["pending_qc", "Pending QC"], ["not_ready", "Not Ready To QC"], ["approved", "Approved"], ["rejected", "Rejected"]],
+    [["pending_qc", "Pending QC"], ["not_ready", "Not Ready To QC"], ["changes", "Changes Requested"], ["approved", "Approved"], ["rejected", "Rejected"]],
     [["active", "Active"], ["inactive", "Inactive"], ["deleted", "Deleted"]],
     [["live", "Live"], ["not_live", "Not Live"]],
     [["unauthorized", "Unauthorized"]],
@@ -49,6 +49,7 @@ const VP_TESTS = {
     not_ready: (f) => !f.deleted && f.notReady,
     approved: (f) => !f.deleted && f.approved,
     rejected: (f) => !f.deleted && f.rejected,
+    changes: (f) => !f.deleted && (f.changes || f.investigating),
     active: (f) => !f.deleted && f.active,
     inactive: (f) => !f.deleted && !f.active,
     deleted: (f) => f.deleted,
@@ -124,6 +125,8 @@ function vpFlags(p) {
     const notReady = (pending && missing.length > 0) || draft;
     const approved = p.status === "approved";
     const rejected = p.status === "rejected";
+    const changes = p.status === "changes_requested";      // admin asked for fixes - edit and save to resubmit
+    const investigating = p.status === "under_investigation"; // frozen while Lizimas checks it
     const active = p.is_active !== false;
     const unauthorized = !!p.admin_restricted;
     const inStock = Number(p.stock) > 0;
@@ -136,6 +139,8 @@ function vpFlags(p) {
         else if (notReady) reason = `Not ready for QC - add ${missing.join(", ")}`;
         else if (pending) reason = "Waiting for quality check (QC)";
         else if (rejected) reason = `Rejected in QC${p.rejection_reason ? ": " + p.rejection_reason : ""}`;
+        else if (changes) reason = `Changes requested${p.rejection_reason ? ": " + p.rejection_reason : ""} - edit and save to resubmit`;
+        else if (investigating) reason = "Under review by Lizimas Store - hidden and locked for now";
         else if (unauthorized) reason = "Restricted by Lizimas Store - contact support";
         else if (!active) reason = "Inactive - switch it on in the Active column";
         else if (!inStock) reason = "Quantity is 0 - add stock";
@@ -145,7 +150,9 @@ function vpFlags(p) {
     else if (notReady) qc = "Not Ready To QC";
     else if (pending) qc = "Pending QC";
     else if (rejected) qc = "Rejected";
-    return { deleted, pending, notReady, approved, rejected, active, unauthorized, inStock, live, pendingDeletion, reason, qc };
+    else if (changes) qc = "Changes Requested";
+    else if (investigating) qc = "Under Review";
+    return { deleted, pending, notReady, approved, rejected, changes, investigating, active, unauthorized, inStock, live, pendingDeletion, reason, qc };
 }
 
 function vpCount(key) {
@@ -532,7 +539,7 @@ function renderVendorProductsTable() {
 
     const body = pageRows.map((p) => {
         const f = vpFlags(p);
-        const qcCls = { "Pending QC": "vp-qc-wait", "Not Ready To QC": "vp-qc-warn", Draft: "vp-qc-warn", Rejected: "vp-qc-bad", Approved: "vp-qc-ok" }[f.qc];
+        const qcCls = { "Pending QC": "vp-qc-wait", "Not Ready To QC": "vp-qc-warn", Draft: "vp-qc-warn", "Changes Requested": "vp-qc-warn", "Under Review": "vp-qc-bad", Rejected: "vp-qc-bad", Approved: "vp-qc-ok" }[f.qc];
         const nameHtml = f.deleted
             ? `<span class="vp-name vp-name-deleted">${vpEsc(p.name)}</span>`
             : `<button type="button" class="vp-name" onclick="editVendorProduct(${Number(p.id)})">${vpEsc(p.name)}</button>`;
@@ -578,7 +585,7 @@ function vpMobileCard(p) {
             <div class="vpm-sku">Seller SKU: ${p.sku ? vpEsc(p.sku) : "&mdash;"}</div>
             <div class="vpm-sku">Lizimas SKU: ${p.lizimas_sku ? vpEsc(p.lizimas_sku) : "&mdash;"}</div>
             <div class="vpm-prices">${price}${p.subsidy_price ? ` <span class="vpm-subsidy">Subsidy ${vpMoney(p.subsidy_price)}</span>` : ""}</div>
-            <div class="vpm-meta"><span>Qty ${Number(p.stock) || 0}</span><span class="vp-qc ${{ "Pending QC": "vp-qc-wait", "Not Ready To QC": "vp-qc-warn", Draft: "vp-qc-warn", Rejected: "vp-qc-bad", Approved: "vp-qc-ok" }[f.qc]}">${f.qc}</span>${f.pendingDeletion ? '<span class="vp-qc vp-qc-warn">Pending Deletion</span>' : ""}</div>
+            <div class="vpm-meta"><span>Qty ${Number(p.stock) || 0}</span><span class="vp-qc ${{ "Pending QC": "vp-qc-wait", "Not Ready To QC": "vp-qc-warn", Draft: "vp-qc-warn", "Changes Requested": "vp-qc-warn", "Under Review": "vp-qc-bad", Rejected: "vp-qc-bad", Approved: "vp-qc-ok" }[f.qc]}">${f.qc}</span>${f.pendingDeletion ? '<span class="vp-qc vp-qc-warn">Pending Deletion</span>' : ""}</div>
             <div class="vpm-foot"><div>${vpVisibleCell(f, true)}</div><div class="vpm-active">${f.deleted ? '<span class="vp-muted">Deleted</span>' : `<span>Active</span>${vpActiveSwitch(p, f)}`}</div></div>
         </div>
     </div>`;

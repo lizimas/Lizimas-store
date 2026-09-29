@@ -7,7 +7,7 @@
 const NOTIFICATION_TYPES = [
     "new_order", "low_stock", "product_approved", "product_rejected",
     "compliance_action", "payout_update", "refund_decision", "admin_message",
-    "kyc_status_change", "consignment_status", "ad_campaign_status"
+    "kyc_status_change", "consignment_status", "ad_campaign_status", "product_review"
 ];
 
 // Matches the `stock < 10` threshold getVendorDashboardSummary already
@@ -48,6 +48,10 @@ function buildNotification(type, context = {}) {
                 message: `${context.productName} was rejected: ${context.reason}`,
                 linkTab: "products"
             };
+        case "product_review":
+            return context.kind === "investigation"
+                ? { title: "Product under review", message: `${context.productName} is being checked by Lizimas Store and is hidden from the store for now. We'll contact you if we need anything.`, linkTab: "products" }
+                : { title: "Changes requested", message: `${context.productName} needs changes before it can go live: ${context.reason || "see the product for details."} Edit and save it to resubmit.`, linkTab: "products" };
         case "compliance_action":
             return {
                 title: context.actionLabel,

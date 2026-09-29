@@ -317,6 +317,17 @@ router.get("/staff/:id/login-history", getLoginHistory);
 
 // Product approval workflow
 router.get("/products/pending", getPendingProducts);
+// Product Approval page (productReviewController.js).
+const productReview = require("../controllers/productReviewController");
+router.get("/product-reviews/meta", productReview.meta);
+router.get("/product-reviews", productReview.list);
+router.post("/product-reviews/bulk", productReview.bulk);
+router.get("/product-reviews/:id", productReview.detail);
+router.post("/product-reviews/:id/decision", productReview.decide);
+router.post("/product-reviews/:id/notes", productReview.addNote);
+router.put("/product-reviews/:id/flags", productReview.setFlags);
+router.post("/product-reviews/:id/market-price", productReview.addMarketPrice);
+router.put("/product-reviews/:id/cost", productReview.setCost);
 router.get("/products/:id/full", getProductFullView);
 router.patch("/products/:id/approve", approveProduct);
 router.patch("/products/:id/reject", rejectProduct);

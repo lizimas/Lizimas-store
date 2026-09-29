@@ -3390,6 +3390,8 @@ let pendingProductsCache = [];
 let pendingProductsFilter = "all"; // all | staff | vendor
 
 async function loadPendingProducts() {
+    // Product Approval page (admin-product-review.js) replaces the old list.
+    if (typeof prLoad === "function" && document.getElementById("pr-root")) return prLoad();
     try {
         pendingProductsCache = await authorizedFetch("/api/admin/products/pending") || [];
         renderPendingProductsFilter();
