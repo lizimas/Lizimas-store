@@ -25,7 +25,7 @@
             body: body ? JSON.stringify(body) : undefined
         });
         const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.error || `Request failed (${r.status})`);
+        if (!r.ok) throw new Error((d.error || `Request failed (${r.status})`) + (d.detail ? ` (${d.detail})` : ""));
         return d;
     }
 
@@ -68,7 +68,7 @@
             el.querySelector(".pr-results").innerHTML = `<p class="no-data">${esc(e.message)}</p>`;
             return;
         }
-        if (st.data.error) { el.querySelector(".pr-results").innerHTML = `<p class="no-data">${esc(st.data.error)}</p>`; return; }
+        if (st.data.error) { el.querySelector(".pr-results").innerHTML = `<p class="no-data">${esc(st.data.error)}${st.data.detail ? `<br><small>${esc(st.data.detail)}</small>` : ""}</p>`; return; }
         renderTabs(m); renderFilters(); renderResults(m);
     }
 
@@ -219,7 +219,7 @@
         } else if (!window.confirm(`Approve ${ids.length} product${ids.length === 1 ? "" : "s"} and put ${ids.length === 1 ? "it" : "them"} live?`)) return;
         try {
             const out = await call(`${API}/bulk`, "POST", body);
-            toast(out.message + (out.failed && out.failed.length ? ` ${out.failed.map((f) => f.error).filter(Boolean)[0] || ""}` : ""));
+            toast(out.message + (out.failed && out.failed.length ? ` ${out.failed.map((f) => f.error).filter(Boolean)[0] || ""}` : ""), out.failed && out.failed.length > 0);
             st.selected.clear();
             load();
         } catch (e) { toast(e.message, true); }
@@ -260,7 +260,7 @@
         t.setAttribute("role", "status");
         t.textContent = msg;
         document.body.appendChild(t);
-        setTimeout(() => t.remove(), 4200);
+        setTimeout(() => t.remove(), bad ? 12000 : 4200);
     }
 
     // ======================================================== REVIEW PAGE ==

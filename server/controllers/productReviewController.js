@@ -103,7 +103,7 @@ exports.list = async (req, res) => {
         });
     } catch (e) {
         console.error("product review list:", e);
-        res.status(500).json({ error: "Could not load products for review." });
+        res.status(500).json({ error: "Could not load products for review.", detail: e && e.message ? String(e.message).slice(0, 300) : undefined });
     }
 };
 
@@ -279,7 +279,7 @@ exports.detail = async (req, res) => {
         });
     } catch (e) {
         console.error("product review detail:", e);
-        res.status(500).json({ error: "Could not load the review details." });
+        res.status(500).json({ error: "Could not load the review details.", detail: e && e.message ? String(e.message).slice(0, 300) : undefined });
     }
 };
 
@@ -335,7 +335,7 @@ exports.decide = async (req, res) => {
         res.json({ message: `${out.name} - ${out.status_label}.`, ...out });
     } catch (e) {
         console.error("product review decision:", e);
-        res.status(500).json({ error: "Could not save the decision." });
+        res.status(500).json({ error: "Could not save the decision.", detail: e && e.message ? String(e.message).slice(0, 300) : undefined });
     }
 };
 
@@ -355,12 +355,12 @@ exports.bulk = async (req, res) => {
             try {
                 const out = await applyDecision(req.user, id, body, name);
                 (out.ok ? done : failed).push(out.ok ? { id, name: out.name } : { id, error: out.error });
-            } catch (e) { failed.push({ id, error: "Could not save" }); }
+            } catch (e) { console.error("bulk decision", id, e.message); failed.push({ id, error: "Could not save: " + String(e.message || "").slice(0, 200) }); }
         }
         res.json({ done: done.length, failed, message: `${done.length} product${done.length === 1 ? "" : "s"} ${body.action === "approve" ? "approved" : "rejected"}${failed.length ? `, ${failed.length} skipped` : ""}.` });
     } catch (e) {
         console.error("product review bulk:", e);
-        res.status(500).json({ error: "Bulk action failed." });
+        res.status(500).json({ error: "Bulk action failed.", detail: e && e.message ? String(e.message).slice(0, 300) : undefined });
     }
 };
 
@@ -379,7 +379,7 @@ exports.addNote = async (req, res) => {
         res.status(201).json(row);
     } catch (e) {
         console.error("product review note:", e);
-        res.status(500).json({ error: "Could not save the note." });
+        res.status(500).json({ error: "Could not save the note.", detail: e && e.message ? String(e.message).slice(0, 300) : undefined });
     }
 };
 
@@ -395,7 +395,7 @@ exports.setFlags = async (req, res) => {
         res.json({ flags: row.review_flags });
     } catch (e) {
         console.error("product review flags:", e);
-        res.status(500).json({ error: "Could not save the flags." });
+        res.status(500).json({ error: "Could not save the flags.", detail: e && e.message ? String(e.message).slice(0, 300) : undefined });
     }
 };
 
@@ -425,7 +425,7 @@ exports.addMarketPrice = async (req, res) => {
         res.status(201).json({ ...row, result: R.marketFlag(product.price, { lowest: row.lowest_price, typical: row.typical_price, highest: row.highest_price }) });
     } catch (e) {
         console.error("market price check:", e);
-        res.status(500).json({ error: "Could not save the prices." });
+        res.status(500).json({ error: "Could not save the prices.", detail: e && e.message ? String(e.message).slice(0, 300) : undefined });
     }
 };
 
@@ -445,6 +445,6 @@ exports.setCost = async (req, res) => {
         res.json({ cost_price: row.cost_price != null ? Number(row.cost_price) : null, margin: R.margin(row.price, row.cost_price) });
     } catch (e) {
         console.error("cost price:", e);
-        res.status(500).json({ error: "Could not save the cost price." });
+        res.status(500).json({ error: "Could not save the cost price.", detail: e && e.message ? String(e.message).slice(0, 300) : undefined });
     }
 };
