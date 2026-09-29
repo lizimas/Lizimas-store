@@ -1254,6 +1254,19 @@ function vdToggleProductImportPanel() {
     if (!panel.hidden) document.getElementById("vd-product-import-results").innerHTML = "";
 }
 
+// A ready-to-fill CSV with every column (one example row).
+function vdDownloadImportTemplate() {
+    const cols = ["name", "desired_payout", "stock", "description", "category", "images", "sku", "brand", "weight_kg", "length_cm", "width_cm", "height_cm",
+        "warranty_months", "gtin", "mpn", "material", "color", "sleeve", "style", "length", "fit", "pattern", "care_instructions", "occasion", "id"];
+    const example = ["Example product name", "50000", "10", "What it is, what's included", "", "https://example.com/photo1.jpg | https://example.com/photo2.jpg | https://example.com/photo3.jpg",
+        "", "", "0.5", "20", "15", "10", "", "", "", "", "", "", "", "", "", "", "", "", ""];
+    const csv = [cols, example].map(r => r.map(v => /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v).join(",")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const a = document.createElement("a"); a.href = url; a.download = "lizimas-products-template.csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
 function vdImportEsc(value) {
     return String(value == null ? "" : value)
         .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -1271,7 +1284,7 @@ async function vdUploadProductsCsv() {
 
     btn.disabled = true;
     btn.textContent = "Importing...";
-    resultsEl.innerHTML = '<p style="color:#666;">Uploading and importing - this can take a moment for large files...</p>';
+    resultsEl.innerHTML = '<p style="color:#666;">Uploading and importing - photo links are downloaded and checked one by one, so this can take a minute or two...</p>';
 
     try {
         const formData = new FormData();
@@ -1286,14 +1299,18 @@ async function vdUploadProductsCsv() {
             return;
         }
 
-        let html = `<p style="color:#16A34A; font-weight:600;">Import complete: ${data.created} created, ${data.updated} updated, ${data.skipped} skipped (${data.totalRows} rows total). New and changed listings are pending admin approval.</p>`;
-        if (data.errors && data.errors.length) {
-            html += '<div style="margin-top:8px; max-height:220px; overflow-y:auto; border:1px solid #eee; border-radius:6px; padding:8px;">';
-            html += data.errors.map(e =>
-                `<div style="padding:4px 0; border-bottom:1px solid #f2f2f2;"><b>Row ${e.row}</b> (${vdImportEsc(e.name || "")}): ${vdImportEsc((e.errors || []).join("; "))}</div>`
-            ).join("");
-            html += "</div>";
-        }
+        const drafts = data.drafts || [], problems = data.photo_problems || [], notes = data.photo_notes || [];
+        let html = `<p style="color:#16A34A; font-weight:600;">Import complete: ${data.created} created, ${data.updated} updated, ${data.skipped} skipped (${data.totalRows} rows total).</p>`
+            + `<p style="color:#555; margin:4px 0 0;">${vdImportEsc(data.message || "")}</p>`;
+        const box = (title, tone, items) => items.length
+            ? `<div style="margin-top:10px;"><div style="font-weight:700; color:${tone};">${title}</div><div style="margin-top:4px; max-height:220px; overflow-y:auto; border:1px solid #eee; border-radius:6px; padding:8px;">${items.join("")}</div></div>` : "";
+        const line = (row, name, text) => `<div style="padding:4px 0; border-bottom:1px solid #f2f2f2;"><b>Row ${row}</b> (${vdImportEsc(name || "")}): ${text}</div>`;
+        html += box("Rows skipped", "#DC2626", (data.errors || []).map(e => line(e.row, e.name, vdImportEsc((e.errors || []).join("; ")))));
+        html += box(`Saved as drafts - add photos and submit (${drafts.length})`, "#B45309", drafts.map(d => line(d.row, d.name, vdImportEsc(d.reason))));
+        html += box(`Photos not accepted (${problems.length})`, "#DC2626", problems.map(p => line(p.row, p.name,
+            `<span style="color:#666; word-break:break-all;">${vdImportEsc(p.link)}</span> - ${vdImportEsc((p.reasons || []).join("; "))}`)));
+        html += box("Photo notes", "#92400E", notes.map(n => line(n.row, n.name,
+            `<span style="color:#666; word-break:break-all;">${vdImportEsc(n.link)}</span> - ${vdImportEsc((n.notes || []).join("; "))}`)));
         resultsEl.innerHTML = html;
 
         fileInput.value = "";

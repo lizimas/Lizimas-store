@@ -46,7 +46,10 @@ function uploadBufferToCloudinary(fileBuffer) {
 // Vendor photo checks (Sept 2026): upload with a small PNG preview made by
 // Cloudinary during the upload, which the checks measure (imageChecks.js).
 const ImageChecks = require("../utils/imageChecks");
-const { uploadCheckedPhotos } = require("../utils/vendorPhotos");
+const { uploadCheckedPhotos, knownVendorHashes } = require("../utils/vendorPhotos");
+const { fetchRemoteImage } = require("../utils/remoteImage");
+const { splitLinks, importRowPhotos, mapLimit } = require("../utils/importPhotos");
+const IMPORT_MAX_ROWS_WITH_PHOTOS = 100;
 const isVendorRole = (role) => ["vendor", "vendor_staff"].includes(role);
 function uploadBufferWithPreview(fileBuffer) {
     return new Promise((resolve, reject) => {
@@ -1173,7 +1176,7 @@ exports.updateProduct = async (req, res) => {
             newImagePaths = await Promise.all(uploadedFiles.map(f => uploadBufferToCloudinary(f.buffer)));
         }
 
-        const statusClause = ["product_staff", "vendor"].includes(req.user.role) ? `, status='pending'` : "";
+        const statusClause = ["product_staff", "vendor", "vendor_staff"].includes(req.user.role) ? `, status='pending'` : "";
 
         // Only a vendor re-running the commission engine touches the pricing
         // snapshot columns - a staff/admin edit (even of a vendor's product)
@@ -1338,6 +1341,13 @@ exports.importVendorProducts = async (req, res) => {
     if (rows.length > 2000) {
         return res.status(400).json({ error: `File has ${rows.length} rows - please split it into batches of 2000 or fewer.` });
     }
+    // Photo links (Sept 2026): downloaded and checked like uploaded photos,
+    // which takes a moment each - so files with photo links are kept smaller.
+    const rowLinks = rows.map((row) => splitLinks(row));
+    const rowsWithLinks = rowLinks.filter((l) => l.length).length;
+    if (rowsWithLinks > IMPORT_MAX_ROWS_WITH_PHOTOS) {
+        return res.status(400).json({ error: `${rowsWithLinks} rows have photo links - please split the file into batches of ${IMPORT_MAX_ROWS_WITH_PHOTOS} rows or fewer when including photos.` });
+    }
 
     const { rows: prohibitedList } = await pool.query(
         `SELECT keyword, category_id, reason FROM prohibited_items WHERE is_active = true`
@@ -1375,7 +1385,28 @@ exports.importVendorProducts = async (req, res) => {
         }
     }
 
-    const results = { created: 0, updated: 0, skipped: 0, errors: [] };
+    const results = { created: 0, updated: 0, skipped: 0, errors: [], drafts: [], photo_problems: [], photo_notes: [] };
+
+    // Download and check every row's photo links up front (a few rows at a
+    // time), before the database work, so the transaction stays short.
+    const minPhotos = ImageChecks.Checks.RULES.MIN_IMAGES;
+    const known = await knownVendorHashes((sql, params) => pool.query(sql, params), vendorId, null);
+    const photoDeps = {
+        fetchImage: (link) => fetchRemoteImage(link),
+        upload: uploadBufferWithPreview,
+        destroy: (publicId) => cloudinary.uploader.destroy(publicId),
+        fetchBuffer: (url) => ImageChecks.fetchBuffer(url)
+    };
+    const worthFetching = (row) => String(row.name || "").trim() && Number(String(row.desired_payout || "").trim()) > 0;
+    const rowPhotos = await mapLimit(rows, 4, (row, i) =>
+        rowLinks[i].length && worthFetching(row) ? importRowPhotos(rowLinks[i], known, photoDeps) : null);
+    const photosUsed = new Set();
+    const discardPhotos = async (onlyUnused) => {
+        const ids = [];
+        rowPhotos.forEach((r, i) => { if (r && (!onlyUnused || !photosUsed.has(i))) r.kept.forEach((k) => ids.push(k.publicId)); });
+        await Promise.all(ids.map((id) => cloudinary.uploader.destroy(id).catch(() => {})));
+    };
+
     const categoryCache = new Map();
     const commissionRuleCache = new Map();
 
@@ -1419,7 +1450,7 @@ exports.importVendorProducts = async (req, res) => {
             const careInstructions = row.care_instructions !== undefined ? String(row.care_instructions).trim() : "";
             const occasion = row.occasion !== undefined ? String(row.occasion).trim() : "";
             const warrantyMonthsRaw = row.warranty_months !== undefined ? String(row.warranty_months).trim() : "";
-            const imageRaw = row.image !== undefined ? String(row.image).trim() : "";
+            const photos = rowPhotos[i] || { kept: [], problems: [], notes: [] };
 
             const rowErrors = [];
             if (!name) rowErrors.push("name is required");
@@ -1519,7 +1550,7 @@ exports.importVendorProducts = async (req, res) => {
                     "sleeve = $11", "style = $12", "length = $13", "fit = $14", "pattern = $15",
                     "care_instructions = $16", "occasion = $17", "warranty_months = $18",
                     "vendor_desired_payout = $19", "commission_rate_applied = $20",
-                    "fixed_fee_applied = $21", "commission_rule_id = $22", "status = 'pending'"
+                    "fixed_fee_applied = $21", "commission_rule_id = $22"
                 ];
                 const params = [
                     name, description, pricing.customerPrice, stock, categoryId,
@@ -1531,7 +1562,13 @@ exports.importVendorProducts = async (req, res) => {
 
                 if (packageSize) { params.push(packageSize); setClauses.push(`package_size = $${params.length}`); }
                 if (sku) { params.push(sku); setClauses.push(`sku = $${params.length}`); }
-                if (imageRaw) { params.push(imageRaw); setClauses.push(`image = $${params.length}`); }
+                // At least the minimum number of photos (kept + new), or it waits as a draft.
+                const have = (await client.query(
+                    `SELECT COUNT(*)::int AS n, (SELECT image FROM products WHERE id = $1) AS image FROM product_images WHERE product_id = $1`,
+                    [targetRow.id])).rows[0];
+                const rowStatus = have.n + photos.kept.length >= minPhotos ? "pending" : "draft";
+                params.push(rowStatus); setClauses.push(`status = $${params.length}`);
+                if (photos.kept.length && !have.image) { params.push(photos.kept[0].url); setClauses.push(`image = $${params.length}`); }
 
                 if (rowMeasured.ok && rowMeasured.provided) {
                     for (const k of ["weight_kg", "length_cm", "width_cm", "height_cm"]) { params.push(rowMeasured.value[k]); setClauses.push(`${k} = $${params.length}`); }
@@ -1541,6 +1578,9 @@ exports.importVendorProducts = async (req, res) => {
                     `UPDATE products SET ${setClauses.join(", ")} WHERE id = $${params.length - 1} AND vendor_id = $${params.length} AND deleted_at IS NULL`,
                     params
                 );
+                await addImportedPhotos(client, targetRow.id, photos.kept);
+                photosUsed.add(i);
+                noteImportPhotos(results, rowNum, name, photos, rowStatus, have.n + photos.kept.length, minPhotos);
                 results.updated++;
             } else {
                 const inserted = await client.query(
@@ -1549,17 +1589,21 @@ exports.importVendorProducts = async (req, res) => {
                         sku, brand, gtin, mpn, material, color, sleeve, style, length, fit, pattern,
                         care_instructions, occasion, warranty_months, package_size, image,
                         vendor_desired_payout, commission_rate_applied, fixed_fee_applied, commission_rule_id
-                     ) VALUES ($1,$2,$3,$4,$5,$6,'pending',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
+                     ) VALUES ($1,$2,$3,$4,$5,$6,$28,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
                      RETURNING id, sku`,
                     [
                         name, description, pricing.customerPrice, stock, categoryId, req.user.userId, vendorId,
                         sku || generateSku(brand, vendorId), brand || null, gtin || null, mpn || null, material || null, color || null,
                         sleeve || null, style || null, length || null, fit || null, pattern || null,
                         careInstructions || null, occasion || null, warrantyMonths, packageSize || "Small",
-                        imageRaw || null,
-                        pricing.vendorPayout, pricing.commissionRate, pricing.fixedFee, pricing.ruleId
+                        photos.kept.length ? photos.kept[0].url : null,
+                        pricing.vendorPayout, pricing.commissionRate, pricing.fixedFee, pricing.ruleId,
+                        photos.kept.length >= minPhotos ? "pending" : "draft"
                     ]
                 );
+                await addImportedPhotos(client, inserted.rows[0].id, photos.kept);
+                photosUsed.add(i);
+                noteImportPhotos(results, rowNum, name, photos, photos.kept.length >= minPhotos ? "pending" : "draft", photos.kept.length, minPhotos);
                 // Keep the in-memory maps current so a later row in the same
                 // file can target the product this row just created (e.g. by
                 // the sku it was just given).
@@ -1574,21 +1618,47 @@ exports.importVendorProducts = async (req, res) => {
         await client.query("COMMIT");
     } catch (error) {
         await client.query("ROLLBACK");
+        await discardPhotos(false);
         console.error("Vendor import products error:", error);
         return res.status(500).json({ error: "Import failed and was rolled back." });
     } finally {
         client.release();
     }
+    // Photos downloaded for rows that were then skipped.
+    await discardPhotos(true);
 
     logActivity(req.user.userId, "bulk_imported_products", "product", null,
-        `Bulk import: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped`);
+        `Bulk import: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped, ${results.drafts.length} saved as drafts`);
 
     res.json({
-        message: "Import complete. Every new or changed listing is pending admin approval, same as a manual edit.",
+        message: results.drafts.length
+            ? `Import complete. ${results.drafts.length} listing(s) were saved as drafts because they need at least ${minPhotos} good photos - open each one, add photos and submit it. Everything else is pending admin approval.`
+            : "Import complete. Every new or changed listing is pending admin approval, same as a manual edit.",
         totalRows: rows.length,
         ...results
     });
 };
+
+// Imported photos become the product's gallery, after any it already has.
+async function addImportedPhotos(db, productId, kept) {
+    if (!kept.length) return;
+    const start = Number((await db.query(
+        "SELECT COALESCE(MAX(display_order), -1) AS m FROM product_images WHERE product_id = $1", [productId])).rows[0].m) + 1;
+    for (const [k, photo] of kept.entries()) {
+        await db.query(
+            `INSERT INTO product_images (product_id, image_path, display_order, phash) VALUES ($1, $2, $3, $4)`,
+            [productId, photo.url, start + k, photo.hash || null]
+        );
+    }
+}
+function noteImportPhotos(results, rowNum, name, photos, status, total, minPhotos) {
+    photos.problems.forEach((p) => results.photo_problems.push({ row: rowNum, name, link: p.link, reasons: p.reasons }));
+    photos.notes.forEach((n) => results.photo_notes.push({ row: rowNum, name, link: n.link, notes: n.notes }));
+    if (status === "draft") {
+        results.drafts.push({ row: rowNum, name, photos: total,
+            reason: `Has ${total} good photo${total === 1 ? "" : "s"} - needs at least ${minPhotos}. Saved as a draft: open it, add photos and submit it.` });
+    }
+}
 
 // Delete a single product image
 exports.deleteProductImage = async (req, res) => {

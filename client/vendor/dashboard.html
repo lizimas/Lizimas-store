@@ -33,6 +33,10 @@
     <div class="vm-screen" id="vm-screen-products">
         <div class="vm-pm-title">Product Management</div>
         <div id="vm-product-tier-status" style="font-size:11.5px; color:#888; margin:-6px 16px 8px;"></div>
+        <button class="vm-list-row" style="margin:0 14px 8px; border-radius:10px;" onclick="vmShowScreen('import-products')">
+            <span>Import products (CSV / Excel)</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
         <button class="vm-list-row" style="margin:0 14px 8px; border-radius:10px;" onclick="vmShowScreen('consignments')">
             <span>Fulfillment by Lizimas</span>
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
@@ -556,6 +560,13 @@
         <div id="vm-profile-body"><div class="vm-loading-state">Loading...</div></div>
     </div>
 
+    <!-- Import products from a CSV/Excel file (phones and computers): the
+         import panel from the old desktop Products tab is moved in here. -->
+    <div class="vm-screen" id="vm-screen-import-products">
+        <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Import Products</span></div>
+        <div class="vendor-desktop-shell vm-desk-frame"><main id="vm-import-host" class="admin-main vm-desk-host"></main></div>
+    </div>
+
     <!-- Identity & Business Verification (phones and computers): the KYC
          panel from the overview is moved in here when this screen opens. -->
     <div class="vm-screen" id="vm-screen-verification">
@@ -942,7 +953,12 @@
 
                     <div id="vd-product-import-panel" hidden class="panel" style="margin-bottom:16px;">
                         <h3 style="margin:0 0 4px;">Import Products</h3>
-                        <p style="font-size:12.5px; color:#888; margin:0 0 10px; max-width:640px;">Upload a .csv, .xlsx, or .xls file to add or update several products at once. Columns: <code>name</code>, <code>desired_payout</code> (what you want to earn per unit - required), <code>stock</code>, <code>description</code>, <code>category</code> (must match an existing category name), <code>sku</code>, <code>package_size</code>, <code>brand</code>, <code>gtin</code>, <code>mpn</code>, <code>material</code>, <code>color</code>, <code>sleeve</code>, <code>style</code>, <code>length</code>, <code>fit</code>, <code>pattern</code>, <code>care_instructions</code>, <code>occasion</code>, <code>warranty_months</code>, <code>image</code> (an already-hosted image URL). Give a row an <code>id</code> or a <code>sku</code> that matches one of your existing products to update it - everything else creates a new listing. Every new or changed row goes in as pending, same as adding or editing one product by hand.</p>
+                        <div style="font-size:12.5px; color:#555; margin:0 0 10px; max-width:720px; line-height:1.55;">
+                            <p style="margin:0 0 6px;">Upload a .csv, .xlsx or .xls file to add or update several products at once. <a href="javascript:void(0)" onclick="vdDownloadImportTemplate()">Download a template</a>.</p>
+                            <p style="margin:0 0 6px;"><b>Required:</b> <code>name</code>, <code>desired_payout</code> (what you want to earn per unit). <b>Usually:</b> <code>stock</code>, <code>description</code>, <code>category</code> (an existing category name), <code>weight_kg</code>, <code>length_cm</code>, <code>width_cm</code>, <code>height_cm</code>. <b>Optional:</b> <code>sku</code>, <code>brand</code>, <code>warranty_months</code>, <code>gtin</code>, <code>mpn</code>, <code>material</code>, <code>color</code>, <code>sleeve</code>, <code>style</code>, <code>length</code>, <code>fit</code>, <code>pattern</code>, <code>care_instructions</code>, <code>occasion</code>.</p>
+                            <p style="margin:0 0 6px;"><b>Photos:</b> put at least 3 photo links in the <code>images</code> column, separated by <code>|</code>. Each photo is downloaded and checked like an uploaded one (at least 800&times;800, under 5MB, sharp, well lit). A product that ends up with fewer than 3 good photos is saved as a <b>draft</b> - open it, add photos and submit it. Up to 100 rows with photo links per file.</p>
+                            <p style="margin:0;">Give a row an <code>id</code> or a <code>sku</code> that matches one of your products to update it; anything else creates a new listing. New and changed listings go to Lizimas for approval, same as adding one by hand.</p>
+                        </div>
                         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                             <input type="file" id="vd-product-import-file" accept=".csv,.xlsx,.xls" style="font-size:13px;">
                             <button type="button" onclick="vdUploadProductsCsv()" id="vd-product-import-btn" style="background:var(--vd-navy); color:#fff; border:none; border-radius:8px; padding:9px 16px; cursor:pointer; font-weight:600; font-size:13px;">Upload &amp; Import</button>
@@ -1905,8 +1921,8 @@
     <script src="../js/lz-text-counter.js?v=1"></script>
     <script src="../js/vendor-dashboard.js?v=33"></script>
     <script src="../js/vendor-statements.js?v=4"></script>
-<script src="../js/vendor-mobile.js?v=15"></script>
-<script src="../js/vendor-products.js?v=3"></script>
+<script src="../js/vendor-mobile.js?v=16"></script>
+<script src="../js/vendor-products.js?v=4"></script>
 <script src="../js/vendor-consignments.js?v=1"></script>
 <script src="../js/vendor-promo-monitor.js?v=2"></script>
 <script src="../js/vendor-shop-setup.js?v=4"></script>

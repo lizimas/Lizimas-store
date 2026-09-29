@@ -49,7 +49,8 @@ const VM_NAV_FALLBACK = {
     "ads-create": "account",
     "promo-monitoring": "account",
     "desk": "account",
-    "verification": "account"
+    "verification": "account",
+    "import-products": "products"
 };
 
 // --- More tools (computers) -------------------------------------------------
@@ -82,6 +83,16 @@ function vmOpenDeskTab(tab) {
     window.scrollTo({ top: 0 });
 }
 window.vmOpenDeskTab = vmOpenDeskTab;
+
+function vmLoadImportProducts() {
+    const panel = document.getElementById("vd-product-import-panel");
+    const host = document.getElementById("vm-import-host");
+    if (!panel || !host) return;
+    if (panel.parentElement !== host) host.appendChild(panel);
+    panel.hidden = false;
+    const results = document.getElementById("vd-product-import-results");
+    if (results && !document.getElementById("vd-product-import-btn").disabled) results.innerHTML = "";
+}
 
 function vmLoadVerification() {
     const panel = document.getElementById("vendor-kyc-panel");
@@ -119,6 +130,7 @@ function vmShowScreen(name, opts) {
     }
 
     if (name === "verification") vmLoadVerification();
+    if (name === "import-products") vmLoadImportProducts();
     if (name === "home") vmLoadHome();
     if (name === "orders") vmLoadOrders();
     if (name === "products") vmLoadProducts();
