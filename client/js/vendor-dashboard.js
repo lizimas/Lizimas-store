@@ -1409,8 +1409,8 @@ function resetVendorProductForm() {
     vdPickedFiles = [];
     vdLocalPreviews = [];
     vdAllImages = [];
-    const _vdPo = document.getElementById("vd-photo-order"); if (_vdPo) _vdPo.remove();
     const _vdPreview = document.getElementById("product-image-preview"); if (_vdPreview) _vdPreview.innerHTML = "";
+    renderVendorPhotoOrderList();
     document.getElementById("product-submit-btn").textContent = "Submit for Approval";
     document.getElementById("product-form-status").textContent = "";
     const specsList = document.getElementById("specs-list");
@@ -1434,6 +1434,8 @@ function resetVendorProductForm() {
 let vdLocalPreviews = [];
 let vdAllImages = [];
 let vdPickedFiles = [];
+// Vendors can upload up to 8 photos (admin / Lizimas Store: 20).
+const VD_MAX_PHOTOS = 8;
 
 function setupVendorImageDropzone() {
     const dropzone = document.getElementById("product-image-dropzone");
@@ -1476,9 +1478,13 @@ async function renderVendorImagePreviews(fileList) {
     // least 3, so a vendor can pick them over several goes); the X on each
     // thumbnail removes one.
     const submitBtn = document.getElementById("product-submit-btn");
-    const files = Array.from(fileList || []);
+    let files = Array.from(fileList || []);
     const input = document.getElementById("product-images");
+    if (input) input.value = "";
     if (files.length === 0) { renderVendorPhotoOrderList(); return; }
+    const room = Math.max(0, VD_MAX_PHOTOS - vdAllImages.length);
+    const leftOut = Math.max(0, files.length - room);
+    files = files.slice(0, room);
 
     // Block submit while reads are in flight, or a partial set can upload.
     if (submitBtn) submitBtn.disabled = true;
@@ -1541,6 +1547,13 @@ async function renderVendorImagePreviews(fileList) {
             + ". Re-select them, or pick from Files rather than a cloud gallery.";
         preview.appendChild(warn);
     }
+    if (leftOut > 0) {
+        const warn = document.createElement("div");
+        warn.style.cssText = "color:#b45309; font-size:12px; width:100%; margin-bottom:6px;";
+        warn.textContent = "Vendors can upload up to " + VD_MAX_PHOTOS + " photos - " + leftOut +
+            " photo(s) were not added. Remove one first to add another.";
+        preview.appendChild(warn);
+    }
 
     vdRebuildAllImages();
     renderVendorPhotoOrderList();
@@ -1556,54 +1569,45 @@ function vdPhotoCountLine(n) {
         : '<div style="font-size:12px;color:#B45309;margin-bottom:8px;">' + n + ' of ' + min + ' photos minimum - add ' + (min - n) + ' more</div>';
 }
 
+// vdAllImages is the display order ([0] = Main photo): "id:<image id>" for
+// saved photos, "new:<index in vdPickedFiles>" for ones not uploaded yet.
+// Keeps the vendor's order and adds newly picked photos at the end.
 function vdRebuildAllImages() {
-    const stored = vdAllImages.filter(im => im.key.startsWith("id:"));
-    vdAllImages = stored.concat(
-        vdPickedFiles.map((f, i) => ({ key: "new:" + i, url: vdLocalPreviews[i] }))
-    );
+    const kept = vdAllImages.filter(im => !vdIsNew(im.key) || Number(im.key.slice(4)) < vdPickedFiles.length);
+    const have = new Set(kept.map(im => im.key));
+    vdPickedFiles.forEach((f, i) => {
+        if (!have.has("new:" + i)) kept.push({ key: "new:" + i, url: vdLocalPreviews[i] });
+    });
+    vdAllImages = kept;
 }
 
-function renderVendorPhotoOrderList() {
+function renderVendorPhotoOrderList(statusText) {
     const preview = document.getElementById("product-image-preview");
     if (!preview) return;
     let block = document.getElementById("vd-photo-order");
-    const all = vdAllImages;
-    if (all.length === 0) { if (block) block.remove(); return; }
     if (!block) {
         block = document.createElement("div");
         block.id = "vd-photo-order";
-        block.style.cssText = "width:100%; margin-bottom:10px;";
+        block.style.cssText = "width:100%;";
         preview.parentNode.insertBefore(block, preview);
     }
+    // The grid is the drop zone and the "add photos" button now.
+    const zone = document.getElementById("product-image-dropzone");
+    if (zone) zone.style.display = "none";
 
-    const storedCount = all.filter(im => im.key.startsWith("id:")).length;
-
-    block.innerHTML =
-        '<div style="font-size:12px;font-weight:700;color:#444;margin-bottom:8px;">Photos (first photo is the main one shown on the storefront)</div>' +
-        vdPhotoCountLine(all.length) +
-        all.map((im, i) => {
-            const isNew = vdIsNew(im.key);
-            const prev = all[i - 1];
-            const next = all[i + 1];
-            const canUp = prev && vdIsNew(prev.key) === isNew;
-            const canDown = next && vdIsNew(next.key) === isNew;
-            return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
-                '<span style="min-width:16px;font-size:12px;color:#666;">' + (i + 1) + '</span>' +
-                '<div style="position:relative;flex:0 0 auto;">' +
-                    '<img src="' + im.url + '" style="width:46px;height:46px;object-fit:cover;border-radius:4px;display:block;">' +
-                    '<button type="button" onclick="removeVendorPhoto(\'' + im.key + '\')" title="Remove photo" ' +
-                        'style="position:absolute;top:-7px;right:-7px;width:21px;height:21px;padding:0;line-height:19px;text-align:center;' +
-                        'background:#fff;color:#c0392b;border:1px solid #e0b4ae;border-radius:50%;font-size:12px;cursor:pointer;">&#10005;</button>' +
-                '</div>' +
-                '<button type="button" onclick="moveVendorPhotoOrder(' + i + ',-1)" ' + (canUp ? '' : 'disabled') + ' style="padding:6px 12px;">&uarr;</button>' +
-                '<button type="button" onclick="moveVendorPhotoOrder(' + i + ',1)" ' + (canDown ? '' : 'disabled') + ' style="padding:6px 12px;">&darr;</button>' +
-                (isNew ? '<span style="font-size:10px;font-weight:700;color:#ff6a00;letter-spacing:.5px;">NEW</span>' : '') +
-            '</div>';
-        }).join("") +
-        (storedCount > 1
-            ? '<button type="button" onclick="saveVendorPhotoOrder()" style="margin-top:4px;padding:6px 14px;background:var(--vd-navy,#1a1a2e);color:#fff;border:none;border-radius:4px;">Save order</button>'
-            : '') +
-        '<span id="vd-photo-order-status" style="margin-left:8px;font-size:12px;color:#666;"></span>';
+    const n = vdAllImages.length, min = vdPhotoMin();
+    const countLine = n >= min ? "" : (n + " of " + min + " photos minimum - add " + (min - n) + " more.");
+    LzPhotoGrid.render(block, {
+        items: vdAllImages.map(im => ({ key: im.key, url: im.url, isNew: vdIsNew(im.key) })),
+        max: VD_MAX_PHOTOS,
+        note: "Vendors can upload up to " + VD_MAX_PHOTOS + " photos." + (countLine ? " " + countLine : ""),
+        busy: vdDeleteInFlight,
+        status: statusText || "",
+        onMove: (from, to) => moveVendorPhotoOrder(from, to),
+        onRemove: key => removeVendorPhoto(key),
+        onAdd: () => { const input = document.getElementById("product-images"); if (input) input.click(); },
+        onDropFiles: files => renderVendorImagePreviews(files)
+    });
 }
 
 function removeVendorPhoto(key) {
@@ -1618,7 +1622,13 @@ function removeVendorNewPhoto(key) {
     try { URL.revokeObjectURL(vdLocalPreviews[i]); } catch (e) {}
     vdPickedFiles.splice(i, 1);
     vdLocalPreviews.splice(i, 1);
-    vdRebuildAllImages();
+    vdAllImages = vdAllImages
+        .filter(im => im.key !== key)
+        .map(im => {
+            if (!vdIsNew(im.key)) return im;
+            const n = Number(im.key.slice(4));
+            return n > i ? { key: "new:" + (n - 1), url: im.url } : im;
+        });
     renderVendorPhotoOrderList();
 }
 
@@ -1631,66 +1641,44 @@ async function deleteVendorStoredPhoto(key) {
     if (!confirm("Remove this photo from the product?")) return;
 
     vdDeleteInFlight = true;
-    document.querySelectorAll("#vd-photo-order button").forEach(b => b.disabled = true);
-    const status = document.getElementById("vd-photo-order-status");
-    if (status) status.textContent = "Removing...";
+    renderVendorPhotoOrderList("Removing...");
+    let msg = "";
     try {
         const data = await vendorAuthorizedFetch("/api/vendors/products/images/" + imageId, { method: "DELETE" });
         if (data && data.error) {
-            if (status) status.textContent = "Failed: " + data.error;
+            msg = "Could not remove: " + data.error;
             return;
         }
         vdAllImages = vdAllImages.filter(im => im.key !== key);
-        renderVendorPhotoOrderList();
-        const s2 = document.getElementById("vd-photo-order-status");
-        if (s2) s2.textContent = "Removed";
+        msg = "Photo removed.";
     } catch (e) {
-        if (status) status.textContent = "Failed: " + e.message;
+        msg = "Could not remove: " + e.message;
     } finally {
         vdDeleteInFlight = false;
-        renderVendorPhotoOrderList();
+        renderVendorPhotoOrderList(msg);
     }
 }
 
-function moveVendorPhotoOrder(index, delta) {
-    const target = index + delta;
-    if (target < 0 || target >= vdAllImages.length) return;
-    const a = vdAllImages[index];
-    const b = vdAllImages[target];
-    // Saved and unsaved photos do not interleave: unsaved always sort last.
-    if (vdIsNew(a.key) !== vdIsNew(b.key)) return;
-
-    if (vdIsNew(a.key)) {
-        const i = Number(a.key.slice(4));
-        const j = Number(b.key.slice(4));
-        const tf = vdPickedFiles[i]; vdPickedFiles[i] = vdPickedFiles[j]; vdPickedFiles[j] = tf;
-        const tp = vdLocalPreviews[i]; vdLocalPreviews[i] = vdLocalPreviews[j]; vdLocalPreviews[j] = tp;
-        vdRebuildAllImages();
-    } else {
-        vdAllImages[index] = b;
-        vdAllImages[target] = a;
-    }
-
+function moveVendorPhotoOrder(from, to) {
+    vdAllImages = LzPhotoGrid.moveItem(vdAllImages, from, to);
     renderVendorPhotoOrderList();
 }
 
-async function saveVendorPhotoOrder() {
-    const productId = document.getElementById("product-id").value;
-    const status = document.getElementById("vd-photo-order-status");
-    if (!productId) { if (status) status.textContent = "Save the product first."; return; }
-    const imageIds = vdAllImages
-        .filter(im => im.key.startsWith("id:"))
-        .map(im => Number(im.key.slice(3)));
-    if (status) status.textContent = "Saving...";
+// Saves the order shown in the grid once the product is saved (new photos
+// have ids by then). The server makes the first photo the Main photo.
+async function vdSavePhotoOrder(productId, returnedRecords) {
+    const ids = vdAllImages.map(im => vdIsNew(im.key)
+        ? ((returnedRecords[Number(im.key.slice(4))] || {}).id)
+        : Number(im.key.slice(3)));
+    if (!ids.length || ids.some(v => !Number.isInteger(Number(v)))) return;
     try {
-        const res = await vendorAuthorizedFetch("/api/vendors/products/" + productId + "/images/order", {
+        await vendorAuthorizedFetch("/api/vendors/products/" + productId + "/images/order", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ imageIds: imageIds })
+            body: JSON.stringify({ imageIds: ids.map(Number) })
         });
-        if (status) status.textContent = (res && res.success) ? "Order saved." : ("Failed: " + ((res && res.error) || "Unexpected response."));
     } catch (e) {
-        if (status) status.textContent = "Failed: " + e.message;
+        console.error("Save photo order error:", e);
     }
 }
 
@@ -2444,7 +2432,7 @@ async function submitVendorProductForm() {
     }
     // Photo checks: at least the minimum number of photos (stored + new).
     if (window.LzImageChecks) {
-        const countError = LzImageChecks.countMessage(vdAllImages.length);
+        const countError = LzImageChecks.countMessage(vdAllImages.length, VD_MAX_PHOTOS);
         if (countError) {
             statusEl.textContent = countError;
             const zone = document.getElementById("product-image-dropzone");
@@ -2502,6 +2490,7 @@ async function submitVendorProductForm() {
         }
 
         const savedProductId = data.product ? data.product.id : id;
+        if (savedProductId) await vdSavePhotoOrder(savedProductId, data.image_records || []);
         const specsPayload = collectVendorSpecRows();
         if (savedProductId && specsPayload.length > 0) {
             try {

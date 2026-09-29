@@ -51,6 +51,23 @@ const { fetchRemoteImage } = require("../utils/remoteImage");
 const { splitLinks, importRowPhotos, mapLimit } = require("../utils/importPhotos");
 const IMPORT_MAX_ROWS_WITH_PHOTOS = 100;
 const isVendorRole = (role) => ["vendor", "vendor_staff"].includes(role);
+// Photos per product: vendors 8, admin / Lizimas Store 20 (vendor uploads
+// are also checked in utils/imageChecks.js countMessage).
+const MAX_PHOTOS_STORE = ImageChecks.Checks.RULES.MAX_IMAGES_STORE;
+const tooManyPhotos = (n) => n > MAX_PHOTOS_STORE
+    ? { error: `A product can have up to ${MAX_PHOTOS_STORE} photos - this would make ${n}. Remove some first.` } : null;
+
+// products.image is the Main photo shown on product cards: always the first
+// photo in the gallery order.
+async function syncMainImage(db, productId) {
+    await db.query(
+        `UPDATE products SET image = first.image_path
+           FROM (SELECT image_path FROM product_images WHERE product_id = $1
+                  ORDER BY COALESCE(display_order, 999999) ASC, id ASC LIMIT 1) first
+          WHERE products.id = $1 AND products.image IS DISTINCT FROM first.image_path`,
+        [productId]
+    );
+}
 function uploadBufferWithPreview(fileBuffer) {
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
@@ -178,6 +195,8 @@ exports.addProduct = async (req, res) => {
             if (!checked.ok) return res.status(checked.status).json(checked.body);
             imagePaths = checked.urls; imageHashes = checked.hashes; imageWarnings = checked.warnings;
         } else {
+            const over = tooManyPhotos(uploadedFiles.length);
+            if (over) return res.status(400).json(over);
             imagePaths = await Promise.all(uploadedFiles.map(f => uploadBufferToCloudinary(f.buffer)));
         }
         const mainImage = imagePaths.length > 0 ? imagePaths[0] : (req.body.image || null);
@@ -1178,6 +1197,11 @@ exports.updateProduct = async (req, res) => {
             if (!checked.ok) return res.status(checked.status).json(checked.body);
             newImagePaths = checked.urls; newImageHashes = checked.hashes; imageWarnings = checked.warnings;
         } else {
+            if (uploadedFiles.length) {
+                const have = (await pool.query("SELECT COUNT(*)::int AS n FROM product_images WHERE product_id = $1", [id])).rows[0].n;
+                const over = tooManyPhotos(have + uploadedFiles.length);
+                if (over) return res.status(400).json(over);
+            }
             newImagePaths = await Promise.all(uploadedFiles.map(f => uploadBufferToCloudinary(f.buffer)));
         }
 
@@ -1729,6 +1753,9 @@ exports.deleteProductImage = async (req, res) => {
                 );
             }
 
+            // Removing the Main photo makes the next one the Main photo.
+            await syncMainImage(client, deletedRow.product_id);
+
             // Swatch thumbnail pointed at the deleted file: re-derive or null it.
             if (deletedRow.color_id) {
                 const next = await client.query(
@@ -2114,6 +2141,8 @@ exports.updateImageOrder = async (req, res) => {
                 [i, ids[i], id]
             );
         }
+        // The first photo is the Main photo (product cards, cart, sharing).
+        await syncMainImage(client, id);
 
         await client.query("COMMIT");
         res.json({ success: true, updated: ids.length });

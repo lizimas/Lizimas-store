@@ -1418,39 +1418,55 @@ function setupProductImageDropzone() {
     });
 }
 
+// Picking photos adds them after the ones already there, up to the limit
+// (20 for Lizimas' own products). The first photo is the Main photo; the
+// grid (client/js/lz-photo-grid.js) reorders them without re-uploading.
+const PD_MAX_PHOTOS = 20;
+
 async function renderImagePreviews(fileList) {
     const preview = document.getElementById("product-image-preview");
     if (!preview) return;
     preview.innerHTML = "";
-    pdPickedFiles = [];
+    const input = document.getElementById("product-image");
 
     const saveBtn = document.getElementById("product-save-btn");
-    const files = Array.from(fileList);
-    if (files.length === 0) {
-        pdLocalPreviews = [];
-        pdAllImages = pdAllImages.filter(im => im.key.startsWith("id:"));
-        document.querySelectorAll(".pd-color-thumb-picker").forEach(p => renderThumbOptions(p));
-        return;
+    let files = Array.from(fileList || []);
+    if (input) input.value = "";
+    if (files.length === 0) { renderPhotoOrderList(); return; }
+
+    const room = PD_MAX_PHOTOS - pdAllImages.length;
+    let leftOut = 0;
+    if (files.length > room) {
+        leftOut = files.length - Math.max(room, 0);
+        files = files.slice(0, Math.max(room, 0));
     }
 
     // Block Save while reads are in flight, or a partial set can be uploaded.
     if (saveBtn) saveBtn.disabled = true;
     const status = document.createElement("div");
     status.style.cssText = "font-size:12px; color:#666; width:100%;";
-    status.textContent = "Preparing " + files.length + " photo(s)...";
     preview.appendChild(status);
 
     const failures = [];
     for (let i = 0; i < files.length; i++) {
         status.textContent = "Preparing photo " + (i + 1) + " of " + files.length + "...";
         const res = await preparePickedFile(files[i]);
-        if (res.ok) pdPickedFiles.push(res.file);
-        else failures.push(res);
+        if (res.ok) {
+            pdPickedFiles.push(res.file);
+            pdLocalPreviews.push(URL.createObjectURL(res.file));
+        } else failures.push(res);
     }
 
     if (saveBtn) saveBtn.disabled = false;
     preview.innerHTML = "";
 
+    if (leftOut > 0) {
+        const warn = document.createElement("div");
+        warn.style.cssText = "color:#b45309; font-size:12px; width:100%; margin-bottom:6px;";
+        warn.textContent = "A product can have up to " + PD_MAX_PHOTOS + " photos - " + leftOut +
+            " photo(s) were not added. Remove some first to add others.";
+        preview.appendChild(warn);
+    }
     if (failures.length > 0) {
         const warn = document.createElement("div");
         warn.style.cssText = "color:#c0392b; font-size:12px; width:100%; margin-bottom:6px;";
@@ -1460,11 +1476,8 @@ async function renderImagePreviews(fileList) {
         preview.appendChild(warn);
     }
 
-    pdLocalPreviews = pdPickedFiles.map(f => URL.createObjectURL(f));
-    pdAllImages = pdAllImages.filter(im => im.key.startsWith("id:"))
-        .concat(pdPickedFiles.map((f, i) => ({ key: "new:" + i, url: pdLocalPreviews[i] })));
+    pdRebuildAllImages();
     document.querySelectorAll(".pd-color-thumb-picker").forEach(picker => renderThumbOptions(picker));
-
     renderPhotoOrderList();
 }
 
@@ -2078,7 +2091,7 @@ function openProductForm() {
     if (adminSpecsTableWrap) adminSpecsTableWrap.innerHTML = "";
     pdLocalPreviews = [];
     pdAllImages = [];
-    const _po = document.getElementById("pd-photo-order"); if (_po) _po.remove();
+    renderPhotoOrderList();
     pdSelectedSizes = [];
     pdSelectedColors = {};
     document.querySelectorAll("#size-checkbox-list input[type=checkbox]").forEach(cb => cb.checked = false);
@@ -2122,7 +2135,10 @@ function editProduct(id) {
     LzBlockEditor.mount(document.getElementById("desc-blocks-editor"), product.id, { tokenKey: "adminToken" });
     document.getElementById("product-image").value = "";
     pdPickedFiles = [];
+    pdLocalPreviews = [];
+    pdAllImages = [];
     document.getElementById("product-image-preview").innerHTML = "";
+    renderPhotoOrderList();
     document.getElementById("product-form-error").textContent = "";
     document.getElementById("product-form-container").classList.remove("hidden");
 }
@@ -2218,6 +2234,9 @@ async function saveProduct() {
         }
         const returnedImages = result.images || [];
         const returnedRecords = result.image_records || [];
+
+        const orderRes = await pdSavePhotoOrder(savedProductId, returnedRecords);
+        if (!orderRes.ok) console.error("Save photo order error:", orderRes.message);
 
         const colorsPayload = Object.keys(pdSelectedColors)
             .map(name => ({
@@ -4360,11 +4379,16 @@ document.addEventListener("click", (e) => {
 // ---- Stored photo order (edit mode only; new picks have no id yet) ----
 function pdIsNew(key) { return key.startsWith("new:"); }
 
+// pdAllImages is the display order ([0] = Main photo). Saved photos are
+// "id:<image id>", photos not uploaded yet are "new:<index in pdPickedFiles>".
+// Keeps the order the person chose and adds newly picked photos at the end.
 function pdRebuildAllImages() {
-    const stored = pdAllImages.filter(im => im.key.startsWith("id:"));
-    pdAllImages = stored.concat(
-        pdPickedFiles.map((f, i) => ({ key: "new:" + i, url: pdLocalPreviews[i] }))
-    );
+    const kept = pdAllImages.filter(im => !pdIsNew(im.key) || Number(im.key.slice(4)) < pdPickedFiles.length);
+    const have = new Set(kept.map(im => im.key));
+    pdPickedFiles.forEach((f, i) => {
+        if (!have.has("new:" + i)) kept.push({ key: "new:" + i, url: pdLocalPreviews[i] });
+    });
+    pdAllImages = kept;
 }
 
 // Removing an unsaved photo shifts every later new: index, so colour
@@ -4392,46 +4416,30 @@ function pdSwapColorKeys(i, j) {
     });
 }
 
-function renderPhotoOrderList() {
+function renderPhotoOrderList(statusText) {
     const preview = document.getElementById("product-image-preview");
     if (!preview) return;
     let block = document.getElementById("pd-photo-order");
-    const all = pdAllImages;
-    if (all.length === 0) { if (block) block.remove(); return; }
     if (!block) {
         block = document.createElement("div");
         block.id = "pd-photo-order";
-        block.style.cssText = "width:100%; margin-bottom:10px;";
+        block.style.cssText = "width:100%;";
         preview.parentNode.insertBefore(block, preview);
     }
+    // The grid is the drop zone and the "add photos" button now.
+    const zone = document.getElementById("product-image-dropzone");
+    if (zone) zone.style.display = "none";
 
-    const storedCount = all.filter(im => im.key.startsWith("id:")).length;
-
-    block.innerHTML =
-        '<div style="font-size:12px;font-weight:700;color:#444;margin-bottom:8px;">Photos</div>' +
-        all.map((im, i) => {
-            const isNew = pdIsNew(im.key);
-            const prev = all[i - 1];
-            const next = all[i + 1];
-            const canUp = prev && pdIsNew(prev.key) === isNew;
-            const canDown = next && pdIsNew(next.key) === isNew;
-            return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
-                '<span style="min-width:16px;font-size:12px;color:#666;">' + (i + 1) + '</span>' +
-                '<div style="position:relative;flex:0 0 auto;">' +
-                    '<img src="' + im.url + '" style="width:46px;height:46px;object-fit:cover;border-radius:4px;display:block;">' +
-                    '<button type="button" onclick="removePhoto(\'' + im.key + '\')" title="Remove photo" ' +
-                        'style="position:absolute;top:-7px;right:-7px;width:21px;height:21px;padding:0;line-height:19px;text-align:center;' +
-                        'background:#fff;color:#c0392b;border:1px solid #e0b4ae;border-radius:50%;font-size:12px;cursor:pointer;">&#10005;</button>' +
-                '</div>' +
-                '<button type="button" onclick="movePhotoOrder(' + i + ',-1)" ' + (canUp ? '' : 'disabled') + ' style="padding:6px 12px;">&uarr;</button>' +
-                '<button type="button" onclick="movePhotoOrder(' + i + ',1)" ' + (canDown ? '' : 'disabled') + ' style="padding:6px 12px;">&darr;</button>' +
-                (isNew ? '<span style="font-size:10px;font-weight:700;color:#ff6a00;letter-spacing:.5px;">NEW</span>' : '') +
-            '</div>';
-        }).join("") +
-        (storedCount > 1
-            ? '<button type="button" onclick="savePhotoOrder()" style="margin-top:4px;padding:6px 14px;background:#ff6a00;color:#fff;border:none;border-radius:4px;">Save order</button>'
-            : '') +
-        '<span id="pd-photo-order-status" style="margin-left:8px;font-size:12px;color:#666;"></span>';
+    LzPhotoGrid.render(block, {
+        items: pdAllImages.map(im => ({ key: im.key, url: im.url, isNew: pdIsNew(im.key) })),
+        max: PD_MAX_PHOTOS,
+        busy: pdDeleteInFlight,
+        status: statusText || "",
+        onMove: (from, to) => movePhotoOrder(from, to),
+        onRemove: key => removePhoto(key),
+        onAdd: () => { const input = document.getElementById("product-image"); if (input) input.click(); },
+        onDropFiles: files => renderImagePreviews(files)
+    });
 }
 
 function removePhoto(key) {
@@ -4447,7 +4455,13 @@ function removeNewPhoto(key) {
     pdPickedFiles.splice(i, 1);
     pdLocalPreviews.splice(i, 1);
     pdRemapColorsAfterRemoval(i);
-    pdRebuildAllImages();
+    pdAllImages = pdAllImages
+        .filter(im => im.key !== key)
+        .map(im => {
+            if (!pdIsNew(im.key)) return im;
+            const n = Number(im.key.slice(4));
+            return n > i ? { key: "new:" + (n - 1), url: im.url } : im;
+        });
     renderPhotoOrderList();
     document.querySelectorAll(".pd-color-thumb-picker").forEach(pk => renderThumbOptions(pk));
 }
@@ -4461,14 +4475,13 @@ async function deleteStoredPhoto(key) {
     if (!confirm("Remove this photo from the product?")) return;
 
     pdDeleteInFlight = true;
-    document.querySelectorAll("#pd-photo-order button").forEach(b => b.disabled = true);
-    const status = document.getElementById("pd-photo-order-status");
-    if (status) status.textContent = "Removing...";
+    renderPhotoOrderList("Removing...");
+    let msg = "";
     try {
         // authorizedFetch returns parsed JSON and throws on error.
         const data = await authorizedFetch("/api/products/images/" + imageId, { method: "DELETE" });
         if (data && data.error) {
-            if (status) status.textContent = "Failed: " + data.error;
+            msg = "Could not remove: " + data.error;
             return;
         }
         pdAllImages = pdAllImages.filter(im => im.key !== key);
@@ -4477,59 +4490,38 @@ async function deleteStoredPhoto(key) {
                 pdSelectedColors[name] = pdSelectedColors[name].filter(k => k !== key);
             }
         });
-        renderPhotoOrderList();
         document.querySelectorAll(".pd-color-thumb-picker").forEach(pk => renderThumbOptions(pk));
-        const s2 = document.getElementById("pd-photo-order-status");
-        if (s2) s2.textContent = "Removed";
+        msg = "Photo removed.";
     } catch (e) {
-        if (status) status.textContent = "Failed: " + e.message;
+        msg = "Could not remove: " + e.message;
     } finally {
         pdDeleteInFlight = false;
-        renderPhotoOrderList();
+        renderPhotoOrderList(msg);
     }
 }
 
-function movePhotoOrder(index, delta) {
-    const target = index + delta;
-    if (target < 0 || target >= pdAllImages.length) return;
-    const a = pdAllImages[index];
-    const b = pdAllImages[target];
-    // Saved and unsaved photos do not interleave: unsaved always sort last.
-    if (pdIsNew(a.key) !== pdIsNew(b.key)) return;
-
-    if (pdIsNew(a.key)) {
-        const i = Number(a.key.slice(4));
-        const j = Number(b.key.slice(4));
-        const tf = pdPickedFiles[i]; pdPickedFiles[i] = pdPickedFiles[j]; pdPickedFiles[j] = tf;
-        const tp = pdLocalPreviews[i]; pdLocalPreviews[i] = pdLocalPreviews[j]; pdLocalPreviews[j] = tp;
-        pdSwapColorKeys(i, j);
-        pdRebuildAllImages();
-    } else {
-        pdAllImages[index] = b;
-        pdAllImages[target] = a;
-    }
-
+function movePhotoOrder(from, to) {
+    pdAllImages = LzPhotoGrid.moveItem(pdAllImages, from, to);
     renderPhotoOrderList();
     document.querySelectorAll(".pd-color-thumb-picker").forEach(p => renderThumbOptions(p));
 }
 
-async function savePhotoOrder() {
-    const productId = document.getElementById("product-id").value;
-    const status = document.getElementById("pd-photo-order-status");
-    if (!productId) { if (status) status.textContent = "Save the product first."; return; }
-    const imageIds = pdAllImages
-        .filter(im => im.key.startsWith("id:"))
-        .map(im => Number(im.key.slice(3)));
-    if (status) status.textContent = "Saving...";
+// Saves the order shown in the grid (after the product itself is saved, so
+// new photos have ids). The server also makes the first one the Main photo.
+async function pdSavePhotoOrder(productId, returnedRecords) {
+    const ids = pdAllImages.map(im => pdIsNew(im.key)
+        ? ((returnedRecords[Number(im.key.slice(4))] || {}).id)
+        : Number(im.key.slice(3)));
+    if (!ids.length || ids.some(v => !Number.isInteger(Number(v)))) return { ok: true };
     try {
         const res = await authorizedFetch("/api/products/" + productId + "/images/order", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ imageIds: imageIds })
+            body: JSON.stringify({ imageIds: ids.map(Number) })
         });
-        if (status) status.textContent = (res && res.success) ? "Order saved." : ("Failed: " + ((res && res.error) || "Unexpected response."));
+        return (res && res.success) ? { ok: true } : { ok: false, message: (res && res.error) || "Unexpected response." };
     } catch (e) {
-        if (status) status.textContent = "Failed: " + e.message;
+        return { ok: false, message: e.message };
     }
 }
 

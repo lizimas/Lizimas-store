@@ -114,6 +114,17 @@ async function photosBySku(input, deps) {
         } else {
             start = Number((await client.query(
                 "SELECT COALESCE(MAX(display_order), -1) AS m FROM product_images WHERE product_id = $1", [own.id])).rows[0].m) + 1;
+            // A product can have up to 20 photos; extra ones are left out.
+            const have = Number((await client.query(
+                "SELECT COUNT(*)::int AS n FROM product_images WHERE product_id = $1", [own.id])).rows[0].n);
+            const room = Math.max(0, 20 - have);
+            const extra = kept.splice(room);
+            extra.forEach((k) => skipped.push({ name: k.name, reason: "The product already has 20 photos (the most allowed)." }));
+            await Promise.all(extra.map((k) => Promise.resolve(deps.destroy(k.publicId)).catch(() => {})));
+            if (!kept.length) {
+                await client.query("ROLLBACK");
+                return { status: 400, body: { error: "no_photos_kept", message: `${sku} already has 20 photos (the most allowed).`, skipped } };
+            }
         }
         for (let i = 0; i < kept.length; i++) {
             await client.query(

@@ -624,3 +624,68 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 
 /* Nothing to show (no discount) - keep them out of the price row. */
 .pd-price-original[hidden], .pd-discount-badge[hidden], .pd-stock[hidden] { display: none; }
+
+/* ---- Sept 2026 additions: badges, delivery line, share/report,
+   seller box, section menu, highlights in columns of five ---- */
+.pd-badges { display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 0 6px; }
+.pd-badges[hidden] { display: none; }
+.pd-badge { font-size: 11.5px; font-weight: 700; padding: 3px 8px; border-radius: 4px; letter-spacing: .02em; }
+.pd-badge-official { background: #1a1a2e; color: #fff; }
+.pd-brand { font-size: 14px; color: #4b5563; margin: 0 0 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.pd-brand[hidden] { display: none; }
+
+.pd-ship-line { font-size: 13px; color: #374151; margin: 2px 0 6px; }
+.pd-ship-line[hidden] { display: none; }
+
+.pd-share { display: none; }
+@media (min-width: 900px) {
+    .pd-share { display: block; margin-top: 16px; padding-top: 14px; border-top: 1px solid #eef0f3; }
+    .pd-share-title { font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: #1a1a2e; }
+    .pd-share-icons { display: flex; gap: 10px; margin-top: 10px; }
+    .pd-share-icons a {
+        width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid #1a1a2e; color: #1a1a2e;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .pd-share-icons a:hover { background: #1a1a2e; color: #fff; }
+    .pd-share-icons svg { width: 18px; height: 18px; }
+    .pd-report-link { display: inline-block; margin-top: 16px; font-size: 13.5px; color: #1d4ed8; text-decoration: none; }
+    .pd-report-link:hover { text-decoration: underline; }
+}
+
+.pd-del-row[hidden] { display: none; }
+.pd-side-title-link { display: flex; justify-content: space-between; align-items: center; text-decoration: none; }
+.pd-side-title-link span { font-size: 20px; line-height: 1; color: #6b7280; }
+#pd-seller-box .seller-panel { border: 0; padding: 0; margin: 0; }
+#pd-seller-box .seller-panel-head { padding-top: 10px; border-top: 1px solid #f0f0f0; }
+#pd-seller-box .seller-performance-list::before {
+    content: "Seller Performance"; font-size: 14px; font-weight: 700; color: #111827; margin-bottom: 4px;
+}
+#pd-seller-box .seller-perf-item { font-size: 12.5px; }
+#pd-seller-box.pd-seller-own .seller-performance-list::before { content: "Why buy here"; }
+#pd-seller-box .seller-follow-btn { background: #f4b400; color: #1a1a2e; border-radius: 6px; margin-left: auto; }
+
+.pd-side-nav { display: none; }
+@media (min-width: 900px) {
+    .pd-side-nav { display: block; overflow: hidden; margin-top: 14px; }
+    .pd-side-nav a {
+        display: flex; align-items: center; gap: 12px; padding: 14px 16px; font-size: 14.5px;
+        color: #1f2937; text-decoration: none; border-top: 1px solid #f0f0f0;
+    }
+    .pd-side-nav a:first-child { border-top: 0; }
+    .pd-side-nav a[hidden] { display: none; }
+    .pd-side-nav a svg { width: 20px; height: 20px; flex-shrink: 0; color: #1a1a2e; }
+    .pd-side-nav a:hover { background: #f6f7f9; }
+    .pd-side-nav a.active { background: #e9ebef; font-weight: 700; }
+    .pd-side-sticky { top: 120px; }
+}
+
+/* Highlights: five going down; more than five -> two columns of five. */
+.pd-highlights, .pd-highlights.pd-hl-two { grid-template-columns: 1fr; }
+@media (min-width: 640px) {
+    .pd-highlights { grid-template-columns: 1fr; }
+    .pd-highlights.pd-hl-two {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: repeat(5, auto);
+        grid-auto-flow: column;
+    }
+}

@@ -16,14 +16,18 @@ const PD_SPEC_LABELS = {
 // the rest of the product page rendering.
 async function loadSellerPanel(product) {
     var panel = document.getElementById("pd-seller-panel");
-    if (!panel || !product.vendor_slug) return;
+    if (!panel) return;
+    if (!product.vendor_id) { pdRenderOwnSeller(panel); return; }
+    if (!product.vendor_slug) return;
     try {
         var data = await spFetchStore(product.vendor_slug);
         if (!data) return;
-        await renderSellerPanel(panel, data, { showVisitLink: true });
+        await renderSellerPanel(panel, data, { showVisitLink: false });
         panel.hidden = false;
         var box = document.getElementById("pd-seller-box");
         if (box) box.hidden = false;
+        var link = document.getElementById("pd-seller-link");
+        if (link) link.href = "/store/" + encodeURIComponent(product.vendor_slug);
     } catch (error) {
         console.error("Seller panel load error:", error);
     }
@@ -143,6 +147,8 @@ async function loadProductDetail() {
         if (idEl) idEl.textContent = "Item ID: " + product.id;
 
         pdRenderStock(product);
+        pdRenderBadges(product);
+        pdSetupShare(product);
         pdRenderMini(product, pdHasDiscount ? pdSalePrice : Number(product.price), pdHasDiscount ? pdOriginalPrice : null);
         pdSetupAskLink(product);
         pdSetupDelivery(product.id);
@@ -1052,6 +1058,7 @@ async function pdSetupDelivery(productId) {
     const showFee = async district => {
         if (!district) {
             out.textContent = "Choose your location to see the delivery fee and time.";
+            pdShipLine(null);
             return;
         }
         out.textContent = "Checking...";
@@ -1060,9 +1067,10 @@ async function pdSetupDelivery(productId) {
                 encodeURIComponent(district) + "&product_ids=" + encodeURIComponent(productId));
             const d = await res.json();
             if (!res.ok) { out.textContent = d.error || "Delivery is not yet available for that area."; return; }
-            if (d.quoteRequired) { out.textContent = d.message; return; }
+            if (d.quoteRequired) { out.textContent = d.message; pdShipLine(null); return; }
             out.innerHTML = 'Delivery fee <strong>UGX ' + Number(d.fee || 0).toLocaleString() + '</strong>' +
                 (d.eta ? '<br>Arrives in ' + pdEscape(d.eta) : '');
+            pdShipLine(d.fee, d.district || district);
         } catch (e) {
             out.textContent = "Could not check delivery right now.";
         }
@@ -1108,6 +1116,7 @@ function pdBuildHighlights(product) {
         if (tab) tab.hidden = true;
         return;
     }
+    list.classList.toggle("pd-hl-two", items.length > 5);
     list.innerHTML = items.slice(0, 10).map(t =>
         '<li><span class="pd-hl-icon" aria-hidden="true">&#10022;</span><span>' + pdEscape(t) + '</span></li>'
     ).join("");
@@ -1128,6 +1137,9 @@ function pdOpenSection(id, scroll) {
     panel.querySelectorAll(".pd-dbody > .pd-section").forEach(sec => {
         sec.hidden = sec.id !== id;
     });
+    document.querySelectorAll("#pd-side-nav a").forEach(a => {
+        a.classList.toggle("active", a.dataset.sec === id);
+    });
     if (scroll) panel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -1140,6 +1152,8 @@ function pdSetupDetailsPanel() {
     panel.querySelectorAll(".pd-dbody > .pd-section").forEach(sec => {
         const tab = panel.querySelector('.pd-dtab[data-sec="' + sec.id + '"]');
         if (tab && sec.dataset.empty === "1") tab.hidden = true;
+        const side = document.querySelector('#pd-side-nav a[data-sec="' + sec.id + '"]');
+        if (side && sec.dataset.empty === "1") side.hidden = true;
     });
 
     panel.querySelectorAll(".pd-dtab").forEach(tab => {
@@ -1173,6 +1187,66 @@ function pdSetupDetailsPanel() {
         e.preventDefault();
         pdOpenSection(id, true);
     });
+}
+
+
+// "Official Store" badge above the title for Lizimas' own products. The
+// warranty sits next to the price and gets its own row under Delivery &
+// Returns.
+function pdRenderBadges(product) {
+    const el = document.getElementById("pd-badges");
+    const months = Number(product.warranty_months) || 0;
+    const label = months === 1 ? "1 Month" : months + " Months";
+    const out = [];
+    if (!product.vendor_id) out.push('<span class="pd-badge pd-badge-official">Official Store</span>');
+    if (el && out.length) { el.innerHTML = out.join(""); el.hidden = false; }
+
+    const row = document.getElementById("pd-warranty-row");
+    if (row && months > 0) {
+        document.getElementById("pd-warranty-text").textContent = label + " manufacturer warranty";
+        row.hidden = false;
+    }
+}
+
+// "+ delivery UGX 5,000 to Kampala" under the price once a location is chosen.
+function pdShipLine(fee, district) {
+    const el = document.getElementById("pd-ship-line");
+    if (!el) return;
+    if (fee === null || fee === undefined || !district) { el.hidden = true; return; }
+    el.innerHTML = "+ delivery <strong>UGX " + Number(fee).toLocaleString() + "</strong> to " + pdEscape(district);
+    el.hidden = false;
+}
+
+// Lizimas' own products: the store itself is the seller.
+function pdRenderOwnSeller(panel) {
+    panel.innerHTML =
+        '<div class="seller-panel-head">' +
+            '<span class="seller-panel-name">Lizimas Store</span>' +
+            '<span class="seller-score-badge">Official Store</span>' +
+        '</div>' +
+        '<ul class="seller-performance-list">' +
+            '<li class="seller-perf-item seller-perf-excellent"><span class="seller-perf-dot"></span>Sold and delivered by Lizimas Store</li>' +
+            '<li class="seller-perf-item seller-perf-excellent"><span class="seller-perf-dot"></span>Free pickup at our Bugolobi store</li>' +
+            '<li class="seller-perf-item seller-perf-excellent"><span class="seller-perf-dot"></span>7-day returns on eligible items</li>' +
+            '<li class="seller-perf-item seller-perf-excellent"><span class="seller-perf-dot"></span>Pay with Mobile Money or Cash on Delivery</li>' +
+        '</ul>';
+    panel.hidden = false;
+    const box = document.getElementById("pd-seller-box");
+    if (box) { box.hidden = false; box.classList.add("pd-seller-own"); }
+}
+
+// Share buttons and the "Report incorrect product information" link
+// (opens WhatsApp to Lizimas with the item already named).
+function pdSetupShare(product) {
+    const url = window.location.origin + window.location.pathname + window.location.search;
+    const text = (product.name || "Lizimas Store") + " - UGX " + Number(product.price || 0).toLocaleString();
+    const set = (id, href) => { const a = document.getElementById(id); if (a) a.href = href; };
+    set("pd-share-fb", "https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(url));
+    set("pd-share-x", "https://twitter.com/intent/tweet?text=" + encodeURIComponent(text) + "&url=" + encodeURIComponent(url));
+    set("pd-share-wa", "https://wa.me/?text=" + encodeURIComponent(text + " " + url));
+    set("pd-report-link", "https://wa.me/256792363104?text=" + encodeURIComponent(
+        "Hello Lizimas Store, some information on this product looks incorrect: " + (product.name || "") +
+        " (Item ID " + product.id + ") " + url + "\nWhat is wrong: "));
 }
 
 document.addEventListener("DOMContentLoaded", loadProductDetail);
