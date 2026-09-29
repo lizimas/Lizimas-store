@@ -352,6 +352,25 @@
                             <button type="button" onclick="uploadProductsCsv()" id="product-import-btn" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:9px 16px; cursor:pointer; font-weight:600; font-size:13px;">Upload &amp; Import</button>
                         </div>
                         <div id="product-import-results" style="margin-top:14px; font-size:12.5px;"></div>
+
+                        <h3 style="margin:18px 0 4px; border-top:1px solid #eee; padding-top:16px;">Photos by SKU</h3>
+                        <p style="font-size:12.5px; color:#888; margin:0 0 10px;">For Lizimas' own products. Name each photo by its product's SKU - <code>YD-8981_1.jpg</code>, <code>YD-8981_2.jpg</code> (or put them in a <code>YD-8981</code> folder as <code>1.jpg</code>, <code>2.jpg</code>). Photo 1 becomes the main photo. Pick a whole folder and every photo goes to its product. Vendor products are never changed.</p>
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <label style="background:#1a1a2e; color:#fff; border-radius:8px; padding:9px 16px; cursor:pointer; font-weight:600; font-size:13px;">Choose folder
+                                <input type="file" id="pbs-folder" webkitdirectory directory multiple onchange="pbsPick(this)" style="display:none;"></label>
+                            <label style="border:1px solid #1a1a2e; color:#1a1a2e; border-radius:8px; padding:8px 14px; cursor:pointer; font-weight:600; font-size:13px;">Choose photos
+                                <input type="file" id="pbs-files" accept=".jpg,.jpeg,.png,.webp" multiple onchange="pbsPick(this)" style="display:none;"></label>
+                            <select id="pbs-mode" style="padding:8px; border:1px solid #ccc; border-radius:8px; font-size:13px;">
+                                <option value="replace">Replace the product's photos</option>
+                                <option value="add">Add to the product's photos</option>
+                            </select>
+                            <label style="font-size:12.5px; color:#555; display:flex; align-items:center; gap:5px;"><input type="checkbox" id="pbs-skip-small" onchange="pbsRegroup()"> Skip photos marked TOO-SMALL</label>
+                        </div>
+                        <div id="pbs-results" style="margin-top:12px; font-size:12.5px;"></div>
+                        <div style="display:flex; gap:12px; align-items:center; margin-top:10px;">
+                            <button type="button" id="pbs-upload-btn" onclick="pbsUpload()" disabled style="background:#f4b400; color:#1a1a2e; border:none; border-radius:8px; padding:9px 16px; cursor:pointer; font-weight:700; font-size:13px;">Upload photos</button>
+                            <span id="pbs-progress" style="font-size:12.5px; color:#555;"></span>
+                        </div>
                     </div>
 
                     <div class="hidden panel" id="admin-channel-panel" style="margin-bottom:16px;">
@@ -2549,6 +2568,7 @@
 <script src="js/lz-package-size.js?v=3"></script>
     <script src="js/lz-text-counter.js?v=1"></script>
     <script src="js/admin.js?v=vc8"></script>
+    <script src="js/admin-photos-by-sku.js?v=pbs1"></script>
 <script src="js/admin-product-discounts.js?v=2"></script>
 <script src="js/admin-users.js?v=1"></script>
 <script src="js/photo-crop.js?v=1"></script>

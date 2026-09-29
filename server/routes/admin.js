@@ -344,6 +344,9 @@ router.patch("/orders/:id/status", updateOrderStatus);
 
 router.post("/products/import", csvUpload.single("file"), require("../controllers/adminController").importProducts);
 router.get("/products/export", require("../controllers/adminController").exportProducts);
+// Photos for Lizimas' own products, matched by the SKU in the file name
+// (one request per SKU - see adminPhotosBySkuController.js).
+router.post("/products/photos-by-sku", upload.array("photos", 12), require("../controllers/adminPhotosBySkuController").uploadPhotosBySku);
 
 // Store-level Channel integration (migration 085) - same Applications
 // concept vendors have, scoped to Lizimas's own products so Ryan can push

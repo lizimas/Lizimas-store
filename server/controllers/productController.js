@@ -84,6 +84,7 @@ function safePackageSize(value) {
     return SIZE_RANK[value] ? value : "Small";
 }
 exports.safePackageSize = safePackageSize;
+exports.uploadBufferWithPreview = uploadBufferWithPreview;
 
 // Sellers must never see or derive Lizimas' commission rate from their own
 // dashboard (Ryan, Sept 2026) - vendor_desired_payout (their own input) and
