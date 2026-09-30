@@ -1097,6 +1097,7 @@ async function pdSetupDelivery(productId) {
     };
 
     const showFee = async district => {
+        pdDoorInfoArea(null);
         if (!district) {
             out.textContent = "Choose your location to see the delivery fee and time.";
             pdShipLine(null);
@@ -1111,6 +1112,7 @@ async function pdSetupDelivery(productId) {
             if (d.quoteRequired) { out.textContent = d.message; pdShipLine(null); return; }
             out.innerHTML = 'Delivery fee <strong>UGX ' + Number(d.fee || 0).toLocaleString() + '</strong>' +
                 (d.eta ? '<br>Arrives in ' + pdEscape(d.eta) : '');
+            pdDoorInfoArea(d.district || district, d.eta);
             pdShipLine(d.fee, d.district || district);
         } catch (e) {
             out.textContent = "Could not check delivery right now.";
@@ -1295,4 +1297,31 @@ function pdSetupShare(product) {
         " (Item ID " + product.id + ") " + url + "\nWhat is wrong: "));
 }
 
+// "Details" next to Door Delivery opens a box with our delivery timing and
+// policy (the same wording as help#delivery). Opens and closes in place.
+function pdSetupDoorInfo() {
+    const btn = document.getElementById("pd-door-more");
+    const box = document.getElementById("pd-door-info");
+    if (!btn || !box) return;
+    const set = open => {
+        box.hidden = !open;
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+        btn.classList.toggle("open", open);
+    };
+    btn.onclick = () => set(box.hidden);
+    const close = document.getElementById("pd-door-close");
+    if (close) close.onclick = () => { set(false); btn.focus(); };
+    box.addEventListener("keydown", e => { if (e.key === "Escape") { set(false); btn.focus(); } });
+}
+
+// The chosen district's own delivery time, shown inside the details box.
+function pdDoorInfoArea(district, eta) {
+    const el = document.getElementById("pd-door-info-area");
+    if (!el) return;
+    if (!district || !eta) { el.hidden = true; el.textContent = ""; return; }
+    el.innerHTML = "For <strong>" + pdEscape(district) + "</strong>: arrives in about <strong>" + pdEscape(eta) + "</strong>.";
+    el.hidden = false;
+}
+
+document.addEventListener("DOMContentLoaded", pdSetupDoorInfo);
 document.addEventListener("DOMContentLoaded", loadProductDetail);
