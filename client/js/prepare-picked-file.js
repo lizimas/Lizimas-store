@@ -41,9 +41,26 @@ async function preparePickedFile(file, attempt) {
         bmp.close();
         if (!w || !h) throw new Error("decode produced no dimensions");
 
+        // The server takes only JPG, PNG and WebP. Safari also opens HEIC
+        // (iPhone / Photos app), AVIF (saved from many shops), GIF and others,
+        // so anything else is redrawn and sent as a JPG instead of failing at
+        // Save with "Only .jpeg, .jpg, .png, and .webp image files are allowed".
+        const isWebp = bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+            bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+        if (!isJpeg && !isPng && !isWebp) {
+            const jpg = await pickedToJpeg(blob, w, h);
+            const base = String(file.name || "photo").replace(/\.[^.]*$/, "") || "photo";
+            return {
+                ok: true,
+                converted: true,
+                file: new File([jpg], base + ".jpg", { type: "image/jpeg", lastModified: file.lastModified })
+            };
+        }
+        const type = isJpeg ? "image/jpeg" : isPng ? "image/png" : "image/webp";
+
         return {
             ok: true,
-            file: new File([blob], file.name, { type: blob.type, lastModified: file.lastModified })
+            file: new File([buf], file.name, { type, lastModified: file.lastModified })
         };
     } catch (err) {
         if (attempt === 1) {
@@ -53,6 +70,22 @@ async function preparePickedFile(file, attempt) {
         }
         return { ok: false, name: file.name, reason: err.message };
     }
+}
+
+// Redraws a decoded photo as a JPG (white behind any transparency).
+async function pickedToJpeg(blob, w, h) {
+    const bmp = await createImageBitmap(blob);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(bmp, 0, 0, w, h);
+    bmp.close();
+    const out = await new Promise(res => canvas.toBlob(res, "image/jpeg", 0.92));
+    if (!out) throw new Error("could not convert to JPG");
+    return out;
 }
 
 // Video counterpart. Same first guard as above -- read the bytes now so a

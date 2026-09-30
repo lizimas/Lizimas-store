@@ -15,7 +15,10 @@ const fileFilter = (req, file, cb) => {
     if (extOk || mimeOk) {
         cb(null, true);
     } else {
-        const err = new Error("Only .jpeg, .jpg, .png, and .webp image files are allowed.");
+        // Name the file, so a 13-photo product says which one to replace.
+        const name = String(file.originalname || "").slice(0, 80);
+        const err = new Error("Only .jpeg, .jpg, .png, and .webp image files are allowed." +
+            (name ? ' "' + name + '" is not one of these - save it as a JPG and add it again.' : ""));
         err.code = "INVALID_FILE_TYPE";
         cb(err);
     }
