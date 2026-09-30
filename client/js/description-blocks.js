@@ -154,6 +154,12 @@
         const requested = parseInt(payload.columns, 10) || items.length;
         const cols = Math.min(Math.max(requested, 1), 8);
         grid.style.setProperty("--pdb-grid-cols", cols);
+        // Collage layouts, and more than 4 columns scroll sideways (Sept 2026).
+        if (["1+2", "2+1", "2x2"].includes(payload.layout)) {
+            grid.classList.add("pdb-grid-collage", "pdb-grid-" + payload.layout.replace("+", "p"));
+        } else if (cols > 4) {
+            grid.classList.add("pdb-grid-scroll");
+        }
 
         // Wraps an already-built element in a clickable <a>, in place.
         function wrapInLink(el, url) {

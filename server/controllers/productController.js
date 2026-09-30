@@ -2,6 +2,7 @@ const pool = require("../config/database");
 const { generateSku } = require("../utils/sku");
 const cloudinary = require("../config/cloudinary");
 const { logActivity } = require("../utils/activityLog");
+const { publicProductRow, readExtraProductFields, cleanColorInput, variantCombos, suggestVariantSku } = require("../utils/productForm");
 const { canApplyComplianceAction } = require("../utils/vendorCompliance");
 const { createVendorNotification } = require("./vendorController");
 const { calculatePricing, getActiveCommissionRule, computePricing } = require("../utils/commissionEngine");
@@ -112,9 +113,24 @@ exports.uploadBufferWithPreview = uploadBufferWithPreview;
 // staff/admin viewing the same shared endpoints (getMyProducts, and staff
 // editing a vendor's product via /api/products) still see them.
 function redactCommissionForVendor(role, product) {
-    if (role !== "vendor" || !product) return product;
-    const { commission_rate_applied, fixed_fee_applied, commission_rule_id, ...rest } = product;
+    if (!["vendor", "vendor_staff"].includes(role) || !product) return product;
+    const { commission_rate_applied, fixed_fee_applied, commission_rule_id,
+            cost_price, review_flags, review_reason_code, reviewed_by, ...rest } = product;
     return rest;
+}
+
+
+
+
+const wantsDraft = (body) => String((body && body.save_as_draft) || "") === "1";
+
+async function saveExtraFields(db, productId, extra) {
+    const keys = Object.keys(extra);
+    if (!keys.length) return {};
+    const sets = keys.map((k, i) => `${k} = $${i + 1}`).join(", ");
+    const r = await db.query(`UPDATE products SET ${sets} WHERE id = $${keys.length + 1} RETURNING ${keys.join(", ")}`,
+        keys.map((k) => extra[k]).concat([productId]));
+    return r.rows[0] || {};
 }
 
 // Add product (with optional multiple image uploads)
@@ -138,7 +154,12 @@ exports.addProduct = async (req, res) => {
         const prohibitedError = await checkProhibitedOrNull({ name, description, brand, category_id });
         if (prohibitedError) return res.status(400).json(prohibitedError);
 
-        const status = ["product_staff", "vendor", "vendor_staff"].includes(req.user.role) ? "pending" : "approved";
+        let extra;
+        try { extra = readExtraProductFields(req.body, req.user.role); } catch (e) { return res.status(400).json({ error: e.message }); }
+        // "Save as Draft" keeps the product off the store and out of the
+        // approval queue until it's submitted.
+        const draft = wantsDraft(req.body);
+        const status = draft ? "draft" : (["product_staff", "vendor", "vendor_staff"].includes(req.user.role) ? "pending" : "approved");
 
         // Vendor-submitted products carry a vendor_id so they can be scoped to
         // that vendor's own listings/orders/payouts, separately from created_by
@@ -191,7 +212,7 @@ exports.addProduct = async (req, res) => {
         const uploadedFiles = req.files || [];
         let imagePaths, imageHashes = [], imageWarnings = [];
         if (isVendorRole(req.user.role)) {
-            const checked = await uploadCheckedPhotos(uploadedFiles, { existingCount: 0, vendorId }, photoDeps);
+            const checked = await uploadCheckedPhotos(uploadedFiles, { existingCount: 0, vendorId, draft }, photoDeps);
             if (!checked.ok) return res.status(checked.status).json(checked.body);
             imagePaths = checked.urls; imageHashes = checked.hashes; imageWarnings = checked.warnings;
         } else {
@@ -217,6 +238,7 @@ exports.addProduct = async (req, res) => {
         );
 
         const newProduct = product.rows[0];
+        if (Object.keys(extra).length) Object.assign(newProduct, await saveExtraFields(pool, newProduct.id, extra));
         if (measured.provided) {
             await saveMeasurements(pool, newProduct.id, measured.value);
             Object.assign(newProduct, measured.value);
@@ -249,7 +271,9 @@ exports.addProduct = async (req, res) => {
 
         logActivity(req.user.userId, "added_product", "product", newProduct.id, `Added "${name}" (status: ${status})`);
 
-        const message = status === "pending"
+        const message = status === "draft"
+            ? "Saved as a draft. It isn't on the store or sent for approval until you submit it."
+            : status === "pending"
             ? "Product submitted and is pending admin approval."
             : "Product added successfully";
 
@@ -374,7 +398,7 @@ exports.getProducts = async (req, res) => {
 
         // Public, unauthenticated listing - see getProductById for why all
         // four commission-engine columns are stripped, not just the rate.
-        res.json(products.rows.map(({ vendor_desired_payout, commission_rate_applied, fixed_fee_applied, commission_rule_id, ...publicProduct }) => publicProduct));
+        res.json(products.rows.map(publicProductRow));
 
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -418,8 +442,13 @@ exports.getMyProducts = async (req, res) => {
         // product would silently pull it off sale. `is_own` tells the client
         // which rows are editable.
         const isManager = req.user.role === "store_manager";
+        // Admin products page (Sept 2026): all of Lizimas' own products in
+        // every status (drafts included), with the admin-only fields.
+        const lizimasOwn = req.user.role === "admin" && req.query && req.query.lizimas === "1";
 
-        const scopeClause = isManager
+        const scopeClause = lizimasOwn
+            ? "AND p.vendor_id IS NULL AND ($1::int IS NOT NULL)"
+            : isManager
             ? ""
             : "AND p.created_by = $1";
         // Vendor Product Management's "Deleted" filter asks for soft-deleted
@@ -518,11 +547,15 @@ exports.getProductById = async (req, res) => {
         // vendor_promotions' own snapshotted original_price.
         const result = await pool.query(
             `SELECT products.*, vendors.business_name AS vendor_business_name, vendors.slug AS vendor_slug,
+                    -- The "Was" price (compare_at_price) only shows when no
+                    -- flash sale, promotion or discount is running.
                     COALESCE(fsi.sale_price, vp.proposed_sale_price,
-                             CASE WHEN pd.percent IS NOT NULL THEN ROUND(products.price * (1 - pd.percent / 100)) END) AS sale_price,
+                             CASE WHEN pd.percent IS NOT NULL THEN ROUND(products.price * (1 - pd.percent / 100)) END,
+                             CASE WHEN products.compare_at_price > products.price THEN products.price END) AS sale_price,
                     CASE WHEN fsi.sale_price IS NOT NULL THEN products.price
                          WHEN vp.proposed_sale_price IS NOT NULL THEN vp.original_price
-                         WHEN pd.percent IS NOT NULL THEN products.price END AS original_price,
+                         WHEN pd.percent IS NOT NULL THEN products.price
+                         WHEN products.compare_at_price > products.price THEN products.compare_at_price END AS original_price,
                     CASE WHEN fsi.sale_price IS NULL AND vp.proposed_sale_price IS NULL THEN pd.percent END AS discount_percent
              FROM products
              LEFT JOIN vendors ON vendors.id = products.vendor_id AND vendors.status = 'approved'
@@ -562,7 +595,7 @@ exports.getProductById = async (req, res) => {
         // Public, unauthenticated endpoint - strip the commission-engine
         // inputs/outputs entirely rather than just the rate: payout next to
         // the public price would let anyone back-calculate the rate anyway.
-        const { vendor_desired_payout, commission_rate_applied, fixed_fee_applied, commission_rule_id, ...publicProduct } = result.rows[0];
+        const publicProduct = publicProductRow(result.rows[0]);
         // Page view counter (migrations/128_product_view_daily.sql) -
         // fire-and-forget: a failed count must never hold up the page.
         pool.query(
@@ -613,11 +646,65 @@ exports.getSizeCatalog = async (req, res) => {
 exports.getColorCatalog = async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT id, name, display_order FROM color_catalog ORDER BY display_order ASC`
+            `SELECT id, name, display_order, hex FROM color_catalog ORDER BY display_order ASC, id ASC`
         );
         res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+};
+
+// Colour list management (Sept 2026): admin / Lizimas staff add colours with
+// a colour picker (name + #RRGGBB) and can rename or recolour them. Vendors
+// only choose from this list (saveProductOptions refuses new names from them).
+
+
+exports.createCatalogColor = async (req, res) => {
+    try {
+        const c = cleanColorInput(req.body || {}, false);
+        if (c.error) return res.status(400).json({ error: c.error });
+        const dup = await pool.query(`SELECT id, name FROM color_catalog WHERE lower(trim(name)) = lower($1)`, [c.value.name]);
+        if (dup.rows.length) return res.status(409).json({ error: `"${dup.rows[0].name}" is already in the colour list.`, id: dup.rows[0].id });
+        const r = await pool.query(
+            `INSERT INTO color_catalog (name, hex, display_order)
+             VALUES ($1, $2, (SELECT COALESCE(MAX(display_order), 0) + 1 FROM color_catalog))
+             RETURNING id, name, hex, display_order`,
+            [c.value.name, c.value.hex]
+        );
+        logActivity(req.user.userId, "added_color", "color", r.rows[0].id, `Added colour ${r.rows[0].name} ${r.rows[0].hex || ""}`);
+        res.json(r.rows[0]);
+    } catch (error) {
+        console.error("createCatalogColor error:", error.message);
+        res.status(500).json({ error: "Could not add the colour." });
+    }
+};
+
+exports.updateCatalogColor = async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id)) return res.status(400).json({ error: "Unknown colour." });
+        const c = cleanColorInput(req.body || {}, true);
+        if (c.error) return res.status(400).json({ error: c.error });
+        if (c.value.name) {
+            const dup = await pool.query(`SELECT id FROM color_catalog WHERE lower(trim(name)) = lower($1) AND id <> $2`, [c.value.name, id]);
+            if (dup.rows.length) return res.status(409).json({ error: "Another colour already has that name." });
+        }
+        const old = (await pool.query(`SELECT name FROM color_catalog WHERE id = $1`, [id])).rows[0];
+        if (!old) return res.status(404).json({ error: "Unknown colour." });
+        const r = await pool.query(
+            `UPDATE color_catalog SET name = COALESCE($1, name), hex = CASE WHEN $3 THEN $2 ELSE hex END
+             WHERE id = $4 RETURNING id, name, hex, display_order`,
+            [c.value.name || null, c.value.hex === undefined ? null : c.value.hex, c.value.hex !== undefined, id]
+        );
+        // Products show the colour's name from their own row; keep them in step.
+        if (c.value.name && c.value.name !== old.name) {
+            await pool.query(`UPDATE product_colors SET name = $1 WHERE color_id = $2`, [c.value.name, id]);
+        }
+        logActivity(req.user.userId, "edited_color", "color", id, `Colour ${old.name} -> ${r.rows[0].name} ${r.rows[0].hex || ""}`);
+        res.json(r.rows[0]);
+    } catch (error) {
+        console.error("updateCatalogColor error:", error.message);
+        res.status(500).json({ error: "Could not save the colour." });
     }
 };
 
@@ -633,6 +720,22 @@ exports.saveProductOptions = async (req, res) => {
 
         const { sizes, colors, specs } = req.body;
         const touchesVariants = Array.isArray(sizes) || Array.isArray(colors);
+
+        // Vendors pick colours from the list admin keeps; they can't add new
+        // names (so "Blak", "black" and "BLACK" don't end up as three colours).
+        if (Array.isArray(colors) && ["vendor", "vendor_staff"].includes(req.user.role)) {
+            const names = colors.map((c) => String((c && c.name) || "").trim()).filter(Boolean);
+            if (names.length) {
+                const known = new Set((await pool.query(
+                    `SELECT lower(trim(name)) AS n FROM color_catalog WHERE lower(trim(name)) = ANY($1::text[])`,
+                    [names.map((n) => n.toLowerCase())]
+                )).rows.map((r) => r.n));
+                const unknown = names.filter((n) => !known.has(n.toLowerCase()));
+                if (unknown.length) {
+                    return res.status(400).json({ error: `Choose colours from the list. Not in the list: ${unknown.join(", ")}. Ask Lizimas Store to add a colour you need.` });
+                }
+            }
+        }
 
         await client.query("BEGIN");
 
@@ -799,7 +902,7 @@ exports.generateProductVariants = async (req, res) => {
         await client.query("BEGIN");
 
         const productRow = (await client.query(
-            `SELECT id, price FROM products WHERE id = $1 AND deleted_at IS NULL`,
+            `SELECT id, price, sku FROM products WHERE id = $1 AND deleted_at IS NULL`,
             [id]
         )).rows[0];
 
@@ -818,10 +921,14 @@ exports.generateProductVariants = async (req, res) => {
             [id]
         )).rows;
 
-        if (colors.length === 0 || sizes.length === 0) {
+        // One row per colour, per size, or per colour + size - whichever the
+        // product has (Sept 2026: colour-only products such as a cup in Black
+        // and Beige can have their own stock, price and SKU per colour).
+        const combos = variantCombos(colors, sizes);
+        if (combos.length === 0) {
             await client.query("ROLLBACK");
             return res.status(400).json({
-                error: "Product needs at least one colour and one size before variants can be generated."
+                error: "Choose at least one colour or size before making the variants table."
             });
         }
 
@@ -835,19 +942,19 @@ exports.generateProductVariants = async (req, res) => {
         let created = 0;
         let skipped = 0;
 
-        for (const color of colors) {
-            for (const size of sizes) {
-                if (existing.has(`${color.id}:${size.id}`)) {
-                    skipped++;
-                    continue;
-                }
-                await client.query(
-                    `INSERT INTO product_variants (product_id, variant_name, color_id, size_id, price, stock)
-                     VALUES ($1, $2, $3, $4, $5, 0)`,
-                    [id, `${color.name} - ${size.name}`, color.id, size.id, productRow.price]
-                );
-                created++;
+        for (const combo of combos) {
+            const colorId = combo.color ? combo.color.id : null;
+            const sizeId = combo.size ? combo.size.id : null;
+            if (existing.has(`${colorId}:${sizeId}`)) {
+                skipped++;
+                continue;
             }
+            await client.query(
+                `INSERT INTO product_variants (product_id, variant_name, color_id, size_id, price, stock, sku)
+                 VALUES ($1, $2, $3, $4, $5, 0, $6)`,
+                [id, combo.name, colorId, sizeId, productRow.price, suggestVariantSku(productRow.sku, combo)]
+            );
+            created++;
         }
 
         await client.query("COMMIT");
@@ -867,6 +974,8 @@ exports.generateProductVariants = async (req, res) => {
         client.release();
     }
 };
+
+
 
 // Bulk-update variant stock for one product. Single transaction so the grid
 // cannot half-save. Rows not belonging to this product are rejected outright.
@@ -933,7 +1042,15 @@ exports.updateVariantStock = async (req, res) => {
                     return res.status(400).json({ error: "A variant price must be more than 0, or left blank to use the product price." });
                 }
             }
-            clean.push({ variantId, stock, payout, price });
+            let sku;
+            if (Object.prototype.hasOwnProperty.call(u, "sku")) {
+                sku = u.sku == null ? null : String(u.sku).trim().toUpperCase();
+                if (sku === "") sku = null;
+                if (sku && (sku.length > 64 || !/^[A-Z0-9][A-Z0-9._\/-]*$/.test(sku))) {
+                    return res.status(400).json({ error: `SKU "${u.sku}" can only use letters, numbers and - . / _ (up to 64).` });
+                }
+            }
+            clean.push({ variantId, stock, payout, price, sku });
         }
 
         await client.query("BEGIN");
@@ -959,11 +1076,19 @@ exports.updateVariantStock = async (req, res) => {
             [id]
         )).rows[0];
         const isVendor = ["vendor", "vendor_staff"].includes(req.user.role);
+        const skus = clean.filter(u => u.sku).map(u => u.sku);
+        if (new Set(skus).size !== skus.length) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ error: "Two variants have the same SKU - each needs its own." });
+        }
         for (const u of clean) {
             await client.query(
                 `UPDATE product_variants SET stock = $1 WHERE id = $2 AND product_id = $3`,
                 [u.stock, u.variantId, id]
             );
+            if (u.sku !== undefined) {
+                await client.query(`UPDATE product_variants SET sku = $1 WHERE id = $2 AND product_id = $3`, [u.sku, u.variantId, id]);
+            }
             if (isVendor && u.payout !== undefined) {
                 if (u.payout === null) {
                     await client.query(`UPDATE product_variants SET vendor_payout = NULL, price = $1 WHERE id = $2`, [prod.price, u.variantId]);
@@ -991,7 +1116,7 @@ exports.updateVariantStock = async (req, res) => {
         )).rows[0];
 
         const priced = (await client.query(
-            `SELECT id, price, vendor_payout FROM product_variants WHERE product_id = $1 ORDER BY id`, [id]
+            `SELECT id, price, vendor_payout, sku FROM product_variants WHERE product_id = $1 ORDER BY id`, [id]
         )).rows;
 
         await client.query("COMMIT");
@@ -1076,7 +1201,11 @@ exports.getProductOptions = async (req, res) => {
         const { id } = req.params;
 
         const colors = await pool.query(
-            `SELECT id, name, image_path, display_order FROM product_colors WHERE product_id = $1 ORDER BY display_order ASC`,
+            `SELECT pc.id, pc.name, pc.image_path, pc.display_order, cc.hex
+               FROM product_colors pc
+               LEFT JOIN color_catalog cc ON cc.id = pc.color_id
+                    OR (pc.color_id IS NULL AND lower(trim(cc.name)) = lower(trim(pc.name)))
+              WHERE pc.product_id = $1 ORDER BY pc.display_order ASC`,
             [id]
         );
 
@@ -1086,7 +1215,7 @@ exports.getProductOptions = async (req, res) => {
         );
 
         const variants = await pool.query(
-            `SELECT v.id, v.variant_name, v.color_id, v.size_id, v.price, v.stock,
+            `SELECT v.id, v.variant_name, v.color_id, v.size_id, v.price, v.stock, v.sku,
                     (v.price > 0 AND (v.vendor_payout IS NOT NULL OR v.price IS DISTINCT FROM p.price)) AS own_price
                FROM product_variants v JOIN products p ON p.id = v.product_id WHERE v.product_id = $1
               ORDER BY v.id`,
@@ -1173,6 +1302,7 @@ exports.updateProduct = async (req, res) => {
                 material, color, sleeve, style, length, fit, pattern, care_instructions, occasion,
                 warranty_months, brand, gtin, mpn, desired_payout, sku } = req.body;
         let { price } = req.body;
+        const draft = wantsDraft(req.body);
 
         // Delivery tier is calculated from the packed weight/dimensions
         // (migrations/130); a sent package_size is only the fallback.
@@ -1193,7 +1323,7 @@ exports.updateProduct = async (req, res) => {
                 `SELECT p.vendor_id, (SELECT COUNT(*)::int FROM product_images WHERE product_id = p.id) AS n
                    FROM products p WHERE p.id = $1`, [id])).rows[0] || {};
             const checked = await uploadCheckedPhotos(uploadedFiles,
-                { existingCount: owned.n || 0, vendorId: owned.vendor_id || req.vendorId, productId: Number(id) }, photoDeps);
+                { existingCount: owned.n || 0, vendorId: owned.vendor_id || req.vendorId, productId: Number(id), draft }, photoDeps);
             if (!checked.ok) return res.status(checked.status).json(checked.body);
             newImagePaths = checked.urls; newImageHashes = checked.hashes; imageWarnings = checked.warnings;
         } else {
@@ -1205,10 +1335,15 @@ exports.updateProduct = async (req, res) => {
             newImagePaths = await Promise.all(uploadedFiles.map(f => uploadBufferToCloudinary(f.buffer)));
         }
 
-        const statusClause = ["product_staff", "vendor", "vendor_staff"].includes(req.user.role) ? `, status='pending'` : "";
-        const prevStatus = statusClause
-            ? ((await pool.query("SELECT status FROM products WHERE id = $1", [id])).rows[0] || {}).status
-            : null;
+        let extra;
+        try { extra = readExtraProductFields(req.body, req.user.role); } catch (e) { return res.status(400).json({ error: e.message }); }
+        const currentStatus = ((await pool.query("SELECT status FROM products WHERE id = $1", [id])).rows[0] || {}).status;
+        // Sellers' edits go back for approval; "Save as Draft" keeps it a
+        // draft; admin saving a draft (without "draft") puts it live.
+        const statusClause = draft ? `, status='draft'`
+            : ["product_staff", "vendor", "vendor_staff"].includes(req.user.role) ? `, status='pending'`
+            : currentStatus === "draft" ? `, status='approved'` : "";
+        const prevStatus = statusClause ? currentStatus : null;
 
         // Only a vendor re-running the commission engine touches the pricing
         // snapshot columns - a staff/admin edit (even of a vendor's product)
@@ -1247,9 +1382,13 @@ exports.updateProduct = async (req, res) => {
         // Appended after the pricing params (rather than inlined at a fixed
         // $N alongside name/category/etc.) so its placeholder number doesn't
         // depend on whether the vendor-only pricing clause is present.
-        const skuParam = params.length + 1;
-        updateQuery += `, sku=$${skuParam}`;
-        params.push(sku || null);
+        // Only when the form sends a SKU: older admin/staff forms didn't,
+        // and every edit there used to blank the product's SKU.
+        if (sku !== undefined) {
+            const skuParam = params.length + 1;
+            updateQuery += `, sku=$${skuParam}`;
+            params.push(String(sku).trim() || null);
+        }
 
         const nextParam = params.length + 1;
         if (newImagePaths.length > 0) {
@@ -1261,8 +1400,9 @@ exports.updateProduct = async (req, res) => {
         }
 
         const product = await pool.query(updateQuery, params);
+        if (product.rows[0] && Object.keys(extra).length) Object.assign(product.rows[0], await saveExtraFields(pool, id, extra));
         // Approval history: a seller's edit sends it back for review.
-        if (product.rows[0] && prevStatus && prevStatus !== "pending" && prevStatus !== "draft") {
+        if (product.rows[0] && prevStatus && !draft && prevStatus !== "pending" && prevStatus !== "draft") {
             require("./productReviewController").recordEvent(pool, Number(id), {
                 action: prevStatus === "changes_requested" ? "resubmitted" : "edited", from: prevStatus, to: "pending",
                 actorId: req.user.userId, actorName: req.user.name || null, actorRole: req.user.role
@@ -1313,7 +1453,9 @@ exports.updateProduct = async (req, res) => {
 
         logActivity(req.user.userId, "edited_product", "product", Number(id), `Edited "${name}"`);
 
-        const message = ["product_staff", "vendor"].includes(req.user.role)
+        const message = draft
+            ? "Draft saved. It isn't on the store or sent for approval until you submit it."
+            : ["product_staff", "vendor", "vendor_staff"].includes(req.user.role)
             ? "Product updated and is pending admin approval."
             : "Product updated successfully";
 

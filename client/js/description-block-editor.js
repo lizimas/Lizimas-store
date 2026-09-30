@@ -141,6 +141,68 @@
         }
     }
 
+    // ---- Grid layouts -------------------------------------------------------
+    const GRID_LAYOUTS = [
+        { key: "1", label: "1 column", cols: 1 }, { key: "2", label: "2 columns", cols: 2 },
+        { key: "3", label: "3 columns", cols: 3 }, { key: "4", label: "4 columns", cols: 4 },
+        { key: "5", label: "5 columns (scrolls sideways)", cols: 5 }, { key: "6", label: "6 columns (scrolls sideways)", cols: 6 },
+        { key: "8", label: "8 columns (scrolls sideways)", cols: 8 },
+        { key: "1+2", label: "Collage: 1 big + 2 small", need: 3 }, { key: "2+1", label: "Collage: 2 small + 1 big", need: 3 },
+        { key: "2x2", label: "Collage: 2 x 2", need: 4 }
+    ];
+    function gridLayoutOf(payload) {
+        return ["1+2", "2+1", "2x2"].includes(payload.layout) ? payload.layout : "cols";
+    }
+    function gridLayoutIcon(l) {
+        const box = (x, y, w, h) => '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="1.5"/>';
+        let r = "";
+        if (l.cols) {
+            const n = l.cols, gap = 2, w = (40 - gap * (n - 1)) / n;
+            for (let k = 0; k < n; k++) r += box(k * (w + gap), 0, w, 26);
+        } else if (l.key === "1+2") r = box(0, 0, 24, 26) + box(26, 0, 14, 12) + box(26, 14, 14, 12);
+        else if (l.key === "2+1") r = box(0, 0, 14, 12) + box(0, 14, 14, 12) + box(16, 0, 24, 26);
+        else r = box(0, 0, 19, 12) + box(21, 0, 19, 12) + box(0, 14, 19, 12) + box(21, 14, 19, 12);
+        return '<svg viewBox="0 0 40 26" width="40" height="26" aria-hidden="true" fill="currentColor">' + r + "</svg>";
+    }
+    function gridLayoutPicker(i, payload) {
+        const wrap = document.createElement("div");
+        wrap.className = "lzbe-grid-layouts";
+        const title = document.createElement("div");
+        title.className = "lzbe-grid-layouts-title";
+        title.textContent = "Layout";
+        wrap.appendChild(title);
+        const btns = document.createElement("div");
+        btns.className = "lzbe-grid-layout-btns";
+        const current = gridLayoutOf(payload) === "cols" ? String(parseInt(payload.columns, 10) || payload.items.length || 3) : payload.layout;
+        GRID_LAYOUTS.forEach((l) => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "lzbe-grid-layout" + (l.key === current ? " is-on" : "");
+            b.title = l.label;
+            b.setAttribute("aria-label", l.label);
+            b.setAttribute("aria-pressed", l.key === current ? "true" : "false");
+            b.innerHTML = gridLayoutIcon(l);
+            b.addEventListener("click", () => {
+                const p = blocks[i].payload;
+                if (l.cols) { p.layout = "cols"; p.columns = l.cols; } else { p.layout = l.key; p.columns = l.key === "2x2" ? 2 : 3; }
+                const need = l.cols || l.need;
+                while (p.items.length < need) p.items.push({});
+                render();
+            });
+            btns.appendChild(b);
+        });
+        wrap.appendChild(btns);
+        const note = document.createElement("div");
+        note.className = "lzbe-grid-layouts-note";
+        const lay = gridLayoutOf(payload);
+        note.textContent = lay === "1+2" ? "The first column is the big one, the next two sit beside it."
+            : lay === "2+1" ? "The first two sit on the left, the third is the big one."
+            : lay === "2x2" ? "Four columns in two rows."
+            : ((parseInt(payload.columns, 10) || 3) > 4 ? "More than 4 columns scroll sideways on the store." : "Each cell can hold a photo, a video or video link, text and a link.");
+        wrap.appendChild(note);
+        return wrap;
+    }
+
     function addGridItem(gridIndex) {
         blocks[gridIndex].payload.items.push({});
         render();
@@ -599,19 +661,10 @@
                 headingInput.addEventListener("input", (e) => { payload.heading = e.target.value; });
                 row.appendChild(headingInput);
 
-                const colsLabel = document.createElement("label");
-                colsLabel.className = "lzbe-grid-cols";
-                colsLabel.textContent = "Columns on desktop: ";
-                const colsInput = document.createElement("input");
-                colsInput.type = "number";
-                colsInput.min = "1";
-                colsInput.max = "8";
-                colsInput.value = payload.columns || payload.items.length || 3;
-                colsInput.addEventListener("input", (e) => {
-                    payload.columns = Math.min(Math.max(parseInt(e.target.value, 10) || 1, 1), 8);
-                });
-                colsLabel.appendChild(colsInput);
-                row.appendChild(colsLabel);
+                // Layout picker (Sept 2026): 1-8 columns side by side, or a
+                // collage - one big + two small (either side) or 2 x 2. More
+                // than 4 columns scroll sideways on the store.
+                row.appendChild(gridLayoutPicker(i, payload));
 
                 // Full-width (edge-to-edge) display for the whole grid
                 // section, same Lulu-style breakout as the standalone Image
@@ -630,7 +683,7 @@
                 row.appendChild(gridFullWidthLabel);
 
                 const itemsWrap = document.createElement("div");
-                itemsWrap.className = "lzbe-grid-items";
+                itemsWrap.className = "lzbe-grid-items" + (gridLayoutOf(payload) === "cols" && (parseInt(payload.columns, 10) || 0) > 4 ? " lzbe-grid-items-scroll" : "");
 
                 payload.items.forEach((item, j) => {
                     const cell = document.createElement("div");

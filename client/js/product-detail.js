@@ -177,6 +177,14 @@ async function loadProductDetail() {
                 alert("Please choose an option first.");
                 return;
             }
+            // Per-colour / per-size stock: the customer has to pick, and a
+            // row with none left can't be added.
+            if (pdVariantStockEnabled === true && pdVariants.some(v => v.color_id !== null || v.size_id !== null)) {
+                if (pdColors.length && pdSelectedColorId === null) { alert("Please choose a colour first."); return; }
+                if (document.querySelectorAll("#pd-size-buttons .pd-size-btn").length && !pdSelectedSizeId) { alert("Please choose a size first."); return; }
+                const picked = pdPickedVariant();
+                if (picked && Number(picked.stock) <= 0) { alert("Sorry, that one is out of stock."); return; }
+            }
             // The cart shows what checkout will charge: the running sale or
             // discount price when there is one (checkout re-prices anyway).
             const pickPrice = pdColorSizeVariantPrice();
@@ -546,8 +554,14 @@ async function loadOptions(id, product) {
         const swatchContainer = colorRow.querySelector("#pd-color-swatches");
         data.colors.forEach(color => {
             const swatch = document.createElement("div");
-            swatch.className = "pd-color-swatch";
-            swatch.innerHTML = `<img src="${color.image_path || ''}" alt="${color.name}">`;
+            swatch.className = "pd-color-swatch" + (color.image_path ? "" : " pd-color-swatch-dot");
+            swatch.title = color.name;
+            swatch.setAttribute("role", "button");
+            swatch.setAttribute("aria-label", color.name);
+            swatch.innerHTML = color.image_path
+                ? `<img src="${pdEscape(color.image_path)}" alt="${pdEscape(color.name)}">` +
+                  (color.hex ? `<span class="pd-swatch-hex" style="background:${pdEscape(color.hex)}"></span>` : "")
+                : `<span class="pd-swatch-fill" style="background:${pdEscape(color.hex || "#e5e7eb")}"></span>`;
             swatch.onclick = () => selectColor(color.id, color.image_path, color.name);
             swatch.dataset.colorId = color.id;
             swatchContainer.appendChild(swatch);
@@ -572,6 +586,19 @@ async function loadOptions(id, product) {
     }
 
     updateSizeAvailability();
+    pdMarkSoldOutColors();
+}
+
+// Colour-only products with per-colour stock: a colour with none left is
+// greyed out and says so.
+function pdMarkSoldOutColors() {
+    if (pdVariantStockEnabled !== true || document.querySelectorAll("#pd-size-buttons .pd-size-btn").length) return;
+    document.querySelectorAll(".pd-color-swatch").forEach(el => {
+        const v = pdVariants.find(x => Number(x.color_id) === Number(el.dataset.colorId) && x.size_id === null);
+        const out = v && Number(v.stock) <= 0;
+        el.classList.toggle("pd-soldout", !!out);
+        if (out) el.title = el.getAttribute("aria-label") + " - out of stock";
+    });
 }
 
 function selectColor(colorId, imagePath, colorName) {
@@ -626,7 +653,7 @@ function updateStockHint() {
     pdApplyVariantPrice();
     let el = document.getElementById("pd-stock-hint");
 
-    const sizeRow = document.querySelector(".pd-size-buttons");
+    const sizeRow = document.querySelector(".pd-size-buttons") || document.getElementById("pd-color-swatches");
     if (!el && sizeRow && sizeRow.parentElement) {
         el = document.createElement("div");
         el.id = "pd-stock-hint";
@@ -635,15 +662,7 @@ function updateStockHint() {
     }
     if (!el) return;
 
-    if (pdVariantStockEnabled !== true || !pdSelectedColorId || !pdSelectedSizeId) {
-        el.textContent = "";
-        return;
-    }
-
-    const variant = pdVariants.find(v =>
-        Number(v.color_id) === Number(pdSelectedColorId) &&
-        Number(v.size_id) === Number(pdSelectedSizeId)
-    );
+    const variant = pdPickedVariant();
 
     if (!variant) {
         el.textContent = "";
@@ -664,12 +683,22 @@ function updateStockHint() {
     }
 }
 
-// Per-variant prices: a colour+size with its own price sells at that price
+// The colour / size row the customer has picked (colour + size, colour
+// only, or size only - whatever the product's variants are made of).
+function pdPickedVariant() {
+    if (pdVariantStockEnabled !== true) return null;
+    const hasColors = pdColors.length > 0;
+    const hasSizes = document.querySelectorAll("#pd-size-buttons .pd-size-btn").length > 0;
+    if ((hasColors && !pdSelectedColorId) || (hasSizes && !pdSelectedSizeId)) return null;
+    return pdVariants.find(x =>
+        (hasColors ? Number(x.color_id) === Number(pdSelectedColorId) : x.color_id === null) &&
+        (hasSizes ? Number(x.size_id) === Number(pdSelectedSizeId) : x.size_id === null)) || null;
+}
+
+// Per-variant prices: a picked row with its own price sells at that price
 // (checkout charges the same). Returns null when the pick uses the product price.
 function pdColorSizeVariantPrice() {
-    if (pdVariantStockEnabled !== true || !pdSelectedColorId || !pdSelectedSizeId) return null;
-    const v = pdVariants.find(x =>
-        Number(x.color_id) === Number(pdSelectedColorId) && Number(x.size_id) === Number(pdSelectedSizeId));
+    const v = pdPickedVariant();
     return v && v.own_price && Number(v.price) > 0 ? Number(v.price) : null;
 }
 
@@ -982,7 +1011,9 @@ function pdStore(key, value) {
 function pdRenderStock(product) {
     const el = document.getElementById("pd-stock");
     if (!el || product.stock === undefined || product.stock === null) return;
-    const n = Number(product.stock);
+    // Per-colour / per-size stock: the total of the rows.
+    const rows = pdVariantStockEnabled === true ? pdVariants.filter(v => v.color_id !== null || v.size_id !== null) : [];
+    const n = rows.length ? rows.reduce((t, v) => t + (Number(v.stock) || 0), 0) : Number(product.stock);
     if (!Number.isFinite(n)) return;
     if (n <= 0) {
         el.innerHTML = '<span class="pd-stock-text pd-stock-out">Out of stock</span>';

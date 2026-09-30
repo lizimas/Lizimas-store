@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Admin Dashboard</title>
-<link rel="stylesheet" href="css/admin.css?v=42">
+<link rel="stylesheet" href="css/admin.css?v=43">
     <link rel="stylesheet" href="css/admin-product-discounts.css?v=2">
     <link rel="stylesheet" href="css/admin-users.css?v=1">
-    <link rel="stylesheet" href="css/desc-blocks.css?v=1">
+    <link rel="stylesheet" href="css/desc-blocks.css?v=3">
     <link rel="stylesheet" href="css/admin-product-view.css?v=3">
     <link rel="stylesheet" href="css/admin-product-review.css?v=4">
 </head>
@@ -515,6 +515,14 @@
                                     </button>
                                     <select id="product-category" style="display:none;"></select>
                                     <div>
+                                        <label for="product-sku" style="font-size:13px; font-weight:600; color:#333; display:block;">Seller SKU</label>
+                                        <div style="display:flex; gap:8px;">
+                                            <input type="text" id="product-sku" placeholder="e.g. YD-8981 (leave blank to make one)" maxlength="64" style="flex:1; text-transform:uppercase;">
+                                            <button type="button" onclick="adminAutoSku()" style="padding:10px 14px; border:1px solid #1a1a2e; background:#fff; color:#1a1a2e; border-radius:8px; cursor:pointer; font-weight:600; white-space:nowrap;">Auto-generate</button>
+                                        </div>
+                                        <p style="font-size:12px; color:#666; margin:4px 0 0;">Your stock code for this product. Variants get their own (YD-8981A, YD-8981B...).</p>
+                                    </div>
+                                    <div>
                                         <label for="product-brand" style="font-size:13px; font-weight:600; color:#333; margin-top:10px; display:block;">Brand</label>
                                         <input type="text" id="product-brand" placeholder="e.g. Nescafe">
                                         <p style="font-size:12px; color:#666; margin:4px 0 0;">Manufacturer or brand name. Used by Google Shopping to match your listing.</p>
@@ -539,9 +547,20 @@
 
                             <div class="product-form-section" data-step="3">
                                 <h4>Pricing &amp; Stock</h4>
-                                <div class="field-row">
-                                    <input type="number" id="product-price" placeholder="Price (UGX)">
-                                    <input type="number" id="product-stock" placeholder="Stock quantity">
+                                <div class="adm-price-grid">
+                                    <label>Cost price <span>(what we pay - never shown to customers)</span>
+                                        <input type="number" id="product-cost-price" min="0" step="1" placeholder="e.g. 59976"></label>
+                                    <label>Selling price (UGX) *
+                                        <input type="number" id="product-price" min="1" step="1" placeholder="e.g. 132000"></label>
+                                    <label>"Was" price <span>(optional - shown crossed out)</span>
+                                        <input type="number" id="product-compare-at" min="1" step="1" placeholder="e.g. 165000"></label>
+                                </div>
+                                <div class="adm-price-preview" id="adm-price-preview" aria-live="polite"></div>
+                                <div class="adm-price-grid">
+                                    <label>Quantity in stock *
+                                        <input type="number" id="product-stock" min="0" step="1" placeholder="e.g. 120"></label>
+                                    <label>Low stock alert <span>(blank = 10)</span>
+                                        <input type="number" id="product-low-stock" min="0" step="1" placeholder="10"></label>
                                 </div>
                             </div>
 
@@ -573,8 +592,16 @@
                             </div>
 
                             <div class="product-form-section" data-step="5">
-                                <h4>Available Colors</h4>
-                                <div id="color-checkbox-list" style="display:flex; flex-direction:column; gap:8px;">Loading...</div>
+                                <h4>Colours</h4>
+                                <p style="font-size:12px; color:#666; margin-top:-6px;">Tap the colours this product comes in. Add a new colour with the colour picker, or tap &#9998; to change one. Then tap the photos that show each colour.</p>
+                                <div id="admin-color-swatches"></div>
+                                <div id="color-checkbox-list" style="display:flex; flex-direction:column; gap:10px; margin-top:12px;"></div>
+                            </div>
+
+                            <div class="product-form-section" data-step="5">
+                                <h4>Variants table</h4>
+                                <p style="font-size:12px; color:#666; margin-top:-6px;">One row per colour / size with its own price, stock and SKU.</p>
+                                <div id="admin-variants-table"></div>
                             </div>
 
                             <div class="product-form-section" data-step="6">
@@ -614,9 +641,11 @@
                             </div>
                         </div>
 
-                        <div class="form-actions">
-                            <button id="product-save-btn" onclick="saveProduct()">Save</button>
-                            <button onclick="closeProductForm()">Cancel</button>
+                        <div class="form-actions adm-form-actions">
+                            <button type="button" id="product-draft-btn" class="adm-btn-ghost" onclick="saveProduct({ draft: true })">Save as Draft</button>
+                            <button type="button" class="adm-btn-ghost" onclick="adminPreviewProduct()">Preview</button>
+                            <button id="product-save-btn" onclick="saveProduct()">Save &amp; Publish</button>
+                            <button type="button" onclick="closeProductForm()">Cancel</button>
                         </div>
                         <p id="product-form-error" class="error-text"></p>
                     </div>
@@ -2581,8 +2610,8 @@
 <script src="js/prepare-picked-file.js?v=10"></script>
 <script src="js/lz-table.js?v=6"></script>
 <script src="js/lz-spec-tools.js?v=2"></script>
-<script src="js/description-block-editor.js?v=20"></script>
-<script src="js/description-blocks.js?v=12"></script>
+<script src="js/description-block-editor.js?v=21"></script>
+<script src="js/description-blocks.js?v=13"></script>
 <script src="js/admin-product-review.js?v=5"></script>
 <script src="js/admin-product-view.js?v=3"></script>
 <script src="js/lz-id-ocr.js?v=2"></script>
@@ -2591,12 +2620,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
 <script src="js/lz-package-size.js?v=3"></script>
     <script src="js/lz-text-counter.js?v=1"></script>
-    <script src="js/admin.js?v=vc11"></script>
+    <script src="js/admin.js?v=vc12"></script>
     <script src="js/admin-photos-by-sku.js?v=pbs1"></script>
 <script src="js/admin-product-discounts.js?v=2"></script>
 <script src="js/admin-users.js?v=1"></script>
 <script src="js/lz-photo-grid.js?v=1"></script>
-<script src="js/lz-form-steps.js?v=1"></script>
+<script src="js/lz-form-steps.js?v=2"></script>
+<script src="js/lz-color-swatches.js?v=1"></script>
+<script src="js/lz-variants-table.js?v=1"></script>
+<script src="js/lz-product-preview.js?v=1"></script>
 <script src="js/photo-crop.js?v=1"></script>
 
     <div class="profile-panel-overlay" id="profile-panel-overlay" onclick="closeProfilePanel()"></div>

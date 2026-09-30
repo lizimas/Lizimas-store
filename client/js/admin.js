@@ -1084,34 +1084,47 @@ function toggleSizeSelection(checkbox) {
     }
 }
 
-async function loadColorCatalog() {
-    try {
-        const response = await fetch(`${API_URL}/api/products/catalog/colors`);
-        const colors = await response.json();
-        const container = document.getElementById("color-checkbox-list");
-        container.innerHTML = colors.map(c => `
-            <div>
-                <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
-                    <input type="checkbox" value="${c.name}" onchange="toggleColorSelection(this)"> ${c.name}
-                </label>
-                <div class="pd-color-thumb-picker" data-color-name="${c.name}" style="display:none; flex-wrap:wrap; gap:6px; margin-top:6px;"></div>
-            </div>
-        `).join("");
-    } catch (error) {
-        console.error("Load color catalog error:", error);
+// Colours (Sept 2026): swatches from the colour list (lz-color-swatches.js).
+// Each chosen colour gets a row where its photos are picked, as before.
+function loadColorCatalog() {
+    const host = document.getElementById("admin-color-swatches");
+    if (!host || !window.LzColorSwatches) return;
+    if (!host._lzcs) {
+        LzColorSwatches.mount(host, {
+            canManage: true,
+            selected: Object.keys(pdSelectedColors),
+            api: (url, opts) => authorizedFetch(url, opts),
+            onChange: (names) => adminSyncColors(names)
+        });
     }
 }
 
-function toggleColorSelection(checkbox) {
-    const picker = checkbox.closest("div").querySelector(".pd-color-thumb-picker");
-    if (checkbox.checked) {
-        pdSelectedColors[checkbox.value] = [];
-        picker.style.display = "flex";
-        renderThumbOptions(picker);
-    } else {
-        delete pdSelectedColors[checkbox.value];
-        picker.style.display = "none";
-    }
+function adminSyncColors(names) {
+    const next = {};
+    names.forEach(n => {
+        const existing = Object.keys(pdSelectedColors).find(k => k.toLowerCase() === String(n).toLowerCase());
+        next[n] = existing ? pdSelectedColors[existing] : [];
+    });
+    pdSelectedColors = next;
+    renderColorPhotoRows();
+    if (window.LzFormSteps) LzFormSteps.refresh(document.getElementById("admin-product-steps"));
+}
+
+// One row per chosen colour: swatch, name and its photo picker.
+function renderColorPhotoRows() {
+    const box = document.getElementById("color-checkbox-list");
+    if (!box) return;
+    const names = Object.keys(pdSelectedColors);
+    if (!names.length) { box.innerHTML = ""; return; }
+    box.innerHTML = names.map(n => {
+        const hex = window.LzColorSwatches ? LzColorSwatches.hexOf(n) : null;
+        return `<div class="adm-color-row">
+            <div class="adm-color-row-head"><span class="adm-color-dot" style="background:${hex || "#fff"}"></span>${adminEsc(n)}
+                <span class="adm-color-hint">tap the photos that show ${adminEsc(n)}</span></div>
+            <div class="pd-color-thumb-picker" data-color-name="${adminEsc(n)}" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;"></div>
+        </div>`;
+    }).join("");
+    box.querySelectorAll(".pd-color-thumb-picker").forEach(picker => renderThumbOptions(picker));
 }
 
 function renderThumbOptions(picker) {
@@ -1177,16 +1190,9 @@ async function loadProductOptionsIntoForm(productId) {
             if (!Array.isArray(pdSelectedColors[im.color_name])) pdSelectedColors[im.color_name] = [];
             pdSelectedColors[im.color_name].push("id:" + im.id);
         });
-
-        document.querySelectorAll("#color-checkbox-list input[type=checkbox]").forEach(cb => {
-            const on = Object.prototype.hasOwnProperty.call(pdSelectedColors, cb.value);
-            cb.checked = on;
-            const picker = cb.closest("div").querySelector(".pd-color-thumb-picker");
-            if (picker) {
-                picker.style.display = on ? "flex" : "none";
-                if (on) renderThumbOptions(picker);
-            }
-        });
+        const swatchHost = document.getElementById("admin-color-swatches");
+        if (window.LzColorSwatches && swatchHost) LzColorSwatches.setSelected(swatchHost, Object.keys(pdSelectedColors));
+        renderColorPhotoRows();
 
         pdSelectedSizes = (opts.sizes || []).map(s => s.name);
         document.querySelectorAll("#size-checkbox-list input[type=checkbox]").forEach(cb => {
@@ -1270,7 +1276,17 @@ async function loadProducts() {
         await loadColorCatalog();
 
         const response = await fetch(`${API_URL}/api/products`);
-        const products = await response.json();
+        let products = await response.json();
+        // Lizimas' own products in every status (drafts, pending) with the
+        // admin-only fields (cost, low-stock level) - merged over the public list.
+        try {
+            const own = await authorizedFetch("/api/products/mine?lizimas=1");
+            if (Array.isArray(own)) {
+                const byId = new Map(products.map(p => [p.id, p]));
+                own.forEach(o => byId.set(o.id, Object.assign({}, byId.get(o.id) || {}, o)));
+                products = Array.from(byId.values()).sort((a, b) => b.id - a.id);
+            }
+        } catch (e) { console.warn("Own products (drafts) not loaded:", e.message); }
         adminProducts = products;
 
         renderProductSummary(products);
@@ -1288,7 +1304,7 @@ function renderProductSummary(products) {
 
     const total = products.length;
     const inStock = products.filter(p => p.stock > 10).length;
-    const lowStock = products.filter(p => p.stock > 0 && p.stock <= 10).length;
+    const lowStock = products.filter(p => p.stock > 0 && p.stock <= pdLowAt(p)).length;
     const outOfStock = products.filter(p => p.stock <= 0).length;
 
     container.innerHTML = `
@@ -1333,7 +1349,7 @@ function renderProductsTable() {
 
     let filtered = adminProducts.filter(p => {
         if (currentProductFilter === "instock") return p.stock > 10;
-        if (currentProductFilter === "lowstock") return p.stock > 0 && p.stock <= 10;
+        if (currentProductFilter === "lowstock") return p.stock > 0 && p.stock <= pdLowAt(p);
         if (currentProductFilter === "outofstock") return p.stock <= 0;
         return true;
     });
@@ -1366,7 +1382,7 @@ function renderProductsTable() {
                 ${filtered.map(p => `
                     <tr>
                         <td data-label=""><img class="product-table-thumb" src="${p.image || ''}" onerror="this.style.visibility='hidden'"></td>
-                        <td data-label="Name">${adminEsc(p.name)} <span style="color:#999; font-size:0.85em; white-space:nowrap;">#${p.id}</span><div style="font-size:12px; color:#666; margin-top:2px;">Seller SKU: ${adminEsc(p.sku || "—")} &middot; Lizimas SKU: ${adminEsc(p.lizimas_sku || "—")}</div>${p.possible_duplicate_of ? `<div style="font-size:11px; color:#B45309; margin-top:2px;">&#9888; possible duplicate of #${p.possible_duplicate_of}</div>` : ""}</td>
+                        <td data-label="Name">${adminEsc(p.name)} <span style="color:#999; font-size:0.85em; white-space:nowrap;">#${p.id}</span>${adminStatusBadge(p)}<div style="font-size:12px; color:#666; margin-top:2px;">Seller SKU: ${adminEsc(p.sku || "—")} &middot; Lizimas SKU: ${adminEsc(p.lizimas_sku || "—")}</div>${p.possible_duplicate_of ? `<div style="font-size:11px; color:#B45309; margin-top:2px;">&#9888; possible duplicate of #${p.possible_duplicate_of}</div>` : ""}</td>
                         <td data-label="Category">${p.category || "—"}</td>
                         <td data-label="Price">UGX ${Number(p.price).toLocaleString()}</td>
                         <td data-label="Stock">${p.stock}</td>
@@ -2095,8 +2111,10 @@ function openProductForm() {
     pdSelectedSizes = [];
     pdSelectedColors = {};
     document.querySelectorAll("#size-checkbox-list input[type=checkbox]").forEach(cb => cb.checked = false);
-    document.querySelectorAll("#color-checkbox-list input[type=checkbox]").forEach(cb => cb.checked = false);
-    document.querySelectorAll(".pd-color-thumb-picker").forEach(picker => { picker.style.display = "none"; picker.innerHTML = ""; });
+    const _sw = document.getElementById("admin-color-swatches");
+    if (window.LzColorSwatches && _sw) LzColorSwatches.setSelected(_sw, []);
+    renderColorPhotoRows();
+    adminFillExtraFields(null);
     renderCategorySelect();
     document.getElementById("product-form-container").classList.remove("hidden");
     adminProductStepsMount();
@@ -2128,6 +2146,7 @@ function editProduct(id) {
     document.getElementById("product-brand").value = product.brand || "";
     document.getElementById("product-gtin").value = product.gtin || "";
     document.getElementById("product-mpn").value = product.mpn || "";
+    adminFillExtraFields(product);
     document.getElementById("variants-section").classList.remove("hidden");
     const editAdminSpecsTableWrap = document.getElementById("admin-specs-table-wrap");
     if (editAdminSpecsTableWrap) editAdminSpecsTableWrap.innerHTML = "";
@@ -2149,7 +2168,8 @@ function closeProductForm() {
     document.getElementById("product-form-container").classList.add("hidden");
 }
 
-async function saveProduct() {
+async function saveProduct(opts) {
+    const asDraft = !!(opts && opts.draft);
     const id = document.getElementById("product-id").value;
     const name = document.getElementById("product-name").value.trim();
     const category_id = document.getElementById("product-category").value;
@@ -2207,6 +2227,12 @@ async function saveProduct() {
     formData.append("brand", brand);
     formData.append("gtin", gtin);
     formData.append("mpn", mpn);
+    const skuVal = (document.getElementById("product-sku") || {}).value;
+    if (skuVal !== undefined) formData.append("sku", String(skuVal).trim().toUpperCase());
+    formData.append("cost_price", (document.getElementById("product-cost-price") || {}).value || "");
+    formData.append("compare_at_price", (document.getElementById("product-compare-at") || {}).value || "");
+    formData.append("low_stock_threshold", (document.getElementById("product-low-stock") || {}).value || "");
+    if (asDraft) formData.append("save_as_draft", "1");
 
     for (let i = 0; i < files.length; i++) {
         formData.append("images", files[i]);
@@ -2278,6 +2304,13 @@ async function saveProduct() {
             }
         }
 
+        if (asDraft) {
+            // Stay on the product (now saved) so the variants table can be
+            // filled in; later saves update it instead of creating another.
+            await adminReopenAfterDraft(savedProductId, result.message);
+            loadProducts();
+            return;
+        }
         closeProductForm();
         loadProducts();
         loadStats();
@@ -3882,15 +3915,16 @@ function renderManageStock(colors, sizes) {
         : `<span style="color:#8a6d00; font-weight:600;">Simple stock (product level)</span>`;
 
     if (msVariants.length === 0) {
-        const canGenerate = colors.length > 0 && sizes.length > 0;
+        const canGenerate = colors.length > 0 || sizes.length > 0;
+        const rowsCount = colors.length && sizes.length ? colors.length * sizes.length : (colors.length || sizes.length);
         body.innerHTML = `
             <p style="margin:0 0 12px;">Mode: ${mode}</p>
             <p style="margin:0 0 12px;">No variants yet. Generating creates one row per
-            colour and size combination at zero stock \u2014 ${colors.length} \u00d7 ${sizes.length}
-            = <strong>${colors.length * sizes.length}</strong> rows.</p>
+            ${colors.length && sizes.length ? "colour and size combination" : colors.length ? "colour" : "size"} at zero stock \u2014
+            <strong>${rowsCount}</strong> rows. (You can also do this in Edit \u2192 step 5, Variants table.)</p>
             ${canGenerate
                 ? `<button onclick="generateVariants()">Generate Variants</button>`
-                : `<p class="no-data">Add at least one colour and one size first.</p>`}
+                : `<p class="no-data">Add colours or sizes first (Edit \u2192 step 5).</p>`}
         `;
         return;
     }
@@ -10596,10 +10630,14 @@ function adminProductSummary() {
         { label: "Category", value: hasCat ? catLabel : "Missing", ok: hasCat, step: 1 },
         { label: "Brand", value: val("product-brand") || "-", step: 1 },
         { label: "Photos", value: photos ? photos + " of " + PD_MAX_PHOTOS + " (first one is the Main photo)" : "None yet", ok: photos > 0 ? true : undefined, step: 2 },
+        { label: "Seller SKU", value: val("product-sku") || "Made automatically", step: 1 },
         { label: "Price", value: money(val("product-price")) || "Missing", ok: !!val("product-price"), step: 3 },
+        { label: "\"Was\" price", value: Number(val("product-compare-at")) > Number(val("product-price")) ? money(val("product-compare-at")) : "-", step: 3 },
+        { label: "Cost price", value: money(val("product-cost-price")) || "-", step: 3 },
         { label: "Stock", value: val("product-stock") || "Missing", ok: val("product-stock") !== "", step: 3 },
         { label: "Description", value: desc ? desc.length + " characters" : "-", step: 4 },
-        { label: "Sizes / colours", value: (pdSelectedSizes.length + " sizes, " + Object.keys(pdSelectedColors).length + " colours"), step: 5 },
+        { label: "Sizes / colours", value: (pdSelectedSizes.length + " sizes, " + Object.keys(pdSelectedColors).length + " colours" +
+            (Object.keys(pdSelectedColors).length ? " (" + Object.keys(pdSelectedColors).join(", ") + ")" : "")), step: 5 },
         { label: "Specifications", value: document.querySelectorAll("#specs-list .spec-label-input").length + " rows", step: 6 },
         { label: "Packed weight", value: weight ? weight + " kg" : (isNew ? "Missing" : "-"), ok: isNew ? !!weight : undefined, step: 6 },
         { label: "Warranty", value: val("product-warranty-months") ? val("product-warranty-months") + " months" : "None", step: 6 }
@@ -10623,4 +10661,124 @@ function adminProductStepsMount() {
         actions: [document.querySelector("#product-form-container > .form-actions")]
     });
     LzFormSteps.reset(root);
+}
+
+
+// A product's own "Low stock alert" level (Add Product > Pricing), else 10.
+function pdLowAt(p) {
+    return p && p.low_stock_threshold !== null && p.low_stock_threshold !== undefined && p.low_stock_threshold !== ""
+        ? Number(p.low_stock_threshold) : 10;
+}
+
+
+// ---------- Add / Edit Product redesign (Sept 2026) ----------
+
+function adminStatusBadge(p) {
+    const st = String(p.status || "approved");
+    if (st === "approved") return "";
+    const map = { draft: ["Draft", "#475467", "#f2f4f7"], pending: ["Pending approval", "#b54708", "#fffaeb"],
+        rejected: ["Rejected", "#b42318", "#fef3f2"], changes_requested: ["Changes requested", "#b54708", "#fffaeb"],
+        under_investigation: ["Under investigation", "#b42318", "#fef3f2"] };
+    const m = map[st] || [st, "#475467", "#f2f4f7"];
+    return ` <span style="font-size:11px; font-weight:700; color:${m[1]}; background:${m[2]}; padding:2px 8px; border-radius:999px; white-space:nowrap;">${m[0]}</span>`;
+}
+
+function adminFillExtraFields(product) {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v === null || v === undefined ? "" : v; };
+    const num = v => v === null || v === undefined || v === "" ? "" : Number(v);
+    set("product-sku", product ? product.sku : "");
+    set("product-cost-price", product ? num(product.cost_price) : "");
+    set("product-compare-at", product ? num(product.compare_at_price) : "");
+    set("product-low-stock", product ? num(product.low_stock_threshold) : "");
+    adminPricePreview();
+    adminMountVariantsTable(product);
+}
+
+function adminMountVariantsTable(product) {
+    const host = document.getElementById("admin-variants-table");
+    if (!host || !window.LzVariantsTable) return;
+    LzVariantsTable.mount(host, {
+        productId: product ? product.id : null,
+        mode: "admin",
+        api: (url, opts) => authorizedFetch(url, opts),
+        stockEnabled: !!(product && product.variant_stock_enabled),
+        productPrice: product ? Number(product.price) : null,
+        onModeChange: enabled => { if (product) product.variant_stock_enabled = enabled; }
+    });
+}
+
+// Live price line: "UGX 132,000  Was UGX 165,000  -20%" plus the margin.
+function adminPricePreview() {
+    const el = document.getElementById("adm-price-preview");
+    if (!el) return;
+    const v = id => Number((document.getElementById(id) || {}).value) || 0;
+    const price = v("product-price"), was = v("product-compare-at"), cost = v("product-cost-price");
+    if (!price) { el.innerHTML = '<span class="adm-pp-muted">Customers will see the price here as you type.</span>'; return; }
+    const f = n => "UGX " + Math.round(n).toLocaleString();
+    let html = '<span class="adm-pp-label">Customers see:</span> <strong class="adm-pp-price">' + f(price) + "</strong>";
+    if (was > price) html += ' <s class="adm-pp-was">' + f(was) + '</s> <span class="adm-pp-off">-' + Math.round((1 - price / was) * 100) + "%</span>";
+    else if (was && was <= price) html += ' <span class="adm-pp-warn">The "Was" price must be higher than the selling price to show.</span>';
+    if (cost) {
+        const m = price - cost, pct = Math.round((m / price) * 100);
+        html += '<div class="adm-pp-margin' + (m < 0 ? " adm-pp-loss" : "") + '">Margin: ' + f(m) + " (" + pct + "% of the price)" + (m < 0 ? " - selling below cost" : "") + "</div>";
+    }
+    el.innerHTML = html;
+}
+document.addEventListener("input", e => {
+    if (e.target && ["product-price", "product-compare-at", "product-cost-price"].includes(e.target.id)) adminPricePreview();
+});
+
+// Seller SKU suggestion: brand letters + a random code (the server makes one
+// the same way when the field is left blank).
+function adminAutoSku() {
+    const el = document.getElementById("product-sku");
+    if (!el) return;
+    const brand = String((document.getElementById("product-brand") || {}).value || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3);
+    const name = String((document.getElementById("product-name") || {}).value || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3);
+    const prefix = brand || name || "LS";
+    const code = Math.random().toString(36).slice(2, 7).toUpperCase().replace(/[^A-Z0-9]/g, "7");
+    el.value = prefix + "-" + code;
+}
+
+// After "Save as Draft": keep the form open on the saved product.
+async function adminReopenAfterDraft(productId, message) {
+    document.getElementById("product-id").value = productId;
+    document.getElementById("product-form-title").textContent = "Edit Product (draft)";
+    pdPickedFiles = [];
+    pdLocalPreviews = [];
+    let product = null;
+    try {
+        const own = await authorizedFetch("/api/products/mine?lizimas=1");
+        product = Array.isArray(own) ? own.find(p => Number(p.id) === Number(productId)) : null;
+    } catch (e) { /* keep going */ }
+    if (product) {
+        const idx = adminProducts.findIndex(p => Number(p.id) === Number(productId));
+        if (idx >= 0) adminProducts[idx] = Object.assign({}, adminProducts[idx], product); else adminProducts.unshift(product);
+        adminFillExtraFields(product);
+    }
+    await loadProductOptionsIntoForm(productId);
+    if (window.LzBlockEditor) LzBlockEditor.mount(document.getElementById("desc-blocks-editor"), productId, { tokenKey: "adminToken" });
+    document.getElementById("variants-section").classList.remove("hidden");
+    loadVariants(productId);
+    const err = document.getElementById("product-form-error");
+    if (err) { err.style.color = "#067647"; err.textContent = (message || "Draft saved.") + " Fill in the variants table in step 5 if this product has colours or sizes."; setTimeout(() => { err.style.color = ""; }, 8000); }
+}
+
+function adminPreviewProduct() {
+    if (!window.LzProductPreview) return;
+    const val = id => { const el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; };
+    LzProductPreview.open({
+        name: val("product-name"),
+        brand: val("product-brand"),
+        price: Number(val("product-price")) || 0,
+        was: Number(val("product-compare-at")) || 0,
+        warrantyMonths: Number(val("product-warranty-months")) || 0,
+        stock: val("product-stock") === "" ? null : Number(val("product-stock")),
+        photos: pdAllImages.map(im => im.url),
+        colors: Object.keys(pdSelectedColors).map(n => ({ name: n, hex: window.LzColorSwatches ? LzColorSwatches.hexOf(n) : null })),
+        sizes: pdSelectedSizes.slice(),
+        description: val("product-description"),
+        specs: collectSpecRows(),
+        official: true
+    });
 }

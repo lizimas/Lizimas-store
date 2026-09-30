@@ -30,6 +30,12 @@ async function knownVendorHashes(query, vendorId, productId) {
 async function uploadCheckedPhotos(files, opts, deps) {
     files = files || [];
     const pre = ImageChecks.preUploadCheck(files, opts.existingCount || 0);
+    // A draft may have fewer than the minimum photos (it isn't submitted
+    // yet); the most-photos limit still applies.
+    if (opts.draft && pre.countError && pre.count < ImageChecks.Checks.RULES.MIN_IMAGES) {
+        pre.countError = null;
+        pre.ok = !pre.errors.length;
+    }
     if (!pre.ok) return { ok: false, status: 400, body: ImageChecks.rejectionResponse(pre.errors, pre.countError) };
     if (!files.length) return { ok: true, urls: [], hashes: [], warnings: [] };
 

@@ -18,7 +18,9 @@ const {
     getMyProducts,
     generateProductVariants,
     setVariantStockMode,
-    updateVariantStock
+    updateVariantStock,
+    createCatalogColor,
+    updateCatalogColor,
 } = require("../controllers/productController");
 
 const {
@@ -51,6 +53,10 @@ router.put("/:id/description-blocks", requireAuth, requireStaffOrAdmin, saveDesc
 router.post("/:id/description-blocks/image", requireAuth, requireStaffOrAdmin, upload.single("image"), uploadBlockImage);
 router.get("/catalog/sizes", getSizeCatalog);
 router.get("/catalog/colors", getColorCatalog);
+// Colour list: admin / Lizimas staff add colours (name + colour code) and edit
+// them; vendors only choose from the list.
+router.post("/catalog/colors", requireAuth, requireStaffOrAdmin, createCatalogColor);
+router.patch("/catalog/colors/:id", requireAuth, requireStaffOrAdmin, updateCatalogColor);
 router.post("/:id/options", requireAuth, requireStaffOrAdmin, saveProductOptions);
 
 // Variant stock mode: build the colour x size matrix, then switch the product

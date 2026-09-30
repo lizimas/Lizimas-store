@@ -99,10 +99,14 @@ exports.checkout = async (req, res) => {
             // A colour + size pick on a product that tracks stock per variant
             // is that variant: its own stock and, if set, its own price
             // (per-variant prices, migration 138).
-            if (!variantId && colorId && sizeId) {
+            // Colour-only and size-only variants (Sept 2026) match on the
+            // one they have, with the other side empty.
+            if (!variantId && (colorId || sizeId)) {
                 const matched = await client.query(
                     `SELECT v.id FROM product_variants v JOIN products p ON p.id = v.product_id
-                      WHERE v.product_id = $1 AND v.color_id = $2 AND v.size_id = $3
+                      WHERE v.product_id = $1
+                        AND v.color_id IS NOT DISTINCT FROM $2::int
+                        AND v.size_id IS NOT DISTINCT FROM $3::int
                         AND p.variant_stock_enabled = true
                       LIMIT 1`,
                     [productId, colorId, sizeId]
@@ -112,7 +116,7 @@ exports.checkout = async (req, res) => {
 
             if (variantId) {
                 const variantResult = await client.query(
-                    "SELECT v.id, v.product_id, v.variant_name, v.price, v.vendor_payout, v.stock, p.price AS product_price, p.name AS product_name, p.sku, p.vendor_id, p.commission_rate_applied, p.fixed_fee_applied, p.commission_rule_id, COALESCE(v.image_path, p.image) AS image_url, c.name AS color_name, s.name AS size_name FROM product_variants v JOIN products p ON p.id = v.product_id LEFT JOIN product_colors c ON c.id = v.color_id LEFT JOIN product_sizes s ON s.id = v.size_id WHERE v.id = $1 AND v.product_id = $2",
+                    "SELECT v.id, v.product_id, v.variant_name, v.price, v.vendor_payout, v.stock, p.price AS product_price, p.name AS product_name, COALESCE(v.sku, p.sku) AS sku, p.vendor_id, p.commission_rate_applied, p.fixed_fee_applied, p.commission_rule_id, COALESCE(v.image_path, p.image) AS image_url, c.name AS color_name, s.name AS size_name FROM product_variants v JOIN products p ON p.id = v.product_id LEFT JOIN product_colors c ON c.id = v.color_id LEFT JOIN product_sizes s ON s.id = v.size_id WHERE v.id = $1 AND v.product_id = $2",
                     [variantId, productId]
                 );
 
@@ -418,13 +422,20 @@ exports.checkout = async (req, res) => {
                 );
             } else {
                 const stockResult = await client.query(
-                    "UPDATE products SET stock = stock - $1 WHERE id = $2 RETURNING stock",
+                    "UPDATE products SET stock = stock - $1 WHERE id = $2 RETURNING stock, low_stock_threshold",
                     [item.quantity, item.productId]
                 );
                 // Low-stock notification (Task #65) - simple products only;
                 // variant-level stock is tracked per color/size and doesn't
                 // reduce to one "the product is low" number the same way.
-                if (item.vendorId && stockResult.rows.length && Number(stockResult.rows[0].stock) < LOW_STOCK_THRESHOLD) {
+                // A product's own "Low stock alert" level (migration 142) wins
+                // over the default.
+                const lowAt = stockResult.rows.length && stockResult.rows[0].low_stock_threshold != null
+                    ? Number(stockResult.rows[0].low_stock_threshold) : null;
+                const isLow = stockResult.rows.length && (lowAt !== null
+                    ? Number(stockResult.rows[0].stock) <= lowAt
+                    : Number(stockResult.rows[0].stock) < LOW_STOCK_THRESHOLD);
+                if (item.vendorId && isLow) {
                     item.resultingStock = Number(stockResult.rows[0].stock);
                 }
 

@@ -15,7 +15,16 @@ let allProducts = [];
 function applyPercentDiscounts(list) {
     (list || []).forEach(product => {
         const dp = Number(product.discount_price);
-        if (!(dp > 0) || !(dp < Number(product.price))) return;
+        if (!(dp > 0) || !(dp < Number(product.price))) {
+            // No discount running: show the "Was" price (compare-at) if set.
+            const was = Number(product.compare_at_price);
+            if (was > Number(product.price)) {
+                product.originalPrice = was;
+                product.discount = Math.round((1 - Number(product.price) / was) * 100);
+                product.wasPriceOnly = true;
+            }
+            return;
+        }
         product.originalPrice = Number(product.price);
         product.discount = Math.round(Number(product.discount_percent));
         product.price = dp;
@@ -37,7 +46,7 @@ async function applyActiveFlashSalePricing() {
             const salePrice = Number(item.sale_price);
             // A flash sale wins over a percent discount, measured against
             // the product's real listed price.
-            const listed = Number(product.originalPrice || product.price);
+            const listed = Number(product.wasPriceOnly ? product.price : (product.originalPrice || product.price));
             if (!(salePrice < listed)) return;
             product.originalPrice = listed;
             product.discount = Math.round((1 - salePrice / product.originalPrice) * 100);

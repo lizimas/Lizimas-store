@@ -6,10 +6,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
 <title>Lizimas Store — Vendor Dashboard</title>
-<link rel="stylesheet" href="../css/admin.css?v=42">
+<link rel="stylesheet" href="../css/admin.css?v=43">
 <link rel="stylesheet" href="../css/vendor-desktop.css?v=8">
 <link rel="stylesheet" href="../css/vendor-mobile.css?v=11">
 <link rel="stylesheet" href="../css/vendor-wide.css?v=1">
+<link rel="stylesheet" href="/css/desc-blocks.css?v=3">
 </head>
 <body>
 
@@ -1156,6 +1157,10 @@
                                             <label style="font-size:13px; font-weight:600; color:#333;">Stock</label>
                                             <input type="number" id="product-stock" min="0" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                                         </div>
+                                        <div style="flex:1;">
+                                            <label style="font-size:13px; font-weight:600; color:#333;">Low stock alert <span style="font-weight:400; color:#888;">(blank = 10)</span></label>
+                                            <input type="number" id="product-low-stock" min="0" placeholder="10" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                        </div>
                                     </div>
                                     <div id="pricing-preview" style="display:none; background:#F0F4FF; border:1px solid #C7D2FE; border-radius:8px; padding:12px; font-size:13px; color:#333;">
                                         <div style="font-size:15px; font-weight:700;">Customer pays: UGX <span id="preview-customer-price">-</span></div>
@@ -1221,7 +1226,11 @@
                             <span>I confirm this product is authentic, accurately described, and that I can provide invoices/supplier documentation if Lizimas Store requests proof of authenticity (<a href="../vendor-policies#anti-counterfeit" target="_blank">Anti-Counterfeit Policy</a>).</span>
                         </label>
 
-                        <button id="product-submit-btn" onclick="submitVendorProductForm()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:12px; cursor:pointer; font-weight:600; margin-top:12px; width:100%;">Submit for Approval</button>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+                            <button type="button" onclick="submitVendorProductForm({ draft: true })" style="flex:1 1 140px; background:#fff; color:#1a1a2e; border:1.5px solid #1a1a2e; border-radius:8px; padding:12px; cursor:pointer; font-weight:600;">Save as Draft</button>
+                            <button type="button" onclick="vendorPreviewProduct()" style="flex:1 1 140px; background:#fff; color:#1a1a2e; border:1.5px solid #1a1a2e; border-radius:8px; padding:12px; cursor:pointer; font-weight:600;">Preview</button>
+                        </div>
+                        <button id="product-submit-btn" onclick="submitVendorProductForm()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:12px; cursor:pointer; font-weight:600; margin-top:8px; width:100%;">Submit for Approval</button>
                         <p id="product-form-status" style="font-size:13px; color:#666;"></p>
                             </div>
 
@@ -1230,11 +1239,11 @@
 
                     <div id="vendor-variants-panel" class="panel" hidden>
                         <h2>Variants <span style="font-weight:400; color:#888; font-size:13px;">(optional — colours/sizes with their own stock counts)</span></h2>
-                        <p class="admin-page-subtitle">Save your colours and sizes, generate one row per combination, then enter stock for each. Turning on variant stock replaces the single Stock field above for this product.</p>
+                        <p class="admin-page-subtitle">Choose colours and/or sizes and press Save Colours/Sizes. Then make the table - one row per colour, size, or colour + size - and fill in stock, payout and SKU for each. Ticking "Use these stock numbers" replaces the single Stock field above.</p>
                         <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
-                            <div style="flex:1; min-width:200px;">
-                                <label style="font-size:13px; font-weight:600; color:#333;">Colours <span style="font-weight:400; color:#888;">(comma-separated)</span></label>
-                                <input type="text" id="vendor-variant-colors" placeholder="e.g. Red, Blue, Black" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            <div style="flex:1 1 100%; min-width:200px;">
+                                <label style="font-size:13px; font-weight:600; color:#333; display:block; margin-bottom:6px;">Colours <span style="font-weight:400; color:#888;">(tap the colours this product comes in)</span></label>
+                                <div id="vendor-color-swatches"></div>
                             </div>
                             <div style="flex:1; min-width:200px;">
                                 <label style="font-size:13px; font-weight:600; color:#333;">Sizes <span style="font-weight:400; color:#888;">(comma-separated)</span></label>
@@ -1937,12 +1946,16 @@
     <script src="../js/lz-id-ocr.js?v=2"></script>
     <script src="../js/lz-table.js?v=6"></script>
     <script src="../js/lz-spec-tools.js?v=2"></script>
-    <script src="../js/description-block-editor.js?v=20"></script>
+    <script src="../js/description-block-editor.js?v=21"></script>
     <script src="../js/lz-package-size.js?v=3"></script>
     <script src="../js/lz-text-counter.js?v=1"></script>
 <script src="../js/lz-photo-grid.js?v=1"></script>
-<script src="../js/lz-form-steps.js?v=1"></script>
-    <script src="../js/vendor-dashboard.js?v=35"></script>
+<script src="../js/lz-form-steps.js?v=2"></script>
+<script src="../js/lz-color-swatches.js?v=1"></script>
+<script src="../js/lz-variants-table.js?v=1"></script>
+<script src="../js/lz-product-preview.js?v=1"></script>
+<script src="../js/description-blocks.js?v=13"></script>
+    <script src="../js/vendor-dashboard.js?v=36"></script>
     <script src="../js/vendor-statements.js?v=4"></script>
 <script src="../js/vendor-mobile.js?v=16"></script>
 <script src="../js/vendor-products.js?v=5"></script>

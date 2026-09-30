@@ -1404,6 +1404,8 @@ function resetVendorProductForm() {
     document.getElementById("product-brand").value = "";
     document.getElementById("product-gtin").value = "";
     document.getElementById("product-mpn").value = "";
+    const _low = document.getElementById("product-low-stock"); if (_low) _low.value = "";
+    const _st = document.getElementById("product-form-status"); if (_st) _st.style.color = "";
     document.getElementById("product-images").value = "";
     document.getElementById("product-authenticity-confirm").checked = false;
     vdPickedFiles = [];
@@ -2071,7 +2073,8 @@ function hideVendorVariantsPanel() {
     const panel = document.getElementById("vendor-variants-panel");
     if (panel) panel.hidden = true;
     vendorVariantProductId = null;
-    document.getElementById("vendor-variant-colors").value = "";
+    const _vsw = document.getElementById("vendor-color-swatches");
+    if (_vsw && window.LzColorSwatches && _vsw._lzcs) LzColorSwatches.setSelected(_vsw, []);
     document.getElementById("vendor-variant-sizes").value = "";
     document.getElementById("vendor-variant-options-status").textContent = "";
     document.getElementById("vendor-variant-stock-area").innerHTML = "";
@@ -2089,7 +2092,11 @@ async function loadVendorVariantOptions(productId) {
         ]);
         const opts = await optRes.json();
 
-        document.getElementById("vendor-variant-colors").value = (opts.colors || []).map(c => c.name).join(", ");
+        const swHost = document.getElementById("vendor-color-swatches");
+        if (swHost && window.LzColorSwatches) {
+            if (!swHost._lzcs) LzColorSwatches.mount(swHost, { canManage: false, selected: [] });
+            LzColorSwatches.setSelected(swHost, (opts.colors || []).map(c => c.name));
+        }
         document.getElementById("vendor-variant-sizes").value = (opts.sizes || []).map(s => s.name).join(", ");
         vendorVariantStockEnabled = !!(productRes && productRes.variant_stock_enabled);
 
@@ -2100,7 +2107,20 @@ async function loadVendorVariantOptions(productId) {
             (vp.variants || []).forEach(v => { vendorVariantPrices[v.id] = v; });
         } catch (e) { /* prices optional */ }
 
-        renderVendorVariantStockArea(opts.colors || [], opts.sizes || [], opts.variants || []);
+        const tableHost = document.getElementById("vendor-variant-stock-area");
+        if (tableHost && window.LzVariantsTable) {
+            LzVariantsTable.mount(tableHost, {
+                productId, mode: "vendor",
+                api: (url, o) => vendorAuthorizedFetch(url, o),
+                stockEnabled: vendorVariantStockEnabled,
+                onModeChange: enabled => {
+                    vendorVariantStockEnabled = enabled;
+                    if (productRes) productRes.variant_stock_enabled = enabled;
+                }
+            });
+        } else {
+            renderVendorVariantStockArea(opts.colors || [], opts.sizes || [], opts.variants || []);
+        }
     } catch (error) {
         console.error("Load vendor variant options error:", error);
     }
@@ -2160,8 +2180,8 @@ function renderVendorVariantStockArea(colors, sizes, variants) {
 async function saveVendorProductOptions() {
     if (!vendorVariantProductId) return;
     const statusEl = document.getElementById("vendor-variant-options-status");
-    const colors = document.getElementById("vendor-variant-colors").value
-        .split(",").map(s => s.trim()).filter(Boolean).map(name => ({ name }));
+    const swHost = document.getElementById("vendor-color-swatches");
+    const colors = (swHost && window.LzColorSwatches ? LzColorSwatches.selected(swHost) : []).map(name => ({ name }));
     const sizes = document.getElementById("vendor-variant-sizes").value
         .split(",").map(s => s.trim()).filter(Boolean);
 
@@ -2339,6 +2359,8 @@ async function editVendorProduct(id) {
     document.getElementById("product-id").value = product.id;
     document.getElementById("product-name").value = product.name || "";
     document.getElementById("product-sku").value = product.sku || "";
+    const _low = document.getElementById("product-low-stock");
+    if (_low) _low.value = product.low_stock_threshold === null || product.low_stock_threshold === undefined ? "" : product.low_stock_threshold;
     if (window.LzFormSteps) LzFormSteps.reset(document.getElementById("vendor-product-steps"));
     document.getElementById("product-description").value = product.description || "";
     // Older listings (added before the commission engine) never recorded
@@ -2388,7 +2410,8 @@ async function deleteVendorProduct(id) {
     }
 }
 
-async function submitVendorProductForm() {
+async function submitVendorProductForm(opts) {
+    const asDraft = !!(opts && opts.draft);
     const id = document.getElementById("product-id").value;
     const name = document.getElementById("product-name").value.trim();
     const sku = document.getElementById("product-sku").value.trim();
@@ -2409,7 +2432,9 @@ async function submitVendorProductForm() {
         return;
     }
 
-    if (!document.getElementById("product-authenticity-confirm").checked) {
+    // A draft isn't submitted, so the statement and the photo minimum wait
+    // until "Submit for Approval".
+    if (!asDraft && !document.getElementById("product-authenticity-confirm").checked) {
         statusEl.textContent = "Please confirm the authenticity statement to continue.";
         return;
     }
@@ -2434,7 +2459,10 @@ async function submitVendorProductForm() {
     }
     // Photo checks: at least the minimum number of photos (stored + new).
     if (window.LzImageChecks) {
-        const countError = LzImageChecks.countMessage(vdAllImages.length, VD_MAX_PHOTOS);
+        const n = vdAllImages.length;
+        const countError = asDraft
+            ? (n > VD_MAX_PHOTOS ? LzImageChecks.countMessage(n, VD_MAX_PHOTOS) : null)
+            : LzImageChecks.countMessage(n, VD_MAX_PHOTOS);
         if (countError) {
             statusEl.textContent = countError;
             const zone = document.getElementById("product-image-dropzone");
@@ -2459,6 +2487,8 @@ async function submitVendorProductForm() {
     formData.append("brand", brand);
     formData.append("gtin", gtin);
     formData.append("mpn", mpn);
+    formData.append("low_stock_threshold", (document.getElementById("product-low-stock") || {}).value || "");
+    if (asDraft) formData.append("save_as_draft", "1");
     // Ordered by vdPickedFiles (drag/drop + reorder UI), not the raw file
     // input, so whichever photo the vendor put first actually uploads first.
     for (const file of vdPickedFiles) {
@@ -2521,6 +2551,12 @@ async function submitVendorProductForm() {
             }
         }
 
+        if (asDraft && savedProductId) {
+            // Stay on the saved draft: later saves update it, and the
+            // Variants table can be filled in now.
+            await vendorReopenAfterDraft(savedProductId, data.message);
+            return;
+        }
         resetVendorProductForm();
         // Phones show this same form in the mobile Add Product screen.
         if (typeof vmShowScreen === "function") vmShowScreen("products");
@@ -5413,3 +5449,45 @@ document.addEventListener("change", e => {
         LzFormSteps.refresh(document.getElementById("vendor-product-steps"));
     }
 });
+
+
+// ---------- Add / Edit Product redesign (Sept 2026) ----------
+
+async function vendorReopenAfterDraft(productId, message) {
+    document.getElementById("product-id").value = productId;
+    vdPickedFiles = [];
+    vdLocalPreviews = [];
+    try { await loadVendorProducts(); } catch (e) { /* list refresh is best-effort */ }
+    await loadVendorProductImagesIntoForm(productId);
+    if (window.LzBlockEditor) {
+        LzBlockEditor.mount(document.getElementById("desc-blocks-editor"), productId, { tokenKey: "vendorToken", apiBase: "/api/vendors/products" });
+    }
+    const btn = document.getElementById("product-submit-btn");
+    if (btn) btn.textContent = "Submit for Approval";
+    await loadVendorVariantOptions(productId);
+    const statusEl = document.getElementById("product-form-status");
+    if (statusEl) {
+        statusEl.style.color = "#067647";
+        statusEl.textContent = (message || "Draft saved.") + " You can add colours and sizes in Variants below, then Submit for Approval when ready.";
+    }
+}
+
+function vendorPreviewProduct() {
+    if (!window.LzProductPreview) return;
+    const val = id => { const el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; };
+    const customer = Number(String((document.getElementById("preview-customer-price") || {}).textContent || "").replace(/[^0-9.]/g, "")) || 0;
+    const swHost = document.getElementById("vendor-color-swatches");
+    const colors = swHost && window.LzColorSwatches && swHost._lzcs && !document.getElementById("vendor-variants-panel").hidden
+        ? LzColorSwatches.selected(swHost).map(n => ({ name: n, hex: LzColorSwatches.hexOf(n) })) : [];
+    LzProductPreview.open({
+        name: val("product-name"),
+        brand: val("product-brand"),
+        price: customer,
+        warrantyMonths: Number(val("product-warranty-months")) || 0,
+        stock: val("product-stock") === "" ? null : Number(val("product-stock")),
+        photos: vdAllImages.map(im => im.url),
+        colors,
+        description: val("product-description"),
+        specs: typeof collectVendorSpecRows === "function" ? collectVendorSpecRows() : []
+    });
+}

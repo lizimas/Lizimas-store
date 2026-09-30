@@ -2511,3 +2511,35 @@ textarea#product-description { min-height: 220px; resize: vertical; font-size: 1
 .admin-guide-link:hover { opacity: 1; background: rgba(255,255,255,.08); }
 .vd-guide-link { display: flex; align-items: center; gap: 10px; text-decoration: none; color: rgba(255,255,255,.85); padding: 10px 14px; border-radius: 10px; font-size: 15px; }
 .vd-guide-link:hover { background: rgba(255,255,255,.08); color: #fff; }
+
+/* ---- Add / Edit Product redesign (Sept 2026) ---- */
+.adm-price-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 10px; }
+.adm-price-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; color: #333; }
+.adm-price-grid label span { font-weight: 400; color: #888; font-size: 12px; }
+.adm-price-grid input { width: 100%; box-sizing: border-box; }
+.adm-price-preview { background: #f8f9fb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; margin: 2px 0 14px; font-size: 14px; }
+.adm-pp-label { color: #6b7280; font-size: 13px; }
+.adm-pp-price { color: #16a34a; font-size: 18px; }
+.adm-pp-was { color: #9ca3af; }
+.adm-pp-off { background: #fff4d6; color: #a86b00; font-weight: 700; font-size: 12.5px; padding: 1px 7px; border-radius: 4px; }
+.adm-pp-warn { color: #b54708; font-size: 12.5px; }
+.adm-pp-muted { color: #9ca3af; font-size: 13px; }
+.adm-pp-margin { margin-top: 6px; font-size: 13px; color: #067647; }
+.adm-pp-margin.adm-pp-loss { color: #b42318; font-weight: 700; }
+.adm-color-row { border: 1px solid #eceef1; border-radius: 10px; padding: 10px 12px; }
+.adm-color-row-head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13.5px; color: #1f2937; flex-wrap: wrap; }
+.adm-color-dot { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(0,0,0,.18); }
+.adm-color-hint { font-weight: 400; color: #6b7280; font-size: 12px; }
+.adm-form-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.adm-form-actions .adm-btn-ghost { background: #fff !important; color: #1a1a2e !important; border: 1.5px solid #1a1a2e !important; }
+
+/* Description grid: layout picker and sideways-scrolling wide grids */
+.lzbe-grid-layouts { margin: 8px 0; }
+.lzbe-grid-layouts-title { font-size: 0.8rem; color: #555; font-weight: 600; margin-bottom: 4px; }
+.lzbe-grid-layout-btns { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.lzbe-grid-layout { flex: 0 0 auto; padding: 6px 7px; border: 1.5px solid #d1d5db; border-radius: 8px; background: #fff; color: #9ca3af; cursor: pointer; line-height: 0; }
+.lzbe-grid-layout:hover { border-color: #1a1a2e; color: #1a1a2e; }
+.lzbe-grid-layout.is-on { border-color: #1a1a2e; color: #1a1a2e; background: #fff8e1; }
+.lzbe-grid-layouts-note { font-size: 0.75rem; color: #6b7280; margin-top: 4px; }
+.lzbe-grid-items.lzbe-grid-items-scroll { display: flex; overflow-x: auto; }
+.lzbe-grid-items.lzbe-grid-items-scroll > .lzbe-grid-item { flex: 0 0 220px; }
