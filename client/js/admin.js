@@ -1082,6 +1082,21 @@ function toggleSizeSelection(checkbox) {
     } else {
         pdSelectedSizes = pdSelectedSizes.filter(s => s !== checkbox.value);
     }
+    adminRefreshVariants();
+}
+
+// Ticked sizes in the size list's own order (XS, S, M... not click order).
+function adminOrderedSizes() {
+    const order = Array.from(document.querySelectorAll("#size-checkbox-list input[type=checkbox]")).map(cb => cb.value);
+    return pdSelectedSizes.slice().sort((a, b) => {
+        const ia = order.indexOf(a), ib = order.indexOf(b);
+        return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+    });
+}
+
+function adminRefreshVariants() {
+    const host = document.getElementById("admin-variants-table");
+    if (host && window.LzVariantsTable && host._lzvl) LzVariantsTable.refreshLive(host);
 }
 
 // Colours (Sept 2026): swatches from the colour list (lz-color-swatches.js).
@@ -1107,6 +1122,7 @@ function adminSyncColors(names) {
     });
     pdSelectedColors = next;
     renderColorPhotoRows();
+    adminRefreshVariants();
     if (window.LzFormSteps) LzFormSteps.refresh(document.getElementById("admin-product-steps"));
 }
 
@@ -1169,6 +1185,7 @@ function selectColorThumb(imgEl, colorName) {
 
     const picker = imgEl.closest("[data-color-name]");
     if (picker) refreshColorThumbBadges(picker, colorName);
+    adminRefreshVariants();
 }
 
 async function loadProductOptionsIntoForm(productId) {
@@ -1198,6 +1215,7 @@ async function loadProductOptionsIntoForm(productId) {
         document.querySelectorAll("#size-checkbox-list input[type=checkbox]").forEach(cb => {
             cb.checked = pdSelectedSizes.includes(cb.value);
         });
+        adminRefreshVariants();
 
         const specsList = document.getElementById("specs-list");
         if (specsList) {
@@ -1214,7 +1232,12 @@ async function loadCategories() {
         const response = await fetch(`${API_URL}/api/products/categories`);
         allCategories = await response.json();
 
-        renderCategorySelect();
+        // Keep the category already chosen while the product form is open
+        // (a product-list refresh after Save as Draft used to blank it).
+        const sel = document.getElementById("product-category");
+        const form = document.getElementById("product-form-container");
+        const keep = sel && form && !form.classList.contains("hidden") && sel.value ? sel.value : undefined;
+        renderCategorySelect(keep);
 
     } catch (error) {
         console.error("Load categories error:", error);
@@ -1261,6 +1284,14 @@ function openAdminProductCategoryPicker() {
     CategoryPicker.open(allCategories, select.value || null, (cat) => {
         if (!cat) return;
         select.value = cat.id;
+        // Never leave the pick blank: add it if the list doesn't have it.
+        if (String(select.value) !== String(cat.id)) {
+            const opt = document.createElement("option");
+            opt.value = cat.id;
+            opt.textContent = cat.name;
+            select.appendChild(opt);
+            select.value = cat.id;
+        }
         syncAdminProductCategoryButtonLabel();
     });
 }
@@ -2184,6 +2215,8 @@ async function saveProduct(opts) {
     const files = pdPickedFiles;
 
     const errorEl = document.getElementById("product-form-error");
+    errorEl.textContent = "";
+    errorEl.style.color = "";
 
     if (!name || !category_id || !price || !stock) {
         errorEl.textContent = "Please fill in name, category, price, and stock.";
@@ -2277,16 +2310,30 @@ async function saveProduct(opts) {
 
         const specsPayload = collectSpecRows();
 
+        let variantsProblem = null;
         if (savedProductId && (pdSelectedSizes.length > 0 || colorsPayload.length > 0 || specsPayload.length > 0)) {
             try {
                 await authorizedFetch(`/api/products/${savedProductId}/options`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ sizes: pdSelectedSizes, colors: colorsPayload, specs: specsPayload })
+                    body: JSON.stringify({ sizes: adminOrderedSizes(), colors: colorsPayload, specs: specsPayload })
                 });
+                // Then the variants table's rows (price, stock, SKU).
+                const vHost = document.getElementById("admin-variants-table");
+                if (vHost && window.LzVariantsTable && (pdSelectedSizes.length || colorsPayload.length)) {
+                    const vr = await LzVariantsTable.saveLive(vHost, savedProductId, (url, o) => authorizedFetch(url, o));
+                    if (!vr.ok) variantsProblem = vr.message;
+                }
             } catch (optionsError) {
                 console.error("Save options error:", optionsError);
+                variantsProblem = optionsError.message || "Colours, sizes or variants could not be saved.";
             }
+        }
+        if (variantsProblem) {
+            errorEl.textContent = "Product saved, but: " + variantsProblem;
+            document.getElementById("product-id").value = savedProductId;
+            loadProducts();
+            return;
         }
 
         // Description blocks: on create the editor mounts without an id, so
@@ -10694,16 +10741,22 @@ function adminFillExtraFields(product) {
     adminMountVariantsTable(product);
 }
 
+// Variants table (Step 5): rows appear as soon as colours / sizes are
+// ticked, and save together with the product.
 function adminMountVariantsTable(product) {
     const host = document.getElementById("admin-variants-table");
     if (!host || !window.LzVariantsTable) return;
-    LzVariantsTable.mount(host, {
+    LzVariantsTable.mountLive(host, {
         productId: product ? product.id : null,
-        mode: "admin",
-        api: (url, opts) => authorizedFetch(url, opts),
         stockEnabled: !!(product && product.variant_stock_enabled),
-        productPrice: product ? Number(product.price) : null,
-        onModeChange: enabled => { if (product) product.variant_stock_enabled = enabled; }
+        getSelection: () => ({ colors: Object.keys(pdSelectedColors), sizes: adminOrderedSizes() }),
+        getBaseSku: () => (document.getElementById("product-sku") || {}).value || (product && product.sku) || "",
+        getPrice: () => (document.getElementById("product-price") || {}).value,
+        getPhoto: colorName => {
+            const keys = pdSelectedColors[colorName] || [];
+            const im = keys.length ? pdAllImages.find(x => x.key === keys[0]) : null;
+            return im ? im.url : null;
+        }
     });
 }
 
@@ -10761,7 +10814,7 @@ async function adminReopenAfterDraft(productId, message) {
     document.getElementById("variants-section").classList.remove("hidden");
     loadVariants(productId);
     const err = document.getElementById("product-form-error");
-    if (err) { err.style.color = "#067647"; err.textContent = (message || "Draft saved.") + " Fill in the variants table in step 5 if this product has colours or sizes."; setTimeout(() => { err.style.color = ""; }, 8000); }
+    if (err) { err.style.color = "#067647"; err.textContent = (message || "Draft saved.") + " Press Save & Publish when it's ready to go on the store."; setTimeout(() => { err.style.color = ""; }, 8000); }
 }
 
 function adminPreviewProduct() {

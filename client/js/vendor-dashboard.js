@@ -1001,6 +1001,14 @@ function openProductCategoryPicker() {
     CategoryPicker.open(staffCategories, select.value || null, (cat) => {
         if (!cat) return;
         select.value = cat.id;
+        // Never leave the pick blank: add it if the list doesn't have it.
+        if (String(select.value) !== String(cat.id)) {
+            const opt = document.createElement("option");
+            opt.value = cat.id;
+            opt.textContent = cat.name;
+            select.appendChild(opt);
+            select.value = cat.id;
+        }
         select.dispatchEvent(new Event("change"));
         syncProductCategoryButtonLabel();
     });

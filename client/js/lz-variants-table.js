@@ -26,7 +26,7 @@
 .lzvt input { padding: 7px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; box-sizing: border-box; font-family: inherit; }
 .lzvt input.lzvt-num { width: 92px; }
 .lzvt input.lzvt-price { width: 120px; }
-.lzvt input.lzvt-sku { width: 130px; text-transform: uppercase; }
+.lzvt input.lzvt-sku { width: 165px; text-transform: uppercase; }
 .lzvt-colour { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; white-space: nowrap; }
 .lzvt-dot { width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(0,0,0,.18); flex: 0 0 16px; }
 .lzvt-dot.lzvt-nohex { background: repeating-conic-gradient(#e5e7eb 0 25%, #fff 0 50%) 50% / 6px 6px; }
@@ -225,5 +225,187 @@
         reload(host);
     }
 
-    window.LzVariantsTable = { mount, reload };
+
+    // ---- Live table (admin form, Sept 2026) --------------------------------
+    // Rows appear as soon as colours / sizes are ticked - no saving first.
+    // What is typed is kept per colour+size while ticks change; the form
+    // saves it with the product (saveLive).
+    const rowKey = (c, z) => String(c || "").toLowerCase() + "|" + String(z || "").toLowerCase();
+
+    function suggestSku(base, colorIndex, size) {
+        base = String(base || "").trim().toUpperCase();
+        if (!base) return "";
+        let letters = "";
+        if (colorIndex >= 0) {
+            let n = colorIndex;
+            do { letters = String.fromCharCode(65 + (n % 26)) + letters; n = Math.floor(n / 26) - 1; } while (n >= 0);
+        }
+        return (base + letters + (size ? "-" + String(size).toUpperCase().replace(/[^A-Z0-9]+/g, "") : "")).slice(0, 64);
+    }
+
+    async function loadSaved(st) {
+        st.saved = {};
+        if (!st.productId) return;
+        try {
+            const r = await fetch("/api/products/" + st.productId + "/options");
+            if (!r.ok) return;
+            const o = await r.json();
+            const cn = {}, zn = {};
+            (o.colors || []).forEach((c) => { cn[c.id] = c; });
+            (o.sizes || []).forEach((z) => { zn[z.id] = z.name; });
+            (o.variants || []).forEach((v) => {
+                if (v.color_id === null && v.size_id === null) return;
+                const c = cn[v.color_id];
+                st.saved[rowKey(c ? c.name : "", zn[v.size_id] || "")] = {
+                    id: v.id, price: v.own_price ? Number(v.price) : "", stock: Number(v.stock) || 0, sku: v.sku || "",
+                    photo: c ? c.image_path : null
+                };
+            });
+        } catch (e) { /* the table still works without saved rows */ }
+    }
+
+    function liveRows(st) {
+        const sel = st.getSelection();
+        const colors = sel.colors || [], sizes = sel.sizes || [];
+        const rows = [];
+        const add = (c, ci, z) => rows.push({ color: c, colorIndex: ci, size: z, key: rowKey(c, z) });
+        if (colors.length && sizes.length) colors.forEach((c, ci) => sizes.forEach((z) => add(c, ci, z)));
+        else if (colors.length) colors.forEach((c, ci) => add(c, ci, ""));
+        else sizes.forEach((z) => add("", -1, z));
+        return { rows, colors, sizes };
+    }
+
+    function drawLive(host, message, bad) {
+        const st = host._lzvl;
+        const { rows, colors, sizes } = liveRows(st);
+        const body = host.querySelector(".lzvt-body");
+        if (!rows.length) {
+            body.innerHTML = '<div class="lzvt-empty">Tick the colours and/or sizes this product comes in (above) - a row for each appears here to fill in price, stock and SKU.</div>';
+            return;
+        }
+        const base = st.getBaseSku ? st.getBaseSku() : "";
+        const defPrice = st.getPrice ? Number(st.getPrice()) || 0 : 0;
+        const html = rows.map((r) => {
+            const v = st.values[r.key] || st.saved[r.key] || {};
+            if (!st.values[r.key]) st.values[r.key] = { price: v.price === undefined ? "" : v.price, stock: v.stock === undefined ? 0 : v.stock, sku: v.sku || "" };
+            const val = st.values[r.key];
+            const hex = r.color && window.LzColorSwatches ? window.LzColorSwatches.hexOf(r.color) : null;
+            const photo = st.getPhoto ? st.getPhoto(r.color) : null;
+            return '<tr data-key="' + esc(r.key) + '">' +
+                (colors.length ? '<td data-label="Colour"><span class="lzvt-colour"><span class="lzvt-dot' + (hex ? "" : " lzvt-nohex") + '"' +
+                    (hex ? ' style="background:' + esc(hex) + '"' : "") + "></span>" + esc(r.color) + "</span></td>" : "") +
+                (sizes.length ? '<td data-label="Size"><strong>' + esc(r.size) + "</strong></td>" : "") +
+                '<td data-label="Price (UGX)"><input type="number" min="1" step="1" class="lzvt-price" data-f="price" value="' + esc(val.price) +
+                    '" placeholder="' + (defPrice ? esc(defPrice.toLocaleString()) : "Product price") + '"></td>' +
+                '<td data-label="Stock"><input type="number" min="0" step="1" class="lzvt-num lzvt-stock" data-f="stock" value="' + esc(val.stock) + '"></td>' +
+                '<td data-label="SKU"><input type="text" class="lzvt-sku" data-f="sku" maxlength="64" value="' + esc(val.sku) +
+                    '" placeholder="' + esc(suggestSku(base, r.colorIndex, r.size) || "Optional") + '"></td>' +
+                (colors.length ? '<td data-label="Photo">' + (photo ? '<img class="lzvt-photo" src="' + esc(photo) + '" alt="">' : '<span class="lzvt-nophoto">Tap photos above</span>') + "</td>" : "") +
+            "</tr>";
+        }).join("");
+        const total = rows.reduce((n, r) => n + (Number((st.values[r.key] || {}).stock) || 0), 0);
+        body.innerHTML =
+            '<div class="lzvt-wrap"><table><thead><tr>' +
+                (colors.length ? "<th>Colour</th>" : "") + (sizes.length ? "<th>Size</th>" : "") +
+                "<th>Price (UGX)</th><th>Stock</th><th>SKU</th>" + (colors.length ? "<th>Photo</th>" : "") +
+            "</tr></thead><tbody>" + html + "</tbody></table></div>" +
+            '<div class="lzvt-foot">' + rows.length + " rows &middot; " + total + " units in total. Leave a price blank to sell that row at the selling price. " +
+                "A blank SKU gets the one shown in grey. It all saves with the product (Save as Draft or Save &amp; Publish).</div>" +
+            '<div class="lzvt-bar">' +
+                '<button type="button" class="lzvt-gen lzvt-fill">Fill all stock with&hellip;</button>' +
+                '<label class="lzvt-mode"><input type="checkbox" class="lzvt-use"' + (st.useVariantStock ? " checked" : "") + "> Use these stock numbers on the store</label>" +
+            "</div>" +
+            '<div class="lzvt-msg' + (bad ? " lzvt-bad" : "") + '" aria-live="polite">' + esc(message || "") + "</div>";
+
+        body.querySelectorAll("tbody input").forEach((inp) => {
+            inp.addEventListener("input", () => {
+                const key = inp.closest("tr").dataset.key;
+                st.values[key] = st.values[key] || {};
+                st.values[key][inp.dataset.f] = inp.dataset.f === "sku" ? inp.value.toUpperCase() : inp.value;
+                if (inp.dataset.f === "stock") {
+                    const t = rows.reduce((n, r) => n + (Number((st.values[r.key] || {}).stock) || 0), 0);
+                    const foot = body.querySelector(".lzvt-foot");
+                    if (foot) foot.innerHTML = foot.innerHTML.replace(/[\d,]+ units in total/, t + " units in total");
+                }
+            });
+        });
+        body.querySelector(".lzvt-fill").onclick = () => {
+            const n = prompt("Stock for every row:", "0");
+            if (n === null) return;
+            const v = Math.max(0, parseInt(n, 10) || 0);
+            rows.forEach((r) => { st.values[r.key] = Object.assign({}, st.values[r.key], { stock: v }); });
+            drawLive(host);
+        };
+        body.querySelector(".lzvt-use").onchange = (e) => { st.useVariantStock = e.target.checked; };
+    }
+
+    async function mountLive(host, opts) {
+        if (!host) return;
+        ensureStyle();
+        host._lzvl = Object.assign({ values: {}, saved: {}, useVariantStock: false }, opts || {});
+        host._lzvl.useVariantStock = !!opts.stockEnabled;
+        host.innerHTML = '<div class="lzvt"><div class="lzvt-body"></div></div>';
+        await loadSaved(host._lzvl);
+        drawLive(host);
+    }
+
+    function refreshLive(host) { if (host && host._lzvl) drawLive(host); }
+
+    // Saves the rows for a product that has just been saved (and whose
+    // colours/sizes were just saved): makes any missing rows, then writes
+    // price, stock and SKU, then the "use these stock numbers" choice.
+    async function saveLive(host, productId, api) {
+        const st = host && host._lzvl;
+        if (!st) return { ok: true };
+        const { rows } = liveRows(st);
+        if (!rows.length) return { ok: true };
+        const baseSku = st.getBaseSku ? st.getBaseSku() : "";
+        try {
+            await api("/api/products/" + productId + "/variants/generate", { method: "POST" });
+            const r = await fetch("/api/products/" + productId + "/options");
+            const o = await r.json();
+            const cn = {}, zn = {};
+            (o.colors || []).forEach((c) => { cn[c.id] = c.name; });
+            (o.sizes || []).forEach((z) => { zn[z.id] = z.name; });
+            const idByKey = {};
+            (o.variants || []).forEach((v) => {
+                if (v.color_id === null && v.size_id === null) return;
+                idByKey[rowKey(cn[v.color_id] || "", zn[v.size_id] || "")] = v;
+            });
+            const updates = [];
+            rows.forEach((row) => {
+                const v = idByKey[row.key];
+                if (!v) return;
+                const val = st.values[row.key] || {};
+                const price = String(val.price === undefined ? "" : val.price).trim();
+                updates.push({
+                    variant_id: v.id,
+                    stock: Math.max(0, parseInt(val.stock, 10) || 0),
+                    price: price === "" ? null : Number(price),
+                    sku: String(val.sku || "").trim() || suggestSku(baseSku, row.colorIndex, row.size) || v.sku || null
+                });
+            });
+            if (updates.length) {
+                const d = await api("/api/products/" + productId + "/variants/stock", {
+                    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ updates })
+                });
+                if (d && d.error) return { ok: false, message: d.error };
+            }
+            const anyStock = updates.some((u) => u.stock > 0);
+            if (st.useVariantStock && !anyStock) return { ok: false, message: "Variants saved, but the store keeps using the product's Stock figure until at least one row has stock." };
+            const m = await api("/api/products/" + productId + "/variant-stock", {
+                method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: !!st.useVariantStock })
+            });
+            if (m && m.error) return { ok: false, message: m.error };
+            st.productId = productId;
+            await loadSaved(st);
+            st.values = {};
+            drawLive(host);
+            return { ok: true, count: updates.length };
+        } catch (e) {
+            return { ok: false, message: e.message || "Could not save the variants." };
+        }
+    }
+
+    window.LzVariantsTable = { mount, reload, mountLive, refreshLive, saveLive };
 })();
