@@ -1294,6 +1294,25 @@ function pdSetupShare(product) {
     set("pd-share-fb", "https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(url));
     set("pd-share-x", "https://twitter.com/intent/tweet?text=" + encodeURIComponent(text) + "&url=" + encodeURIComponent(url));
     set("pd-share-wa", "https://wa.me/?text=" + encodeURIComponent(text + " " + url));
+    // Instagram has no share-a-link address, so its button copies the
+    // product link and opens Instagram in a new tab to paste it there.
+    const ig = document.getElementById("pd-share-ig");
+    if (ig) ig.onclick = () => {
+        const note = document.getElementById("pd-share-note");
+        const say = msg => {
+            if (!note) return;
+            note.textContent = msg;
+            note.hidden = false;
+            clearTimeout(pdSetupShare.t);
+            pdSetupShare.t = setTimeout(() => { note.hidden = true; }, 6000);
+        };
+        const ok = () => say("Link copied. Paste it in your Instagram post, story or message.");
+        const fail = () => say("Copy this link for Instagram: " + url);
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(ok, fail);
+            else fail();
+        } catch (e) { fail(); }
+    };
     set("pd-report-link", "https://wa.me/256792363104?text=" + encodeURIComponent(
         "Hello Lizimas Store, some information on this product looks incorrect: " + (product.name || "") +
         " (Item ID " + product.id + ") " + url + "\nWhat is wrong: "));

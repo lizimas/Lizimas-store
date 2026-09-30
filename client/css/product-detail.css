@@ -648,6 +648,8 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
     }
     .pd-share-icons a:hover { background: #1a1a2e; color: #fff; }
     .pd-share-icons svg { width: 18px; height: 18px; }
+    .pd-share-note { margin-top: 8px; font-size: 12.5px; color: #166534; background: #ecfdf3; border-radius: 6px; padding: 6px 9px; word-break: break-all; }
+    .pd-share-note[hidden] { display: none; }
     .pd-report-link { display: inline-block; margin-top: 16px; font-size: 13.5px; color: #1d4ed8; text-decoration: none; }
     .pd-report-link:hover { text-decoration: underline; }
 }
