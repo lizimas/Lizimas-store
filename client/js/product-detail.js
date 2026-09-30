@@ -1263,12 +1263,12 @@ function pdShipLine(fee, district) {
 // Every product Lizimas sells itself (products page, ?seller=official).
 const PD_OFFICIAL_URL = "/products?seller=official";
 
-// Lizimas' own products: the store itself is the seller. The name and the
-// "Official Store" badge both open the Official Store listing.
+// Lizimas' own products: the store itself is the seller. The name is plain
+// text; the "Official Store" badge and the link below open the listing.
 function pdRenderOwnSeller(panel) {
     panel.innerHTML =
         '<div class="seller-panel-head">' +
-            '<a class="seller-panel-name pd-official-link" href="' + PD_OFFICIAL_URL + '">Lizimas Store</a>' +
+            '<span class="seller-panel-name">Lizimas Store</span>' +
             '<a class="seller-score-badge pd-official-link" href="' + PD_OFFICIAL_URL + '" title="See all Official Store products">Official Store &rsaquo;</a>' +
         '</div>' +
         '<ul class="seller-performance-list">' +
@@ -1281,6 +1281,8 @@ function pdRenderOwnSeller(panel) {
     panel.hidden = false;
     const box = document.getElementById("pd-seller-box");
     if (box) { box.hidden = false; box.classList.add("pd-seller-own"); }
+    const head = document.getElementById("pd-seller-link");
+    if (head) head.href = PD_OFFICIAL_URL;
 }
 
 // Share buttons and the "Report incorrect product information" link
