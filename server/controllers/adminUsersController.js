@@ -19,7 +19,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function setupLinkFor(req, user) {
     const token = jwt.sign({ userId: user.id, email: user.email, purpose: "passwordReset" }, JWT_SECRET, { expiresIn: "15m" });
-    return `${req.protocol}://${req.get("host")}/staff-reset-password.html?token=${token}&portal=admin`;
+    return `${req.protocol}://${req.get("host")}/staff-reset-password?token=${token}&portal=admin`;
 }
 
 function shape(row) {

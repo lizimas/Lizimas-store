@@ -101,7 +101,7 @@ function getBaseProductId(cartItemId) {
 
 function goToChangeVariant(cartItemId) {
     const baseId = getBaseProductId(cartItemId);
-    window.location.href = `index.html?openProduct=${baseId}`;
+    window.location.href = `./?openProduct=${baseId}`;
 }
 
 function recalculateFooter() {

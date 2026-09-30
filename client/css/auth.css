@@ -411,7 +411,7 @@
 
 /* ================================================================== */
 /* Auth redesign - navy hero band, overlapping card, gold primary.     */
-/* Scoped to .auth-page so checkout.html is untouched.                 */
+/* Scoped to .auth-page so checkout is untouched.                 */
 /* ================================================================== */
 
 .auth-page {

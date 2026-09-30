@@ -44,7 +44,7 @@ async function submitStaffPasswordReset() {
             // Admin team members (invited from Admin > Users & Permissions)
             // sign in on the admin page, not the staff login.
             window.location.href = new URLSearchParams(window.location.search).get("portal") === "admin"
-                ? "admin.html" : "staff-login.html";
+                ? "admin" : "staff-login";
         }, 2000);
 
     } catch (error) {

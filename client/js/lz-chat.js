@@ -327,10 +327,10 @@
       '<button class="lzc-send" id="lzc-send">Send</button>' +
       "</div>" +
       '<div class="lzc-links">' +
-      '<a href="help.html">Help Centre</a>' +
-      '<a href="faq.html">FAQ</a>' +
-      '<a href="returns.html">Returns</a>' +
-      '<a href="contact.html">Contact</a>' +
+      '<a href="help">Help Centre</a>' +
+      '<a href="faq">FAQ</a>' +
+      '<a href="returns">Returns</a>' +
+      '<a href="contact">Contact</a>' +
       "</div>" +
       '<div class="lzc-alt">' +
       'Prefer WhatsApp? <a href="' + CFG.whatsapp +

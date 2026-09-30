@@ -97,20 +97,20 @@ exports.getAdminChannelAuthorizeUrl = async (req, res) => {
 exports.adminChannelOAuthCallback = async (req, res) => {
     const { code, state, error: channelError } = req.query;
     if (channelError) {
-        return res.redirect(`/admin.html?channel_oauth=error&message=${encodeURIComponent(String(channelError))}#products`);
+        return res.redirect(`/admin?channel_oauth=error&message=${encodeURIComponent(String(channelError))}#products`);
     }
     if (!code || !state) {
-        return res.redirect(`/admin.html?channel_oauth=error&message=${encodeURIComponent("Missing code or state from Channel.")}#products`);
+        return res.redirect(`/admin?channel_oauth=error&message=${encodeURIComponent("Missing code or state from Channel.")}#products`);
     }
     try {
         const result = await channelAdminSync.handleOAuthCallback(code, state);
         if (!result.success) {
-            return res.redirect(`/admin.html?channel_oauth=error&message=${encodeURIComponent(result.message || "Could not connect to Channel.")}#products`);
+            return res.redirect(`/admin?channel_oauth=error&message=${encodeURIComponent(result.message || "Could not connect to Channel.")}#products`);
         }
-        return res.redirect(`/admin.html?channel_oauth=success#products`);
+        return res.redirect(`/admin?channel_oauth=success#products`);
     } catch (error) {
         console.error("adminChannelOAuthCallback error:", error);
-        return res.redirect(`/admin.html?channel_oauth=error&message=${encodeURIComponent("Something went wrong completing Channel sign-in.")}#products`);
+        return res.redirect(`/admin?channel_oauth=error&message=${encodeURIComponent("Something went wrong completing Channel sign-in.")}#products`);
     }
 };
 

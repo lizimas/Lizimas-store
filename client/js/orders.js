@@ -175,7 +175,7 @@ async function loadMyOrders() {
 
     if (!token) {
         document.getElementById("logged-out-card").style.display = "block";
-        navLink.innerHTML = `<a href="login.html">Login</a>`;
+        navLink.innerHTML = `<a href="login">Login</a>`;
         return;
     }
 

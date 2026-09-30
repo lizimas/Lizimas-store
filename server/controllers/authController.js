@@ -76,8 +76,8 @@ async function deviceGate(user, req, surface) {
         ip: req.headers["cf-connecting-ip"] || req.ip,
         userAgent: req.headers["user-agent"] || "unknown",
         time: new Date().toLocaleString("en-GB", { timeZone: "Africa/Kampala" }) + " (EAT)",
-        approveUrl: `${base}/device-approve.html?t=${request.approveToken}`,
-        denyUrl: `${base}/device-approve.html?d=${request.denyToken}`
+        approveUrl: `${base}/device-approve?t=${request.approveToken}`,
+        denyUrl: `${base}/device-approve?d=${request.denyToken}`
     }).catch(err => console.error("Device approval email failed:", err));
 
     return { pending: true, ref: request.ref, expiresAt: request.expiresAt };
@@ -809,7 +809,7 @@ async function createStaffAccount(req, res) {
         // Same fix as forcePasswordReset below: this is a brand-new staff
         // account, so the setup link needs to land on the staff-branded reset
         // page, not the customer storefront's reset-password.html.
-        const setupLink = `${req.protocol}://${req.get("host")}/staff-reset-password.html?token=${inviteToken}`;
+        const setupLink = `${req.protocol}://${req.get("host")}/staff-reset-password?token=${inviteToken}`;
         const inviteSent = await sendStaffInviteEmail(invited.email, invited.name, setupLink, 15);
 
         res.status(201).json({
@@ -1239,7 +1239,7 @@ async function forgotPassword(req, res) {
             { expiresIn: `${RESET_MINUTES}m` }
         );
 
-        const resetLink = `${req.protocol}://${req.get("host")}/reset-password.html?token=${resetToken}&portal=${portal}`;
+        const resetLink = `${req.protocol}://${req.get("host")}/reset-password?token=${resetToken}&portal=${portal}`;
 
         sendPasswordResetEmail(user.email, resetLink, RESET_MINUTES).catch(err => console.error("Password reset email failed:", err));
 
@@ -1346,7 +1346,7 @@ async function forcePasswordReset(req, res) {
         // the customer storefront's reset-password.html - sending a staff member
         // there showed them the customer nav and dropped them at customer login
         // afterward.
-        const resetLink = `${req.protocol}://${req.get("host")}/staff-reset-password.html?token=${resetToken}`;
+        const resetLink = `${req.protocol}://${req.get("host")}/staff-reset-password?token=${resetToken}`;
         const emailSent = await sendPasswordResetEmail(target.email, resetLink, 30);
 
         res.json({

@@ -638,7 +638,7 @@ function handleAddToCart(productId, variant = null) {
     }
 
     if (cameFromCart) {
-        window.location.href = "cart.html";
+        window.location.href = "cart";
     }
 }
 
@@ -1059,7 +1059,7 @@ async function displayFeaturedProducts(products) {
                 <h2 class="ls-row-title">${category.name}</h2>
                 <div class="ls-row-controls">
                     <a class="ls-row-viewall"
-                       href="products.html?category=${encodeURIComponent(category.name)}">View all &#8594;</a>
+                       href="products?category=${encodeURIComponent(category.name)}">View all &#8594;</a>
                 </div>
             </div>
             <div class="ls-row-body">
@@ -1532,7 +1532,7 @@ async function openProductModal(productId) {
 
 function closeProductModal() {
     if (cameFromCart) {
-        window.location.href = "cart.html";
+        window.location.href = "cart";
         return;
     }
     document.getElementById("product-modal").classList.add("hidden");
@@ -1802,7 +1802,7 @@ function renderCategoryHeading(name, count) {
         <span class="category-section-count">${count} item${count === 1 ? "" : "s"}</span>`;
 }
 
-// Red banner for the flash-deals "View all" page (products.html?flash=1),
+// Red banner for the flash-deals "View all" page (products?flash=1),
 // coloured to match the card it was linked from rather than the plain
 // grey heading renderCategoryHeading draws for every other filtered view.
 function renderFlashHeading(sale, count) {
@@ -1932,7 +1932,7 @@ function wireFlashShareButton(sale) {
     }
     btn.hidden = false;
 
-    const shareUrl = `${window.location.origin}/products.html?flash=1&share=${encodeURIComponent(sale.share_token)}`;
+    const shareUrl = `${window.location.origin}/products?flash=1&share=${encodeURIComponent(sale.share_token)}`;
     const shareText = `${sale.title || "Grab Or Gone!"} — check out this deal on Lizimas:`;
 
     btn.onclick = async () => {
@@ -1964,9 +1964,9 @@ document.addEventListener("DOMContentLoaded", loadFlashSale);
 
 // Sponsored Products row (Advertise Your Products / Vendor Center
 // comparison, Sept 2026): the dedicated storefront showcase for vendor CPC
-// ad campaigns - see #ls-sponsored in index.html and
+// ad campaigns - see #ls-sponsored in ./ and
 // GET /api/ads/sponsored-products (adTrackingController.js). No-ops on any
-// page without the section (products.html, categories.html, etc. all load
+// page without the section (products, categories, etc. all load
 // this same file). Hidden whenever there are currently no active,
 // unexhausted campaigns with products to show.
 async function loadSponsoredRow() {

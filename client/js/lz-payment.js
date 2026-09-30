@@ -72,7 +72,7 @@
 
         // Hosted-checkout card payments (Flutterwave) don't poll at all —
         // there's nothing to poll yet. The browser leaves this page entirely
-        // and Flutterwave brings it back to payment-return.html, which calls
+        // and Flutterwave brings it back to payment-return, which calls
         // the by-ref confirm endpoint instead.
         if (r.data.checkoutUrl) {
           self.render({

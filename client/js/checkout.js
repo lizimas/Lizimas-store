@@ -395,7 +395,7 @@ function finishOrderSuccess(orderId) {
         `Thank you for shopping with Lizimas Store!\n\nOrder #${orderId} has been received.`
     );
     localStorage.removeItem("cart");
-    window.location.href = "index.html";
+    window.location.href = "./";
 }
 
 async function startMobileMoneyPayment(orderId, phone) {
@@ -414,7 +414,7 @@ async function startMobileMoneyPayment(orderId, phone) {
         document.getElementById("momo-waiting-modal").style.display = "none";
         alert("Could not start Mobile Money payment. Your order was saved as pending - please try paying again from your order history, or contact us.");
         localStorage.removeItem("cart");
-        window.location.href = "index.html";
+        window.location.href = "./";
     }
 }
 
@@ -436,7 +436,7 @@ async function startCardPayment(orderId) {
         document.getElementById("momo-waiting-modal").style.display = "none";
         alert("Could not start the card payment. Your order was saved as pending - please try paying again from your order history, or contact us.");
         localStorage.removeItem("cart");
-        window.location.href = "index.html";
+        window.location.href = "./";
     }
 }
 
@@ -463,7 +463,7 @@ function pollPaymentStatus(paymentId, pollToken, orderId) {
                         " Your order is saved as pending - you can try paying again from your order history."
                     );
                     localStorage.removeItem("cart");
-                    window.location.href = "index.html";
+                    window.location.href = "./";
                 }
                 return;
             }
@@ -476,7 +476,7 @@ function pollPaymentStatus(paymentId, pollToken, orderId) {
             document.getElementById("momo-waiting-modal").style.display = "none";
             alert("We could not confirm your payment yet. Your order is saved as pending - we will update it once payment is confirmed.");
             localStorage.removeItem("cart");
-            window.location.href = "index.html";
+            window.location.href = "./";
             return;
         }
 
@@ -491,7 +491,7 @@ function cancelMomoWait() {
     document.getElementById("momo-waiting-modal").style.display = "none";
     alert("Payment cancelled. Your order is saved as pending - you can complete payment later from your order history.");
     localStorage.removeItem("cart");
-    window.location.href = "index.html";
+    window.location.href = "./";
 }
 
 document.addEventListener("DOMContentLoaded", () => {

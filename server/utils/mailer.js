@@ -69,9 +69,9 @@ function renderCustomerEmail(opts) {
 
   <tr><td style="padding:16px 24px 22px;border-top:1px dashed #ddd;font-size:12.5px;color:#666;line-height:1.7">
     <strong style="color:${BRAND.navy}">${BRAND.name}</strong> &nbsp;&middot;&nbsp; ${BRAND.tagline}<br>
-    <a href="${BRAND.site}/faq.html" style="color:${BRAND.navy};text-decoration:none;font-weight:600">FAQ</a> &middot;
-    <a href="${BRAND.site}/returns.html" style="color:${BRAND.navy};text-decoration:none;font-weight:600">Returns</a> &middot;
-    <a href="${BRAND.site}/privacy.html" style="color:${BRAND.navy};text-decoration:none;font-weight:600">Privacy</a> &middot;
+    <a href="${BRAND.site}/faq" style="color:${BRAND.navy};text-decoration:none;font-weight:600">FAQ</a> &middot;
+    <a href="${BRAND.site}/returns" style="color:${BRAND.navy};text-decoration:none;font-weight:600">Returns</a> &middot;
+    <a href="${BRAND.site}/privacy" style="color:${BRAND.navy};text-decoration:none;font-weight:600">Privacy</a> &middot;
     <a href="${BRAND.facebook}" style="color:${BRAND.navy};text-decoration:none;font-weight:600">Facebook</a><br>
     ${BRAND.phone} &nbsp;&middot;&nbsp; ${BRAND.email} &nbsp;&middot;&nbsp; www.lizimasstore.com
   </td></tr>
@@ -212,7 +212,7 @@ async function sendOrderStatusEmail(email, order, status, items) {
 
     try {
         const name = order.customer_name || order.customer_email || "Customer";
-        const orderUrl = `${BRAND.site}/orders.html`;
+        const orderUrl = `${BRAND.site}/orders`;
         const isDelivered = status === "delivered";
         const list = Array.isArray(items) ? items : [];
 
@@ -541,7 +541,7 @@ async function sendStaffActivationEmail(email, name) {
 <p style="margin:0 0 12px">Hi ${escHtml(name)},</p>
 <p style="margin:0 0 12px">Your staff account has been approved and is now active. You can sign in to the staff dashboard at any time.</p>
 <p style="margin:0 0 12px">Welcome to the team.</p>`,
-                ctaUrl: `${BRAND.site}/staff-login.html`,
+                ctaUrl: `${BRAND.site}/staff-login`,
                 ctaText: "Go to staff login"
             })
         });
@@ -570,7 +570,7 @@ async function sendVendorApplicationReceivedEmail(email, name, businessName) {
 <p style="margin:0 0 12px">Hi ${escHtml(name)},</p>
 <p style="margin:0 0 12px">Thanks for applying to sell on Lizimas Store as <strong>${escHtml(businessName)}</strong>. Your application is now pending review - we'll email you as soon as a decision has been made.</p>
 <p style="margin:0 0 12px">In the meantime, you can log in to your vendor dashboard and complete KYC verification (your identity or business registration details). Doing this now speeds up review once your application reaches the front of the queue.</p>`,
-                ctaUrl: `${BRAND.site}/vendor-login.html`,
+                ctaUrl: `${BRAND.site}/vendor-login`,
                 ctaText: "Go to vendor login"
             })
         });
@@ -601,7 +601,7 @@ async function sendVendorSignupReminderEmail(email) {
 <p style="margin:0 0 12px">We noticed you started registering to sell on Lizimas Store but didn't finish - this sometimes happens if your internet connection drops partway through.</p>
 <p style="margin:0 0 12px">If you'd still like to sell with us, please go back and complete your registration. You'll need to verify your email again since the earlier verification code has expired.</p>
 <p style="margin:0;color:#777;font-size:13px">If you didn't mean to start this, you can safely ignore this email.</p>`,
-                ctaUrl: `${BRAND.site}/vendor-register.html`,
+                ctaUrl: `${BRAND.site}/vendor-register`,
                 ctaText: "Complete your registration"
             })
         });

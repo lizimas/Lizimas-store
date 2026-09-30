@@ -1,6 +1,6 @@
 // Vendor Center screens rebuilt to match Vendor Center (Ryan, Sept
 // 2026), shared by BOTH vendor dashboard shells (desktop sidebar/tabs and
-// the mobile app shell - client/vendor/dashboard.html). Loaded after
+// the mobile app shell - client/vendor/dashboard). Loaded after
 // vendor-dashboard.js, vendor-mobile.js and vendor-shop-setup.js and reuses
 // their globals (vendorAuthorizedFetch, vendorEsc, getVendorToken, API_URL,
 // vmShowScreen, vdStaffCache, vdStaffAvailableRoles, vdRoleLabel,

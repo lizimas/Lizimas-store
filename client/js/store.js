@@ -1,4 +1,4 @@
-// Public vendor storefront (client/store.html). Reads the vendor slug from
+// Public vendor storefront (client/store). Reads the vendor slug from
 // the pretty URL server/routes/store-page.js serves (/store/<slug>), or from
 // a ?slug= query string as a fallback for local testing, then renders the
 // vendor's about text, delivery/payment method badge, and their live

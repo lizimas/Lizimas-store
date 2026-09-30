@@ -17,7 +17,7 @@ function esc(s) {
     .replace(/"/g, "&quot;");
 }
 
-router.get("/product-detail.html", async (req, res, next) => {
+router.get(["/product-detail.html", "/product-detail"], async (req, res, next) => {
   const id = parseInt(req.query.id, 10);
   if (!id) return next();
   try {

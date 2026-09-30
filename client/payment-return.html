@@ -2,7 +2,7 @@
 <html>
 
 <head>
-<script src="/js/lz-session.js?v=1"></script>
+<script src="/js/lz-session.js?v=2"></script>
 <script src="/js/lz-remember.js?v=2"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -74,7 +74,7 @@
 </div>
 
 <script>
-/* payment-return.html — Flutterwave hosted-checkout redirect landing page.
+/* payment-return — Flutterwave hosted-checkout redirect landing page.
  *
  * Deliberately a small standalone script rather than a load of lz-payment.js:
  * the poller in that file is built to START a payment and poll it; this page
@@ -102,7 +102,7 @@
                     ? '<a class="lz-pay__cta" href="' + esc(view.receiptUrl) + '">View receipt</a>'
                     : '') +
                 (view.retry
-                    ? '<a class="lz-pay__retry" href="index.html">Return to store</a>'
+                    ? '<a class="lz-pay__retry" href="./">Return to store</a>'
                     : '') +
             '</div>';
     }

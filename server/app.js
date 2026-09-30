@@ -91,9 +91,14 @@ app.use("/", require("./routes/product-page"));
 app.use("/", require("./routes/store-page"));
 app.use("/", require("./routes/feed"));
 
+// Clean page addresses (Ryan, Sept 2026): /vendor-login instead of
+// /vendor-login.html. Old .html links (emails, bookmarks, Google) get a
+// permanent redirect to the clean address, keeping ?query and #hash.
+app.use(require("./utils/cleanUrls").redirectHtml(path.join(__dirname, "../client")));
+
 // Static files
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
-app.use(express.static(path.join(__dirname, "../client")));
+app.use(express.static(path.join(__dirname, "../client"), { extensions: ["html"] }));
 
 // Upload and multipart errors must return JSON, not an HTML crash page,
 // or the admin panel shows a raw stack trace to the user.

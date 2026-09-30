@@ -57,7 +57,7 @@ function vsStatusStyle(displayStatus) {
     return { bg: "#fef3c7", fg: "#92400e", dot: "#eab308" };
 }
 
-// --- Sub-tab switcher (called by the buttons in dashboard.html) ---------
+// --- Sub-tab switcher (called by the buttons in dashboard) ---------
 
 window.switchWalletSubTab = function (which) {
     const section = document.getElementById("tab-wallet");

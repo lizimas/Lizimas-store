@@ -1,7 +1,7 @@
 // Vendor mobile Home - "Welcome to Lizimas Store! Let's take your shop live!"
 // shop-setup onboarding (Ryan, Sept 2026 - Vendor
 // Center's mobile seller onboarding). Loaded after vendor-dashboard.js and
-// vendor-mobile.js (see client/vendor/dashboard.html) and reuses their
+// vendor-mobile.js (see client/vendor/dashboard) and reuses their
 // globals: vendorAuthorizedFetch, getVendorToken, API_URL, vendorEsc,
 // vmStatusCopy, vmRenderHomeKpi.
 //
@@ -201,7 +201,7 @@ function vssAgreementHtml() {
         ? `Signed on ${new Date(a.policies_accepted_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}${a.policies_version ? ` (version ${vendorEsc(a.policies_version)})` : ""}`
         : "Not signed yet";
     return `<div class="vss-card"><h2 class="vss-h2">Signed Agreement</h2>
-        <a class="vss-link" href="../vendor-policies.html" target="_blank" rel="noopener">Your signed contract with Lizimas Store</a>
+        <a class="vss-link" href="../vendor-policies" target="_blank" rel="noopener">Your signed contract with Lizimas Store</a>
         <p class="vss-muted" style="margin-top:6px;">Vendor terms, marketplace policies and prohibited items list</p>
         <p class="vss-muted">${signed}</p>
     </div>`;

@@ -27,7 +27,7 @@ async function loginAccount() {
         localStorage.setItem("userInfo", JSON.stringify(result.user));
 
         statusEl.textContent = "Login successful! Redirecting...";
-        window.location.href = "orders.html";
+        window.location.href = "orders";
 
     } catch (error) {
         console.error(error);
@@ -79,7 +79,7 @@ async function handleGoogleCredential(response) {
         localStorage.setItem("userInfo", JSON.stringify(result.user));
 
         statusEl.textContent = "Login successful! Redirecting...";
-        window.location.href = "orders.html";
+        window.location.href = "orders";
 
     } catch (error) {
         console.error("Google sign-in error:", error);
@@ -105,7 +105,7 @@ const FACEBOOK_REDIRECT_URI = "https://lizimasstore.com/api/auth/oauth/facebook/
 // relies on - so there's no SDK to load and no async init to race.
 //
 // Reveal is synchronous and runs as soon as this file does (below the button
-// markup in login.html, so the elements already exist): unlike the old
+// markup in login, so the elements already exist): unlike the old
 // SDK-gated version, nothing here waits on a network load, but the "ships
 // inert while APP_ID is a placeholder" property is unchanged.
 (function revealFacebookButton() {
@@ -164,7 +164,7 @@ async function verifyTwoFactor() {
         localStorage.setItem("userInfo", JSON.stringify(result.user));
 
         statusEl.textContent = "Login successful! Redirecting...";
-        window.location.href = "orders.html";
+        window.location.href = "orders";
 
     } catch (error) {
         console.error(error);

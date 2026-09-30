@@ -82,7 +82,7 @@
         if (res.status === 401 || res.status === 403) {
             stopPolling();
             localStorage.removeItem("staffToken");
-            window.location.href = "../staff-login.html";
+            window.location.href = "../staff-login";
             return null;
         }
         if (!res.ok) throw new Error("Request failed: " + res.status);
@@ -765,7 +765,7 @@
         $("sc-logout").addEventListener("click", function () {
             stopPolling();
             localStorage.removeItem("staffToken");
-            window.location.href = "../staff-login.html";
+            window.location.href = "../staff-login";
         });
 
         // Idle agents should not poll. Resuming refreshes immediately rather
@@ -792,7 +792,7 @@
 
     async function init() {
         if (!token) {
-            window.location.href = "../staff-login.html";
+            window.location.href = "../staff-login";
             return;
         }
 

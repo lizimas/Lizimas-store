@@ -3,7 +3,7 @@
  * Lizimas Store - premium desktop skin for the vendor dashboard.
  *
  * Scoped entirely under .vendor-desktop-shell (added to the existing
- * .admin-shell wrapper in client/vendor/dashboard.html) so it can safely
+ * .admin-shell wrapper in client/vendor/dashboard) so it can safely
  * override the shared admin.css classes (.admin-sidebar, .tab-btn, .panel,
  * etc.) without touching how those same classes render on the staff and
  * admin panels, which reuse admin.css but never carry this wrapper class.

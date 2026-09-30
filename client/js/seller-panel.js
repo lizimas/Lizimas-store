@@ -91,7 +91,7 @@ async function renderSellerPanel(container, { vendor, sellerScore, followerCount
     followBtn.onclick = async () => {
         const token = localStorage.getItem("userToken");
         if (!token) {
-            window.location.href = "/login.html";
+            window.location.href = "/login";
             return;
         }
         followBtn.disabled = true;

@@ -20,7 +20,7 @@ function clearStaffToken() {
 
 function staffLogout() {
     clearStaffToken();
-    window.location.href = "../staff-login.html";
+    window.location.href = "../staff-login";
 }
 
 async function staffAuthorizedFetch(path, options = {}) {
@@ -37,7 +37,7 @@ async function staffAuthorizedFetch(path, options = {}) {
 
     if (response.status === 401 || response.status === 403) {
         clearStaffToken();
-        window.location.href = "../staff-login.html";
+        window.location.href = "../staff-login";
         throw new Error("Unauthorized");
     }
 
@@ -65,7 +65,7 @@ function showToast(message) {
 
 async function init() {
     if (!getStaffToken()) {
-        window.location.href = "../staff-login.html";
+        window.location.href = "../staff-login";
         return;
     }
 
@@ -73,7 +73,7 @@ async function init() {
         const me = await staffAuthorizedFetch("/api/auth/me");
         if (!me.user || me.user.role !== "product_staff") {
             clearStaffToken();
-            window.location.href = "../staff-login.html";
+            window.location.href = "../staff-login";
             return;
         }
         document.getElementById("staff-name-display").textContent = me.user.name;

@@ -6,7 +6,7 @@ const RESET_RULES = {
     customer: { re: /^(?=.*[A-Za-z])(?=.*\d).{8,}$/, text: "At least 8 characters, including a letter and a number." },
     vendor: { re: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/, text: "At least 8 characters with an uppercase letter, a lowercase letter, a number and a symbol." }
 };
-const LOGIN_PAGE = RESET_PORTAL === "vendor" ? "vendor-login.html" : "login.html";
+const LOGIN_PAGE = RESET_PORTAL === "vendor" ? "vendor-login" : "login";
 
 function getResetToken() {
     const params = new URLSearchParams(window.location.search);
@@ -64,7 +64,7 @@ async function submitNewPassword() {
         const result = await apiPost("/auth/reset-password", { token, newPassword });
         statusEl.classList.add("is-ok");
         statusEl.textContent = (result.message || "Password reset successfully.") + " Taking you to sign in...";
-        const dest = result.role && result.role !== "customer" ? "vendor-login.html" : LOGIN_PAGE;
+        const dest = result.role && result.role !== "customer" ? "vendor-login" : LOGIN_PAGE;
         setTimeout(() => { window.location.href = dest; }, 2000);
     } catch (error) {
         console.error(error);

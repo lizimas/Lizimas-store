@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="/js/lz-session.js?v=1"></script>
+<script src="/js/lz-session.js?v=2"></script>
 <script src="/js/lz-remember.js?v=2"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,7 +23,7 @@
     history.replaceState(null, "", window.location.pathname);
 
     if (!raw) {
-        window.location.replace("login.html?e=oauth");
+        window.location.replace("login?e=oauth");
         return;
     }
 
@@ -31,7 +31,7 @@
     try {
         data = JSON.parse(decodeURIComponent(raw));
     } catch (err) {
-        window.location.replace("login.html?e=oauth");
+        window.location.replace("login?e=oauth");
         return;
     }
 
@@ -39,7 +39,7 @@
         localStorage.setItem("userToken", data.t);
         if (window.LzRemember) LzRemember.apply("userToken");
         localStorage.setItem("userInfo", JSON.stringify(data.u));
-        window.location.replace("orders.html");
+        window.location.replace("orders");
         return;
     }
 
@@ -48,11 +48,11 @@
     // so hand the pending token back to it rather than reimplementing here.
     if (data.pendingToken) {
         sessionStorage.setItem("lzOauthPending", JSON.stringify(data));
-        window.location.replace("login.html?oauth=pending");
+        window.location.replace("login?oauth=pending");
         return;
     }
 
-    window.location.replace("login.html?e=oauth");
+    window.location.replace("login?e=oauth");
 })();
 </script>
 </body>

@@ -1,4 +1,4 @@
-// All Categories overview page (categories.html).
+// All Categories overview page (categories).
 // Groups every category by its top-level parent and renders each parent
 // as its own section with a "VIEW ALL" link, matching the section pattern
 // used for product listings on products.html.
@@ -43,7 +43,7 @@ async function loadCategoriesPage() {
                 : (hasLZ
                     ? `<img src="${LZImage.placeholder(c.name, "square")}" alt="${safe(c.name)}" width="300" height="300" loading="lazy" decoding="async">`
                     : "");
-            return `<a class="cat-page-tile" href="products.html?category=${encodeURIComponent(c.name)}">
+            return `<a class="cat-page-tile" href="products?category=${encodeURIComponent(c.name)}">
                 <span class="cat-page-thumb${src ? "" : " is-empty"}">${img}</span>
                 <span class="cat-page-name">${safe(c.name)}</span>
             </a>`;
@@ -53,7 +53,7 @@ async function loadCategoriesPage() {
             <section class="cat-page-section">
                 <div class="cat-page-section-head">
                     <h2 class="cat-page-section-title">${safe(parent.name)}</h2>
-                    <a class="cat-page-viewall" href="products.html?category=${encodeURIComponent(parent.name)}">
+                    <a class="cat-page-viewall" href="products?category=${encodeURIComponent(parent.name)}">
                         VIEW ALL ${safe(parent.name).toUpperCase()} &#8594;
                     </a>
                 </div>

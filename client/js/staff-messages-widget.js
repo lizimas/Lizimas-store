@@ -1,5 +1,5 @@
 // Messenger-style docked "Message Admin" chat window, shared by all staff
-// dashboards (product.html, manager.html, chat.html). Wrapped in an IIFE so
+// dashboards (product, manager, chat). Wrapped in an IIFE so
 // it never collides with each page's own API_URL/getToken-style globals.
 //
 // This file builds the window itself (hidden by default) and exposes

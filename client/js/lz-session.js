@@ -21,9 +21,10 @@
         var forced = document.documentElement.getAttribute("data-lz-portal");
         if (forced && KEYS[forced]) return forced;
         var p = location.pathname;
-        if (/^\/admin(\.html)?$/.test(p) || /^\/admin-system-guide\.html$/.test(p)) return "admin";
-        if (/^\/staff\//.test(p) || /^\/staff-(login|reset-password)\.html$/.test(p)) return "staff";
-        if (/^\/vendor\//.test(p) || /^\/vendor-(login|register|forgot-password)\.html$/.test(p)) return "vendor";
+        // Clean addresses (/vendor-login) and the old .html ones both count.
+        if (/^\/admin(\.html)?$/.test(p) || /^\/admin-system-guide(\.html)?$/.test(p)) return "admin";
+        if (/^\/staff\//.test(p) || /^\/staff-(login|reset-password)(\.html)?$/.test(p)) return "staff";
+        if (/^\/vendor\//.test(p) || /^\/vendor-(login|register|forgot-password)(\.html)?$/.test(p)) return "vendor";
         return "user";
     }
     var PORTAL = detectPortal();

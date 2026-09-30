@@ -1,4 +1,4 @@
-// Vendor mobile app shell (client/vendor/dashboard.html), shown below the
+// Vendor mobile app shell (client/vendor/dashboard), shown below the
 // ~768px breakpoint (see client/css/vendor-mobile.css). Matches the channel's
 // real seller-center IA: a persistent Home/Orders/Manage Products/Menu
 // bottom nav, with Menu as the hub for Settings and everything else.
@@ -10,7 +10,7 @@
 // etc.) rather than re-deriving order/product stage logic a second time -
 // this file only adds NEW rendering (cards instead of tables) and the
 // net-new Shop Activation / Holiday Mode screens. Loaded after
-// vendor-dashboard.js (see dashboard.html), so all of those already exist
+// vendor-dashboard.js (see dashboard), so all of those already exist
 // by the time this file runs.
 
 const VM_ICON = {
@@ -108,7 +108,7 @@ function vmDeskToolsCard() {
     return `<div class="vm-card vm-desk-only" style="padding:4px 16px;">
         <div class="vm-group-header"><span class="vm-group-header-label">More tools</span></div>
         ${rows}
-        <a class="vm-list-row" href="../seller-guide.html" target="_blank" rel="noopener" style="text-decoration:none; color:inherit;"><span class="vm-list-row-label">Seller Guide</span>${chev}</a>
+        <a class="vm-list-row" href="../seller-guide" target="_blank" rel="noopener" style="text-decoration:none; color:inherit;"><span class="vm-list-row-label">Seller Guide</span>${chev}</a>
     </div>`;
 }
 

@@ -10,18 +10,18 @@ router.get('/sitemap.xml', async (req, res) => {
 
     const staticPages = [
       { url: '/', priority: '1.0', changefreq: 'daily' },
-      { url: '/products.html', priority: '0.9', changefreq: 'daily' },
-      { url: '/categories.html', priority: '0.8', changefreq: 'weekly' },
-      { url: '/contact.html', priority: '0.5', changefreq: 'monthly' },
-      { url: '/faq.html', priority: '0.5', changefreq: 'monthly' },
-      { url: '/help.html', priority: '0.5', changefreq: 'monthly' },
-      { url: '/returns.html', priority: '0.5', changefreq: 'monthly' },
-      { url: '/vendor-requirements.html', priority: '0.8', changefreq: 'monthly' },
-      { url: '/vendor-register.html', priority: '0.8', changefreq: 'monthly' },
-      { url: '/vendor-policies.html', priority: '0.5', changefreq: 'monthly' },
-      { url: '/report.html', priority: '0.3', changefreq: 'monthly' },
-      { url: '/terms.html', priority: '0.3', changefreq: 'yearly' },
-      { url: '/privacy.html', priority: '0.3', changefreq: 'yearly' },
+      { url: '/products', priority: '0.9', changefreq: 'daily' },
+      { url: '/categories', priority: '0.8', changefreq: 'weekly' },
+      { url: '/contact', priority: '0.5', changefreq: 'monthly' },
+      { url: '/faq', priority: '0.5', changefreq: 'monthly' },
+      { url: '/help', priority: '0.5', changefreq: 'monthly' },
+      { url: '/returns', priority: '0.5', changefreq: 'monthly' },
+      { url: '/vendor-requirements', priority: '0.8', changefreq: 'monthly' },
+      { url: '/vendor-register', priority: '0.8', changefreq: 'monthly' },
+      { url: '/vendor-policies', priority: '0.5', changefreq: 'monthly' },
+      { url: '/report', priority: '0.3', changefreq: 'monthly' },
+      { url: '/terms', priority: '0.3', changefreq: 'yearly' },
+      { url: '/privacy', priority: '0.3', changefreq: 'yearly' },
     ];
     // Removed the old '/about.html' entry (Sept 2026) - that file doesn't
     // exist in client/, so Google was being pointed at a 404 on every
@@ -79,7 +79,7 @@ router.get('/sitemap.xml', async (req, res) => {
 
     for (const c of categories) {
       xml += `  <url>\n`;
-      xml += `    <loc>${baseUrl}/products.html?category=${c.id}</loc>\n`;
+      xml += `    <loc>${baseUrl}/products?category=${c.id}</loc>\n`;
       xml += `    <changefreq>weekly</changefreq>\n`;
       xml += `    <priority>0.6</priority>\n`;
       xml += `  </url>\n`;

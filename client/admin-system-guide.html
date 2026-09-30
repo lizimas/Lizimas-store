@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="/js/lz-session.js?v=1"></script>
+<script src="/js/lz-session.js?v=2"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
@@ -11,7 +11,7 @@
 <body>
 <header class="g-top-bar">
     <div class="g-top-inner">
-        <a class="g-brand" href="admin.html"><span class="g-brand-badge">L</span> Lizimas System Guide</a>
+        <a class="g-brand" href="admin"><span class="g-brand-badge">L</span> Lizimas System Guide</a>
         <label class="g-search-wrap" for="g-search">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
             <input id="g-search" type="search" placeholder="Search by keyword - e.g. payout, commission, delivery fee, KYC, refund, flash sale" autocomplete="off" aria-label="Search the system guide">
@@ -19,8 +19,8 @@
         </label>
         <span id="g-count" aria-live="polite"></span>
         <nav class="g-top-links" aria-label="Links">
-            <a href="admin.html">Admin panel</a>
-            <a href="seller-guide.html">Seller &amp; Staff Guide</a>
+            <a href="admin">Admin panel</a>
+            <a href="seller-guide">Seller &amp; Staff Guide</a>
         </nav>
     </div>
 </header>
@@ -52,14 +52,14 @@
         </div>
         <div id="g-noresults" hidden>Nothing matches every word you typed. Try fewer or shorter words.</div>
         <div id="g-body"></div>
-        <p class="g-foot">Lizimas Store &middot; internal System Guide &middot; September 2026. Vendor-facing instructions live in the <a href="seller-guide.html">Seller &amp; Staff Guide</a>.</p>
+        <p class="g-foot">Lizimas Store &middot; internal System Guide &middot; September 2026. Vendor-facing instructions live in the <a href="seller-guide">Seller &amp; Staff Guide</a>.</p>
     </main>
 </div>
 <button type="button" id="g-top" hidden>&uarr; Top</button>
 
 <script>
 // Only signed-in admins are sent here from the admin panel; anyone else goes to the staff login.
-(function () { try { if (!localStorage.getItem("adminToken") && !localStorage.getItem("staffToken") && !localStorage.getItem("token")) location.replace("staff-login.html"); } catch (e) { /* ignore */ } })();
+(function () { try { if (!localStorage.getItem("adminToken") && !localStorage.getItem("staffToken") && !localStorage.getItem("token")) location.replace("staff-login"); } catch (e) { /* ignore */ } })();
 
 window.LZ_GUIDE = { sections: [
 { id: "overview", title: "1. The big picture", items: [
@@ -97,13 +97,13 @@ window.LZ_GUIDE = { sections: [
   { id: "roles", title: "Who uses what", keywords: "roles customer vendor staff admin product staff store manager customer support vendor staff",
     html: `<table>
     <tr><th>Person</th><th>Logs in at</th><th>Uses</th></tr>
-    <tr><td>Customer</td><td><code>login.html</code> (or checks out as a guest)</td><td>Shop, pay, track orders, reviews, chat</td></tr>
-    <tr><td>Vendor (shop owner)</td><td><code>vendor-login.html</code></td><td>Vendor Center (<code>vendor/dashboard.html</code>)</td></tr>
-    <tr><td>Vendor team member</td><td><code>vendor-login.html</code></td><td>Vendor Center, limited by the permissions the owner gave</td></tr>
-    <tr><td>Product Staff</td><td><code>staff-login.html</code></td><td><code>staff/product.html</code>: submit products for approval</td></tr>
-    <tr><td>Store Manager</td><td><code>staff-login.html</code></td><td><code>staff/manager.html</code>: products go live immediately</td></tr>
-    <tr><td>Customer Support</td><td><code>staff-login.html</code></td><td><code>staff/chat.html</code>: live chat inbox</td></tr>
-    <tr><td>Admin</td><td><code>staff-login.html</code></td><td><code>admin.html</code>: everything</td></tr></table>` },
+    <tr><td>Customer</td><td><code>login</code> (or checks out as a guest)</td><td>Shop, pay, track orders, reviews, chat</td></tr>
+    <tr><td>Vendor (shop owner)</td><td><code>vendor-login</code></td><td>Vendor Center (<code>vendor/dashboard</code>)</td></tr>
+    <tr><td>Vendor team member</td><td><code>vendor-login</code></td><td>Vendor Center, limited by the permissions the owner gave</td></tr>
+    <tr><td>Product Staff</td><td><code>staff-login</code></td><td><code>staff/product</code>: submit products for approval</td></tr>
+    <tr><td>Store Manager</td><td><code>staff-login</code></td><td><code>staff/manager</code>: products go live immediately</td></tr>
+    <tr><td>Customer Support</td><td><code>staff-login</code></td><td><code>staff/chat</code>: live chat inbox</td></tr>
+    <tr><td>Admin</td><td><code>staff-login</code></td><td><code>admin</code>: everything</td></tr></table>` },
   { id: "money-flow", title: "How money flows (price, commission, delivery, payout)", keywords: "money flow commission price payout delivery fee statement weekly cycle",
     html: `<ol>
     <li><strong>Price:</strong> a vendor enters the payout they want. The Commission Engine (Categories) adds the category's commission to get the customer price. Staff and admin enter the customer price directly.</li>
@@ -113,31 +113,31 @@ window.LZ_GUIDE = { sections: [
     </ol>` }
 ]},
 { id: "customer", title: "2. Customer site", items: [
-  { id: "c-browse", title: "Browsing and search", keywords: "home index products categories search sponsored flash sale grab or gone category", where: "<code>index.html</code>, <code>products.html</code>, <code>categories.html</code>",
-    html: `<p>The homepage shows Sponsored products (paid ads), Shop by Category, Explore Categories, the <em>Grab Or Gone!</em> flash sale with a countdown, and homepage promo slots 1&ndash;6 (set in admin &rarr; Promotions). Header search goes to <code>products.html?q=</code>; category and brand filters use <code>?category=</code> and <code>?brand=</code>. Every search is counted in admin &rarr; Dashboard / Analytics (top searches).</p>` },
-  { id: "c-product", title: "Product page", keywords: "product detail gallery variants specifications reviews seller score share", where: "<code>product-detail.html</code>",
+  { id: "c-browse", title: "Browsing and search", keywords: "home index products categories search sponsored flash sale grab or gone category", where: "<code>./</code>, <code>products</code>, <code>categories</code>",
+    html: `<p>The homepage shows Sponsored products (paid ads), Shop by Category, Explore Categories, the <em>Grab Or Gone!</em> flash sale with a countdown, and homepage promo slots 1&ndash;6 (set in admin &rarr; Promotions). Header search goes to <code>products?q=</code>; category and brand filters use <code>?category=</code> and <code>?brand=</code>. Every search is counted in admin &rarr; Dashboard / Analytics (top searches).</p>` },
+  { id: "c-product", title: "Product page", keywords: "product detail gallery variants specifications reviews seller score share", where: "<code>product-detail</code>",
     html: `<p>Shows the photo gallery, colour and size variants with stock hints, Specifications, Description (rich blocks), Customer Reviews, share, and the seller panel with the vendor and seller score. "Save" is stored in the browser only. Product views are counted each day for analytics and for vendors' promotion monitoring.</p>` },
-  { id: "c-store", title: "Vendor storefront", keywords: "store storefront vendor page slug about badge", where: "<code>store.html?slug=...</code>",
+  { id: "c-store", title: "Vendor storefront", keywords: "store storefront vendor page slug about badge", where: "<code>store?slug=...</code>",
     html: `<p>A vendor's public page: business name, badges (Cash on Delivery or Payment First; verified brands), About text and their live products.</p>` },
-  { id: "c-cart-checkout", title: "Cart and checkout", keywords: "cart checkout delivery pickup map location payment mobile money card flexipay cash on delivery discount code guest", where: "<code>cart.html</code>, <code>checkout.html</code>",
+  { id: "c-cart-checkout", title: "Cart and checkout", keywords: "cart checkout delivery pickup map location payment mobile money card flexipay cash on delivery discount code guest", where: "<code>cart</code>, <code>checkout</code>",
     html: `<ul><li>The cart is kept in the browser: select items, change quantity, remove.</li>
     <li>Checkout: your details, then <strong>Home Delivery</strong> (pin on a map, share location, or search for the area, falling back to Region &rarr; District &rarr; Division &rarr; Area) or <strong>Self Pickup</strong> (free, at the Bugolobi store).</li>
     <li>The delivery fee is shown by zone and delivery size. Enter a discount code in the Order Summary.</li>
-    <li>Payment: Mobile Money (a prompt on the phone, network detected from the number), card (Flutterwave; returns to <code>payment-return.html</code>), FlexiPay or Cash on Delivery. A customer account is not required.</li></ul>` },
-  { id: "c-orders", title: "Orders, tracking and reviews", keywords: "orders track order history review rating", where: "<code>orders.html</code>",
+    <li>Payment: Mobile Money (a prompt on the phone, network detected from the number), card (Flutterwave; returns to <code>payment-return</code>), FlexiPay or Cash on Delivery. A customer account is not required.</li></ul>` },
+  { id: "c-orders", title: "Orders, tracking and reviews", keywords: "orders track order history review rating", where: "<code>orders</code>",
     html: `<p>Signed-in customers see their order history and can review items. Anyone can track an order with the order ID plus phone number. Customers get order confirmation and status updates by email and SMS.</p>` },
-  { id: "c-returns", title: "Returns (customer side)", keywords: "returns 7 days refund exchange whatsapp", where: "<code>returns.html</code>",
+  { id: "c-returns", title: "Returns (customer side)", keywords: "returns 7 days refund exchange whatsapp", where: "<code>returns</code>",
     html: `<p>Customers ask for a return within <strong>7 days of delivery</strong> via WhatsApp or chat (order number, reason, photo). Refunds go back by the original payment method. Admin decides refunds in Vendors &rarr; Returns awaiting a refund decision.</p>` },
-  { id: "c-account", title: "Customer accounts and security", keywords: "register login google facebook 2fa device approval forgot password keep me logged in report account issue data deletion", where: "<code>register.html</code>, <code>login.html</code>, <code>report.html</code>",
+  { id: "c-account", title: "Customer accounts and security", keywords: "register login google facebook 2fa device approval forgot password keep me logged in report account issue data deletion", where: "<code>register</code>, <code>login</code>, <code>report</code>",
     html: `<ul><li>Register with email (phone optional) or sign in with Google or Facebook.</li>
     <li><strong>Keep me logged in:</strong> ticked, the login survives refreshes and closing tabs, but ends when the device restarts (the browser is quit). Unticked, it also ends once every Lizimas tab has been closed for about 45 seconds. The same applies to vendors.</li>
-    <li>Two-step verification by code or email code. A sign-in from an unknown device can need email approval (<code>device-approve.html</code>); refusing it locks the account.</li>
-    <li>Account problems are reported on <code>report.html</code> and handled in admin &rarr; Security. Facebook data-deletion status is shown on <code>data-deletion-status.html</code>.</li></ul>` },
-  { id: "c-help", title: "Help, chat and contact", keywords: "help faq contact chat whatsapp live support", where: "<code>help.html</code>, <code>faq.html</code>, <code>contact.html</code>, chat bubble on every page",
+    <li>Two-step verification by code or email code. A sign-in from an unknown device can need email approval (<code>device-approve</code>); refusing it locks the account.</li>
+    <li>Account problems are reported on <code>report</code> and handled in admin &rarr; Security. Facebook data-deletion status is shown on <code>data-deletion-status</code>.</li></ul>` },
+  { id: "c-help", title: "Help, chat and contact", keywords: "help faq contact chat whatsapp live support", where: "<code>help</code>, <code>faq</code>, <code>contact</code>, chat bubble on every page",
     html: `<p>The live chat on every page goes to Customer Support agents (admin &rarr; Live Support / Support Team). There is also a WhatsApp button and email.</p>` }
 ]},
-{ id: "vendor", title: "3. Vendor Center", intro: "Vendors run their whole shop here. The vendor-facing how-to is the <a href='seller-guide.html'>Seller &amp; Staff Guide</a>.", items: [
-  { id: "v-onboarding", title: "Registration, KYC and shop setup", keywords: "vendor registration kyc shop setup 5 steps existing shop seller type approval", where: "<code>vendor-register.html</code> &rarr; admin Vendors (approval) &rarr; Vendor Center Home (phone) / Dashboard",
+{ id: "vendor", title: "3. Vendor Center", intro: "Vendors run their whole shop here. The vendor-facing how-to is the <a href='seller-guide'>Seller &amp; Staff Guide</a>.", items: [
+  { id: "v-onboarding", title: "Registration, KYC and shop setup", keywords: "vendor registration kyc shop setup 5 steps existing shop seller type approval", where: "<code>vendor-register</code> &rarr; admin Vendors (approval) &rarr; Vendor Center Home (phone) / Dashboard",
     html: `<ol><li>Register: email + code, personal details, Company or Individual, shop name, then accept the policies. You approve the application in admin &rarr; Vendors.</li>
     <li>KYC: company (URSB, TIN, VAT, Form 20) or individual (National ID); plus a work permit for non-citizens. You review it in admin &rarr; Vendors &rarr; KYC.</li>
     <li>Five shop setup steps: Shop, Company, Shipping, Payment, Additional Information (existing shop yes/no, existing shop name(s) and reason for a new shop, seller type, catalog details). <strong>Admin can read all the answers</strong> via Vendors &rarr; <strong>Vendor Center</strong> button.</li></ol>` },
@@ -158,11 +158,11 @@ window.LZ_GUIDE = { sections: [
     html: `<p>Payout accounts (reviewed in admin &rarr; Payment Instruments), brand authorization (admin &rarr; Brand Authorizations), shop active / holiday mode, Channel applications, team users with permissions, pickers, and compliance notices sent from admin.</p>` }
 ]},
 { id: "staff", title: "4. Staff tools", items: [
-  { id: "s-product", title: "Product Staff", keywords: "product staff submit approval my submissions", where: "<code>staff/product.html</code>",
+  { id: "s-product", title: "Product Staff", keywords: "product staff submit approval my submissions", where: "<code>staff/product</code>",
     html: `<p>Adds products with the customer price, stock, packed weight &amp; size (delivery size calculated automatically), specifications, sizes and colours, and photos. Products go to approval (admin &rarr; Staff &amp; Approvals).</p>` },
-  { id: "s-manager", title: "Store Manager", keywords: "store manager publish immediately delete request", where: "<code>staff/manager.html</code>",
+  { id: "s-manager", title: "Store Manager", keywords: "store manager publish immediately delete request", where: "<code>staff/manager</code>",
     html: `<p>Same form, but products go live immediately. Delete requests need admin approval (Staff &amp; Approvals &rarr; Deletion requests).</p>` },
-  { id: "s-support", title: "Customer Support", keywords: "customer support chat inbox assign transfer close", where: "<code>staff/chat.html</code>",
+  { id: "s-support", title: "Customer Support", keywords: "customer support chat inbox assign transfer close", where: "<code>staff/chat</code>",
     html: `<p>Live chat inbox with filters (All, Mine, Unassigned, Open, Pending, Waiting, Active, Closed), assign to me, transfer, close or reopen. Routing, SLAs and canned replies are set in admin &rarr; Support Team.</p>` }
 ]},
 { id: "admin", title: "5. Admin panel, tab by tab", items: [

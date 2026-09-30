@@ -12,7 +12,7 @@
 (function () {
     "use strict";
 
-    // staff-login.html predates the .auth-submit convention and identifies its
+    // staff-login predates the .auth-submit convention and identifies its
     // buttons by id instead, one per stage: credentials, 2FA, forced reset,
     // and first-time 2FA enrolment. Order matters only in that the visibility
     // test below picks whichever stage is currently on screen.

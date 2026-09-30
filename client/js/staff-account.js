@@ -112,8 +112,8 @@
   // Password change and device management.
   //
   // Both sections are injected into the existing modal rather than added to
-  // the markup, because that markup is duplicated across product.html,
-  // manager.html and chat.html. One copy here keeps all three identical.
+  // the markup, because that markup is duplicated across product,
+  // manager and chat.html. One copy here keeps all three identical.
   // ---------------------------------------------------------------------
 
   var MIN_PASSWORD = 8; // matches the server; do not relax without changing it there

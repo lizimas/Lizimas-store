@@ -2575,7 +2575,7 @@ width:90%;
     white-space: nowrap;
 }
 
-/* Flash-deals "view all" banner (products.html?flash=1) - same red as the
+/* Flash-deals "view all" banner (products?flash=1) - same red as the
    homepage flash card so the two pages read as one continuous flow. */
 .ls-flash-page-banner {
     width: 100%;
@@ -4654,7 +4654,7 @@ body.sheet-open {
     .ls-mega-panel { display: none !important; }
 }
 
-/* ---------- Help Centre (help.html) ---------- */
+/* ---------- Help Centre (help) ---------- */
 
 .ls-help {
   display: block;
@@ -4761,7 +4761,7 @@ body.sheet-open {
   .ls-help-section { padding: 18px 15px; }
 }
 
-/* ---------- Help Centre (help.html) ---------- */
+/* ---------- Help Centre (help) ---------- */
 
 .ls-help {
   display: block;
@@ -5257,7 +5257,7 @@ body.sheet-open {
 .cart-footer a { text-decoration: none; }
 
 
-/* Manufacturer warranty badge, shown beside the price on product-detail.html
+/* Manufacturer warranty badge, shown beside the price on product-detail
    when a product has warranty_months set. Hidden entirely otherwise. */
 .pd-price-original {
     color: #999;
@@ -5299,7 +5299,7 @@ body.sheet-open {
 }
 
 
-/* Description / Specifications tabs on product-detail.html, replacing the
+/* Description / Specifications tabs on product-detail, replacing the
    old "Product details" modal sheet - specs render inline now. */
 .pd-tabs {
     display: flex;
@@ -5460,7 +5460,7 @@ body.sheet-open {
 
 
 /* ---------------------------------------------------------------------
-   Vendor storefront (client/store.html) - a shopper's view of one
+   Vendor storefront (client/store) - a shopper's view of one
    vendor's public page: banner, logo, name/about, then their live
    catalogue rendered with the same .product-card/.product-grid markup
    used everywhere else on the site.

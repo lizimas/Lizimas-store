@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="/js/lz-session.js?v=1"></script>
+<script src="/js/lz-session.js?v=2"></script>
 <script src="../js/lz-remember.js?v=2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="UTF-8">
@@ -210,7 +210,7 @@
         <div class="vm-card" style="padding:4px 16px;">
             <div class="vm-group-header"><span class="vm-group-header-label">Platform Settings</span></div>
             <div class="vm-list-row" style="cursor:default;"><span class="vm-list-row-label">Currency</span><span style="font-size:12.5px; color:#888;">UGX &mdash; Uganda Shilling</span></div>
-            <a class="vm-list-row" href="../seller-guide.html" target="_blank" rel="noopener" style="text-decoration:none; color:inherit;">
+            <a class="vm-list-row" href="../seller-guide" target="_blank" rel="noopener" style="text-decoration:none; color:inherit;">
                 <span class="vm-list-row-label">Seller Guide (how everything works)</span>
                 <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
             </a>
@@ -432,7 +432,7 @@
     <div class="vm-screen" id="vm-screen-add-product">
         <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Add Product</span></div>
         <div class="vm-card vm-add-product-intro">
-            Same form as the desktop Vendor Center. Follow the <a href="../vendor-policies.html#content-images" target="_blank">Content &amp; Image Guidelines</a>: accurate name and description, your desired payout in UGX (Lizimas calculates the customer price), and at least three clear photos of the actual item. New listings are reviewed before they go live.
+            Same form as the desktop Vendor Center. Follow the <a href="../vendor-policies#content-images" target="_blank">Content &amp; Image Guidelines</a>: accurate name and description, your desired payout in UGX (Lizimas calculates the customer price), and at least three clear photos of the actual item. New listings are reviewed before they go live.
         </div>
         <div id="vm-add-product-host" class="vm-add-product-host"></div>
     </div>
@@ -664,7 +664,7 @@
                     <button class="tab-btn" data-tab="messages">
                         <span class="sidebar-icon">&#128172;</span> Support
                     </button>
-                    <a class="vd-guide-link" href="../seller-guide.html" target="_blank" rel="noopener">
+                    <a class="vd-guide-link" href="../seller-guide" target="_blank" rel="noopener">
                         <span class="sidebar-icon">&#128214;</span> Seller Guide
                     </a>
                 </nav>
@@ -1077,7 +1077,7 @@
                 <section id="tab-add-product" class="tab-content hidden">
                     <h2 class="admin-page-title">Add Product</h2>
                     <p class="admin-page-subtitle">
-                        Follow the <a href="../vendor-policies.html#content-images" target="_blank">Content &amp; Image Guidelines</a>:
+                        Follow the <a href="../vendor-policies#content-images" target="_blank">Content &amp; Image Guidelines</a>:
                         use an accurate name and description, list everything included, enter your desired payout in UGX (Lizimas
                         calculates the customer price for you), and at least three clear photos that show the actual item. New listings are reviewed before they go live.
                     </p>
@@ -1087,9 +1087,12 @@
 
                     <div class="panel">
                         <input type="hidden" id="product-id">
-                        <div class="product-form-sections">
+                        <!-- Step by step (client/js/lz-form-steps.js): on a computer every
+                             step shows with a steps bar on top; on a phone one step per
+                             screen with Back / Continue. Field ids are unchanged. -->
+                        <div class="product-form-sections" id="vendor-product-steps">
 
-                            <div class="product-form-section">
+                            <div class="product-form-section" data-step="1">
                                 <h4>Basic Information</h4>
                                 <div class="field-row">
                                     <div>
@@ -1108,19 +1111,41 @@
                                         </button>
                                         <select id="product-category" onchange="scheduleVendorPricingPreview()" style="display:none;"></select>
                                     </div>
-                                    <div>
-                                        <label style="font-size:13px; font-weight:600; color:#333;">Description</label>
-                                        <textarea id="product-description" data-lz-count rows="10" placeholder="Features, condition, intended use, and everything included in the box" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;"></textarea>
+                                    <div style="display:flex; gap:12px;">
+                                        <div style="flex:1;">
+                                            <label style="font-size:13px; font-weight:600; color:#333;">Brand <span style="font-weight:400; color:#888;">(if applicable)</span></label>
+                                            <input type="text" id="product-brand" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                        </div>
                                     </div>
-                                </div>
-                                <div style="margin-top:14px;">
-                                    <label style="font-size:13px; font-weight:600; color:#333; display:block; margin-bottom:4px;">Rich Content <span style="font-weight:400; color:#888;">(optional &mdash; add photo/text blocks below the short description above, same as staff listings)</span></label>
-                                    <div id="desc-blocks-editor"></div>
+                                    <div style="display:flex; gap:12px;">
+                                        <div style="flex:1;">
+                                            <label style="font-size:13px; font-weight:600; color:#333;">GTIN <span style="font-weight:400; color:#888;">(barcode, optional)</span></label>
+                                            <input type="text" id="product-gtin" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                        </div>
+                                        <div style="flex:1;">
+                                            <label style="font-size:13px; font-weight:600; color:#333;">MPN <span style="font-weight:400; color:#888;">(manufacturer part no., optional)</span></label>
+                                            <input type="text" id="product-mpn" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div class="product-form-section">
-                                <h4>Pricing &amp; Inventory</h4>
+                            <div class="product-form-section" data-step="2">
+                                <h4>Images</h4>
+                                <div class="field-row">
+                                    <div>
+                                        <label style="font-size:13px; font-weight:600; color:#333;">Photos <span style="font-weight:400; color:#888;">(at least 3 required — each at least 800×800 pixels and under 5MB; sharp, well lit, plain background, no watermarks)</span></label>
+                                        <div class="drag-drop-zone" id="product-image-dropzone">
+                                            Drag &amp; drop images here, or click to browse
+                                        </div>
+                                        <input type="file" id="product-images" accept="image/*" multiple class="hidden">
+                                        <div class="drag-drop-preview-grid" id="product-image-preview"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="product-form-section" data-step="3">
+                                <h4>Pricing &amp; Stock</h4>
                                 <div class="field-row">
                                     <div style="display:flex; gap:12px;">
                                         <div style="flex:1;">
@@ -1137,6 +1162,35 @@
                                         <div style="margin-top:4px; color:#555;">You receive: UGX <span id="preview-payout">-</span></div>
                                     </div>
                                     <p id="pricing-preview-error" style="display:none; font-size:12px; color:#B45309; background:#FFFBEB; border-radius:6px; padding:8px;"></p>
+                                </div>
+                            </div>
+
+                            <div class="product-form-section" data-step="4">
+                                <h4>Description</h4>
+                                <div class="field-row">
+                                    <div>
+                                        <label style="font-size:13px; font-weight:600; color:#333;">Description</label>
+                                        <textarea id="product-description" data-lz-count rows="10" placeholder="Features, condition, intended use, and everything included in the box" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;"></textarea>
+                                    </div>
+                                </div>
+                                <div style="margin-top:14px;">
+                                    <label style="font-size:13px; font-weight:600; color:#333; display:block; margin-bottom:4px;">Rich Content <span style="font-weight:400; color:#888;">(optional &mdash; add photo/text blocks below the short description above, same as staff listings)</span></label>
+                                    <div id="desc-blocks-editor"></div>
+                                </div>
+                            </div>
+
+                            <div class="product-form-section" data-step="5">
+                                <h4>Specifications</h4>
+                                <p style="font-size:12px; color:#666; margin-top:-6px;">Optional key/value facts shown on the product page (e.g. Material: Cotton, Battery Life: 10 hours) &mdash; the same structure staff and admin listings use, so your products read consistently on the storefront.</p>
+                                <div id="specs-list" style="display:flex; flex-direction:column; gap:6px;"></div>
+                                <button type="button" onclick="addVendorSpecRow()" style="margin-top:8px; padding:8px 12px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer;">+ Add Specification</button>
+
+                                <div class="lz-spec-tools" data-add="addVendorSpecRow" data-table-id="vendor-specs-table-wrap"></div>
+                            </div>
+
+                            <div class="product-form-section" data-step="5">
+                                <h4>Shipping &amp; Warranty</h4>
+                                <div class="field-row">
                                     <div>
                                         <div class="lz-pack" data-lz-pack="product">
     <div class="lz-pack-title">Packed weight &amp; size</div>
@@ -1152,59 +1206,26 @@
                                     </div>
                                     <div style="display:flex; gap:12px;">
                                         <div style="flex:1;">
-                                            <label style="font-size:13px; font-weight:600; color:#333;">Brand <span style="font-weight:400; color:#888;">(if applicable)</span></label>
-                                            <input type="text" id="product-brand" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
-                                        <div style="flex:1;">
                                             <label style="font-size:13px; font-weight:600; color:#333;">Warranty (months)</label>
                                             <input type="number" id="product-warranty-months" min="0" placeholder="Leave blank if none" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                                         </div>
                                     </div>
-                                    <div style="display:flex; gap:12px;">
-                                        <div style="flex:1;">
-                                            <label style="font-size:13px; font-weight:600; color:#333;">GTIN <span style="font-weight:400; color:#888;">(barcode, optional)</span></label>
-                                            <input type="text" id="product-gtin" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
-                                        <div style="flex:1;">
-                                            <label style="font-size:13px; font-weight:600; color:#333;">MPN <span style="font-weight:400; color:#888;">(manufacturer part no., optional)</span></label>
-                                            <input type="text" id="product-mpn" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
 
-                            <div class="product-form-section">
-                                <h4>Images</h4>
-                                <div class="field-row">
-                                    <div>
-                                        <label style="font-size:13px; font-weight:600; color:#333;">Photos <span style="font-weight:400; color:#888;">(at least 3 required — each at least 800×800 pixels and under 5MB; sharp, well lit, plain background, no watermarks)</span></label>
-                                        <div class="drag-drop-zone" id="product-image-dropzone">
-                                            Drag &amp; drop images here, or click to browse
-                                        </div>
-                                        <input type="file" id="product-images" accept="image/*" multiple class="hidden">
-                                        <div class="drag-drop-preview-grid" id="product-image-preview"></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="product-form-section">
-                                <h4>Specifications</h4>
-                                <p style="font-size:12px; color:#666; margin-top:-6px;">Optional key/value facts shown on the product page (e.g. Material: Cotton, Battery Life: 10 hours) &mdash; the same structure staff and admin listings use, so your products read consistently on the storefront.</p>
-                                <div id="specs-list" style="display:flex; flex-direction:column; gap:6px;"></div>
-                                <button type="button" onclick="addVendorSpecRow()" style="margin-top:8px; padding:8px 12px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer;">+ Add Specification</button>
-
-                                <div class="lz-spec-tools" data-add="addVendorSpecRow" data-table-id="vendor-specs-table-wrap"></div>
-                            </div>
-
-                        </div>
-
+                            <div class="product-form-section" data-step="6" data-review="1">
+                                <h4>Review &amp; Submit</h4>
+                                <div class="lzfs-review" id="vendor-product-review"></div>
                         <label style="font-size:13px; display:flex; gap:8px; align-items:flex-start; background:#FFF8E1; padding:10px; border-radius:8px; margin-top:20px;">
                             <input type="checkbox" id="product-authenticity-confirm" style="margin-top:3px;">
-                            <span>I confirm this product is authentic, accurately described, and that I can provide invoices/supplier documentation if Lizimas Store requests proof of authenticity (<a href="../vendor-policies.html#anti-counterfeit" target="_blank">Anti-Counterfeit Policy</a>).</span>
+                            <span>I confirm this product is authentic, accurately described, and that I can provide invoices/supplier documentation if Lizimas Store requests proof of authenticity (<a href="../vendor-policies#anti-counterfeit" target="_blank">Anti-Counterfeit Policy</a>).</span>
                         </label>
 
                         <button id="product-submit-btn" onclick="submitVendorProductForm()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:12px; cursor:pointer; font-weight:600; margin-top:12px; width:100%;">Submit for Approval</button>
                         <p id="product-form-status" style="font-size:13px; color:#666;"></p>
+                            </div>
+
+                        </div>
                     </div>
 
                     <div id="vendor-variants-panel" class="panel" hidden>
@@ -1270,8 +1291,8 @@
                     <p class="admin-page-subtitle">
                         Move each item through New &#8594; Accepted &#8594; Processing &#8594; Ready for Handover, then
                         prepare it per the
-                        <a href="../vendor-policies.html#packaging" target="_blank">Packaging Guidelines</a> and
-                        <a href="../vendor-policies.html#fulfilment" target="_blank">Fulfilment Guidelines</a> and mark
+                        <a href="../vendor-policies#packaging" target="_blank">Packaging Guidelines</a> and
+                        <a href="../vendor-policies#fulfilment" target="_blank">Fulfilment Guidelines</a> and mark
                         it handed over. Lizimas Store inspects each item before accepting it and taking over delivery.
                     </p>
                     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
@@ -1920,7 +1941,8 @@
     <script src="../js/lz-package-size.js?v=3"></script>
     <script src="../js/lz-text-counter.js?v=1"></script>
 <script src="../js/lz-photo-grid.js?v=1"></script>
-    <script src="../js/vendor-dashboard.js?v=34"></script>
+<script src="../js/lz-form-steps.js?v=1"></script>
+    <script src="../js/vendor-dashboard.js?v=35"></script>
     <script src="../js/vendor-statements.js?v=4"></script>
 <script src="../js/vendor-mobile.js?v=16"></script>
 <script src="../js/vendor-products.js?v=5"></script>

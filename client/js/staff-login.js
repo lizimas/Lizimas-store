@@ -86,11 +86,11 @@ let pendingLoginToken = null;
 
 function redirectByRole(role) {
     if (role === "product_staff") {
-        window.location.href = "staff/product.html";
+        window.location.href = "staff/product";
     } else if (role === "store_manager") {
-        window.location.href = "staff/manager.html";
+        window.location.href = "staff/manager";
     } else if (role === "customer_support") {
-        window.location.href = "staff/chat.html";
+        window.location.href = "staff/chat";
     } else {
         localStorage.removeItem("staffToken");
         document.getElementById("login-error").textContent = "This login is for staff accounts only.";

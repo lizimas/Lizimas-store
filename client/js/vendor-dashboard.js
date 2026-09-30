@@ -7,13 +7,13 @@ function getVendorToken() {
 
 function vendorLogout() {
     localStorage.removeItem("vendorToken");
-    window.location.href = "../vendor-login.html";
+    window.location.href = "../vendor-login";
 }
 
 async function vendorAuthorizedFetch(path, options = {}) {
     const token = getVendorToken();
     if (!token) {
-        window.location.href = "../vendor-login.html";
+        window.location.href = "../vendor-login";
         throw new Error("Not logged in");
     }
 
@@ -28,7 +28,7 @@ async function vendorAuthorizedFetch(path, options = {}) {
 
     if (response.status === 401 || response.status === 403) {
         localStorage.removeItem("vendorToken");
-        window.location.href = "../vendor-login.html";
+        window.location.href = "../vendor-login";
         throw new Error("Unauthorized");
     }
 
@@ -1412,6 +1412,7 @@ function resetVendorProductForm() {
     const _vdPreview = document.getElementById("product-image-preview"); if (_vdPreview) _vdPreview.innerHTML = "";
     renderVendorPhotoOrderList();
     document.getElementById("product-submit-btn").textContent = "Submit for Approval";
+    if (window.LzFormSteps) LzFormSteps.reset(document.getElementById("vendor-product-steps"));
     document.getElementById("product-form-status").textContent = "";
     const specsList = document.getElementById("specs-list");
     if (specsList) specsList.innerHTML = "";
@@ -2338,6 +2339,7 @@ async function editVendorProduct(id) {
     document.getElementById("product-id").value = product.id;
     document.getElementById("product-name").value = product.name || "";
     document.getElementById("product-sku").value = product.sku || "";
+    if (window.LzFormSteps) LzFormSteps.reset(document.getElementById("vendor-product-steps"));
     document.getElementById("product-description").value = product.description || "";
     // Older listings (added before the commission engine) never recorded
     // vendor_desired_payout - fall back to the current price so the field
@@ -3826,7 +3828,7 @@ function renderVendorReportsChart(dailySales) {
 
 // --- Storefront branding (Tasks #68/#74/#75) ------------------------------
 // About text and delivery/payment method, shown on the vendor's own public
-// store page (client/store.html). No logo/banner here - Ryan asked for
+// store page (client/store). No logo/banner here - Ryan asked for
 // those removed from the storefront (Sept 2026); a plain JSON PATCH is
 // enough now that there's nothing to upload.
 
@@ -5332,7 +5334,7 @@ async function vdExportSelectedToChannel() {
 
 document.addEventListener("DOMContentLoaded", () => {
     if (!getVendorToken()) {
-        window.location.href = "../vendor-login.html";
+        window.location.href = "../vendor-login";
         return;
     }
     setupVendorTabs();
@@ -5353,5 +5355,61 @@ document.addEventListener("DOMContentLoaded", () => {
         const accountTabBtn = document.querySelector('.tab-btn[data-tab="account"]');
         if (accountTabBtn) accountTabBtn.click();
         vdCheckChannelOAuthReturn();
+    }
+});
+
+
+// ---------- Add / Edit Product: step by step (client/js/lz-form-steps.js) ----------
+function vendorProductSummary() {
+    const val = id => { const el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; };
+    const hasCat = !!val("product-category");
+    const catLabel = (document.getElementById("product-category-btn-label") || {}).textContent || "";
+    const n = vdAllImages.length, min = vdPhotoMin();
+    const desc = val("product-description");
+    const weight = val("product-weight-kg");
+    const isNew = !val("product-id");
+    const customer = (document.getElementById("preview-customer-price") || {}).textContent || "";
+    const agreed = !!(document.getElementById("product-authenticity-confirm") || {}).checked;
+    return [
+        { label: "Product name", value: val("product-name") || "Missing", ok: !!val("product-name"), step: 1 },
+        { label: "Category", value: hasCat ? catLabel : "Missing", ok: hasCat, step: 1 },
+        { label: "Brand", value: val("product-brand") || "-", step: 1 },
+        { label: "Photos", value: n + " of " + VD_MAX_PHOTOS + " (at least " + min + ")", ok: n >= min && n <= VD_MAX_PHOTOS, step: 2 },
+        { label: "Your payout", value: val("product-payout") ? "UGX " + Number(val("product-payout")).toLocaleString() : "Missing", ok: !!val("product-payout"), step: 3 },
+        { label: "Customer pays", value: customer && customer !== "-" ? "UGX " + customer : "-", step: 3 },
+        { label: "Stock", value: val("product-stock") || "Missing", ok: val("product-stock") !== "", step: 3 },
+        { label: "Description", value: desc ? desc.length + " characters" : "Missing", ok: !!desc, step: 4 },
+        { label: "Specifications", value: document.querySelectorAll("#specs-list input").length / 2 + " rows", step: 5 },
+        { label: "Packed weight", value: weight ? weight + " kg" : (isNew ? "Missing" : "-"), ok: isNew ? !!weight : undefined, step: 5 },
+        { label: "Warranty", value: val("product-warranty-months") ? val("product-warranty-months") + " months" : "None", step: 5 },
+        { label: "Authenticity statement", value: agreed ? "Confirmed" : "Tick the box below", ok: agreed }
+    ];
+}
+
+function vendorProductValidate(step) {
+    const val = id => { const el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; };
+    if (step === 1 && (!val("product-name") || !val("product-category"))) return "Add the product name and choose a category to continue.";
+    if (step === 2) {
+        const n = vdAllImages.length, min = vdPhotoMin();
+        if (n < min) return "Add at least " + min + " photos to continue (" + n + " so far).";
+    }
+    if (step === 3 && (!val("product-payout") || val("product-stock") === "")) return "Add your payout and stock to continue.";
+    return null;
+}
+
+function vendorProductStepsMount() {
+    const root = document.getElementById("vendor-product-steps");
+    if (!root || !window.LzFormSteps) return;
+    LzFormSteps.mount(root, {
+        titles: ["Basic", "Photos", "Pricing", "Description", "Specs & Shipping", "Review & Submit"],
+        summary: vendorProductSummary,
+        validate: vendorProductValidate
+    });
+    LzFormSteps.reset(root);
+}
+document.addEventListener("DOMContentLoaded", vendorProductStepsMount);
+document.addEventListener("change", e => {
+    if (e.target && e.target.id === "product-authenticity-confirm" && window.LzFormSteps) {
+        LzFormSteps.refresh(document.getElementById("vendor-product-steps"));
     }
 });

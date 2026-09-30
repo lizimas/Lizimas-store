@@ -370,7 +370,7 @@ async function registerVendor() {
         statusEl.classList.add("is-ok");
         statusEl.textContent = "Application submitted! Redirecting to login...";
         setTimeout(function () {
-            window.location.href = "vendor-login.html?registered=1";
+            window.location.href = "vendor-login?registered=1";
         }, 1200);
 
     } catch (error) {
@@ -508,7 +508,7 @@ async function handleVendorLogin() {
         }
 
         setVendorToken(data.token);
-        window.location.href = "vendor/dashboard.html";
+        window.location.href = "vendor/dashboard";
 
     } catch (error) {
         console.error("Vendor login error:", error);
@@ -531,7 +531,7 @@ async function submitVendorLogin2FA() {
         if (!response.ok) { errorEl.textContent = data.error || "Invalid code."; return; }
 
         setVendorToken(data.token);
-        window.location.href = "vendor/dashboard.html";
+        window.location.href = "vendor/dashboard";
     } catch (error) {
         console.error("2FA verification error:", error);
         errorEl.textContent = "Could not connect to server.";
@@ -557,7 +557,7 @@ async function submitVendorForcedReset() {
         if (!response.ok) { errorEl.textContent = data.error || "Could not reset password."; return; }
 
         setVendorToken(data.token);
-        window.location.href = "vendor/dashboard.html";
+        window.location.href = "vendor/dashboard";
     } catch (error) {
         console.error("Complete forced reset error:", error);
         errorEl.textContent = "Could not connect to server.";
@@ -644,7 +644,7 @@ async function submitVendor2FASetup() {
         if (!response.ok) { errorEl.textContent = data.error || "Invalid code."; return; }
 
         setVendorToken(data.token);
-        window.location.href = "vendor/dashboard.html";
+        window.location.href = "vendor/dashboard";
     } catch (error) {
         console.error("2FA verify error:", error);
         errorEl.textContent = "Could not connect to server.";

@@ -64,7 +64,7 @@ function renderExplorePages(track, items) {
             : (hasLZ
                 ? `<img src="${LZImage.placeholder(c.name, "square")}" alt="${c.name}" width="600" height="600" loading="lazy" decoding="async">`
                 : "");
-        return `<a class="ls-explore-tile" href="products.html?category=${encodeURIComponent(c.name)}">
+        return `<a class="ls-explore-tile" href="products?category=${encodeURIComponent(c.name)}">
             <span class="ls-explore-thumb${src ? "" : " is-empty"}">${img}</span>
             <span class="ls-explore-name">${c.name}</span>
         </a>`;
@@ -448,7 +448,7 @@ document.addEventListener("DOMContentLoaded", loadPromoStrip);
 // category rather than a hand-picked set.
 function categoryTileLink(p) {
     if (p.link_url && stripSafeHref(p.link_url)) return stripSafeHref(p.link_url);
-    if (p.category_name) return `products.html?category=${encodeURIComponent(p.category_name)}`;
+    if (p.category_name) return `products?category=${encodeURIComponent(p.category_name)}`;
     return "";
 }
 
@@ -564,12 +564,12 @@ async function loadCategoryNav() {
                     ? `<div class="ls-nav-menu">${p.children.map(second => {
                         const leaves = second.children.length
                             ? `<div class="ls-nav-submenu">${second.children.map(third =>
-                                `<a href="products.html?category=${encodeURIComponent(third.name)}">${third.name}</a>`
+                                `<a href="products?category=${encodeURIComponent(third.name)}">${third.name}</a>`
                               ).join("")}</div>`
                             : "";
                         return `<div class="ls-nav-menu-item">
                             <a class="ls-nav-menu-link"
-                               href="products.html?category=${encodeURIComponent(second.name)}">
+                               href="products?category=${encodeURIComponent(second.name)}">
                                 <span>${second.name}</span>
                                 ${second.children.length ? '<span class="ls-nav-arrow">&#8250;</span>' : ""}
                             </a>
@@ -580,7 +580,7 @@ async function loadCategoryNav() {
 
                 return `<div class="ls-nav-item">
                     <a class="ls-nav-parent"
-                       href="products.html?category=${encodeURIComponent(p.name)}">${p.name}</a>
+                       href="products?category=${encodeURIComponent(p.name)}">${p.name}</a>
                     ${menu}
                 </div>`;
             }).join("");
@@ -623,7 +623,7 @@ function buildDrawer(rail) {
             const leaves = second.children.length
                 ? second.children.map(third =>
                     `<a class="ls-drawer-child"
-                        href="products.html?category=${encodeURIComponent(third.name)}">${third.name}</a>`
+                        href="products?category=${encodeURIComponent(third.name)}">${third.name}</a>`
                   ).join("")
                 : `<p class="ls-drawer-empty">Nothing here yet.</p>`;
 
@@ -696,7 +696,7 @@ function setupDrawerToggle() {
     });
 }
 
-// The header search only navigates. products.html owns the matching logic,
+// The header search only navigates. products owns the matching logic,
 // so there is one search implementation rather than two that can drift.
 function setupHeaderSearch() {
     const input = document.getElementById("header-search");
@@ -708,7 +708,7 @@ function setupHeaderSearch() {
         e.preventDefault();
         const q = input.value.trim();
         if (!q) return;
-        window.location.href = "products.html?q=" + encodeURIComponent(q);
+        window.location.href = "products?q=" + encodeURIComponent(q);
     });
 }
 
@@ -731,7 +731,7 @@ function buildMegaPanel() {
     if (!rail || !col2 || !col3 || !drawerTree) return;
 
     const href = name =>
-        "products.html?category=" + encodeURIComponent(name);
+        "products?category=" + encodeURIComponent(name);
 
     const row = (item, cls) => {
         const arrow = item.children && item.children.length

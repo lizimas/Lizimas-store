@@ -232,13 +232,13 @@ function oauthRedirectResponder(req, res) {
             const keep = req.cookies && req.cookies.lz_keep_user === "1";
             setSessionCookie(req, res, "user", out.token, keep);
             const payload = encodeURIComponent(JSON.stringify({ t: "cookie", u: out.user }));
-            return res.redirect(`/oauth-complete.html#${payload}`);
+            return res.redirect(`/oauth-complete#${payload}`);
         }
         if (out.requires2FA || out.requiresPasswordReset || out.requiresDeviceApproval) {
             const payload = encodeURIComponent(JSON.stringify(out));
-            return res.redirect(`/oauth-complete.html#${payload}`);
+            return res.redirect(`/oauth-complete#${payload}`);
         }
-        return res.redirect("/login.html?e=oauth");
+        return res.redirect("/login?e=oauth");
     };
 }
 
@@ -253,11 +253,11 @@ async function facebookCallback(req, res) {
             surface: "oauth_facebook",
             failureReason: "csrf_mismatch"
         });
-        return res.redirect("/login.html?e=csrf");
+        return res.redirect("/login?e=csrf");
     }
 
     if (!FACEBOOK_CONFIGURED) {
-        return res.redirect("/login.html?e=oauth");
+        return res.redirect("/login?e=oauth");
     }
 
     try {
@@ -274,7 +274,7 @@ async function facebookCallback(req, res) {
         if (!tokenRes.ok || !tokenBody || !tokenBody.access_token) {
             console.error("Facebook code exchange failed:", tokenBody);
             await logLoginAttempt(null, req, false, { surface: "oauth_facebook", failureReason: "code_exchange_failed" });
-            return res.redirect("/login.html?e=oauth");
+            return res.redirect("/login?e=oauth");
         }
 
         await facebookSignIn(req, res, {
@@ -285,7 +285,7 @@ async function facebookCallback(req, res) {
 
     } catch (error) {
         console.error("Facebook callback error:", error);
-        return res.redirect("/login.html?e=oauth");
+        return res.redirect("/login?e=oauth");
     }
 }
 
@@ -349,7 +349,7 @@ async function facebookDataDeletion(req, res) {
     }
 
     return res.json({
-        url: `${PUBLIC_BASE_URL}/data-deletion-status.html?id=${confirmationCode}`,
+        url: `${PUBLIC_BASE_URL}/data-deletion-status?id=${confirmationCode}`,
         confirmation_code: confirmationCode
     });
 }
@@ -526,7 +526,7 @@ async function googleCallback(req, res) {
             surface: "oauth_google",
             failureReason: "csrf_mismatch"
         });
-        return res.redirect("/login.html?e=csrf");
+        return res.redirect("/login?e=csrf");
     }
 
     // Same sign-in as the popup flow; the outcome comes straight back as a

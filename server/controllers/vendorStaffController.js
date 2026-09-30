@@ -150,7 +150,7 @@ exports.createVendorStaffUser = async (req, res) => {
             JWT_SECRET,
             { expiresIn: "15m" }
         );
-        const setupLink = `${req.protocol}://${req.get("host")}/reset-password.html?token=${inviteToken}`;
+        const setupLink = `${req.protocol}://${req.get("host")}/reset-password?token=${inviteToken}`;
         const inviteSent = await sendVendorStaffInviteEmail(insertedUser.email, insertedUser.name, businessName, setupLink, 15);
 
         res.status(201).json({

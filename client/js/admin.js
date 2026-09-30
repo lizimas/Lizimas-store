@@ -1583,7 +1583,7 @@ async function uploadProductsCsv() {
 // vendor-dashboard.js's vd* Channel functions structurally, but talks to
 // /api/admin/channel/* and has no vendor concept: there is only one store,
 // so there is only one Applications list, and the OAuth callback lands
-// back on /admin.html#products instead of the vendor dashboard. ---
+// back on /admin#products instead of the vendor dashboard. ---
 
 let ajChannelApplications = [];
 let ajChannelSetupAppId = null;
@@ -2099,6 +2099,7 @@ function openProductForm() {
     document.querySelectorAll(".pd-color-thumb-picker").forEach(picker => { picker.style.display = "none"; picker.innerHTML = ""; });
     renderCategorySelect();
     document.getElementById("product-form-container").classList.remove("hidden");
+    adminProductStepsMount();
 }
 
 function editProduct(id) {
@@ -2141,6 +2142,7 @@ function editProduct(id) {
     renderPhotoOrderList();
     document.getElementById("product-form-error").textContent = "";
     document.getElementById("product-form-container").classList.remove("hidden");
+    adminProductStepsMount();
 }
 
 function closeProductForm() {
@@ -5055,13 +5057,13 @@ const PROMO_LAYOUT_RULES = {
     strip_link: {
         copy: false,
         imageHeading: "Icon (120\u00d7120)",
-        linkHint: "Required \u2014 https://... or a page such as /faq.html"
+        linkHint: "Required \u2014 https://... or a page such as /faq"
     },
     row_tile: {
         copy: false,
         category: true,
         imageHeading: "Tile image or video (600\u00d71300, video max 30s / 30MB)",
-        linkHint: "Link, e.g. /products.html?category=Electronics"
+        linkHint: "Link, e.g. /products?category=Electronics"
     },
     category_grid: {
         copy: false,
@@ -5933,7 +5935,7 @@ function renderFlashSalesTable() {
 // GET /api/flash-sales/share/:token regardless of whether it's "the"
 // currently-featured homepage sale.
 function flashSaleShareUrl(token) {
-    return `${window.location.origin}/products.html?flash=1&share=${encodeURIComponent(token)}`;
+    return `${window.location.origin}/products?flash=1&share=${encodeURIComponent(token)}`;
 }
 
 async function copyTextToClipboard(text, buttonEl) {
@@ -10574,4 +10576,51 @@ function renderVendorCenterDetails(d) {
             <section><h3 class="admin-vc-h">Transactions exports</h3>${exportsHtml}</section>
             <section><h3 class="admin-vc-h">Promotion monitoring</h3>${promosHtml}</section>
         </div>`;
+}
+
+
+// ---------- Add / Edit Product: step by step (client/js/lz-form-steps.js) ----------
+function adminProductStepsRoot() { return document.getElementById("admin-product-steps"); }
+
+function adminProductSummary() {
+    const val = id => { const el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; };
+    const money = v => v ? "UGX " + Number(v).toLocaleString() : "";
+    const catLabel = (document.getElementById("product-category-btn-label") || {}).textContent || "";
+    const hasCat = !!val("product-category");
+    const photos = pdAllImages.length;
+    const desc = val("product-description");
+    const weight = val("product-weight-kg");
+    const isNew = !val("product-id");
+    return [
+        { label: "Product name", value: val("product-name") || "Missing", ok: !!val("product-name"), step: 1 },
+        { label: "Category", value: hasCat ? catLabel : "Missing", ok: hasCat, step: 1 },
+        { label: "Brand", value: val("product-brand") || "-", step: 1 },
+        { label: "Photos", value: photos ? photos + " of " + PD_MAX_PHOTOS + " (first one is the Main photo)" : "None yet", ok: photos > 0 ? true : undefined, step: 2 },
+        { label: "Price", value: money(val("product-price")) || "Missing", ok: !!val("product-price"), step: 3 },
+        { label: "Stock", value: val("product-stock") || "Missing", ok: val("product-stock") !== "", step: 3 },
+        { label: "Description", value: desc ? desc.length + " characters" : "-", step: 4 },
+        { label: "Sizes / colours", value: (pdSelectedSizes.length + " sizes, " + Object.keys(pdSelectedColors).length + " colours"), step: 5 },
+        { label: "Specifications", value: document.querySelectorAll("#specs-list .spec-label-input").length + " rows", step: 6 },
+        { label: "Packed weight", value: weight ? weight + " kg" : (isNew ? "Missing" : "-"), ok: isNew ? !!weight : undefined, step: 6 },
+        { label: "Warranty", value: val("product-warranty-months") ? val("product-warranty-months") + " months" : "None", step: 6 }
+    ];
+}
+
+function adminProductValidate(step) {
+    const val = id => { const el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; };
+    if (step === 1 && (!val("product-name") || !val("product-category"))) return "Add the product name and choose a category to continue.";
+    if (step === 3 && (!val("product-price") || val("product-stock") === "")) return "Add the price and stock to continue.";
+    return null;
+}
+
+function adminProductStepsMount() {
+    const root = adminProductStepsRoot();
+    if (!root || !window.LzFormSteps) return;
+    LzFormSteps.mount(root, {
+        titles: ["Basic", "Photos", "Pricing", "Description", "Variants", "Specs & Shipping", "Review & Save"],
+        summary: adminProductSummary,
+        validate: adminProductValidate,
+        actions: [document.querySelector("#product-form-container > .form-actions")]
+    });
+    LzFormSteps.reset(root);
 }

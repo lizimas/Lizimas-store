@@ -49,7 +49,7 @@ async function registerAccount() {
         localStorage.setItem("userInfo", JSON.stringify(result.user));
 
         statusEl.textContent = "Account created! Redirecting...";
-        window.location.href = "orders.html";
+        window.location.href = "orders";
 
     } catch (error) {
         console.error(error);
