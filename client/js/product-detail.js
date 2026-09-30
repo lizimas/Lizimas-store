@@ -1239,7 +1239,7 @@ function pdRenderBadges(product) {
     const months = Number(product.warranty_months) || 0;
     const label = months === 1 ? "1 Month" : months + " Months";
     const out = [];
-    if (!product.vendor_id) out.push('<span class="pd-badge pd-badge-official">Official Store</span>');
+    if (!product.vendor_id) out.push('<a class="pd-badge pd-badge-official" href="' + PD_OFFICIAL_URL + '" title="See all Official Store products">Official Store</a>');
     if (el && out.length) { el.innerHTML = out.join(""); el.hidden = false; }
 
     const row = document.getElementById("pd-warranty-row");
@@ -1258,19 +1258,24 @@ function pdShipLine(fee, district) {
     el.hidden = false;
 }
 
-// Lizimas' own products: the store itself is the seller.
+// Every product Lizimas sells itself (products page, ?seller=official).
+const PD_OFFICIAL_URL = "/products?seller=official";
+
+// Lizimas' own products: the store itself is the seller. The name and the
+// "Official Store" badge both open the Official Store listing.
 function pdRenderOwnSeller(panel) {
     panel.innerHTML =
         '<div class="seller-panel-head">' +
-            '<span class="seller-panel-name">Lizimas Store</span>' +
-            '<span class="seller-score-badge">Official Store</span>' +
+            '<a class="seller-panel-name pd-official-link" href="' + PD_OFFICIAL_URL + '">Lizimas Store</a>' +
+            '<a class="seller-score-badge pd-official-link" href="' + PD_OFFICIAL_URL + '" title="See all Official Store products">Official Store &rsaquo;</a>' +
         '</div>' +
         '<ul class="seller-performance-list">' +
             '<li class="seller-perf-item seller-perf-excellent"><span class="seller-perf-dot"></span>Sold and delivered by Lizimas Store</li>' +
             '<li class="seller-perf-item seller-perf-excellent"><span class="seller-perf-dot"></span>Free pickup at our Bugolobi store</li>' +
             '<li class="seller-perf-item seller-perf-excellent"><span class="seller-perf-dot"></span>7-day returns on eligible items</li>' +
             '<li class="seller-perf-item seller-perf-excellent"><span class="seller-perf-dot"></span>Pay with Mobile Money or Cash on Delivery</li>' +
-        '</ul>';
+        '</ul>' +
+        '<a class="pd-official-all" href="' + PD_OFFICIAL_URL + '">See all Official Store products &rsaquo;</a>';
     panel.hidden = false;
     const box = document.getElementById("pd-seller-box");
     if (box) { box.hidden = false; box.classList.add("pd-seller-own"); }

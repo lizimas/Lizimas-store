@@ -722,3 +722,13 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 @media (min-width: 900px) {
     .pd-color-swatches { grid-template-columns: repeat(5, minmax(0, 104px)); }
 }
+
+/* Official Store links (seller box + badge above the title) */
+a.pd-badge-official { text-decoration: none; cursor: pointer; }
+a.pd-badge-official:hover { filter: brightness(1.15); }
+.pd-official-link { text-decoration: none; color: inherit; cursor: pointer; }
+a.seller-panel-name.pd-official-link:hover { text-decoration: underline; }
+a.seller-score-badge.pd-official-link:hover { filter: brightness(1.1); }
+.pd-official-all { display: block; margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; color: #1a1a2e;
+    font-weight: 700; font-size: 13.5px; text-decoration: none; }
+.pd-official-all:hover { color: #a86b00; text-decoration: underline; }

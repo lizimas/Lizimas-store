@@ -133,6 +133,22 @@ async function loadProducts() {
             return;
         }
 
+        // "Official Store" on a product page's seller box links here with
+        // ?seller=official: every product Lizimas sells itself.
+        const requestedSeller = new URLSearchParams(window.location.search).get("seller");
+        if (requestedSeller && requestedSeller.toLowerCase() === "official") {
+            let official = [];
+            try {
+                const r = await fetch(`${API_URL}/api/products?seller=official`);
+                if (r.ok) official = applyPercentDiscounts(await r.json());
+            } catch (error) {
+                console.error("Official Store load failed:", error);
+            }
+            displayProducts(official);
+            renderCategoryHeading("Lizimas Official Store", official.length);
+            return;
+        }
+
         // A brand link on a product page arrives here with ?brand=Name. Same
         // shape as the category branch above: the server does the matching so
         // an unknown brand yields an empty grid rather than the full catalogue.

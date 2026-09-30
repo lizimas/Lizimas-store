@@ -323,6 +323,12 @@ exports.getProducts = async (req, res) => {
             )`;
         }
 
+        // "Official Store" link on a product page (?seller=official): only
+        // Lizimas' own products, i.e. the ones with no vendor.
+        if (String(req.query.seller || "").toLowerCase() === "official") {
+            filter += ` AND products.vendor_id IS NULL`;
+        }
+
         const products = await pool.query(
             `SELECT products.*, categories.name AS category,
                     COALESCE(
