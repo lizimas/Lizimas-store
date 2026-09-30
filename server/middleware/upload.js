@@ -150,6 +150,29 @@ const blockVideo = multer({
     limits: { fileSize: PROMO_MEDIA_MAX_BYTES }
 });
 module.exports.blockVideo = blockVideo;
+
+// Product photos (Add / Edit Product, admin and vendor). Also takes the
+// formats Safari and phones hand over - AVIF (saved from shop websites),
+// HEIC/HEIF (iPhone, Photos app) and GIF. The product controller asks
+// Cloudinary to store those as JPG, so the shop only ever shows JPG, PNG or
+// WebP. Kept separate so other upload routes keep their narrow list.
+const productPhotoFilter = (req, file, cb) => {
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    const mime = (file.mimetype || "").toLowerCase();
+    if (/^\.(jpe?g|png|webp|avif|heic|heif|gif)$/.test(ext) ||
+        /^image\/(jpeg|jpg|png|webp|avif|heic|heif|gif)$/.test(mime)) return cb(null, true);
+    const name = String(file.originalname || "").slice(0, 80);
+    const err = new Error("Photos must be JPG, PNG, WebP, AVIF, HEIC or GIF." +
+        (name ? ' "' + name + '" is not one of these - save it as a JPG and add it again.' : ""));
+    err.code = "INVALID_FILE_TYPE";
+    cb(err);
+};
+module.exports.productPhotos = multer({
+    storage,
+    fileFilter: productPhotoFilter,
+    limits: { fileSize: 5 * 1024 * 1024, fieldSize: 5 * 1024 * 1024 }
+});
+module.exports.productPhotoFilter = productPhotoFilter;
 module.exports.PROMO_MEDIA_MAX_BYTES = PROMO_MEDIA_MAX_BYTES;
 
 module.exports.chatAttachment = chatAttachment;

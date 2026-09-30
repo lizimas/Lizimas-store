@@ -62,7 +62,7 @@ async function initiate({ externalRef, amountMinor, currency, orderId, customerE
       tx_ref: externalRef,
       amount: String(amountMinor),   // UGX, whole shillings
       currency,
-      redirect_url: `${PUBLIC_BASE_URL}/payment-return.html`,
+      redirect_url: `${PUBLIC_BASE_URL}/payment-return`,
       customer: {
         email: customerEmail,
         name: customerName || undefined,

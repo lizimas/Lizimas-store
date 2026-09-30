@@ -98,7 +98,16 @@ app.use(require("./utils/cleanUrls").redirectHtml(path.join(__dirname, "../clien
 
 // Static files
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
-app.use(express.static(path.join(__dirname, "../client"), { extensions: ["html"] }));
+// Pages (.html) are always re-checked with the server (a quick 304 when
+// unchanged), so a new deploy's script versions reach browsers straight away
+// instead of Safari reusing an old copy of the page. JS/CSS keep normal
+// caching - their ?v= numbers change on every edit.
+app.use(express.static(path.join(__dirname, "../client"), {
+    extensions: ["html"],
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith(".html")) res.setHeader("Cache-Control", "no-cache");
+    }
+}));
 
 // Upload and multipart errors must return JSON, not an HTML crash page,
 // or the admin panel shows a raw stack trace to the user.

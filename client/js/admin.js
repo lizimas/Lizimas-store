@@ -1411,8 +1411,14 @@ function renderProductsTable() {
         if (currentProductFilter === "instock") return p.stock > 10;
         if (currentProductFilter === "lowstock") return p.stock > 0 && p.stock <= pdLowAt(p);
         if (currentProductFilter === "outofstock") return p.stock <= 0;
+        if (currentProductFilter === "drafts") return p.status === "draft";
         return true;
     });
+
+    // Number of drafts on the Drafts tab.
+    const draftCount = adminProducts.filter(p => p.status === "draft").length;
+    const draftBadge = document.getElementById("product-drafts-count");
+    if (draftBadge) { draftBadge.textContent = draftCount; draftBadge.hidden = !draftCount; }
 
     if (searchTerm) {
         filtered = filtered.filter(p => p.name.toLowerCase().includes(searchTerm)
@@ -1421,7 +1427,9 @@ function renderProductsTable() {
     }
 
     if (filtered.length === 0) {
-        productsTable.innerHTML = `<p class="no-data">No products found.</p>`;
+        productsTable.innerHTML = currentProductFilter === "drafts" && !searchTerm
+            ? `<p class="no-data">No drafts. Use <strong>Save as Draft</strong> on the product form to keep an item here until it's ready.</p>`
+            : `<p class="no-data">No products found.</p>`;
         return;
     }
 

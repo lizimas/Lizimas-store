@@ -30,11 +30,28 @@ async function checkProhibitedOrNull({ name, description, brand, category_id }) 
     };
 }
 
+// AVIF / HEIC / GIF photos (see middleware/upload.js productPhotos) are
+// stored by Cloudinary as JPG; JPG, PNG and WebP go up unchanged.
+function isWebReadyImage(buf) {
+    if (!buf || buf.length < 12) return false;
+    const jpeg = buf[0] === 0xFF && buf[1] === 0xD8;
+    const png = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47;
+    const webp = buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP";
+    return jpeg || png || webp;
+}
+function productUploadOptions(fileBuffer, extra) {
+    const opts = Object.assign({ folder: "lizimas-store/products" }, extra || {});
+    if (!isWebReadyImage(fileBuffer)) opts.format = "jpg";
+    return opts;
+}
+exports._isWebReadyImage = isWebReadyImage;
+exports._productUploadOptions = productUploadOptions;
+
 // Upload a single file buffer to Cloudinary, returns the secure URL
 function uploadBufferToCloudinary(fileBuffer) {
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-            { folder: "lizimas-store/products" },
+            productUploadOptions(fileBuffer),
             (error, result) => {
                 if (error) return reject(error);
                 resolve(result.secure_url);
@@ -72,7 +89,7 @@ async function syncMainImage(db, productId) {
 function uploadBufferWithPreview(fileBuffer) {
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-            { folder: "lizimas-store/products", eager: [ImageChecks.PREVIEW_TRANSFORM] },
+            productUploadOptions(fileBuffer, { eager: [ImageChecks.PREVIEW_TRANSFORM] }),
             (error, result) => {
                 if (error) return reject(error);
                 resolve({

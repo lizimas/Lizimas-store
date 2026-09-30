@@ -154,7 +154,7 @@
     var name = cat.name || cat.title || '';
     var preset = opts.preset || 'tile';
     var d = dims(preset);
-    var href = opts.href || ('/category.html?slug=' + encodeURIComponent(cat.slug || ''));
+    var href = opts.href || ('/products?category=' + encodeURIComponent(name));
     var cls = opts.className || 'cat-tile';
     var src = cat.image_url || cat.image || '';
     var ph = placeholder(name, preset === 'circle' ? 'square' : 'wide');

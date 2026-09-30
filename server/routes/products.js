@@ -70,8 +70,8 @@ router.patch("/:id/variants/stock", requireAuth, requireAdmin, updateVariantStoc
 router.get("/:id", getProductById);
 
 // Admin only: add, update, delete (with image uploads, up to 6 photos per product)
-router.post("/", requireAuth, requireStaffOrAdmin, upload.array("images", 20), addProduct);
-router.put("/:id", requireAuth, requireStaffOrAdmin, upload.array("images", 20), updateProduct);
+router.post("/", requireAuth, requireStaffOrAdmin, upload.productPhotos.array("images", 20), addProduct);
+router.put("/:id", requireAuth, requireStaffOrAdmin, upload.productPhotos.array("images", 20), updateProduct);
 router.delete("/:id", requireAuth, requireStaffOrAdmin, deleteProduct);
 router.patch("/:id/images/order", requireAuth, requireStaffOrAdmin, updateImageOrder);
 router.delete("/images/:imageId", requireAuth, requireAdmin, deleteProductImage);
