@@ -8,8 +8,8 @@
 <title>Product Details | Lizimas Store</title>
 
 <meta name="description" content="Shop quality products at Lizimas Store with fast delivery across Uganda and Mobile Money payment options.">
-<link rel="stylesheet" href="/css/style.css?v=86">
-<link rel="stylesheet" href="/css/product-detail.css?v=42">
+<link rel="stylesheet" href="/css/style.css?v=87">
+<link rel="stylesheet" href="/css/product-detail.css?v=43">
 <link rel="stylesheet" href="/css/desc-blocks.css?v=3">
 </head>
 <body>
@@ -328,6 +328,18 @@
 </aside>
 </div>
 
+<!-- Similar Products (Lulu style): same category, same brand first. -->
+<section class="pd-similar" id="pd-similar" hidden>
+    <div class="pd-similar-head">
+        <h2 class="pd-similar-title">Similar Products</h2>
+        <div class="pd-similar-arrows">
+            <button type="button" class="pd-similar-arrow" data-dir="-1" aria-label="Scroll left">&#8249;</button>
+            <button type="button" class="pd-similar-arrow" data-dir="1" aria-label="Scroll right">&#8250;</button>
+        </div>
+    </div>
+    <div class="pd-similar-scroll" id="pd-similar-scroll"></div>
+</section>
+
 <div id="pd-fullscreen-viewer" class="pd-fullscreen-viewer hidden">
     <button id="pd-fullscreen-close" class="pd-fullscreen-close">&times;</button>
     <button id="pd-fullscreen-share" class="pd-fullscreen-share">&#8599;</button>
@@ -339,7 +351,7 @@
 <script src="/js/cart.js?v=7"></script>
 <script src="/js/categories.js?v=21"></script>
 <script src="/js/seller-panel.js?v=1"></script>
-<script src="/js/product-detail.js?v=36"></script>
+<script src="/js/product-detail.js?v=37"></script>
 <script src="/js/lz-table.js?v=6"></script>
 <script src="/js/description-blocks.js?v=14"></script>
 

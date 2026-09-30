@@ -1074,9 +1074,19 @@ async function displayFeaturedProducts(products) {
     let exploreBatchIndex = 0;
     let rowsSinceExplore = 0;
 
+    // "<Department> Store" rows (Lulu "Tech Store" style): one per top-level
+    // department, dropped in just before that department's first product row.
+    const storeRows = buildDepartmentStoreRows(categories, groups, byId, topIds);
+    const storeShown = new Set();
+
     host.innerHTML = "";
     let tileIndex = 0;
     for (const { category, items } of ordered) {
+        const topId = category.parent_id;
+        if (storeRows.has(topId) && !storeShown.has(topId)) {
+            host.appendChild(storeRows.get(topId));
+            storeShown.add(topId);
+        }
         const section = document.createElement("section");
         section.className = "ls-row";
         section.innerHTML = `
@@ -1133,17 +1143,81 @@ async function displayFeaturedProducts(products) {
     }
 }
 
+// ---------- Department "Store" rows ----------
+// A row of tall tiles, one per sub-category of a department (e.g.
+// Electronics -> Mobile Phones, TVs, Audio...): light-blue background, the
+// sub-category name at the top and a photo standing on a round podium.
+// The photo is the sub-category's own image (Admin > Categories) or, if it
+// has none, the Main photo of one of its products. Clicking a tile opens
+// that sub-category. Needs 3+ sub-categories with a photo, otherwise the
+// department gets no row.
+const LS_STORE_ROW_MIN_TILES = 3;
+
+function buildDepartmentStoreRows(categories, groups, byId, topIds) {
+    const rows = new Map();
+    const byOrder = (a, b) => (a.display_order || 0) - (b.display_order || 0) || a.id - b.id;
+    const tops = categories.filter(c => !c.parent_id && c.is_active !== false).sort(byOrder);
+    for (const top of tops) {
+        const tiles = categories
+            .filter(c => c.parent_id === top.id && c.is_active !== false)
+            .sort(byOrder)
+            .map(sub => {
+                const g = groups.get(sub.id);
+                const withPhoto = g ? g.items.find(p => p.card_image || p.image) : null;
+                const photo = sub.image_url || (withPhoto ? (withPhoto.card_image || withPhoto.image) : "");
+                return photo && (g || sub.image_url) ? { sub, photo } : null;
+            })
+            .filter(Boolean);
+        if (tiles.length < LS_STORE_ROW_MIN_TILES) continue;
+
+        const section = document.createElement("section");
+        section.className = "ls-row ls-store-row";
+        section.innerHTML = `
+            <div class="ls-row-head">
+                <h2 class="ls-row-title">${esc(top.name)} Store</h2>
+                <div class="ls-store-arrows">
+                    <button type="button" class="ls-store-arrow" data-dir="-1" aria-label="Scroll left">&#8249;</button>
+                    <button type="button" class="ls-store-arrow" data-dir="1" aria-label="Scroll right">&#8250;</button>
+                </div>
+            </div>
+            <div class="ls-store-scroll">${tiles.map(({ sub, photo }) => `
+                <a class="ls-store-tile" href="products?category=${encodeURIComponent(sub.name)}">
+                    <span class="ls-store-tile-name">${esc(sub.name)}</span>
+                    <span class="ls-store-tile-stage">
+                        <img src="${esc(photo)}" alt="${esc(sub.name)}" loading="lazy">
+                    </span>
+                </a>`).join("")}
+            </div>`;
+        const scroll = section.querySelector(".ls-store-scroll");
+        const arrows = section.querySelectorAll(".ls-store-arrow");
+        const update = () => {
+            arrows[0].disabled = scroll.scrollLeft <= 2;
+            arrows[1].disabled = scroll.scrollLeft + scroll.clientWidth >= scroll.scrollWidth - 2;
+        };
+        arrows.forEach(btn => btn.addEventListener("click", () => {
+            scroll.scrollBy({ left: Number(btn.dataset.dir) * scroll.clientWidth * 0.8, behavior: "smooth" });
+        }));
+        scroll.addEventListener("scroll", update, { passive: true });
+        requestAnimationFrame(update);
+        window.addEventListener("resize", update);
+        rows.set(top.id, section);
+    }
+    return rows;
+}
+
 // A tile in the same visual language as buildCategoryBannerTile (an
 // .ls-cat-banner: image, dark gradient, label), just pointed at a product
 // instead of a category - the placeholder content for explore blocks until
 // enough curated slot-6 tiles exist to cover the whole page.
+// Photo only (Sept 2026, Ryan): no name written on the tile - tapping the
+// photo opens the product. The name stays as the photo's alt text and the
+// link's label for screen readers and search engines.
 function buildProductExploreTile(product) {
     const href = `/product/${encodeURIComponent(product.id)}`;
+    const name = product.name || "";
     const img = product.image
-        ? `<img src="${esc(product.image)}" alt="" loading="lazy">` : "";
-    const label = product.name
-        ? `<span class="ls-cat-banner-label">${esc(product.name)}</span>` : "";
-    return `<a class="ls-cat-banner" href="${esc(href)}">${img}${label}</a>`;
+        ? `<img src="${esc(product.image)}" alt="${esc(name)}" loading="lazy">` : "";
+    return `<a class="ls-cat-banner ls-cat-banner--photo" href="${esc(href)}" aria-label="${esc(name)}" title="${esc(name)}">${img}</a>`;
 }
 
 // Shuffled once per page load so every visit spotlights a different mix;

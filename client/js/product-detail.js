@@ -197,6 +197,7 @@ async function loadProductDetail() {
         document.getElementById("pd-fullscreen-share").onclick = () => sharePdProduct(product);
 
         renderBreadcrumbs(product.category_id);
+        pdLoadSimilar(product);
 
     } catch (err) {
         console.error(err);
@@ -1348,6 +1349,113 @@ function pdDoorInfoArea(district, eta) {
     if (!district || !eta) { el.hidden = true; el.textContent = ""; return; }
     el.innerHTML = "For <strong>" + pdEscape(district) + "</strong>: arrives in about <strong>" + pdEscape(eta) + "</strong>.";
     el.hidden = false;
+}
+
+// ---------- Similar Products ----------
+// Up to 12 other products from the same category (same brand first). If the
+// category has fewer than 4 others, the parent category fills the row.
+// Clicking a card opens it; "+" adds it to the cart, or opens the product
+// when a colour or size has to be chosen first.
+const PD_SIMILAR_MAX = 12;
+
+async function pdLoadSimilar(product) {
+    const box = document.getElementById("pd-similar");
+    const scroll = document.getElementById("pd-similar-scroll");
+    if (!box || !scroll || !product || !product.category_id) return;
+    try {
+        const cats = await (await fetch("/api/categories")).json();
+        if (!Array.isArray(cats)) return;
+        const byId = new Map(cats.map(c => [c.id, c]));
+        const own = byId.get(product.category_id);
+        if (!own) return;
+        const fetchIn = async (cat) => {
+            const r = await fetch("/api/products?category=" + encodeURIComponent(cat.name));
+            const rows = r.ok ? await r.json() : [];
+            return Array.isArray(rows) ? rows.filter(p => p.id !== product.id) : [];
+        };
+        let list = await fetchIn(own);
+        const parent = own.parent_id ? byId.get(own.parent_id) : null;
+        if (list.length < 4 && parent) {
+            const seen = new Set(list.map(p => p.id));
+            (await fetchIn(parent)).forEach(p => { if (!seen.has(p.id)) list.push(p); });
+        }
+        const brand = String(product.brand || "").trim().toLowerCase();
+        const inStock = p => Number(p.stock) > 0 ? 0 : 1;
+        const sameBrand = p => brand && String(p.brand || "").trim().toLowerCase() === brand ? 0 : 1;
+        list.sort((a, b) => inStock(a) - inStock(b) || sameBrand(a) - sameBrand(b));
+        list = list.slice(0, PD_SIMILAR_MAX);
+        if (!list.length) return;
+
+        scroll.innerHTML = list.map(pdSimilarCard).join("");
+        box.hidden = false;
+        pdWireSimilar(box, scroll, list);
+    } catch (e) {
+        console.warn("Similar products:", e);
+    }
+}
+
+function pdSimilarPrices(p) {
+    const price = Number(p.price) || 0;
+    const disc = Number(p.discount_price) || 0;
+    const cmp = Number(p.compare_at_price) || 0;
+    if (disc && disc < price) return { now: disc, was: price };
+    if (cmp > price) return { now: price, was: cmp };
+    return { now: price, was: 0 };
+}
+
+function pdSimilarCard(p) {
+    const { now, was } = pdSimilarPrices(p);
+    const img = p.card_image || p.image || "";
+    const out = Number(p.stock) <= 0;
+    const fmt = n => Math.round(n).toLocaleString();
+    return '<a class="pd-sim-card" href="/product/' + encodeURIComponent(p.id) + '">' +
+        '<span class="pd-sim-media">' +
+            (img ? '<img src="' + pdEscape(img) + '" alt="' + pdEscape(p.name) + '" loading="lazy">' : "") +
+            (out ? '<span class="pd-sim-out">Out of stock</span>'
+                 : '<button type="button" class="pd-sim-add" data-add="' + p.id + '" aria-label="Add ' + pdEscape(p.name) + ' to cart">+</button>') +
+        "</span>" +
+        '<span class="pd-sim-body">' +
+            (p.brand ? '<span class="pd-sim-brand">' + pdEscape(p.brand) + "</span>" : "") +
+            '<span class="pd-sim-name">' + pdEscape(p.name) + "</span>" +
+            '<span class="pd-sim-prices"><span class="pd-sim-now">UGX ' + fmt(now) + "</span>" +
+                (was ? '<s class="pd-sim-was">' + fmt(was) + "</s>" : "") + "</span>" +
+        "</span></a>";
+}
+
+function pdWireSimilar(box, scroll, list) {
+    const arrows = box.querySelectorAll(".pd-similar-arrow");
+    const update = () => {
+        arrows[0].disabled = scroll.scrollLeft <= 2;
+        arrows[1].disabled = scroll.scrollLeft + scroll.clientWidth >= scroll.scrollWidth - 2;
+    };
+    arrows.forEach(b => b.onclick = () => scroll.scrollBy({ left: Number(b.dataset.dir) * scroll.clientWidth * 0.8, behavior: "smooth" }));
+    scroll.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    requestAnimationFrame(update);
+
+    scroll.addEventListener("click", async (e) => {
+        const btn = e.target.closest(".pd-sim-add");
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const p = list.find(x => x.id === Number(btn.dataset.add));
+        if (!p || btn.disabled) return;
+        btn.disabled = true;
+        try {
+            const r = await fetch("/api/products/" + p.id + "/options");
+            const o = r.ok ? await r.json() : null;
+            if (!o || (o.colors || []).length || (o.sizes || []).length) {
+                window.location.href = "/product/" + p.id;   // colour / size to choose
+                return;
+            }
+            addToCart(p.id, p.name, pdSimilarPrices(p).now, p.card_image || p.image, p.description, null, null, null, null);
+            btn.textContent = "\u2713";
+            btn.classList.add("done");
+            setTimeout(() => { btn.textContent = "+"; btn.classList.remove("done"); btn.disabled = false; }, 1500);
+        } catch (err) {
+            window.location.href = "/product/" + p.id;
+        }
+    });
 }
 
 document.addEventListener("DOMContentLoaded", pdSetupDoorInfo);

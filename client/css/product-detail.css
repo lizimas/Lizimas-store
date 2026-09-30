@@ -756,3 +756,41 @@ a.seller-score-badge.pd-official-link:hover { filter: brightness(1.1); }
 .pd-del-row > div:last-child { flex: 1; min-width: 0; }
 
 .pd-del-info-note { background: #fff; border-radius: 6px; padding: 8px 10px; margin-bottom: 0 !important; }
+
+/* Similar Products (bottom of the product page) */
+.pd-similar { max-width: 1300px; margin: 28px auto 36px; padding: 0 16px; }
+.pd-similar[hidden] { display: none; }
+.pd-similar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.pd-similar-title { font-size: 24px; font-weight: 800; color: #111827; margin: 0; }
+.pd-similar-arrows { display: flex; gap: 10px; }
+.pd-similar-arrow { width: 42px; height: 42px; border-radius: 50%; border: 1.5px solid #1a1a2e; background: #fff; color: #1a1a2e;
+    font-size: 24px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0 0 3px; }
+.pd-similar-arrow:disabled { opacity: .3; cursor: default; }
+.pd-similar-scroll { display: flex; gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding: 2px 2px 6px; }
+.pd-similar-scroll::-webkit-scrollbar { display: none; }
+.pd-sim-card { flex: 0 0 calc((100% - 5 * 18px) / 6); min-width: 200px; background: #fff; border: 1px solid #eceef1; border-radius: 12px;
+    overflow: hidden; text-decoration: none; color: inherit; scroll-snap-align: start; display: flex; flex-direction: column; }
+.pd-sim-card:hover { box-shadow: 0 6px 18px rgba(17, 24, 39, .08); }
+.pd-sim-media { position: relative; aspect-ratio: 1 / 1; background: #f6f7f9; display: flex; align-items: center; justify-content: center; }
+.pd-sim-media { width: 100%; overflow: hidden; }
+.pd-sim-media img { position: absolute; top: 7%; left: 7%; width: 86%; height: 86%; object-fit: contain; mix-blend-mode: multiply; }
+.pd-sim-add { position: absolute; right: 12px; bottom: 12px; width: 40px; height: 40px; border: 0; border-radius: 8px; background: #1a1a2e;
+    color: #f4b400; font-size: 26px; font-weight: 700; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.pd-sim-add:hover { background: #f4b400; color: #1a1a2e; }
+.pd-sim-add.done { background: #16a34a; color: #fff; }
+.pd-sim-out { position: absolute; left: 10px; bottom: 10px; background: #6b7280; color: #fff; font-size: 11.5px; font-weight: 700;
+    padding: 3px 9px; border-radius: 999px; }
+.pd-sim-body { padding: 12px 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.pd-sim-brand { align-self: flex-start; background: #f2f4f7; color: #1a1a2e; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 6px; }
+.pd-sim-name { font-size: 14px; line-height: 1.4; color: #1f2937; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden; min-height: 4.2em; }
+.pd-sim-prices { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: auto; }
+.pd-sim-now { background: #f4b400; color: #1a1a2e; font-weight: 800; font-size: 14.5px; padding: 4px 9px; border-radius: 6px;
+    box-shadow: 3px 3px 0 #1a1a2e; }
+.pd-sim-was { color: #9ca3af; font-size: 13px; }
+@media (max-width: 700px) {
+    .pd-similar-title { font-size: 20px; }
+    .pd-similar-arrows { display: none; }
+    .pd-sim-card { flex-basis: 46%; min-width: 150px; }
+    .pd-similar-scroll { gap: 12px; }
+}
