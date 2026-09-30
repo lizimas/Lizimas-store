@@ -131,6 +131,22 @@ module.exports = upload;
 // Attached rather than exported as an object so every existing
 // `require("../middleware/upload")` call site keeps working unchanged.
 module.exports.promoMedia = promoMedia;
+
+// Description blocks (Sept 2026): a video picked from the computer for a
+// Video block or a grid cell. Video only, same 30MB ceiling as promotions.
+const blockVideo = multer({
+    storage,
+    fileFilter: (req, file, cb) => {
+        const ext = path.extname(file.originalname || "").toLowerCase();
+        const mime = (file.mimetype || "").toLowerCase();
+        if (/^\.(mp4|mov|webm|m4v)$/.test(ext) || /^video\/(mp4|quicktime|webm|x-m4v)$/.test(mime)) return cb(null, true);
+        const err = new Error("Upload an .mp4, .mov or .webm video.");
+        err.code = "INVALID_FILE_TYPE";
+        cb(err);
+    },
+    limits: { fileSize: PROMO_MEDIA_MAX_BYTES }
+});
+module.exports.blockVideo = blockVideo;
 module.exports.PROMO_MEDIA_MAX_BYTES = PROMO_MEDIA_MAX_BYTES;
 
 module.exports.chatAttachment = chatAttachment;

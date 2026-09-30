@@ -392,7 +392,7 @@ function applyColorSelection(colorId, colorName) {
     });
     const nameEl = document.getElementById("pd-selected-color-name");
     if (nameEl) {
-        nameEl.textContent = pdSelectedColorName ? `: ${pdSelectedColorName}` : "";
+        nameEl.textContent = pdSelectedColorName ? ` ${pdSelectedColorName}` : "";
     }
     updateSizeAvailability();
     updateStockHint();
@@ -548,20 +548,30 @@ async function loadOptions(id, product) {
     if (data.colors.length > 0) {
         const colorRow = document.createElement("div");
         colorRow.className = "pd-selector-row";
-        colorRow.innerHTML = `<span class="pd-selector-label">Color<span id="pd-selected-color-name" class="pd-selected-color-name"></span></span><div id="pd-color-swatches" class="pd-color-swatches"></div>`;
+        colorRow.innerHTML = `<span class="pd-selector-label">Color:<span id="pd-selected-color-name" class="pd-selected-color-name"></span></span><div id="pd-color-swatches" class="pd-color-swatches"></div>`;
         section.appendChild(colorRow);
 
         const swatchContainer = colorRow.querySelector("#pd-color-swatches");
         data.colors.forEach(color => {
             const swatch = document.createElement("div");
-            swatch.className = "pd-color-swatch" + (color.image_path ? "" : " pd-color-swatch-dot");
+            // Temu-style tile: the colour's photo with its name under it; a
+            // colour without a photo fills the tile with the colour itself.
+            swatch.className = "pd-color-swatch pd-color-tile";
             swatch.title = color.name;
             swatch.setAttribute("role", "button");
+            swatch.setAttribute("tabindex", "0");
             swatch.setAttribute("aria-label", color.name);
-            swatch.innerHTML = color.image_path
-                ? `<img src="${pdEscape(color.image_path)}" alt="${pdEscape(color.name)}">` +
-                  (color.hex ? `<span class="pd-swatch-hex" style="background:${pdEscape(color.hex)}"></span>` : "")
-                : `<span class="pd-swatch-fill" style="background:${pdEscape(color.hex || "#e5e7eb")}"></span>`;
+            swatch.innerHTML =
+                `<span class="pd-tile-media">` +
+                    (color.image_path
+                        ? `<img src="${pdEscape(color.image_path)}" alt="" loading="lazy">`
+                        : `<span class="pd-swatch-fill" style="background:${pdEscape(color.hex || "#e5e7eb")}"></span>`) +
+                `</span>` +
+                `<span class="pd-tile-name">` +
+                    (color.hex && color.image_path ? `<span class="pd-tile-dot" style="background:${pdEscape(color.hex)}"></span>` : "") +
+                    pdEscape(color.name) +
+                `</span>`;
+            swatch.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); swatch.click(); } });
             swatch.onclick = () => selectColor(color.id, color.image_path, color.name);
             swatch.dataset.colorId = color.id;
             swatchContainer.appendChild(swatch);

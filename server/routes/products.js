@@ -26,7 +26,8 @@ const {
 const {
     getDescriptionBlocks,
     saveDescriptionBlocks,
-    uploadBlockImage
+    uploadBlockImage,
+    uploadBlockVideo,
 } = require("../controllers/descriptionBlockController");
 
 const { requireAuth, requireAdmin, requireStaffOrAdmin } = require("../middleware/authMiddleware");
@@ -42,6 +43,7 @@ router.post(
     upload.single("image"),
     uploadBlockImage
 );
+router.post("/description-blocks/video", requireAuth, requireStaffOrAdmin, upload.blockVideo.single("video"), uploadBlockVideo);
 
 router.get("/", getProducts);
 router.get("/categories", getCategories);
@@ -51,6 +53,7 @@ router.get("/:id/options", getProductOptions);
 router.get("/:id/description-blocks", getDescriptionBlocks);
 router.put("/:id/description-blocks", requireAuth, requireStaffOrAdmin, saveDescriptionBlocks);
 router.post("/:id/description-blocks/image", requireAuth, requireStaffOrAdmin, upload.single("image"), uploadBlockImage);
+router.post("/:id/description-blocks/video", requireAuth, requireStaffOrAdmin, upload.blockVideo.single("video"), uploadBlockVideo);
 router.get("/catalog/sizes", getSizeCatalog);
 router.get("/catalog/colors", getColorCatalog);
 // Colour list: admin / Lizimas staff add colours (name + colour code) and edit

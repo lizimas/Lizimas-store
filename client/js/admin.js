@@ -1127,9 +1127,37 @@ function adminSyncColors(names) {
 }
 
 // One row per chosen colour: swatch, name and its photo picker.
+// First photo linked to a colour (its tile photo on the store), or null.
+function adminColorPhoto(name) {
+    const keys = pdSelectedColors[name] || [];
+    const im = keys.length ? pdAllImages.find(x => x.key === keys[0]) : null;
+    return im ? im.url : null;
+}
+
+// "How customers will see the colours": the same tiles as the product page.
+function renderColorTilesPreview() {
+    const el = document.getElementById("adm-color-tiles");
+    if (!el) return;
+    const names = Object.keys(pdSelectedColors);
+    if (!names.length) { el.innerHTML = ""; return; }
+    el.innerHTML = '<div class="adm-tiles-title">How customers will see the colours</div><div class="adm-tiles">' + names.map((n, i) => {
+        const photo = adminColorPhoto(n), hex = window.LzColorSwatches ? LzColorSwatches.hexOf(n) : null;
+        return '<div class="adm-tile' + (i === 0 ? " on" : "") + '"><div class="adm-tile-media">' +
+            (photo ? '<img src="' + adminEsc(photo) + '" alt="">' : '<span style="background:' + adminEsc(hex || "#e5e7eb") + '"></span>') +
+            '</div><div class="adm-tile-name">' + adminEsc(n) + (photo ? "" : '<div class="adm-tile-hint">tap a photo below</div>') + "</div></div>";
+    }).join("") + "</div>";
+}
+
 function renderColorPhotoRows() {
     const box = document.getElementById("color-checkbox-list");
     if (!box) return;
+    let tiles = document.getElementById("adm-color-tiles");
+    if (!tiles) {
+        tiles = document.createElement("div");
+        tiles.id = "adm-color-tiles";
+        box.parentNode.insertBefore(tiles, box);
+    }
+    renderColorTilesPreview();
     const names = Object.keys(pdSelectedColors);
     if (!names.length) { box.innerHTML = ""; return; }
     box.innerHTML = names.map(n => {
@@ -1185,6 +1213,7 @@ function selectColorThumb(imgEl, colorName) {
 
     const picker = imgEl.closest("[data-color-name]");
     if (picker) refreshColorThumbBadges(picker, colorName);
+    renderColorTilesPreview();
     adminRefreshVariants();
 }
 
@@ -10828,7 +10857,7 @@ function adminPreviewProduct() {
         warrantyMonths: Number(val("product-warranty-months")) || 0,
         stock: val("product-stock") === "" ? null : Number(val("product-stock")),
         photos: pdAllImages.map(im => im.url),
-        colors: Object.keys(pdSelectedColors).map(n => ({ name: n, hex: window.LzColorSwatches ? LzColorSwatches.hexOf(n) : null })),
+        colors: Object.keys(pdSelectedColors).map(n => ({ name: n, hex: window.LzColorSwatches ? LzColorSwatches.hexOf(n) : null, photo: adminColorPhoto(n) })),
         sizes: pdSelectedSizes.slice(),
         description: val("product-description"),
         specs: collectSpecRows(),

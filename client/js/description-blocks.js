@@ -72,6 +72,9 @@
             const video = document.createElement("video");
             video.src = b.image_url;
             video.controls = true;
+            video.playsInline = true;
+            video.preload = "metadata";
+            if (b.poster_url) video.poster = b.poster_url;
             video.style.width = "100%";
             wrap.appendChild(video);
         }
@@ -199,6 +202,9 @@
                     const video = document.createElement("video");
                     video.src = item.video_url;
                     video.controls = true;
+                    video.playsInline = true;
+                    video.preload = "metadata";
+                    if (item.video_poster) video.poster = item.video_poster;
                     video.style.width = "100%";
                     vwrap.appendChild(video);
                 }

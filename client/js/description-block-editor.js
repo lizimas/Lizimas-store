@@ -99,6 +99,98 @@
         return res.json();
     }
 
+    // Video from the computer (Sept 2026): .mp4 / .mov / .webm up to 30MB,
+    // stored on Cloudinary, played on the store as .mp4. XHR (not fetch) so
+    // the person sees how far the upload has got.
+    const VIDEO_MAX_BYTES = 30 * 1024 * 1024;
+    function uploadVideo(file, onProgress) {
+        return new Promise((resolve, reject) => {
+            if (!/\.(mp4|mov|webm|m4v)$/i.test(file.name || "") && !/^video\/(mp4|quicktime|webm|x-m4v)$/i.test(file.type || "")) {
+                reject(new Error("Pick an .mp4, .mov or .webm video."));
+                return;
+            }
+            if (file.size > VIDEO_MAX_BYTES) {
+                reject(new Error("This video is " + Math.round(file.size / 1048576) + " MB - the most is 30 MB. Trim it, or upload it to YouTube (Unlisted) and paste the link."));
+                return;
+            }
+            const productId = host.dataset.productId;
+            const url = productId ? `${apiBase}/${productId}/description-blocks/video` : `${apiBase}/description-blocks/video`;
+            const fd = new FormData();
+            fd.append("video", file);
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", url);
+            // Same sign-in as every other request (lz-session.js adds these to
+            // fetch; XHR has to set them itself): the session cookie, which
+            // part of the site this is, and a real token only if there is one.
+            const t = token();
+            if (/^[\w-]+\.[\w-]+\.[\w-]+$/.test(t)) xhr.setRequestHeader("Authorization", "Bearer " + t);
+            const portal = (window.LzSession && window.LzSession.portal) || document.documentElement.getAttribute("data-lz-portal");
+            if (portal) xhr.setRequestHeader("X-LZ-Session", portal);
+            xhr.withCredentials = true;
+            xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100)); };
+            xhr.onload = () => {
+                let data = null;
+                try { data = JSON.parse(xhr.responseText); } catch (e) { /* not JSON */ }
+                if (xhr.status >= 200 && xhr.status < 300 && data && data.video_url) resolve(data);
+                else reject(new Error((data && (data.message || data.error)) || ("Upload failed (" + xhr.status + ")")));
+            };
+            xhr.onerror = () => reject(new Error("Upload failed - check the connection and try again."));
+            xhr.send(fd);
+        });
+    }
+
+    // "Upload video from computer" button with a progress bar. onDone gets
+    // { video_url, poster_url }.
+    function videoUploadControl(onDone) {
+        const wrap = document.createElement("div");
+        wrap.className = "lzbe-video-upload";
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "lzbe-video-upload-btn";
+        btn.textContent = "\u2B06 Upload video from computer";
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm,.m4v";
+        input.hidden = true;
+        const bar = document.createElement("div");
+        bar.className = "lzbe-video-progress";
+        bar.hidden = true;
+        bar.innerHTML = '<span class="lzbe-video-progress-fill"></span><span class="lzbe-video-progress-text"></span>';
+        const hint = document.createElement("div");
+        hint.className = "lzbe-video-hint";
+        hint.textContent = ".mp4, .mov or .webm, up to 30 MB (about 30-60 seconds). Longer videos: use a YouTube link.";
+        btn.addEventListener("click", () => input.click());
+        input.addEventListener("change", async () => {
+            const file = input.files && input.files[0];
+            input.value = "";
+            if (!file) return;
+            btn.disabled = true;
+            bar.hidden = false;
+            const fill = bar.querySelector(".lzbe-video-progress-fill");
+            const text = bar.querySelector(".lzbe-video-progress-text");
+            const show = (pct, msg) => { fill.style.width = pct + "%"; text.textContent = msg; };
+            show(0, "Uploading " + file.name + "...");
+            setBusy(1);
+            try {
+                const data = await uploadVideo(file, (pct) => show(pct, pct < 100 ? "Uploading... " + pct + "%" : "Processing video..."));
+                show(100, "Uploaded");
+                onDone(data);
+            } catch (err) {
+                console.error("block video upload:", err);
+                bar.hidden = true;
+                alert(err.message);
+            } finally {
+                setBusy(-1);
+                btn.disabled = false;
+            }
+        });
+        wrap.appendChild(btn);
+        wrap.appendChild(input);
+        wrap.appendChild(bar);
+        wrap.appendChild(hint);
+        return wrap;
+    }
+
     async function handleFile(file) {
         if (!file) return;
         // On the Add Product form there is no id yet, so images go to the
@@ -623,9 +715,16 @@
 
                 urlInput.addEventListener("input", (e) => {
                     blocks[i].image_url = e.target.value.trim();
+                    delete blocks[i].poster_url;
                     renderVideoPreview();
                 });
                 row.appendChild(urlInput);
+                row.appendChild(videoUploadControl((data) => {
+                    blocks[i].image_url = data.video_url;
+                    blocks[i].poster_url = data.poster_url || "";
+                    urlInput.value = data.video_url;
+                    renderVideoPreview();
+                }));
                 row.appendChild(previewWrap);
 
                 const caption = document.createElement("input");
@@ -741,8 +840,13 @@
                     videoInput.type = "text";
                     videoInput.placeholder = "YouTube, Vimeo, or direct .mp4/.webm/.mov URL";
                     videoInput.value = item.video_url || "";
-                    videoInput.addEventListener("input", (e) => { item.video_url = e.target.value.trim(); });
+                    videoInput.addEventListener("input", (e) => { item.video_url = e.target.value.trim(); delete item.video_poster; });
                     videoWrap.appendChild(videoInput);
+                    videoWrap.appendChild(videoUploadControl((data) => {
+                        item.video_url = data.video_url;
+                        item.video_poster = data.poster_url || "";
+                        videoInput.value = data.video_url;
+                    }));
                     const videoPlacement = document.createElement("select");
                     [
                         ["replace", "Replace the image"],

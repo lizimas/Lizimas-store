@@ -273,4 +273,33 @@ const uploadBlockImage = async (req, res) => {
     }
 };
 
-module.exports = { getDescriptionBlocks, saveDescriptionBlocks, uploadBlockImage };
+// A video from the computer for a Video block or a grid cell (Sept 2026).
+// Stored on Cloudinary as a video; the address handed back always plays as
+// .mp4 (an iPhone .mov is converted on first view) at up to 1280px wide,
+// with a still of the first frame as the poster.
+function videoUrls(secureUrl) {
+    const url = secureUrl.replace("/upload/", "/upload/w_1280,c_limit,q_auto/").replace(/\.[a-z0-9]+$/i, ".mp4");
+    const poster = secureUrl.replace("/upload/", "/upload/so_0,w_1280,c_limit,q_auto/").replace(/\.[a-z0-9]+$/i, ".jpg");
+    return { url, poster };
+}
+const uploadBlockVideo = async (req, res) => {
+    if (!req.file) return res.status(400).json({ message: "No video uploaded" });
+    try {
+        const cloudinary = require("../config/cloudinary");
+        const result = await new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+                { folder: "lizimas-store/description-blocks", resource_type: "video" },
+                (error, r) => (error ? reject(error) : resolve(r))
+            );
+            stream.end(req.file.buffer);
+        });
+        const v = videoUrls(result.secure_url);
+        res.json({ video_url: v.url, poster_url: v.poster, width: result.width || null, height: result.height || null,
+            duration: result.duration || null });
+    } catch (err) {
+        console.error("uploadBlockVideo:", err);
+        res.status(500).json({ message: "Video upload failed" });
+    }
+};
+
+module.exports = { getDescriptionBlocks, saveDescriptionBlocks, uploadBlockImage, uploadBlockVideo, videoUrls };

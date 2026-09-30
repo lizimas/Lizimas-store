@@ -44,6 +44,12 @@
 .lzpp-dots { display: flex; flex-wrap: wrap; gap: 10px; }
 .lzpp-dot { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11.5px; color: #4b5563; }
 .lzpp-dot span { width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(0,0,0,.18); }
+.lzpp-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; }
+.lzpp-tile { border: 1.5px solid #e5e7eb; border-radius: 8px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
+.lzpp-tile.on { border: 2px solid #111827; }
+.lzpp-tile-media { aspect-ratio: 1 / 1; background: #f6f7f9; display: block; }
+.lzpp-tile-media img, .lzpp-tile-media span { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lzpp-tile-name { font-size: 12.5px; font-weight: 600; text-align: center; padding: 6px 4px; color: #1f2937; }
 .lzpp-sizes { display: flex; flex-wrap: wrap; gap: 8px; }
 .lzpp-sizes span { padding: 7px 14px; border: 1px solid #ccc; border-radius: 20px; font-size: 13px; }
 .lzpp-cart { margin-top: 16px; width: 100%; padding: 13px; background: #f4b400; color: #1a1a2e; border: 0; border-radius: 8px; font-size: 15px; font-weight: 700; }
@@ -103,8 +109,10 @@
                                 (was ? '<s class="lzpp-was">' + ugx(was) + '</s><span class="lzpp-off">-' + Math.round((1 - d.price / was) * 100) + "%</span>" : "") +
                                 (months ? '<span class="lzpp-warranty">&#128737; ' + months + (months === 1 ? " Month" : " Months") + " Manufacturer Warranty</span>" : "") +
                             "</div>" + stockLine +
-                            ((d.colors || []).length ? '<div class="lzpp-label">Colour</div><div class="lzpp-dots">' + d.colors.map((c) =>
-                                '<span class="lzpp-dot"><span style="background:' + esc(c.hex || "#fff") + '"></span>' + esc(c.name) + "</span>").join("") + "</div>" : "") +
+                            ((d.colors || []).length ? '<div class="lzpp-label">Color: <strong>' + esc(d.colors[0].name) + '</strong></div><div class="lzpp-tiles">' + d.colors.map((c, i) =>
+                                '<span class="lzpp-tile' + (i === 0 ? " on" : "") + '"><span class="lzpp-tile-media">' +
+                                    (c.photo ? '<img src="' + esc(c.photo) + '" alt="">' : '<span style="background:' + esc(c.hex || "#e5e7eb") + '"></span>') +
+                                '</span><span class="lzpp-tile-name">' + esc(c.name) + "</span></span>").join("") + "</div>" : "") +
                             ((d.sizes || []).length ? '<div class="lzpp-label">Size</div><div class="lzpp-sizes">' + d.sizes.map((z) => "<span>" + esc(z) + "</span>").join("") + "</div>" : "") +
                             '<button type="button" class="lzpp-cart" disabled>Add To Cart</button>' +
                         "</div>" +

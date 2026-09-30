@@ -102,7 +102,8 @@ const {
 const {
     getDescriptionBlocks,
     saveDescriptionBlocks,
-    uploadBlockImage
+    uploadBlockImage,
+    uploadBlockVideo
 } = require("../controllers/descriptionBlockController");
 const {
     listActiveDropoffPoints,
@@ -246,9 +247,11 @@ router.get("/products/:id/variant-prices", getVariantPrices);
 router.get("/products/:id/description-blocks", getDescriptionBlocks);
 router.put("/products/:id/description-blocks", saveDescriptionBlocks);
 router.post("/products/:id/description-blocks/image", upload.single("image"), uploadBlockImage);
+router.post("/products/:id/description-blocks/video", upload.blockVideo.single("video"), uploadBlockVideo);
 // Staging upload for the vendor Add Product form, where no product id
 // exists yet - mirrors products.js's equivalent no-id route.
 router.post("/products/description-blocks/image", upload.single("image"), uploadBlockImage);
+router.post("/products/description-blocks/video", upload.blockVideo.single("video"), uploadBlockVideo);
 
 router.get("/dropoff-points", listActiveDropoffPoints);
 router.post("/order-items/:orderItemId/handover", requireVendorPermission("vc_order_manager"), vendorMarkHandedOver);
