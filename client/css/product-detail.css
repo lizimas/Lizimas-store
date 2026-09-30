@@ -754,3 +754,5 @@ a.seller-score-badge.pd-official-link:hover { filter: brightness(1.1); }
 .pd-del-info-foot { color: #6b7280; margin-bottom: 0 !important; }
 .pd-del-info a { color: #1a1a2e; font-weight: 600; }
 .pd-del-row > div:last-child { flex: 1; min-width: 0; }
+
+.pd-del-info-note { background: #fff; border-radius: 6px; padding: 8px 10px; margin-bottom: 0 !important; }

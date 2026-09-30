@@ -9,7 +9,7 @@
 
 <meta name="description" content="Shop quality products at Lizimas Store with fast delivery across Uganda and Mobile Money payment options.">
 <link rel="stylesheet" href="/css/style.css?v=86">
-<link rel="stylesheet" href="/css/product-detail.css?v=39">
+<link rel="stylesheet" href="/css/product-detail.css?v=40">
 <link rel="stylesheet" href="/css/desc-blocks.css?v=3">
 </head>
 <body>
@@ -225,9 +225,20 @@
                 <svg viewBox="0 0 24 24"><path d="M4 10l1.2-5h13.6L20 10v10H4V10Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 20v-5h6v5" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
             </span>
             <div>
-                <div class="pd-del-head">Pickup</div>
-                <div class="pd-del-text">Free &middot; collect from our Bugolobi store</div>
+                <div class="pd-del-head pd-del-head-row">Pickup Station
+                    <button type="button" class="pd-del-more" id="pd-pick-more" aria-expanded="false" aria-controls="pd-pick-info">Details <span aria-hidden="true">&rsaquo;</span></button>
+                </div>
+                <div class="pd-del-text">Free &middot; collect from a pickup station</div>
             </div>
+        </div>
+        <div class="pd-del-info" id="pd-pick-info" role="region" aria-label="Pickup station details" hidden>
+            <div class="pd-del-info-head">
+                <strong>Pickup Station</strong>
+                <button type="button" class="pd-del-info-close" id="pd-pick-close" aria-label="Close pickup details">&times;</button>
+            </div>
+            <p>Delivery time starts from the day you place your order until your package arrives at your selected pickup station. You will be notified as soon as your order is ready for collection.</p>
+            <p>Please collect your order within <strong>5 days</strong> of its arrival. Orders not collected within this period will be automatically cancelled.</p>
+            <p class="pd-del-info-note"><strong>Note:</strong> You can pay with cash at the pickup station, or with MTN Mobile Money, Airtel Money, bank card or Stanbic Flexipay on the number given to you. Make sure you are given a receipt after paying.</p>
         </div>
 
         <div class="pd-del-row">
@@ -327,7 +338,7 @@
 <script src="/js/cart.js?v=7"></script>
 <script src="/js/categories.js?v=21"></script>
 <script src="/js/seller-panel.js?v=1"></script>
-<script src="/js/product-detail.js?v=33"></script>
+<script src="/js/product-detail.js?v=34"></script>
 <script src="/js/lz-table.js?v=6"></script>
 <script src="/js/description-blocks.js?v=14"></script>
 

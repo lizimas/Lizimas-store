@@ -1273,7 +1273,7 @@ function pdRenderOwnSeller(panel) {
         '</div>' +
         '<ul class="seller-performance-list">' +
             '<li class="seller-perf-item seller-perf-excellent"><span class="seller-perf-dot"></span>Sold and delivered by Lizimas Store</li>' +
-            '<li class="seller-perf-item seller-perf-excellent"><span class="seller-perf-dot"></span>Free pickup at our Bugolobi store</li>' +
+            '<li class="seller-perf-item seller-perf-excellent"><span class="seller-perf-dot"></span>Free pickup at our pickup station</li>' +
             '<li class="seller-perf-item seller-perf-excellent"><span class="seller-perf-dot"></span>7-day returns on eligible items</li>' +
             '<li class="seller-perf-item seller-perf-excellent"><span class="seller-perf-dot"></span>Pay with Mobile Money or Cash on Delivery</li>' +
         '</ul>' +
@@ -1297,21 +1297,27 @@ function pdSetupShare(product) {
         " (Item ID " + product.id + ") " + url + "\nWhat is wrong: "));
 }
 
-// "Details" next to Door Delivery opens a box with our delivery timing and
-// policy (the same wording as help#delivery). Opens and closes in place.
+// "Details" next to Pickup Station and Door Delivery opens a box with our
+// timing and policy (door delivery: same wording as help#delivery). Each
+// opens and closes in place; opening one closes the other.
 function pdSetupDoorInfo() {
-    const btn = document.getElementById("pd-door-more");
-    const box = document.getElementById("pd-door-info");
-    if (!btn || !box) return;
-    const set = open => {
-        box.hidden = !open;
-        btn.setAttribute("aria-expanded", open ? "true" : "false");
-        btn.classList.toggle("open", open);
+    const pairs = [["pd-pick-more", "pd-pick-info", "pd-pick-close"], ["pd-door-more", "pd-door-info", "pd-door-close"]]
+        .map(([b, x, c]) => ({ btn: document.getElementById(b), box: document.getElementById(x), close: document.getElementById(c) }))
+        .filter(p => p.btn && p.box);
+    const set = (p, open) => {
+        p.box.hidden = !open;
+        p.btn.setAttribute("aria-expanded", open ? "true" : "false");
+        p.btn.classList.toggle("open", open);
     };
-    btn.onclick = () => set(box.hidden);
-    const close = document.getElementById("pd-door-close");
-    if (close) close.onclick = () => { set(false); btn.focus(); };
-    box.addEventListener("keydown", e => { if (e.key === "Escape") { set(false); btn.focus(); } });
+    pairs.forEach(p => {
+        p.btn.onclick = () => {
+            const open = p.box.hidden;
+            pairs.forEach(o => { if (o !== p) set(o, false); });
+            set(p, open);
+        };
+        if (p.close) p.close.onclick = () => { set(p, false); p.btn.focus(); };
+        p.box.addEventListener("keydown", e => { if (e.key === "Escape") { set(p, false); p.btn.focus(); } });
+    });
 }
 
 // The chosen district's own delivery time, shown inside the details box.
