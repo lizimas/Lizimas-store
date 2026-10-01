@@ -8182,55 +8182,8 @@ async function loadVendorCompliancePanel() {
     }
 }
 
-function renderVendorCompliancePanel() {
-    const container = document.getElementById("vendor-compliance-list");
-    if (!container) return;
-
-    if (!vendorComplianceCache || vendorComplianceCache.length === 0) {
-        container.innerHTML = `<p class="no-data">No vendors yet.</p>`;
-        return;
-    }
-
-    container.innerHTML = `
-        <table>
-            <thead><tr><th>Business</th><th>Shop ID</th><th>Owner</th><th>Status</th><th>Payouts</th><th>Actions</th></tr></thead>
-            <tbody>
-                ${vendorComplianceCache.map(v => `
-                    <tr>
-                        <td data-label="Business">${v.business_name}</td>
-                        <td data-label="Shop ID">${v.shop_id
-                            ? `<span style="font-family:monospace; font-weight:600;">${v.shop_id}</span>`
-                            : (v.status === "approved"
-                                ? `<button onclick="regenerateVendorShopIdAction(${v.id})" style="background:#fff; color:#1a1a2e; border:1px solid #1a1a2e; border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">Assign</button>`
-                                : `<span style="color:#bbb;">-</span>`)}</td>
-                        <td data-label="Owner">${v.owner_name}<br><span style="color:#888; font-size:12px;">${v.owner_email}</span></td>
-                        <td data-label="Status"><span class="status-badge ${v.status === "suspended" ? "status-cancelled" : "status-paid"}">${v.status}</span></td>
-                        <td data-label="Payouts">${v.payout_frozen ? `<span class="status-badge status-cancelled">Frozen</span>` : `<span class="status-badge status-paid">Active</span>`}</td>
-                        <td data-label="Actions">
-                            <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                                <button onclick="warnVendorAccount(${v.id})" style="background:#fff; color:#B45309; border:1px solid #B45309; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">Warn</button>
-                                ${v.status === "suspended"
-                                    ? `<button onclick="reinstateVendorAccount(${v.id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">Reinstate</button>`
-                                    : `<button onclick="suspendVendorAccount(${v.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">Suspend</button>`}
-                                ${v.payout_frozen
-                                    ? `<button onclick="unfreezeVendorAccountPayouts(${v.id})" style="background:#16A34A; color:#fff; border:none; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">Unfreeze Payouts</button>`
-                                    : `<button onclick="freezeVendorAccountPayouts(${v.id})" style="background:#DC2626; color:#fff; border:none; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">Freeze Payouts</button>`}
-                                <button onclick="toggleVendorComplianceProducts(${v.id})" style="background:#fff; color:#1a1a2e; border:1px solid #1a1a2e; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">Products</button>
-                                <button onclick="viewVendorComplianceHistory(${v.id})" style="background:#fff; color:#1a1a2e; border:1px solid #1a1a2e; border-radius:6px; padding:5px 8px; font-size:12px; cursor:pointer;">History</button>
-                                <button onclick="viewVendorCenterDetails(${v.id})" style="background:#f4b400; color:#1a1a2e; border:none; border-radius:6px; padding:5px 8px; font-size:12px; font-weight:600; cursor:pointer;">Vendor Center</button>
-                            </div>
-                            ${vendorComplianceOpenProductsId === v.id ? `<div id="vendor-compliance-products-${v.id}" style="margin-top:10px;">Loading...</div>` : ""}
-                        </td>
-                    </tr>
-                `).join("")}
-            </tbody>
-        </table>
-    `;
-
-    if (vendorComplianceOpenProductsId !== null) {
-        loadVendorComplianceProducts(vendorComplianceOpenProductsId);
-    }
-}
+// The table, ⋮ menu and drawer are drawn by renderVendorCompliancePanel in
+// client/js/admin-vendor-compliance.js (Oct 2026 redesign).
 
 // Shop ID () - rare admin escape hatch for a
 // vendor approved before migration 113 shipped (regenerateVendorShopId

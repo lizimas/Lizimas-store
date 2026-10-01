@@ -3545,7 +3545,8 @@ const VENDOR_NOTICE_LABEL = {
     restrict_product: "Product restricted",
     unrestrict_product: "Product restriction lifted",
     freeze_payout: "Payouts frozen",
-    unfreeze_payout: "Payouts unfrozen"
+    unfreeze_payout: "Payouts unfrozen",
+    request_documents: "Documents requested"
 };
 const VENDOR_NOTICE_CLASS = {
     warn: "status-pending",
@@ -3554,7 +3555,8 @@ const VENDOR_NOTICE_CLASS = {
     restrict_product: "status-cancelled",
     unrestrict_product: "status-paid",
     freeze_payout: "status-cancelled",
-    unfreeze_payout: "status-paid"
+    unfreeze_payout: "status-paid",
+    request_documents: "status-pending"
 };
 
 async function loadVendorComplianceNotices() {

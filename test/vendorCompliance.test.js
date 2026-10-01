@@ -7,11 +7,12 @@ const {
     canApplyComplianceAction
 } = require("../server/utils/vendorCompliance.js");
 
-test("COMPLIANCE_ACTION_TYPES has exactly the seven known actions", () => {
+test("COMPLIANCE_ACTION_TYPES has exactly the eight known actions", () => {
     assert.deepEqual(COMPLIANCE_ACTION_TYPES, [
         "warn", "suspend", "reinstate",
         "restrict_product", "unrestrict_product",
-        "freeze_payout", "unfreeze_payout"
+        "freeze_payout", "unfreeze_payout",
+        "request_documents"
     ]);
 });
 

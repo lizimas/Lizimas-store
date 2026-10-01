@@ -13,7 +13,8 @@ const {
     canRequestPayout
 } = require("../utils/vendorWallet");
 const { deriveReturnResolutionStatus } = require("../utils/vendorReturns");
-const { canApplyComplianceAction, COMPLIANCE_ACTION_LABELS } = require("../utils/vendorCompliance");
+const { canApplyComplianceAction, COMPLIANCE_ACTION_LABELS, complianceSummary } = require("../utils/vendorCompliance");
+const { requiredDocumentTypesForKyc, KYC_DOCUMENT_LABELS } = require("../utils/vendorKyc");
 const {
     MAX_VENDOR_DISCOUNT_PERCENT,
     validateProposedPrice,
@@ -663,16 +664,40 @@ exports.advanceVendorOrderStage = async (req, res) => {
 // Every vendor regardless of status - the admin compliance panel's list.
 // getPendingVendors above stays scoped to 'pending' for the applications
 // queue; this is the broader "look up a vendor to act on" view.
+// Every vendor, with what the admin Vendor Compliance table needs: KYC
+// documents per required type, a Compliance state (see complianceSummary
+// in utils/vendorCompliance.js) and how many products admin has hidden.
 exports.getAllVendors = async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT v.id, v.business_name, v.status, v.payout_frozen, v.phone, v.shop_id,
-                    u.name AS owner_name, u.email AS owner_email
+                    v.account_type, v.submitted_at,
+                    u.name AS owner_name, u.email AS owner_email,
+                    COALESCE(k.kyc_status, 'not_started') AS kyc_status,
+                    COALESCE(k.requires_work_permit, false) AS requires_work_permit,
+                    COALESCE((SELECT json_agg(json_build_object(
+                                 'document_type', d.document_type, 'review_status', d.review_status,
+                                 'uploaded_at', d.uploaded_at))
+                              FROM vendor_kyc_documents d WHERE d.vendor_id = v.id), '[]'::json) AS documents,
+                    (SELECT COUNT(*)::int FROM products p
+                      WHERE p.vendor_id = v.id AND p.admin_restricted = true AND p.deleted_at IS NULL) AS restricted_products
              FROM vendors v
              JOIN users u ON u.id = v.user_id
+             LEFT JOIN vendor_kyc k ON k.vendor_id = v.id
              ORDER BY v.business_name ASC`
         );
-        res.json(result.rows);
+        res.json(result.rows.map(v => {
+            const required = requiredDocumentTypesForKyc({ accountType: v.account_type, requiresWorkPermit: v.requires_work_permit });
+            const summary = complianceSummary({
+                vendorStatus: v.status, required, documents: v.documents, restrictedProducts: v.restricted_products
+            });
+            return {
+                ...v,
+                compliance: summary.state,
+                required_documents: summary.documents.map(d => ({ ...d, label: KYC_DOCUMENT_LABELS[d.type] || d.type })),
+                documents_needed: summary.needed
+            };
+        }));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -1569,6 +1594,38 @@ exports.getVendorProductsAdmin = async (req, res) => {
             [id]
         );
         res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// "Send Required Documents" (Oct 2026): tells the vendor which KYC
+// documents are still missing or were rejected. Recorded like every other
+// compliance action, so it shows in their Notices and in the history.
+exports.requestVendorDocuments = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const row = await pool.query(
+            `SELECT v.id, v.status, v.account_type, COALESCE(k.requires_work_permit, false) AS requires_work_permit
+             FROM vendors v LEFT JOIN vendor_kyc k ON k.vendor_id = v.id WHERE v.id = $1`,
+            [id]
+        );
+        if (row.rows.length === 0) return res.status(404).json({ error: "Vendor not found." });
+        const v = row.rows[0];
+        const docs = await pool.query(
+            "SELECT document_type, review_status FROM vendor_kyc_documents WHERE vendor_id = $1", [id]);
+        const required = requiredDocumentTypesForKyc({ accountType: v.account_type, requiresWorkPermit: v.requires_work_permit });
+        const summary = complianceSummary({ vendorStatus: v.status, required, documents: docs.rows, restrictedProducts: 0 });
+        if (!summary.needed.length) {
+            return res.status(409).json({ error: "This vendor has no missing or rejected documents." });
+        }
+        const list = summary.needed.map(t => KYC_DOCUMENT_LABELS[t] || t).join(", ");
+        const note = String((req.body && req.body.note) || "").trim();
+        const reason = "Please upload: " + list + ". Upload them under Identity & Business Verification in your Vendor Center." +
+            (note ? " " + note : "");
+        await insertComplianceAction(id, "request_documents", reason, req.user.userId);
+        logActivity(req.user.userId, "vendor_documents_requested", "vendor", id, list);
+        res.status(201).json({ message: "Document request sent to the vendor.", documents: summary.needed });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
