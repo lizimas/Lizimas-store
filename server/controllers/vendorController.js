@@ -475,6 +475,44 @@ exports.bulkUpdateVendorProducts = async (req, res) => {
 // only for orders placed before that migration existed, so old numbers
 // don't change and new ones stay accurate even if a rate or product price
 // changes later.
+// Vendor Home (Oct 2026 design): sales and orders for the last 30 days
+// against the 30 before, active listings, conversion rate (orders per
+// product page view) and the 5 latest orders. Each part on its own, so one
+// failing query only blanks its box. Customer names are not shown to
+// vendors, so a recent order shows its first item instead.
+async function vendorHomeNumbers(vendorId) {
+    const q = (sql) => pool.query(sql, [vendorId]).then(r => r.rows).catch(e => { console.warn("Vendor home:", e.message); return null; });
+    const [sales, listings, views, recent] = await Promise.all([
+        q(`SELECT COALESCE(SUM(oi.price * oi.quantity), 0)::numeric AS total_sales,
+                  COUNT(DISTINCT o.id)::int AS total_orders,
+                  COALESCE(SUM(oi.price * oi.quantity) FILTER (WHERE o.created_at >= now() - INTERVAL '30 days'), 0)::numeric AS sales_30,
+                  COALESCE(SUM(oi.price * oi.quantity) FILTER (WHERE o.created_at >= now() - INTERVAL '60 days' AND o.created_at < now() - INTERVAL '30 days'), 0)::numeric AS sales_prev_30,
+                  COUNT(DISTINCT o.id) FILTER (WHERE o.created_at >= now() - INTERVAL '30 days')::int AS orders_30,
+                  COUNT(DISTINCT o.id) FILTER (WHERE o.created_at >= now() - INTERVAL '60 days' AND o.created_at < now() - INTERVAL '30 days')::int AS orders_prev_30
+             FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id
+            WHERE p.vendor_id = $1 AND o.status <> 'cancelled'`),
+        q(`SELECT COUNT(*) FILTER (WHERE status = 'approved' AND is_active = true AND admin_restricted = false)::int AS active,
+                  COUNT(*) FILTER (WHERE status = 'approved' AND is_active = true AND admin_restricted = false
+                                    AND created_at >= now() - INTERVAL '30 days')::int AS new_30,
+                  COUNT(*)::int AS total
+             FROM products WHERE vendor_id = $1 AND deleted_at IS NULL`),
+        q(`SELECT COALESCE(SUM(v.views) FILTER (WHERE v.day >= CURRENT_DATE - 29), 0)::int AS views_30,
+                  COALESCE(SUM(v.views) FILTER (WHERE v.day >= CURRENT_DATE - 59 AND v.day < CURRENT_DATE - 29), 0)::int AS views_prev_30
+             FROM product_view_daily v JOIN products p ON p.id = v.product_id WHERE p.vendor_id = $1`),
+        q(`SELECT o.id, o.created_at, o.status, SUM(oi.price * oi.quantity)::numeric AS amount,
+                  SUM(oi.quantity)::int AS items, MIN(p.name) AS first_item
+             FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id
+            WHERE p.vendor_id = $1
+            GROUP BY o.id ORDER BY o.created_at DESC LIMIT 5`)
+    ]);
+    return {
+        sales: sales && sales[0] ? sales[0] : null,
+        listings: listings && listings[0] ? listings[0] : null,
+        views: views && views[0] ? views[0] : null,
+        recent_orders: recent || []
+    };
+}
+
 exports.getVendorDashboardSummary = async (req, res) => {
     try {
         const vendorId = req.vendorId;
@@ -527,8 +565,10 @@ exports.getVendorDashboardSummary = async (req, res) => {
 
         const saleTotal = Number(earningsRes.rows[0].sale_total);
         const chargesTotal = Number(earningsRes.rows[0].charges_total);
+        const home = await vendorHomeNumbers(vendorId);
 
         res.json({
+            home,
             vendor: vendorRow.rows[0],
             followerCount: followerRes.rows[0].n,
             orders: {

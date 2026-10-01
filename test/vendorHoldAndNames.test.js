@@ -61,3 +61,23 @@ test("OCR payload parsing and the rejection message", () => {
     assert.strictEqual(parseOcrText(JSON.stringify({ summary: {} })), null);
     assert.match(nameMismatchMessage({ expected: "Ryan Mukasa" }, "National ID"), /doesn't match the name on your Lizimas account \(Ryan Mukasa\)/);
 });
+
+test("ID name check only rejects when the name area was clearly read", () => {
+    // no name label / machine-readable zone -> left for the reviewer
+    const noLabel = "REPUBLIC OF UGANDA NATIONAL IDENTITY CARD NATIONALITY UGA SEX M DATE OF BIRTH CARD NO HOLDER SIGNATURE " +
+        "DATE OF EXPIRY NIN SOME OTHER WORDS HERE TODAY";
+    assert.strictEqual(nameCheck(noLabel, "Ryan Mukasa", { strict: true, confidence: 90 }).result, "unread");
+    // low confidence -> left for the reviewer
+    assert.strictEqual(nameCheck(ID_TEXT, "Ryan Mukasa", { strict: true, confidence: 60 }).result, "unread");
+    // clear name label, good confidence, none of the name -> mismatch
+    assert.strictEqual(nameCheck(ID_TEXT + " NIN CM900 CARD NUMBER 01234", "Ryan Mukasa", { strict: true, confidence: 85 }).result, "mismatch");
+    // digits read instead of letters still match
+    assert.strictEqual(nameCheck("SURNAME 0KELL0 GIVEN NAME J0HN", "John Okello", { strict: true }).result, "match");
+});
+
+test("an ID matches the shop contact name or an individual's shop name too", () => {
+    const ocr = { text: ID_TEXT + " NIN CM900 CARD NUMBER 01234", confidence: 85 };
+    assert.strictEqual(checkDocumentNames({ documentType: "national_id", ocr, ownerName: "Lizimas Test", businessName: "x", otherNames: ["John Okello"] }).result, "match");
+    assert.strictEqual(checkDocumentNames({ documentType: "national_id", ocr, ownerName: "Lizimas Test", businessName: "x", otherNames: [null, "Peter Okello Shop"] }).result, "match");
+    assert.strictEqual(checkDocumentNames({ documentType: "national_id", ocr, ownerName: "Ryan Mukasa", businessName: "x", otherNames: [] }).result, "mismatch");
+});

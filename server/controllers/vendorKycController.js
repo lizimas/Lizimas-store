@@ -303,7 +303,8 @@ exports.uploadMyKycDocument = async (req, res) => {
 
         const vendorRow = await pool.query(
             `SELECT v.id, v.account_type, v.business_name, u.name AS owner_name,
-                    COALESCE(v.documents_hold, false) AS documents_hold, v.hold_documents
+                    COALESCE(v.documents_hold, false) AS documents_hold, v.hold_documents,
+                    (SELECT sp.contact_name FROM vendor_shop_profile sp WHERE sp.vendor_id = v.id LIMIT 1) AS contact_name
                FROM vendors v LEFT JOIN users u ON u.id = v.user_id WHERE v.id = $1`,
             [req.vendorId]
         );
@@ -352,7 +353,8 @@ exports.uploadMyKycDocument = async (req, res) => {
         // of the vendor's names is refused here, before anything is stored.
         const nameCheck = checkDocumentNames({
             documentType, ocr: parseOcrText(req.body.ocr),
-            ownerName: vendor.owner_name, businessName: vendor.business_name
+            ownerName: vendor.owner_name, businessName: vendor.business_name,
+            otherNames: [vendor.contact_name, vendor.account_type === "individual" ? vendor.business_name : null]
         });
         if (nameCheck && nameCheck.result === "mismatch") {
             return res.status(400).json({

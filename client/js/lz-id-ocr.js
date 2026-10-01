@@ -281,7 +281,10 @@
         opts = opts || {};
         const want = nameWords(name, opts.business);
         if (!want.length) return { result: "unread", expected: String(name || ""), found: [], missing: [] };
-        const words = normalize(text).replace(/</g, " ").replace(/[^A-Z\s]/g, " ").split(/\s+/).filter((w) => w.length >= 2);
+        // Digits OCR often reads instead of letters (0/O, 1/I, 5/S, 8/B...).
+        const fixed = normalize(text).replace(/</g, " ").replace(/[A-Z0-9]+/g, (w) => /[A-Z]/.test(w)
+            ? w.replace(/0/g, "O").replace(/1/g, "I").replace(/5/g, "S").replace(/8/g, "B").replace(/6/g, "G").replace(/2/g, "Z") : w);
+        const words = fixed.replace(/[^A-Z\s]/g, " ").split(/\s+/).filter((w) => w.length >= 2);
         const has = (w) => words.some((t) => t === w
             || (w.length >= 5 && t.length >= 4 && editDistance(w, t) <= (w.length >= 8 ? 2 : 1))
             || (w.length >= 4 && t.includes(w)));
@@ -289,9 +292,15 @@
         const missing = want.filter((w) => !found.includes(w));
         const need = opts.business ? Math.max(1, Math.ceil(want.length / 2)) : Math.min(2, want.length);
         const readable = words.length >= 12 && (opts.confidence == null || opts.confidence >= 55);
+        // Identity documents: only call it a mismatch when the name area was
+        // clearly read - a name label (SURNAME / GIVEN NAMES / NAMES) or the
+        // machine-readable zone - with good confidence; otherwise leave it
+        // to the reviewer rather than refuse a genuine ID.
+        const nameAreaRead = !opts.strict || ((/\b(SURNAME|GIVEN\s*NAMES?|NAMES?|FORENAMES?)\b/.test(fixed) || /[A-Z]{2,}<<[A-Z]/.test(normalize(text)))
+            && words.length >= 20 && (opts.confidence == null || opts.confidence >= 70));
         let result;
         if (found.length >= need) result = "match";
-        else if (!readable) result = "unread";
+        else if (!readable || !nameAreaRead) result = "unread";
         else if (found.length === 0) result = "mismatch";
         else result = "partial";
         return { result, expected: String(name || ""), found, missing };

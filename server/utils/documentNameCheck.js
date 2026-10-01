@@ -24,15 +24,20 @@ function parseOcrText(raw) {
 }
 
 // -> null (nothing to check) | { result, expected, found, missing, checked_as }
-function checkDocumentNames({ documentType, ocr, ownerName, businessName }) {
+// otherNames: more names the person may go by on Lizimas (the shop's
+// contact name; for an individual seller the shop name is often their own
+// name). Any one matching is enough.
+function checkDocumentNames({ documentType, ocr, ownerName, businessName, otherNames }) {
     if (!ocr || !ocr.text) return null;
-    const candidates = PERSON_TYPES.includes(documentType)
-        ? [{ name: ownerName, business: false, as: "owner" }]
-        : [{ name: businessName, business: true, as: "business" }, { name: ownerName, business: false, as: "owner" }];
+    const extra = (otherNames || []).filter(Boolean).map(n => ({ name: n, business: false, as: "other" }));
+    const person = PERSON_TYPES.includes(documentType);
+    const candidates = person
+        ? [{ name: ownerName, business: false, as: "owner", strict: true }, ...extra.map(c => ({ ...c, strict: true }))]
+        : [{ name: businessName, business: true, as: "business" }, { name: ownerName, business: false, as: "owner" }, ...extra];
     let best = null;
     for (const c of candidates) {
         if (!c.name || !String(c.name).trim()) continue;
-        const r = nameCheck(ocr.text, c.name, { business: c.business, confidence: ocr.confidence });
+        const r = nameCheck(ocr.text, c.name, { business: c.business, confidence: ocr.confidence, strict: !!c.strict });
         r.checked_as = c.as;
         if (!best || RANK[r.result] < RANK[best.result]) best = r;
     }

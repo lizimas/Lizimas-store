@@ -117,7 +117,7 @@ async function vssLoadHome(el) {
         let kpiHtml = "";
         try {
             const summary = await vendorAuthorizedFetch("/api/vendors/dashboard-summary");
-            if (!summary.error) kpiHtml = vmRenderHomeKpi({ business_name: data.account.business_name }, summary);
+            if (!summary.error) kpiHtml = vmRenderHomeKpi({ business_name: data.account.business_name, owner_name: data.account.owner_name }, summary);
         } catch (e) { console.error("dashboard-summary error:", e); }
         el.innerHTML = kpiHtml + `<div id="vss-root"></div>`;
         vssRender({ compact: true });

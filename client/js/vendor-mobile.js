@@ -205,31 +205,111 @@ function vmStatTile(label, value, color) {
     return `<div class="vm-stat-tile"><div class="vm-stat-value"${color ? ` style="color:${color};"` : ""}>${value}</div><div class="vm-stat-label">${label}</div></div>`;
 }
 
+// Vendor Home (Oct 2026 design, Lizimas colours): welcome line, four
+// number boxes (sales, orders, active listings, conversion - each against
+// the 30 days before), Recent Orders, Quick Actions, then earnings, order
+// status and seller score. Data: GET /vendors/dashboard-summary (`home`
+// part built by vendorHomeNumbers in vendorController.js).
+// Currency amounts only, never a rate or percentage of commission - sellers
+// must never see the commission % (Ryan, Sept 2026).
+const VMH_ICON = {
+    money: '<circle cx="12" cy="12" r="8.5"/><path d="M14.8 9.2c-.5-.9-1.5-1.4-2.8-1.4-1.6 0-2.8.8-2.8 2.1 0 3 5.8 1.6 5.8 4.4 0 1.3-1.3 2.2-3 2.2-1.4 0-2.5-.6-3-1.6M12 6.3v1.5M12 16.5V18"/>',
+    bag: '<path d="M6 8h12l-1 12H7L6 8Z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>',
+    box: '<path d="M12 3 4 7v10l8 4 8-4V7l-8-4ZM4 7l8 4 8-4M12 11v10"/>',
+    trend: '<path d="m3 17 6-6 4 4 8-8M15 7h6v6"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    chart: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
+    wallet: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12.5h2M3 9.5h18"/>',
+    tag: '<path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.59a2 2 0 0 0 2.82 0l4.6-4.6a2 2 0 0 0 0-2.58Z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+    chev: '<path d="m9 6 6 6-6 6"/>'
+};
+function vmhIco(n, s) {
+    return `<svg viewBox="0 0 24 24" width="${s || 22}" height="${s || 22}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${VMH_ICON[n]}</svg>`;
+}
+function vmhChange(now, prev) {
+    now = Number(now) || 0; prev = Number(prev) || 0;
+    if (!prev) return now ? '<span class="vmh-up">New</span> <span class="vmh-muted">in the last 30 days</span>' : '<span class="vmh-muted">No change yet</span>';
+    const pc = Math.round((now - prev) / prev * 1000) / 10;
+    return `<span class="${pc >= 0 ? "vmh-up" : "vmh-down"}">${pc >= 0 ? "&uarr;" : "&darr;"} ${Math.abs(pc)}%</span> <span class="vmh-muted">vs previous 30 days</span>`;
+}
+function vmhStatus(st) {
+    const map = { delivered: ["Delivered", "vmh-s-green"], shipped: ["Shipped", "vmh-s-green"], paid: ["Processing", "vmh-s-blue"],
+        processing: ["Processing", "vmh-s-blue"], pending: ["Pending", "vmh-s-grey"], cancelled: ["Cancelled", "vmh-s-red"] };
+    const m = map[st] || [String(st || "-").replace(/_/g, " "), "vmh-s-grey"];
+    return `<span class="vmh-status ${m[1]}"><i></i>${vendorEsc(m[0])}</span>`;
+}
+
+// The seller score arrives as { score, isNew, ... } (utils/sellerScore.js).
+function vmhScore(sc) {
+    if (sc == null) return "-";
+    if (typeof sc === "object") return sc.score == null ? "New seller" : sc.score + "%";
+    return String(sc);
+}
+
 function vmRenderHomeKpi(v, data) {
     const o = data.orders, e = data.earnings, p = data.products;
-    const header = `<div class="vm-header"><div class="vm-header-brand"><span class="vm-header-brand-badge" title="Lizimas Vendor" aria-label="Lizimas Vendor">LV</span><span class="vm-header-eyebrow">Lizimas Vendor Center</span></div><div class="vm-header-title">Welcome back, ${vendorEsc(v.business_name || "Lizimas Store")}</div></div>`;
-    const stats = `<div style="margin:-4px 14px 14px;">
-        <div class="vm-stat-row">${vmStatTile("Today's Orders", o.today)}${vmStatTile("Pending Handover", o.pendingHandover, o.pendingHandover > 0 ? "var(--vm-amber-text)" : null)}</div>
-        <div class="vm-stat-row">${vmStatTile("Awaiting Delivery", o.awaitingDelivery)}${vmStatTile("Completed", o.completed, "var(--vm-green-text)")}</div>
-        <div class="vm-stat-row">${vmStatTile("Cancelled", o.cancelled, o.cancelled > 0 ? "var(--vm-red)" : null)}${vmStatTile("Active Returns", o.activeReturns, o.activeReturns > 0 ? "var(--vm-amber-text)" : null)}</div>
+    const h = data.home || {};
+    const sales = h.sales || {}, listings = h.listings || {}, views = h.views || {};
+    const first = String(v.owner_name || v.business_name || "").trim().split(/\s+/)[0] || "there";
+    const conv = (orders, seen) => seen ? Math.round(orders / seen * 1000) / 10 : null;
+    const conv30 = conv(sales.orders_30, views.views_30), convPrev = conv(sales.orders_prev_30, views.views_prev_30);
+    const convChange = conv30 == null ? '<span class="vmh-muted">No product views yet</span>'
+        : convPrev == null ? '<span class="vmh-muted">' + Number(views.views_30 || 0).toLocaleString() + " product views</span>"
+        : `<span class="${conv30 >= convPrev ? "vmh-up" : "vmh-down"}">${conv30 >= convPrev ? "&uarr;" : "&darr;"} ${Math.abs(Math.round((conv30 - convPrev) * 10) / 10)} pts</span> <span class="vmh-muted">vs previous 30 days</span>`;
+    const stat = (icon, tone, label, value, sub) => `<div class="vmh-stat"><span class="vmh-stat-ico vmh-t-${tone}">${vmhIco(icon, 24)}</span>
+        <div class="vmh-stat-body"><div class="vmh-stat-label">${label}</div><div class="vmh-stat-value">${value}</div><div class="vmh-stat-sub">${sub}</div></div></div>`;
+    const recent = (h.recent_orders || []);
+    const action = (icon, tone, title, sub, onclick) => `<button type="button" class="vmh-action" onclick="${onclick}">
+        <span class="vmh-action-ico vmh-t-${tone}">${vmhIco(icon, 24)}</span><span class="vmh-action-text"><strong>${title}</strong><small>${sub}</small></span>${vmhIco("chev", 20)}</button>`;
+    const fmtDate = (d) => new Date(d).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" });
+
+    return `<div class="vmh">
+        <div class="vmh-hello"><h1>Welcome back, ${vendorEsc(first)}!</h1><p>Here's what's happening with ${vendorEsc(v.business_name || "your store")} today.</p></div>
+        <div class="vmh-stats">
+            ${stat("money", "gold", "Total Sales", vmFmtUgx(sales.sales_30 != null ? sales.sales_30 : e.sale), sales.sales_30 != null ? vmhChange(sales.sales_30, sales.sales_prev_30) : '<span class="vmh-muted">Delivered orders</span>')}
+            ${stat("bag", "blue", "Orders", Number(sales.orders_30 != null ? sales.orders_30 : 0).toLocaleString(), sales.orders_30 != null ? vmhChange(sales.orders_30, sales.orders_prev_30) : "")}
+            ${stat("box", "violet", "Active Listings", Number(listings.active != null ? listings.active : p.total).toLocaleString(), listings.new_30 ? `<span class="vmh-up">+${listings.new_30}</span> <span class="vmh-muted">new in 30 days</span>` : `<span class="vmh-muted">of ${Number(listings.total || p.total || 0).toLocaleString()} products</span>`)}
+            ${stat("trend", "orange", "Conversion Rate", conv30 == null ? "&ndash;" : conv30 + "%", convChange)}
+        </div>
+        <p class="vmh-period">Last 30 days &middot; all-time sales ${vmFmtUgx(sales.total_sales || 0)} from ${Number(sales.total_orders || 0).toLocaleString()} orders</p>
+        <div class="vmh-grid">
+            <section class="vmh-card vmh-orders">
+                <div class="vmh-card-head"><h2>Recent Orders</h2><button type="button" class="vmh-link" onclick="vmShowScreen('orders')">View all orders</button></div>
+                ${recent.length ? `<div class="vmh-table-wrap"><table class="vmh-table"><thead><tr><th>Order ID</th><th>Item</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead><tbody>
+                    ${recent.map(r => `<tr><td><a class="vmh-oid" href="javascript:void(0)" onclick="vmShowScreen('orders')">#ORD-${vendorEsc(r.id)}</a></td>
+                        <td>${vendorEsc(r.first_item || "")}${r.items > 1 ? ` <span class="vmh-muted">+${r.items - 1}</span>` : ""}</td>
+                        <td class="vmh-nowrap">${fmtDate(r.created_at)}</td><td class="vmh-nowrap">${vmFmtUgx(r.amount)}</td><td>${vmhStatus(r.status)}</td></tr>`).join("")}
+                </tbody></table></div>` : '<p class="vmh-empty">No orders yet. Share your shop link to get your first sale.</p>'}
+            </section>
+            <section class="vmh-card">
+                <div class="vmh-card-head"><h2>Quick Actions</h2></div>
+                <div class="vmh-actions">
+                    ${action("plus", "gold", "Add New Product", "Create a new product listing", "vmShowScreen('add-product')")}
+                    ${action("chart", "blue", "View Analytics", "See detailed sales insights", "vmOpenDeskTab('reports')")}
+                    ${action("wallet", "green", "Manage Payouts", "View and request your payouts", "vmShowScreen('wallet')")}
+                    ${action("tag", "violet", "Promotions", "Run discounts and join campaigns", "vmShowScreen('promotions')")}
+                </div>
+            </section>
+        </div>
+        <div class="vmh-grid3">
+            <section class="vmh-card"><div class="vmh-card-head"><h2>Earnings</h2><span class="vmh-muted">Delivered orders</span></div>
+                <div class="vmh-row"><span>Sale</span><strong>${vmFmtUgx(e.sale)}</strong></div>
+                <div class="vmh-row"><span>Marketplace charges</span><strong class="vmh-red">&minus; ${vmFmtUgx(e.charges)}</strong></div>
+                <div class="vmh-row vmh-row-total"><span>Net payable</span><strong class="vmh-green">${vmFmtUgx(e.net)}</strong></div></section>
+            <section class="vmh-card"><div class="vmh-card-head"><h2>Orders to handle</h2><button type="button" class="vmh-link" onclick="vmShowScreen('orders')">Open</button></div>
+                <div class="vmh-mini">
+                    <div><strong>${o.today}</strong><span>Today</span></div>
+                    <div class="${o.pendingHandover > 0 ? "vmh-amber" : ""}"><strong>${o.pendingHandover}</strong><span>Pending handover</span></div>
+                    <div><strong>${o.awaitingDelivery}</strong><span>Awaiting delivery</span></div>
+                    <div class="${o.activeReturns > 0 ? "vmh-amber" : ""}"><strong>${o.activeReturns}</strong><span>Active returns</span></div>
+                </div></section>
+            <section class="vmh-card"><div class="vmh-card-head"><h2>Store health</h2></div>
+                <div class="vmh-row"><span>Seller score</span><strong class="vmh-green">${vmhScore(data.sellerScore)}</strong></div>
+                <div class="vmh-row"><span>Rating</span><strong>${data.sellerScore && data.sellerScore.averageRating != null ? data.sellerScore.averageRating + " / 5 (" + data.sellerScore.reviewCount + ")" : "No reviews yet"}</strong></div>
+                <div class="vmh-row"><span>Low stock products</span><strong class="${p.lowStock > 0 ? "vmh-amber" : ""}">${p.lowStock}</strong></div>
+                <div class="vmh-row"><span>Followers</span><strong>${Number(data.followerCount || 0).toLocaleString()}</strong></div></section>
+        </div>
     </div>`;
-    // Currency amounts only, never a rate or percentage - sellers must
-    // never see the commission % (Ryan, Sept 2026) - see
-    // loadVendorDashboardSummary() in vendor-dashboard.js for the desktop
-    // equivalent of this same rule.
-    const earnings = `<div class="vm-card">
-        <div class="vm-card-title">Earnings</div><div class="vm-card-subtitle">Delivered orders</div>
-        <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid #f0f1f4;"><span style="font-size:13px; color:#555;">Sale</span><span style="font-size:13.5px; font-weight:600; color:var(--vm-navy);">${vmFmtUgx(e.sale)}</span></div>
-        <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid #f0f1f4;"><span style="font-size:13px; color:#555;">Marketplace charges</span><span style="font-size:13.5px; font-weight:600; color:var(--vm-red);">&minus; ${vmFmtUgx(e.charges)}</span></div>
-        <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 0 2px;"><span style="font-size:13.5px; font-weight:700; color:var(--vm-navy);">Net payable</span><span style="font-size:16px; font-weight:700; color:var(--vm-green-text);">${vmFmtUgx(e.net)}</span></div>
-    </div>`;
-    const products = `<div class="vm-card">
-        <div class="vm-card-title">Products</div>
-        <div style="display:flex; align-items:center; justify-content:space-between; padding:2px 0;"><span style="font-size:13px; color:#555;">Active products</span><span style="font-size:15px; font-weight:700; color:var(--vm-navy);">${p.total}</span></div>
-        <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0 2px; margin-top:6px; border-top:1px solid #f0f1f4;"><span style="font-size:13px; color:#555;">Low stock</span><span style="font-size:15px; font-weight:700; color:var(--vm-amber-text);">${p.lowStock}</span></div>
-    </div>`;
-    const score = `<div class="vm-card"><div style="display:flex; align-items:center; justify-content:space-between;"><div><div style="font-size:13px; font-weight:600; color:var(--vm-navy); margin-bottom:2px;">Seller score</div><div style="font-size:11.5px; color:#888;">Shown on your storefront and product pages</div></div><span style="font-size:20px; font-weight:700; color:var(--vm-green-text);">${data.sellerScore != null ? data.sellerScore : "-"}</span></div></div>`;
-    return header + stats + earnings + products + score;
 }
 
 // --- Orders -----------------------------------------------------------------
