@@ -227,7 +227,10 @@
     const ID_KINDS = { national_id: "National ID", passport: "Passport", driving_license: "Driving Licence" };
     const ID_RULES = {
         MAX_BYTES: 10 * 1024 * 1024,
-        MIN_LONG: 1000, MIN_SHORT: 600,
+        // Oct 2026: 800x500 is still readable for an ID card (WhatsApp
+        // shrinks photos to about this); below 1000x600 only a warning.
+        MIN_LONG: 800, MIN_SHORT: 500,
+        GOOD_LONG: 1000, GOOD_SHORT: 600,
         BLUR_REJECT: 30, BLUR_WARN: 50,
         DARK_REJECT: 50,
         BRIGHT_REJECT: { mean: 240, p2: 170 },
@@ -271,7 +274,9 @@
         if (info.width && info.height) {
             const long = Math.max(info.width, info.height), short = Math.min(info.width, info.height);
             if (long < ID_RULES.MIN_LONG || short < ID_RULES.MIN_SHORT) {
-                errors.push({ code: "low_resolution", text: `Resolution is too low to read the text (${info.width}×${info.height} - at least ${ID_RULES.MIN_LONG}×${ID_RULES.MIN_SHORT} required)` });
+                errors.push({ code: "low_resolution", text: `The photo is too small to read the text (${info.width}×${info.height} - at least ${ID_RULES.MIN_LONG}×${ID_RULES.MIN_SHORT} needed). WhatsApp makes photos smaller: take the photo with your phone camera and upload it directly` });
+            } else if (long < ID_RULES.GOOD_LONG || short < ID_RULES.GOOD_SHORT) {
+                warnings.push({ code: "small_photo", text: `The photo is quite small (${info.width}×${info.height}) - it will be checked by Lizimas Store; a larger photo from your camera is better` });
             }
         }
         if (metrics) {

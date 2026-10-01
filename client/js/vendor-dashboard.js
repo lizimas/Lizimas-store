@@ -286,7 +286,13 @@ async function loadVendorKyc() {
             formEl.classList.add("hidden");
             lockedEl.classList.remove("hidden");
             const lockedText = document.getElementById("vendor-kyc-locked-text");
-            if (k.kyc_status === "verified") {
+            const stillNeeded = (k.uploadable_types || []).filter(t => {
+                const d = (k.documents || []).find(x => x.document_type === t);
+                return (k.required_documents || []).includes(t) && (!d || d.review_status === "rejected" || d.review_status === "action_required");
+            });
+            if (stillNeeded.length) {
+                lockedText.textContent = "Upload the document" + (stillNeeded.length === 1 ? "" : "s") + " marked Missing or Upload again above - Lizimas Store will review it.";
+            } else if (k.kyc_status === "verified") {
                 lockedText.textContent = "Your identity/business registration is verified. Contact support if anything needs to change.";
             } else {
                 lockedText.textContent = "Your information is with Lizimas Store for review - we'll let you know once it's checked.";

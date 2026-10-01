@@ -81,3 +81,14 @@ test("an ID matches the shop contact name or an individual's shop name too", () 
     assert.strictEqual(checkDocumentNames({ documentType: "national_id", ocr, ownerName: "Lizimas Test", businessName: "x", otherNames: [null, "Peter Okello Shop"] }).result, "match");
     assert.strictEqual(checkDocumentNames({ documentType: "national_id", ocr, ownerName: "Ryan Mukasa", businessName: "x", otherNames: [] }).result, "mismatch");
 });
+
+test("ID photos: 849x550 (a WhatsApp photo) is accepted with a note; below 800x500 is refused", () => {
+    const C = require("../server/utils/imageChecks").Checks;
+    const mid = C.evaluateIdDocument({ bytes: 200000, width: 849, height: 550 }, null);
+    assert.ok(mid.ok);
+    assert.deepStrictEqual(mid.warnings.map(w => w.code), ["small_photo"]);
+    assert.ok(C.evaluateIdDocument({ bytes: 200000, width: 1200, height: 800 }, null).ok);
+    const small = C.evaluateIdDocument({ bytes: 200000, width: 780, height: 500 }, null);
+    assert.ok(!small.ok);
+    assert.match(small.message, /WhatsApp/);
+});

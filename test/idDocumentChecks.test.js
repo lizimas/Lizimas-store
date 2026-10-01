@@ -58,7 +58,7 @@ test("a PDF or a too-small photo is refused", async () => {
     assert.equal((await checkAndUploadIdDocument(pdf, OK, deps(pdf, []), NOW)).body.error, "id_not_image");
     const small = { originalname: "s.png", buffer: png(640, 400, () => [1, 2, 3]), size: 100 };
     const r = await checkAndUploadIdDocument(small, OK, deps(small, []), NOW);
-    assert.equal(r.body.error, "id_rejected"); assert.match(r.body.message, /Resolution is too low/);
+    assert.equal(r.body.error, "id_rejected"); assert.match(r.body.message, /too small to read the text/);
 });
 
 test("clear colour photo passes; glare and black-and-white copies are rejected and removed", async () => {
