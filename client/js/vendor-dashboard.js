@@ -518,7 +518,7 @@ function vdIdDocumentRow(label, doc, canEdit) {
                 <label style="font-size:12.5px; font-weight:600;">Document number <span style="font-weight:400; color:#888;">(exactly as printed)</span>
                     <input id="vd-id-number" type="text" maxlength="30" autocomplete="off" value="${doc && doc.id_number ? esc(doc.id_number) : ""}" style="display:block; width:100%; box-sizing:border-box; margin-top:4px; padding:8px; border:1px solid #ccc; border-radius:6px; text-transform:uppercase;"></label>
                 <label style="font-size:12.5px; font-weight:600;">Expiry date
-                    <input id="vd-id-expires" type="date" min="${minDate}" value="${doc && doc.id_expires_on ? esc(doc.id_expires_on) : ""}" style="display:block; width:100%; box-sizing:border-box; margin-top:4px; padding:8px; border:1px solid #ccc; border-radius:6px;"></label>
+                    <input id="vd-id-expires" type="date" placeholder="DD/MM/YYYY" min="${minDate}" value="${doc && doc.id_expires_on ? esc(doc.id_expires_on) : ""}" style="display:block; width:100%; box-sizing:border-box; margin-top:4px; padding:8px; border:1px solid #ccc; border-radius:6px;"></label>
                 <label style="font-size:12.5px; font-weight:600;">Photo of the document
                     <span style="display:block; font-weight:400; color:#666; margin:2px 0 4px;">A clear colour photo of the whole document: all four corners visible, no glare, name, photo, number and expiry date readable.</span>
                     <input id="vd-id-file" type="file" accept="image/jpeg,image/png,image/webp" onchange="vdCheckIdPhoto(this)" style="font-size:12px;"></label>
@@ -538,13 +538,16 @@ function vdIdDocumentRow(label, doc, canEdit) {
         (details ? `<div class="vrd-extra">${details}</div>` : "") + (form ? `<div class="vrd-form" id="vrd-id-form"${needsUpload && !doc ? "" : " hidden"}>${form}</div>` : ""),
         ((window.vendorKycLastLoaded && window.vendorKycLastLoaded.hold && window.vendorKycLastLoaded.hold.documents) || []).includes("national_id"));
 }
+// Opens (never closes) the identity document form and moves to it.
 function vdToggleIdForm() {
     const f = document.getElementById("vrd-id-form");
     if (!f) return;
-    f.hidden = !f.hidden;
+    f.hidden = false;
     const d = f.querySelector("details");
     if (d) d.open = true;
-    if (!f.hidden) f.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    f.scrollIntoView({ behavior: "smooth", block: "center" });
+    const first = document.getElementById("vd-id-kind");
+    if (first && !first.value) first.focus();
 }
 
 let vdIdPhotoResult = null;
@@ -611,15 +614,19 @@ async function vdCheckIdPhoto(input) {
 }
 
 async function vdSubmitIdDocument() {
-    const typed = vdIdTyped();
+    let typed = vdIdTyped();
     const file = document.getElementById("vd-id-file").files[0];
     if (window.LzImageChecks) {
         const fields = LzImageChecks.checkIdFields(typed);
         if (!fields.ok) {
             const expired = fields.errors.find(e => e.code === "expired");
-            vdIdMessage(vendorEsc(expired ? expired.message : fields.errors.map(e => e.text).join("\n")), "bad");
+            vdIdMessage(vendorEsc(expired ? expired.message : fields.errors.map(e => "• " + e.text).join("\n")
+                + (fields.errors.some(e => e.code === "expires") ? "\nExample: 31/12/2030" : "")), "bad");
+            const first = fields.errors[0] && { kind: "vd-id-kind", number: "vd-id-number", expires: "vd-id-expires" }[fields.errors[0].code];
+            if (first && document.getElementById(first)) document.getElementById(first).focus();
             return;
         }
+        typed = fields.value;   // cleaned number and YYYY-MM-DD date
     }
     if (!file) { vdIdMessage("Choose a photo of the document.", "bad"); return; }
     if (vdIdPhotoResult && !vdIdPhotoResult.ok) { vdIdMessage(vendorEsc(vdIdPhotoResult.message), "bad"); return; }

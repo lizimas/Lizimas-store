@@ -250,14 +250,33 @@
     }
 
     // fields: { kind, number, expires } -> { ok, errors:[{code,text}], value }
+    // Accepts 2030-12-31, 2030/12/31, 31/12/2030, 31-12-2030, 31.12.2030 and
+    // 31 Dec 2030 (day first, as written in Uganda) -> "YYYY-MM-DD" or the
+    // trimmed input when it can't be understood.
+    const MONTHS = { JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6, JUL: 7, AUG: 8, SEP: 9, SEPT: 9, OCT: 10, NOV: 11, DEC: 12 };
+    function normaliseDate(v) {
+        const t = String(v || "").trim();
+        const pad = (n) => String(n).padStart(2, "0");
+        let m = /^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/.exec(t);
+        if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+        m = /^(\d{1,2})[-\/. ](\d{1,2})[-\/. ](\d{4})$/.exec(t);
+        if (m) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
+        m = /^(\d{1,2})[-\/. ]+([A-Za-z]{3,9})[-\/., ]+(\d{4})$/.exec(t);
+        if (m && MONTHS[m[2].slice(0, m[2].length >= 4 && /^sept/i.test(m[2]) ? 4 : 3).toUpperCase()]) {
+            return `${m[3]}-${pad(MONTHS[m[2].slice(0, /^sept/i.test(m[2]) ? 4 : 3).toUpperCase()])}-${pad(m[1])}`;
+        }
+        return t;
+    }
+
     function checkIdFields(fields, now) {
         const f = fields || {};
         const errors = [];
         const kind = String(f.kind || "").trim();
         if (!ID_KINDS[kind]) errors.push({ code: "kind", text: "Choose the document type: National ID, Passport or Driving Licence." });
-        const number = String(f.number || "").trim().toUpperCase().replace(/\s+/g, " ");
-        if (!/^[A-Z0-9][A-Z0-9 \/-]{3,29}$/.test(number)) errors.push({ code: "number", text: "Enter the document number exactly as printed on the document." });
-        const expires = String(f.expires || "").trim();
+        // Dots, commas and stray symbols that some keyboards add are dropped.
+        const number = String(f.number || "").trim().toUpperCase().replace(/[^A-Z0-9 \/-]/g, "").replace(/\s+/g, " ").trim();
+        if (!/^[A-Z0-9][A-Z0-9 \/-]{3,29}$/.test(number)) errors.push({ code: "number", text: "Enter the document number exactly as printed on the document (letters and numbers, at least 4)." });
+        const expires = normaliseDate(f.expires);
         const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(expires);
         const valid = m && !isNaN(Date.parse(expires + "T00:00:00Z")) && new Date(expires + "T00:00:00Z").toISOString().slice(0, 10) === expires;
         if (!valid) errors.push({ code: "expires", text: "Enter the expiry date shown on the document." });
@@ -325,5 +344,5 @@
     }
 
     return { RULES, analyzePixels, evaluate, findDuplicate, hamming, dHash, countMessage, rejectionText, analyzeFile,
-        ID_KINDS, ID_RULES, ID_MESSAGES, checkIdFields, evaluateIdDocument, todayIso };
+        ID_KINDS, ID_RULES, ID_MESSAGES, checkIdFields, evaluateIdDocument, todayIso, normaliseDate };
 });
