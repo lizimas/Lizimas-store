@@ -14,7 +14,8 @@ const {
 } = require("../utils/vendorWallet");
 const { deriveReturnResolutionStatus } = require("../utils/vendorReturns");
 const { canApplyComplianceAction, COMPLIANCE_ACTION_LABELS, complianceSummary } = require("../utils/vendorCompliance");
-const { requiredDocumentTypesForKyc, KYC_DOCUMENT_LABELS } = require("../utils/vendorKyc");
+const { requiredDocumentTypesForKyc, KYC_DOCUMENT_LABELS, KYC_DOCUMENT_TYPES } = require("../utils/vendorKyc");
+const { HOLD_BLOCKED_MESSAGE, holdReadyToRelease } = require("../utils/vendorHold");
 const {
     MAX_VENDOR_DISCOUNT_PERCENT,
     validateProposedPrice,
@@ -48,7 +49,8 @@ exports.getMyVendorProfile = async (req, res) => {
         const result = await pool.query(
             `SELECT id, business_name, account_type, phone,
                     physical_address, momo_number, referral_source, status, rejection_reason,
-                    submitted_at, reviewed_at, slug, about, delivery_method, shop_id
+                    submitted_at, reviewed_at, slug, about, delivery_method, shop_id,
+                    COALESCE(documents_hold, false) AS documents_hold, hold_documents, hold_reason, hold_started_at
              FROM vendors WHERE id = $1`,
             [req.vendorId]
         );
@@ -671,7 +673,8 @@ exports.getAllVendors = async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT v.id, v.business_name, v.status, v.payout_frozen, v.phone, v.shop_id,
-                    v.account_type, v.submitted_at,
+                    v.account_type, v.submitted_at, v.reviewed_at, v.slug,
+                    COALESCE(v.documents_hold, false) AS documents_hold, v.hold_documents, v.hold_reason, v.hold_started_at,
                     u.name AS owner_name, u.email AS owner_email,
                     COALESCE(k.kyc_status, 'not_started') AS kyc_status,
                     COALESCE(k.requires_work_permit, false) AS requires_work_permit,
@@ -687,13 +690,17 @@ exports.getAllVendors = async (req, res) => {
              ORDER BY v.business_name ASC`
         );
         res.json(result.rows.map(v => {
-            const required = requiredDocumentTypesForKyc({ accountType: v.account_type, requiresWorkPermit: v.requires_work_permit });
+            // Documents a vendor is held for count as required too.
+            const required = [...new Set([
+                ...requiredDocumentTypesForKyc({ accountType: v.account_type, requiresWorkPermit: v.requires_work_permit }),
+                ...(v.documents_hold ? (v.hold_documents || []) : [])
+            ])];
             const summary = complianceSummary({
                 vendorStatus: v.status, required, documents: v.documents, restrictedProducts: v.restricted_products
             });
             return {
                 ...v,
-                compliance: summary.state,
+                compliance: v.documents_hold && summary.state !== "restricted" ? "on_hold" : summary.state,
                 required_documents: summary.documents.map(d => ({ ...d, label: KYC_DOCUMENT_LABELS[d.type] || d.type })),
                 documents_needed: summary.needed
             };
@@ -848,6 +855,7 @@ exports.getPublicStorefront = async (req, res) => {
         const vendorResult = await pool.query(
             `SELECT v.id, v.business_name, v.slug, v.about, v.delivery_method,
                     v.shop_active, v.holiday_mode_active, v.holiday_mode_start_date, v.holiday_mode_end_date,
+                    COALESCE(v.documents_hold, false) AS documents_hold,
                     (COALESCE(k.kyc_status, 'not_started') = 'verified') AS is_verified,
                     (COALESCE(k.kyc_status, 'not_started') = 'verified'
                      AND v.account_type = 'company'
@@ -861,7 +869,7 @@ exports.getPublicStorefront = async (req, res) => {
             return res.status(404).json({ error: "Store not found." });
         }
         const { shop_active, holiday_mode_active, holiday_mode_start_date, holiday_mode_end_date,
-                is_verified, is_registered_business, ...vendor } = vendorResult.rows[0];
+                documents_hold, is_verified, is_registered_business, ...vendor } = vendorResult.rows[0];
 
         // Holiday Mode / Shop Activation (migration 081): the storefront
         // page itself still resolves - a shopper following an old link
@@ -875,7 +883,8 @@ exports.getPublicStorefront = async (req, res) => {
             && holiday_mode_start_date && holiday_mode_end_date
             && today >= holiday_mode_start_date.toISOString().slice(0, 10)
             && today <= holiday_mode_end_date.toISOString().slice(0, 10);
-        const shopUnavailable = shop_active === false || onHoliday;
+        // On hold for documents (migration 145): same as a closed shop.
+        const shopUnavailable = shop_active === false || onHoliday || documents_hold === true;
 
         const [productsResult, followerResult, sellerScore, brandAuthResult] = await Promise.all([
             shopUnavailable
@@ -1144,7 +1153,7 @@ exports.getVendorWallet = async (req, res) => {
 exports.requestVendorPayout = async (req, res) => {
     try {
         const vendorRow = await pool.query(
-            "SELECT id, momo_number, payout_frozen FROM vendors WHERE id = $1",
+            "SELECT id, momo_number, payout_frozen, COALESCE(documents_hold, false) AS documents_hold FROM vendors WHERE id = $1",
             [req.vendorId]
         );
         if (vendorRow.rows.length === 0) {
@@ -1153,6 +1162,9 @@ exports.requestVendorPayout = async (req, res) => {
         const vendor = vendorRow.rows[0];
         if (vendor.payout_frozen) {
             return res.status(403).json({ error: "Payouts are currently frozen on your account. Contact Lizimas Store support." });
+        }
+        if (vendor.documents_hold) {
+            return res.status(403).json({ error: HOLD_BLOCKED_MESSAGE });
         }
         if (!vendor.momo_number) {
             return res.status(400).json({ error: "Add your MoMo number in your profile before requesting a payout." });
@@ -1204,6 +1216,7 @@ exports.getVendorPayoutRequests = async (req, res) => {
                     COALESCE(k.kyc_status, 'not_started') AS kyc_status,
                     (COALESCE(k.kyc_status, 'not_started') = 'verified'
                      AND v.payout_frozen = false
+                     AND COALESCE(v.documents_hold, false) = false
                      AND v.status != 'suspended') AS payout_eligible
              FROM vendor_payouts vp
              JOIN vendors v ON v.id = vp.vendor_id
@@ -1227,6 +1240,7 @@ exports.markVendorPayoutPaid = async (req, res) => {
 
         const guard = await pool.query(
             `SELECT vp.status AS payout_status, v.payout_frozen,
+                    COALESCE(v.documents_hold, false) AS documents_hold,
                     v.status AS vendor_status,
                     COALESCE(k.kyc_status, 'not_started') AS kyc_status
              FROM vendor_payouts vp
@@ -1253,6 +1267,12 @@ exports.markVendorPayoutPaid = async (req, res) => {
             return res.status(409).json({
                 error: "payouts_frozen",
                 message: "Cannot approve payout: this vendor's payouts are frozen."
+            });
+        }
+        if (g.documents_hold) {
+            return res.status(409).json({
+                error: "vendor_on_hold",
+                message: "Cannot approve payout: this vendor is on hold until their documents are approved."
             });
         }
         if (g.vendor_status === "suspended") {
@@ -1626,6 +1646,151 @@ exports.requestVendorDocuments = async (req, res) => {
         await insertComplianceAction(id, "request_documents", reason, req.user.userId);
         logActivity(req.user.userId, "vendor_documents_requested", "vendor", id, list);
         res.status(201).json({ message: "Document request sent to the vendor.", documents: summary.needed });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// --- Hold for documents (migration 145) ---------------------------------
+// Puts the vendor on hold until the chosen documents are provided and
+// approved: products hidden, shop unavailable, no product changes, no
+// payouts (see utils/vendorHold.js). A held document that was already
+// accepted is set back to "action required" so the vendor uploads a new one.
+exports.holdVendorForDocuments = async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        const types = [...new Set((Array.isArray(req.body && req.body.documents) ? req.body.documents : [])
+            .map(String).filter(t => KYC_DOCUMENT_TYPES.includes(t)))];
+        if (!types.length) return res.status(400).json({ error: "Choose at least one document." });
+        const note = String((req.body && req.body.note) || "").trim().slice(0, 1000);
+
+        const v = await client.query("SELECT id, status, COALESCE(documents_hold, false) AS documents_hold FROM vendors WHERE id = $1", [id]);
+        if (!v.rows.length) return res.status(404).json({ error: "Vendor not found." });
+        if (v.rows[0].status === "suspended") {
+            return res.status(409).json({ error: "This vendor is suspended. Reinstate them first, or keep them suspended." });
+        }
+
+        const labels = types.map(t => KYC_DOCUMENT_LABELS[t] || t).join(", ");
+        const reason = "Your shop is on hold until you provide: " + labels +
+            ". Upload them under Identity & Business Verification - your shop, products and payouts come back automatically once they're approved." +
+            (note ? " " + note : "");
+
+        await client.query("BEGIN");
+        await client.query(
+            `UPDATE vendors SET documents_hold = true, hold_documents = $2, hold_reason = $3,
+                    hold_started_at = COALESCE(CASE WHEN documents_hold THEN hold_started_at END, now()), hold_by = $4
+              WHERE id = $1`,
+            [id, types, note || null, req.user.userId]
+        );
+        await client.query(
+            `UPDATE vendor_kyc_documents
+                SET review_status = 'action_required',
+                    action_required_reason = $3, reviewed_by = $4, reviewed_at = now()
+              WHERE vendor_id = $1 AND document_type = ANY($2) AND review_status = 'accepted'`,
+            [id, types, note || "Please upload this document again.", req.user.userId]
+        );
+        await client.query("COMMIT");
+
+        await insertComplianceAction(id, "hold_documents", reason, req.user.userId);
+        logActivity(req.user.userId, "vendor_put_on_hold", "vendor", id, labels);
+        res.status(201).json({ message: "Vendor is on hold until the documents are approved.", documents: types });
+    } catch (error) {
+        await client.query("ROLLBACK").catch(() => {});
+        res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
+    }
+};
+
+async function releaseHold(vendorId, reason, adminUserId) {
+    const r = await pool.query(
+        `UPDATE vendors SET documents_hold = false, hold_documents = '{}', hold_reason = NULL,
+                hold_started_at = NULL, hold_by = NULL
+          WHERE id = $1 AND documents_hold = true RETURNING id`,
+        [vendorId]
+    );
+    if (!r.rows.length) return false;
+    await insertComplianceAction(vendorId, "release_hold", reason, adminUserId);
+    return true;
+}
+
+exports.releaseVendorHold = async (req, res) => {
+    try {
+        const note = String((req.body && req.body.note) || "").trim();
+        const done = await releaseHold(req.params.id, note || "Hold released by Lizimas Store. Your shop, products and payouts are back.", req.user.userId);
+        if (!done) return res.status(409).json({ error: "This vendor is not on hold." });
+        logActivity(req.user.userId, "vendor_hold_released", "vendor", req.params.id, note);
+        res.json({ message: "Hold released." });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Called after an admin accepts a KYC document: lifts the hold once every
+// held document is accepted. Never throws (the review itself already saved).
+exports.releaseHoldIfReady = async (vendorId, adminUserId) => {
+    try {
+        const v = await pool.query("SELECT documents_hold, hold_documents FROM vendors WHERE id = $1", [vendorId]);
+        if (!v.rows.length || !v.rows[0].documents_hold) return false;
+        const docs = await pool.query("SELECT document_type, review_status FROM vendor_kyc_documents WHERE vendor_id = $1", [vendorId]);
+        if (!holdReadyToRelease(v.rows[0].hold_documents, docs.rows)) return false;
+        return await releaseHold(vendorId, "All requested documents are approved - your shop, products and payouts are active again.", adminUserId);
+    } catch (error) {
+        console.error("Release hold check failed:", error.message);
+        return false;
+    }
+};
+
+// Admin Vendor Profile page (Oct 2026): key numbers, recent orders and
+// payouts for one vendor. Each part is read on its own, so one failing
+// query leaves that card empty instead of breaking the page.
+exports.getVendorProfileAdmin = async (req, res) => {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid vendor." });
+    const q = (sql, params) => pool.query(sql, params).then(r => r.rows).catch(e => { console.warn("Vendor profile:", e.message); return null; });
+    try {
+        const exists = await pool.query("SELECT id FROM vendors WHERE id = $1", [id]);
+        if (!exists.rows.length) return res.status(404).json({ error: "Vendor not found." });
+        const [sales, listings, rating, orders, payouts] = await Promise.all([
+            q(`SELECT
+                   COALESCE(SUM(oi.price * oi.quantity), 0)::numeric AS total_sales,
+                   COUNT(DISTINCT o.id)::int AS orders,
+                   COALESCE(SUM(oi.price * oi.quantity) FILTER (WHERE o.created_at >= now() - INTERVAL '30 days'), 0)::numeric AS sales_30,
+                   COALESCE(SUM(oi.price * oi.quantity) FILTER (WHERE o.created_at >= now() - INTERVAL '60 days'
+                                                                 AND o.created_at < now() - INTERVAL '30 days'), 0)::numeric AS sales_prev_30,
+                   COUNT(DISTINCT o.id) FILTER (WHERE o.created_at >= now() - INTERVAL '30 days')::int AS orders_30,
+                   COUNT(DISTINCT o.id) FILTER (WHERE o.created_at >= now() - INTERVAL '60 days'
+                                                  AND o.created_at < now() - INTERVAL '30 days')::int AS orders_prev_30
+                 FROM order_items oi
+                 JOIN products p ON p.id = oi.product_id
+                 JOIN orders o ON o.id = oi.order_id
+                WHERE p.vendor_id = $1 AND o.status <> 'cancelled'`, [id]),
+            q(`SELECT COUNT(*) FILTER (WHERE status = 'approved' AND is_active = true AND admin_restricted = false)::int AS active,
+                      COUNT(*)::int AS total
+                 FROM products WHERE vendor_id = $1 AND deleted_at IS NULL`, [id]),
+            q(`SELECT ROUND(AVG(pr.rating)::numeric, 1) AS avg_rating, COUNT(*)::int AS reviews
+                 FROM product_reviews pr JOIN products p ON p.id = pr.product_id WHERE p.vendor_id = $1`, [id]),
+            q(`SELECT o.id, o.created_at, o.status, o.customer_name,
+                      SUM(oi.price * oi.quantity)::numeric AS amount, SUM(oi.quantity)::int AS items,
+                      MIN(p.name) AS first_item
+                 FROM order_items oi
+                 JOIN products p ON p.id = oi.product_id
+                 JOIN orders o ON o.id = oi.order_id
+                WHERE p.vendor_id = $1
+                GROUP BY o.id ORDER BY o.created_at DESC LIMIT 15`, [id]),
+            q(`SELECT id, amount, status, requested_at, paid_at, reference
+                 FROM vendor_payouts WHERE vendor_id = $1 ORDER BY requested_at DESC LIMIT 15`, [id])
+        ]);
+        res.json({
+            metrics: {
+                sales: sales && sales[0] ? sales[0] : null,
+                listings: listings && listings[0] ? listings[0] : null,
+                rating: rating && rating[0] ? rating[0] : null
+            },
+            orders: orders || [],
+            payouts: payouts || []
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

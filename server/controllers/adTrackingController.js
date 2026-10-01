@@ -11,6 +11,7 @@
 // specifically the dedicated "Sponsored" showcase row's data source.
 
 const pool = require("../config/database");
+const { vendorSellableSql } = require("../utils/vendorHold");
 
 // Random selection among currently-active, unexhausted campaigns' products,
 // shaped exactly like a card in buildProductCard()/stBuildProductCard() so
@@ -51,6 +52,7 @@ exports.getSponsoredProducts = async (req, res) => {
                AND p.deleted_at IS NULL AND p.status = 'approved' AND p.is_active = true AND p.admin_restricted = false
                AND (p.vendor_id IS NULL OR (
                     v.shop_active = true
+                    AND ${vendorSellableSql("v")}
                     AND (v.holiday_mode_active = false
                          OR CURRENT_DATE < v.holiday_mode_start_date
                          OR CURRENT_DATE > v.holiday_mode_end_date)

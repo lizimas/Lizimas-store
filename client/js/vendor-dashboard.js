@@ -397,43 +397,91 @@ function renderVendorKycDocumentRows(k) {
 
     const checkbox = document.getElementById("vendor-kyc-work-permit-checkbox");
     const requiresWorkPermit = checkbox ? checkbox.checked : Boolean(k.requires_work_permit);
-    const requiredTypes = vdRequiredDocumentTypes(k.account_type, requiresWorkPermit);
-    const canEdit = k.editable;
+    // Required documents, plus any Lizimas has put the shop on hold for.
+    const holdTypes = (k.hold && k.hold.documents) || [];
+    const requiredTypes = [...new Set([...vdRequiredDocumentTypes(k.account_type, requiresWorkPermit), ...holdTypes])];
+    const canUpload = (type) => Boolean(k.editable) || (k.uploadable_types || []).includes(type);
 
     container.innerHTML = requiredTypes.map((requiredType) => {
         const label = KYC_DOCUMENT_LABELS[requiredType] || requiredType;
         const doc = (k.documents || []).find(d => d.document_type === requiredType);
-
         // Identity document: a small form (type, number, expiry, photo with
         // automatic checks) instead of an instant upload.
-        if (requiredType === "national_id") return vdIdDocumentRow(label, doc, canEdit);
-
-        if (doc) {
-            const docBadge = doc.review_status === "accepted" ? "status-paid"
-                : doc.review_status === "rejected" ? "status-cancelled"
-                : doc.review_status === "action_required" ? "status-pending"
-                : "status-new";
-            const reasonText = doc.review_status === "rejected" ? doc.rejection_reason
-                : doc.review_status === "action_required" ? doc.action_required_reason
-                : "";
-            return `
-                <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; flex-wrap:wrap; padding:6px 0; border-bottom:1px solid #f0f0f0;">
-                    <span style="min-width:170px;">${label}</span>
-                    <span class="status-badge ${docBadge}">${(doc.review_status || "pending").replace(/_/g, " ")}</span>
-                    <span style="color:#888;">${doc.original_filename || ""}</span>
-                    ${canEdit ? `<label style="margin-left:auto; color:#16264f; cursor:pointer; font-size:12px;">Replace<input type="file" class="hidden" onchange="vdUploadKycDocument('${requiredType}', this)"></label>` : ""}
-                </div>
-                ${reasonText ? `<p style="background:#FEF3C7; color:#92400E; padding:8px 10px; border-radius:8px; font-size:12px; margin:4px 0 8px;">${reasonText}</p>` : ""}
-            `;
-        }
-        return `
-            <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; padding:6px 0; border-bottom:1px solid #f0f0f0;">
-                <span style="min-width:170px;">${label}</span>
-                <span style="color:#DC2626;">Not uploaded</span>
-                ${canEdit ? `<input type="file" style="margin-left:auto; font-size:12px;" onchange="vdUploadKycDocument('${requiredType}', this)">` : ""}
-            </div>
-        `;
+        if (requiredType === "national_id") return vdIdDocumentRow(label, doc, canUpload(requiredType));
+        return vdDocRow(requiredType, label, doc, canUpload(requiredType), holdTypes.includes(requiredType));
     }).join("");
+    if (window.vdRenderComplianceTop) window.vdRenderComplianceTop(k, requiredTypes);
+}
+
+// "Required Documents" rows (Oct 2026 design, Lizimas colours).
+const VD_DOC_DESC = {
+    national_id: "A clear colour photo of your National ID, Passport or Driving Licence.",
+    business_registration: "Your URSB business registration certificate.",
+    certificate_of_incorporation: "Your certificate of incorporation.",
+    tax_certificate: "Your TIN certificate from URA, in your business or own name.",
+    vat_certificate: "Your VAT registration certificate.",
+    form_20: "Form 20 listing your company's directors.",
+    bank_certificate: "A bank letter or statement in your business name.",
+    momo_statement: "A Mobile Money statement in your name.",
+    work_permit: "Your valid work permit."
+};
+const VD_DOC_ICON = {
+    national_id: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.2"/><path d="M5.8 16c.5-1.6 1.7-2.4 3.2-2.4s2.7.8 3.2 2.4M14.5 10h3.5M14.5 13.5h3.5"/>',
+    file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+    ok: '<circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.7 2.7L16 9.7"/>',
+    upload: '<path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>',
+    eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/>',
+    clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'
+};
+function vdIco(name, size) {
+    return `<svg viewBox="0 0 24 24" width="${size || 22}" height="${size || 22}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${VD_DOC_ICON[name] || VD_DOC_ICON.file}</svg>`;
+}
+function vdDocState(doc) {
+    if (!doc) return { key: "missing", text: "Missing" };
+    if (doc.review_status === "accepted") return { key: "approved", text: "Approved" };
+    if (doc.review_status === "rejected" || doc.review_status === "action_required") return { key: "redo", text: "Upload again" };
+    return { key: "submitted", text: "Submitted" };
+}
+function vdDocRowShell(type, label, doc, button, extra, held) {
+    const esc = vendorEsc;
+    const st = vdDocState(doc);
+    const reason = doc && (doc.review_status === "rejected" ? doc.rejection_reason : doc.review_status === "action_required" ? doc.action_required_reason : "");
+    const sub = doc && st.key !== "missing"
+        ? (st.key === "approved" ? "Approved" : "Submitted") + " on " + new Date(doc.uploaded_at).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" })
+            + (doc.original_filename ? " &middot; " + esc(doc.original_filename) : "")
+        : esc(VD_DOC_DESC[type] || "");
+    return `<div class="vrd-row vrd-${st.key}" id="vrd-row-${type}">
+        <span class="vrd-ico">${vdIco(st.key === "approved" || st.key === "submitted" ? "ok" : type === "national_id" ? "national_id" : "file")}</span>
+        <div class="vrd-main"><div class="vrd-title">${esc(label)}${held ? ' <span class="vrd-held">Needed to lift the hold</span>' : ""}</div>
+            <div class="vrd-desc">${sub}</div>
+            ${reason ? `<div class="vrd-reason">${esc(reason)}</div>` : ""}
+            <div class="vrd-msg" id="vrd-msg-${type}"></div></div>
+        <div class="vrd-status">${st.key === "submitted" ? "Submitted &middot; in review" : st.text}</div>
+        <div class="vrd-act">${button}</div>
+        ${extra || ""}
+    </div>`;
+}
+function vdDocRow(type, label, doc, canUpload, held) {
+    const st = vdDocState(doc);
+    let button;
+    if (canUpload && st.key !== "approved" && st.key !== "submitted") {
+        button = `<label class="vrd-btn vrd-btn-upload">${vdIco("upload", 18)} ${st.key === "redo" ? "Upload Again" : "Upload Document"}<input type="file" class="hidden" accept="image/jpeg,image/png,image/webp,application/pdf" onchange="vdUploadKycDocument('${type}', this)"></label>`;
+    } else if (doc) {
+        button = `<button type="button" class="vrd-btn vrd-btn-view" onclick="vdViewMyKycDocument('${type}')">View Document ${vdIco("eye", 18)}</button>`
+            + (canUpload ? `<label class="vrd-link">Replace<input type="file" class="hidden" accept="image/jpeg,image/png,image/webp,application/pdf" onchange="vdUploadKycDocument('${type}', this)"></label>` : "");
+    } else {
+        button = `<span class="vrd-locked">${vdIco("clock", 16)} Locked while in review</span>`;
+    }
+    return vdDocRowShell(type, label, doc, button, "", held);
+}
+async function vdViewMyKycDocument(type) {
+    try {
+        const r = await vendorAuthorizedFetch("/api/vendors/me/kyc/documents/url?document_type=" + encodeURIComponent(type));
+        if (r && r.url) window.open(r.url, "_blank", "noopener");
+        else alert((r && r.error) || "Could not open this document.");
+    } catch (e) {
+        alert("Could not open this document.");
+    }
 }
 
 // --- Identity document upload (National ID, Passport or Driving Licence) ---
@@ -472,13 +520,25 @@ function vdIdDocumentRow(label, doc, canEdit) {
                 <button type="button" id="vd-id-submit" onclick="vdSubmitIdDocument()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; justify-self:start;">Upload document</button>
             </div>
         </details>` : "";
-    return `
-        <div style="padding:6px 0 10px; border-bottom:1px solid #f0f0f0; font-size:12.5px;">
-            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="min-width:170px;">${esc(label)}</span>${badge}<span style="color:#888;">${doc ? esc(doc.original_filename || "") : ""}</span></div>
-            ${details}
-            ${reason ? `<p style="background:#FEF3C7; color:#92400E; padding:8px 10px; border-radius:8px; font-size:12px; margin:6px 0;">${esc(reason)}</p>` : ""}
-            ${form}
-        </div>`;
+    const st = vdDocState(doc);
+    const needsUpload = canEdit && st.key !== "approved" && st.key !== "submitted";
+    const button = needsUpload
+        ? `<button type="button" class="vrd-btn vrd-btn-upload" onclick="vdToggleIdForm()">${vdIco("upload", 18)} ${st.key === "redo" ? "Upload Again" : "Upload Document"}</button>`
+        : doc ? `<button type="button" class="vrd-btn vrd-btn-view" onclick="vdViewMyKycDocument('national_id')">View Document ${vdIco("eye", 18)}</button>`
+            + (canEdit ? `<button type="button" class="vrd-link" onclick="vdToggleIdForm()">Replace</button>` : "")
+        : "";
+    void badge; void reason;
+    return vdDocRowShell("national_id", label, doc, button,
+        (details ? `<div class="vrd-extra">${details}</div>` : "") + (form ? `<div class="vrd-form" id="vrd-id-form"${needsUpload && !doc ? "" : " hidden"}>${form}</div>` : ""),
+        ((window.vendorKycLastLoaded && window.vendorKycLastLoaded.hold && window.vendorKycLastLoaded.hold.documents) || []).includes("national_id"));
+}
+function vdToggleIdForm() {
+    const f = document.getElementById("vrd-id-form");
+    if (!f) return;
+    f.hidden = !f.hidden;
+    const d = f.querySelector("details");
+    if (d) d.open = true;
+    if (!f.hidden) f.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 let vdIdPhotoResult = null;
@@ -563,7 +623,9 @@ async function vdSubmitIdDocument() {
     if (vdIdOcr && !vdIdOcr.unavailable && window.LzIdOcr) {
         const a = LzIdOcr.analyze(vdIdOcr.text, vdIdOcr.confidence, typed);
         if (!a.ok) { vdIdMessage(vendorEsc(a.errors[0].message), "bad"); return; }
-        ocrPayload = { summary: a.summary, warnings: a.warnings };
+        // The text goes too: the server compares the name on the document
+        // with the account (utils/documentNameCheck.js).
+        ocrPayload = { summary: a.summary, warnings: a.warnings, text: String(vdIdOcr.text || "").slice(0, 6000), confidence: vdIdOcr.confidence };
         const mismatches = a.warnings.filter(w => /mismatch/.test(w.code));
         const key = JSON.stringify([typed, mismatches.map(w => w.code)]);
         if (mismatches.length && vdIdWarnShownFor !== key) {
@@ -601,11 +663,29 @@ async function vdSubmitIdDocument() {
 async function vdUploadKycDocument(documentType, inputEl) {
     const file = inputEl.files[0];
     if (!file) return;
+    const msg = (html, tone) => {
+        const box = document.getElementById("vrd-msg-" + documentType);
+        if (box) box.innerHTML = html ? `<div class="vrd-note vrd-note-${tone || "info"}">${html}</div>` : "";
+        else if (tone === "bad") alert(String(html).replace(/<[^>]+>/g, ""));
+    };
+    inputEl.value = "";
 
     const formData = new FormData();
     formData.append("document", file);
     formData.append("document_type", documentType);
 
+    // Read the text on a photo so the names can be checked against the
+    // account (the server decides; a PDF is checked by Lizimas staff).
+    if (/^image\//.test(file.type) && window.LzIdOcr) {
+        msg("Reading the document to check the names... (the first time can take a little while)");
+        try {
+            const read = await LzIdOcr.read(file, { generic: true, timeoutMs: 45000, onProgress: (m) => {
+                if (m.status === "recognizing text") msg(`Reading the document... ${Math.round(m.progress * 100)}%`);
+            } });
+            if (read && read.text) formData.append("ocr", JSON.stringify({ text: String(read.text).slice(0, 6000), confidence: read.confidence }));
+        } catch (e) { /* upload anyway; staff will check the names */ }
+    }
+    msg("Uploading...");
     try {
         const token = getVendorToken();
         const response = await fetch(`${API_URL}/api/vendors/me/kyc/documents`, {
@@ -614,11 +694,15 @@ async function vdUploadKycDocument(documentType, inputEl) {
             body: formData
         });
         const result = await response.json();
-        if (result.error) { alert(result.error); return; }
+        if (!response.ok || result.error) {
+            msg(vendorEsc(result.message || result.error || "Could not upload this document.").replace(/\n/g, "<br>"), "bad");
+            return;
+        }
+        msg("");
         loadVendorKyc();
     } catch (error) {
         console.error("vdUploadKycDocument error:", error);
-        alert("Could not upload this document. Please try again.");
+        msg("Could not upload this document. Please try again.", "bad");
     }
 }
 
@@ -3546,7 +3630,9 @@ const VENDOR_NOTICE_LABEL = {
     unrestrict_product: "Product restriction lifted",
     freeze_payout: "Payouts frozen",
     unfreeze_payout: "Payouts unfrozen",
-    request_documents: "Documents requested"
+    request_documents: "Documents requested",
+    hold_documents: "Shop on hold for documents",
+    release_hold: "Hold lifted"
 };
 const VENDOR_NOTICE_CLASS = {
     warn: "status-pending",
@@ -3556,7 +3642,9 @@ const VENDOR_NOTICE_CLASS = {
     unrestrict_product: "status-paid",
     freeze_payout: "status-cancelled",
     unfreeze_payout: "status-paid",
-    request_documents: "status-pending"
+    request_documents: "status-pending",
+    hold_documents: "status-cancelled",
+    release_hold: "status-paid"
 };
 
 async function loadVendorComplianceNotices() {

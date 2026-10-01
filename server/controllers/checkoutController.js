@@ -96,6 +96,22 @@ exports.checkout = async (req, res) => {
                 return res.status(400).json({ error: "Invalid item in cart." });
             }
 
+            // A product whose vendor is suspended, on hold for documents
+            // (migration 145) or has closed their shop can't be bought,
+            // even from a cart filled earlier.
+            const sellerCheck = await client.query(
+                `SELECT p.name FROM products p JOIN vendors v ON v.id = p.vendor_id
+                  WHERE p.id = $1
+                    AND (v.status <> 'approved' OR COALESCE(v.documents_hold, false) = true OR v.shop_active = false)`,
+                [productId]
+            );
+            if (sellerCheck.rows.length) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({
+                    error: `${sellerCheck.rows[0].name} is not available right now. Remove it from your cart to continue.`
+                });
+            }
+
             // A colour + size pick on a product that tracks stock per variant
             // is that variant: its own stock and, if set, its own price
             // (per-variant prices, migration 138).

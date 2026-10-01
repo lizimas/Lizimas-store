@@ -10,7 +10,8 @@ const COMPLIANCE_ACTION_TYPES = [
     "warn", "suspend", "reinstate",
     "restrict_product", "unrestrict_product",
     "freeze_payout", "unfreeze_payout",
-    "request_documents"
+    "request_documents",
+    "hold_documents", "release_hold"
 ];
 
 const COMPLIANCE_ACTION_LABELS = {
@@ -21,7 +22,9 @@ const COMPLIANCE_ACTION_LABELS = {
     unrestrict_product: "Product restriction lifted",
     freeze_payout: "Payouts frozen",
     unfreeze_payout: "Payouts unfrozen",
-    request_documents: "Documents requested"
+    request_documents: "Documents requested",
+    hold_documents: "Shop on hold for documents",
+    release_hold: "Hold lifted"
 };
 
 function isValidComplianceAction(actionType) {
@@ -39,6 +42,8 @@ function canApplyComplianceAction(actionType, current) {
     switch (actionType) {
         case "warn":
         case "request_documents":
+        case "hold_documents":
+        case "release_hold":
             return { allowed: true };
         case "suspend":
             if (current.vendorStatus === "suspended") {

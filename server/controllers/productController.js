@@ -3,6 +3,7 @@ const { generateSku } = require("../utils/sku");
 const cloudinary = require("../config/cloudinary");
 const { logActivity } = require("../utils/activityLog");
 const { publicProductRow, readExtraProductFields, cleanColorInput, variantCombos, suggestVariantSku } = require("../utils/productForm");
+const { vendorSellableSql } = require("../utils/vendorHold");
 const { canApplyComplianceAction } = require("../utils/vendorCompliance");
 const { createVendorNotification } = require("./vendorController");
 const { calculatePricing, getActiveCommissionRule, computePricing } = require("../utils/commissionEngine");
@@ -399,6 +400,7 @@ exports.getProducts = async (req, res) => {
              WHERE products.status = 'approved' AND products.is_active = true AND products.admin_restricted = false AND products.deleted_at IS NULL
                AND (products.vendor_id IS NULL OR (
                     vendors.shop_active = true
+                    AND ${vendorSellableSql("vendors")}
                     AND (vendors.holiday_mode_active = false
                          OR CURRENT_DATE < vendors.holiday_mode_start_date
                          OR CURRENT_DATE > vendors.holiday_mode_end_date)
@@ -606,6 +608,7 @@ exports.getProductById = async (req, res) => {
              WHERE products.id = $1 AND products.deleted_at IS NULL AND products.status = 'approved' AND products.is_active = true AND products.admin_restricted = false
                AND (products.vendor_id IS NULL OR (
                     vendors.shop_active = true
+                    AND ${vendorSellableSql("vendors")}
                     AND (vendors.holiday_mode_active = false
                          OR CURRENT_DATE < vendors.holiday_mode_start_date
                          OR CURRENT_DATE > vendors.holiday_mode_end_date)

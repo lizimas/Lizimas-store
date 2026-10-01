@@ -1,0 +1,73 @@
+/* Vendor compliance (Oct 2026) - Lizimas navy #1a1a2e and gold #f4b400 */
+.vcp-banner { display: flex; align-items: center; gap: 14px; border-radius: 14px; padding: 14px 18px; margin: 0 0 14px; }
+.vcp-banner-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: 13.5px; line-height: 1.45; }
+.vcp-banner-text strong { font-size: 16px; }
+.vcp-red { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
+.vcp-amber { background: #fff8e1; border: 1px solid #f4d98a; color: #8a5a00; }
+.vcp-green { background: #ecfdf3; border: 1px solid #abefc6; color: #067647; }
+.vcp-green .vcp-banner-text { flex-direction: row; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.vcp-green .vcp-banner-text strong { color: #101828; }
+.vcp-banner-btn { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; background: #1a1a2e; color: #f4b400; border: 0; border-radius: 10px;
+    padding: 10px 14px; font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+.vcp-x { background: none; border: 0; color: #067647; cursor: pointer; padding: 4px; border-radius: 8px; }
+.vcp-card { background: #fff; border: 1px solid #e6e8ee; border-radius: 14px; padding: 16px 18px; margin: 0 0 14px; }
+.vcp-card-head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: #1a1a2e; margin-bottom: 6px; }
+.vcp-sub { font-size: 12.5px; color: #667085; }
+.vcp-verified { font-size: 22px; font-weight: 800; color: #15803d; margin: 4px 0 2px; }
+.vcp-ok-line { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #344054; margin-top: 10px; }
+.vcp-ok-line svg { color: #16a34a; }
+.vcp-progress { border: 1px solid #eef0f4; border-radius: 12px; padding: 12px 14px; margin: 10px 0 6px; }
+.vcp-progress-top { display: flex; justify-content: space-between; font-size: 14px; color: #1a1a2e; }
+.vcp-pct { font-weight: 700; color: #b7791f; }
+.vcp-bar { height: 8px; border-radius: 999px; background: #eceff3; overflow: hidden; margin: 10px 0; }
+.vcp-bar span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #f4b400, #e0a200); }
+.vcp-card .vcp-verified ~ .vcp-bar span { background: #16a34a; }
+.vcp-progress-foot { display: flex; justify-content: space-between; font-size: 12.5px; }
+.vcp-g { color: #15803d; font-weight: 600; } .vcp-r { color: #b91c1c; font-weight: 600; }
+.vcp-home { margin: 0 14px 4px; }
+.vcp-h { font-size: 19px !important; color: #1a1a2e !important; margin: 6px 0 4px !important; }
+
+/* Required documents rows */
+#vendor-kyc-document-rows { display: flex; flex-direction: column; border: 1px solid #e6e8ee; border-radius: 14px; overflow: hidden; background: #fff; }
+.vrd-row { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 14px 16px; border-bottom: 1px solid #f0f1f4; }
+.vrd-row:last-child { border-bottom: 0; }
+.vrd-ico { width: 44px; height: 44px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
+.vrd-missing .vrd-ico, .vrd-redo .vrd-ico { background: #fef2f2; color: #dc2626; }
+.vrd-submitted .vrd-ico { background: #fff8e1; color: #b7791f; }
+.vrd-approved .vrd-ico { background: #ecfdf3; color: #16a34a; }
+.vrd-title { font-size: 14.5px; font-weight: 700; color: #1a1a2e; }
+.vrd-held { display: inline-block; font-size: 11px; font-weight: 700; color: #b91c1c; background: #fef2f2; border-radius: 999px; padding: 1px 8px; margin-left: 4px; vertical-align: 1px; }
+.vrd-desc { font-size: 12.5px; color: #667085; margin-top: 2px; word-break: break-word; }
+.vrd-reason { margin-top: 6px; font-size: 12.5px; background: #fff8e1; color: #8a5a00; border-radius: 8px; padding: 6px 9px; }
+.vrd-status { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.vrd-missing .vrd-status, .vrd-redo .vrd-status { color: #dc2626; }
+.vrd-submitted .vrd-status { color: #b7791f; }
+.vrd-approved .vrd-status { color: #16a34a; }
+.vrd-act { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.vrd-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 170px; padding: 10px 14px; border-radius: 10px;
+    font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; background: #fff; white-space: nowrap; }
+.vrd-btn-upload { color: #1a1a2e; border: 1.5px solid #1a1a2e; }
+.vrd-btn-upload:hover { background: #1a1a2e; color: #f4b400; }
+.vrd-btn-view { color: #15803d; border: 1.5px solid #16a34a; }
+.vrd-link { background: none; border: 0; color: #1a1a2e; font: inherit; font-size: 12.5px; text-decoration: underline; cursor: pointer; padding: 0; }
+.vrd-locked { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: #98a2b3; }
+.vrd-msg:empty { display: none; }
+.vrd-note { margin-top: 8px; font-size: 12.5px; border-radius: 8px; padding: 7px 10px; white-space: pre-line; }
+.vrd-note-info { background: #f5f6f8; color: #475467; }
+.vrd-note-bad { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+.vrd-extra, .vrd-form { grid-column: 2 / -1; }
+.vrd-form[hidden] { display: none; }
+.vrd-form details > summary { display: none; }
+.vcp-submit { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; max-width: 480px; padding: 13px 18px; border: 0;
+    border-radius: 12px; background: #1a1a2e; color: #f4b400; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; }
+.vcp-submit:disabled { opacity: .55; cursor: not-allowed; }
+.vcp-submit-note { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #667085; margin: 6px 0 0; }
+.vcp-submit-note:empty { display: none; }
+
+@media (max-width: 700px) {
+    .vrd-row { grid-template-columns: 44px minmax(0, 1fr); }
+    .vrd-status, .vrd-act { grid-column: 2; justify-self: start; align-items: flex-start; }
+    .vrd-btn { min-width: 0; }
+    .vcp-banner { flex-wrap: wrap; }
+    .vcp-banner-btn { width: 100%; justify-content: center; }
+}

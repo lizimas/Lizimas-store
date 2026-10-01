@@ -113,6 +113,9 @@ const {
     unfreezeVendorPayouts,
     getVendorComplianceHistory,
     requestVendorDocuments,
+    holdVendorForDocuments,
+    releaseVendorHold,
+    getVendorProfileAdmin,
     getVendorProductsAdmin,
     getPendingVendorPromotions,
     getApprovedVendorPromotions,
@@ -441,6 +444,9 @@ router.patch("/vendors/:id/reinstate", reinstateVendor);
 router.patch("/vendors/:id/freeze-payouts", freezeVendorPayouts);
 router.patch("/vendors/:id/unfreeze-payouts", unfreezeVendorPayouts);
 router.post("/vendors/:id/request-documents", requestVendorDocuments);
+router.post("/vendors/:id/hold", holdVendorForDocuments);
+router.post("/vendors/:id/release-hold", releaseVendorHold);
+router.get("/vendors/:id/profile", getVendorProfileAdmin);
 router.get("/vendors/:id/compliance-history", getVendorComplianceHistory);
 router.get("/vendors/:id/products", getVendorProductsAdmin);
 router.get("/vendors/:id/vendor-center", getVendorCenterDetailsAdmin);

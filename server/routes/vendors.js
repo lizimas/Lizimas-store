@@ -226,6 +226,9 @@ router.get("/wallet", requireVendorPermission("vc_finance_viewer"), getVendorWal
 router.post("/wallet/payout-requests", requireVendorPermission("vc_finance_viewer"), requestVendorPayout);
 
 router.get("/products", requireVendorPermission("vc_product_manager", "vc_product_viewer", "vc_product_update"), getMyProducts);
+// On hold for documents (migration 145): no product changes until the
+// requested documents are approved.
+router.use("/products", require("../middleware/vendorHold").blockProductChangesWhileOnHold);
 router.patch("/products/bulk", requireVendorPermission("vc_product_manager", "vc_product_update"), bulkUpdateVendorProducts);
 router.post("/products", requireVendorPermission("vc_product_manager"), upload.productPhotos.array("images", 20), addProduct);
 router.post("/products/import", requireVendorPermission("vc_product_manager"), csvUpload.single("file"), importVendorProducts);

@@ -1,4 +1,5 @@
 const pool = require("../config/database");
+const { vendorSellableSql } = require("../utils/vendorHold");
 const { logActivity } = require("../utils/activityLog");
 const { rollForwardDue } = require("../utils/flashSaleRecurrence");
 
@@ -287,6 +288,8 @@ exports.getActiveFlashSalePublic = async (req, res) => {
              WHERE fsi.flash_sale_id = $1
                AND p.deleted_at IS NULL
                AND p.status = 'approved'
+               AND (p.vendor_id IS NULL OR EXISTS (
+                    SELECT 1 FROM vendors fv WHERE fv.id = p.vendor_id AND ${vendorSellableSql("fv")}))
              ORDER BY fsi.display_order ASC, fsi.id ASC`,
             [sale.rows[0].id]
         );
@@ -334,6 +337,8 @@ exports.getSharedFlashSale = async (req, res) => {
              WHERE fsi.flash_sale_id = $1
                AND p.deleted_at IS NULL
                AND p.status = 'approved'
+               AND (p.vendor_id IS NULL OR EXISTS (
+                    SELECT 1 FROM vendors fv WHERE fv.id = p.vendor_id AND ${vendorSellableSql("fv")}))
              ORDER BY fsi.display_order ASC, fsi.id ASC`,
             [s0.id]
         );

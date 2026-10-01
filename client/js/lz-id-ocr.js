@@ -16,6 +16,10 @@
 // notes for the admin reviewer - OCR can misread, so a guess never blocks.
 // If OCR can't run on the device (old browser), read() returns null and the
 // upload carries on with the photo checks and admin review only.
+// nameCheck() (Oct 2026) compares the names on any document with the
+// account's names; the server repeats it (utils/documentNameCheck.js) and
+// rejects a document whose readable text shows none of the name.
+// read(file, { generic: true }) reads any document (certificates, TIN...).
 //
 // Works in Node (require - for tests) and the browser (window.LzIdOcr).
 (function (root, factory) {
@@ -238,6 +242,61 @@
         };
     }
 
+    // --- Names on the document (Oct 2026, Ryan) -----------------------------
+    // Does the name on the document match the name on the Lizimas account?
+    // Word by word, in any order, allowing one misread letter in longer
+    // words (two in very long ones). The machine-readable zone's "<" counts
+    // as a space, so "OKELLO<<JOHN<PETER" is read too.
+    //   match    - enough of the name found (person: 2 words, or all if fewer;
+    //              business: at least half of its distinctive words)
+    //   partial  - some but not enough (left for the reviewer)
+    //   mismatch - the text is clearly readable and none of the name is there
+    //   unread   - too little readable text to judge
+    const NAME_STOP = new Set(["LTD", "LIMITED", "CO", "COMPANY", "ENTERPRISES", "ENTERPRISE", "UGANDA", "U", "SMC", "THE", "AND",
+        "OF", "INVESTMENTS", "INVESTMENT", "GROUP", "INTERNATIONAL", "STORE", "STORES", "SHOP", "TRADING", "TRADERS", "GENERAL",
+        "SUPPLIES", "SERVICES", "MR", "MRS", "MS", "DR", "INC", "PLC"]);
+    function nameWords(name, business) {
+        const out = [];
+        for (const w of normalize(name).replace(/[^A-Z\s]/g, " ").split(/\s+/)) {
+            if (w.length < 2 || (business && NAME_STOP.has(w)) || out.includes(w)) continue;
+            out.push(w);
+        }
+        return out;
+    }
+    function editDistance(a, b) {
+        if (Math.abs(a.length - b.length) > 2) return 3;
+        const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+        for (let i = 1; i <= a.length; i++) {
+            let diag = prev[0];
+            prev[0] = i;
+            for (let j = 1; j <= b.length; j++) {
+                const tmp = prev[j];
+                prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+                diag = tmp;
+            }
+        }
+        return prev[b.length];
+    }
+    function nameCheck(text, name, opts) {
+        opts = opts || {};
+        const want = nameWords(name, opts.business);
+        if (!want.length) return { result: "unread", expected: String(name || ""), found: [], missing: [] };
+        const words = normalize(text).replace(/</g, " ").replace(/[^A-Z\s]/g, " ").split(/\s+/).filter((w) => w.length >= 2);
+        const has = (w) => words.some((t) => t === w
+            || (w.length >= 5 && t.length >= 4 && editDistance(w, t) <= (w.length >= 8 ? 2 : 1))
+            || (w.length >= 4 && t.includes(w)));
+        const found = want.filter(has);
+        const missing = want.filter((w) => !found.includes(w));
+        const need = opts.business ? Math.max(1, Math.ceil(want.length / 2)) : Math.min(2, want.length);
+        const readable = words.length >= 12 && (opts.confidence == null || opts.confidence >= 55);
+        let result;
+        if (found.length >= need) result = "match";
+        else if (!readable) result = "unread";
+        else if (found.length === 0) result = "mismatch";
+        else result = "partial";
+        return { result, expected: String(name || ""), found, missing };
+    }
+
     // --- Browser: run Tesseract ------------------------------------------------
     let workerPromise = null;
     let progressCb = null;     // the current read()'s onProgress, fed by Tesseract's logger
@@ -303,7 +362,8 @@
     }
 
     // Does this reading look like the right way up?
-    function looksRight(text, confidence) {
+    function looksRight(text, confidence, generic) {
+        if (generic) return (normalize(text).match(/[A-Z]{3,}/g) || []).length >= 12 && (confidence == null || confidence >= 40);
         const r = analyze(text, confidence, {});
         return r.ok || r.errors[0].code !== "not_id";
     }
@@ -322,8 +382,8 @@
                 const canvas = await canvasFor(image, angle);
                 const { data } = await worker.recognize(canvas);
                 let text = data.text || "";
-                const ok = looksRight(text, data.confidence);
-                if (ok && detectKind(normalize(text)) !== "driving_license") {
+                const ok = looksRight(text, data.confidence, opts.generic);
+                if (ok && !opts.generic && detectKind(normalize(text)) !== "driving_license") {
                     const band = await readMrzBand(worker, canvas).catch(() => "");
                     if (band) text += "\n" + band;
                 }
@@ -346,5 +406,5 @@
         return Object.assign(analyze(r.text, r.confidence, typed, opts && opts.now), { rotation: r.rotation, text: r.text });
     }
 
-    return { read, datesIn, analyze, parseMrz, readMrz, scanMrzExpiry, findDates, expiryFromLabel, detectKind, checkDigit, numberFound, readFile, MSG };
+    return { nameCheck, nameWords, read, datesIn, analyze, parseMrz, readMrz, scanMrzExpiry, findDates, expiryFromLabel, detectKind, checkDigit, numberFound, readFile, MSG };
 });

@@ -186,6 +186,8 @@ async function vmLoadHome() {
     el.innerHTML = '<div class="vm-loading-state">Loading...</div>';
     try {
         await vssLoadHome(el);
+        // Compliance banner + status card (vendor-compliance.js).
+        if (window.vdComplianceHome) window.vdComplianceHome(el);
     } catch (error) {
         console.error("vmLoadHome error:", error);
         el.innerHTML = '<div class="vm-loading-state">Could not load your dashboard.</div>';

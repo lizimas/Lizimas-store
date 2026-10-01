@@ -25,7 +25,9 @@ const { encryptField, decryptField, hashForLookup } = require("../utils/encrypti
 const { isValidAdminKycTransition, canVendorEditKyc, requiredDocumentTypesForKyc, KYC_DOCUMENT_LABELS } = require("../utils/vendorKyc");
 const { logActivity } = require("../utils/activityLog");
 const { uploadPrivateDocument, privateDocumentViewUrl, destroyPrivateDocument } = require("../utils/cloudinaryUpload");
-const { createVendorNotification } = require("./vendorController");
+const { createVendorNotification, releaseHoldIfReady } = require("./vendorController");
+const { canUploadKycDocument } = require("../utils/vendorHold");
+const { parseOcrText, checkDocumentNames, nameMismatchMessage } = require("../utils/documentNameCheck");
 const cloudinary = require("../config/cloudinary");
 const ImageChecks = require("../utils/imageChecks");
 const { ID_DOCUMENT_TYPE, checkAndUploadIdDocument, checkIdAcceptance } = require("../utils/idDocumentChecks");
@@ -50,7 +52,8 @@ const idDocumentDeps = {
 exports.getMyKyc = async (req, res) => {
     try {
         const vendorRow = await pool.query(
-            "SELECT id, account_type FROM vendors WHERE id = $1",
+            `SELECT id, account_type, COALESCE(documents_hold, false) AS documents_hold, hold_documents, hold_reason, hold_started_at
+             FROM vendors WHERE id = $1`,
             [req.vendorId]
         );
         if (vendorRow.rows.length === 0) {
@@ -73,8 +76,20 @@ exports.getMyKyc = async (req, res) => {
             [vendor.id]
         );
 
+        // Hold for documents (migration 145) + which documents the vendor
+        // may upload right now (also while KYC is otherwise locked).
+        const holdTypes = vendor.documents_hold ? (vendor.hold_documents || []) : [];
+        const hold = vendor.documents_hold
+            ? { documents: holdTypes, reason: vendor.hold_reason, started_at: vendor.hold_started_at } : null;
+        const docStatus = new Map(docRows.rows.map(d => [d.document_type, d.review_status]));
+        const uploadableTypes = (editable, required) => [...new Set([...required, ...holdTypes, "tax_certificate"])]
+            .filter(t => canUploadKycDocument({ kycEditable: editable, holdDocuments: holdTypes, docStatus: docStatus.get(t) }, t));
+
         if (kycRow.rows.length === 0) {
+            const required = requiredDocumentTypesForKyc({ accountType: vendor.account_type, requiresWorkPermit: false });
             return res.json({
+                hold,
+                uploadable_types: uploadableTypes(true, required),
                 kyc_status: "not_started",
                 identity_verified: false,
                 business_verified: false,
@@ -93,7 +108,10 @@ exports.getMyKyc = async (req, res) => {
         }
 
         const kyc = kycRow.rows[0];
+        const requiredNow = requiredDocumentTypesForKyc({ accountType: vendor.account_type, requiresWorkPermit: kyc.requires_work_permit });
         res.json({
+            hold,
+            uploadable_types: uploadableTypes(canVendorEditKyc(kyc.kyc_status), requiredNow),
             kyc_status: kyc.kyc_status,
             identity_verified: kyc.identity_verified,
             business_verified: kyc.business_verified,
@@ -284,30 +302,40 @@ exports.uploadMyKycDocument = async (req, res) => {
         }
 
         const vendorRow = await pool.query(
-            "SELECT id, account_type FROM vendors WHERE id = $1",
+            `SELECT v.id, v.account_type, v.business_name, u.name AS owner_name,
+                    COALESCE(v.documents_hold, false) AS documents_hold, v.hold_documents
+               FROM vendors v LEFT JOIN users u ON u.id = v.user_id WHERE v.id = $1`,
             [req.vendorId]
         );
         if (vendorRow.rows.length === 0) {
             return res.status(404).json({ error: "No vendor profile found for this account." });
         }
         const vendor = vendorRow.rows[0];
+        const holdTypes = vendor.documents_hold ? (vendor.hold_documents || []) : [];
 
         const existing = await pool.query(
             "SELECT kyc_status FROM vendor_kyc WHERE vendor_id = $1",
             [vendor.id]
         );
         const currentStatus = existing.rows.length > 0 ? existing.rows[0].kyc_status : "not_started";
-        if (!canVendorEditKyc(currentStatus)) {
+        const documentType = req.body.document_type;
+        // A locked KYC (verified / in review) still lets the vendor upload a
+        // document that is missing, was rejected, or that they're on hold
+        // for (utils/vendorHold.js canUploadKycDocument).
+        const current = await pool.query(
+            "SELECT review_status FROM vendor_kyc_documents WHERE vendor_id = $1 AND document_type = $2",
+            [vendor.id, documentType]
+        );
+        if (!canUploadKycDocument({ kycEditable: canVendorEditKyc(currentStatus), holdDocuments: holdTypes,
+                docStatus: current.rows[0] ? current.rows[0].review_status : null }, documentType)) {
             return res.status(409).json({
                 error: `Documents can't be changed while your KYC is ${currentStatus.replace(/_/g, " ")}. Contact support if something needs correcting.`
             });
         }
-
-        const documentType = req.body.document_type;
         // tax_certificate is also accepted (optional) for individual accounts -
         // the shop-setup Company Information step shows the TIN upload to
         // every vendor.
-        const allowedTypes = [...new Set([...requiredDocumentTypesForKyc({ accountType: vendor.account_type, requiresWorkPermit: true }), "tax_certificate"])];
+        const allowedTypes = [...new Set([...requiredDocumentTypesForKyc({ accountType: vendor.account_type, requiresWorkPermit: true }), "tax_certificate", ...holdTypes])];
         if (!allowedTypes.includes(documentType)) {
             return res.status(400).json({
                 error: `${KYC_DOCUMENT_LABELS[documentType] || documentType} isn't a document type accepted for a ${vendor.account_type} account. Accepted: ${allowedTypes.map((t) => KYC_DOCUMENT_LABELS[t] || t).join(", ")}.`
@@ -319,6 +347,21 @@ exports.uploadMyKycDocument = async (req, res) => {
             [vendor.id, documentType]
         );
 
+        // Names on the document must match the account (Oct 2026): the
+        // browser sends the text it read; a readable document showing none
+        // of the vendor's names is refused here, before anything is stored.
+        const nameCheck = checkDocumentNames({
+            documentType, ocr: parseOcrText(req.body.ocr),
+            ownerName: vendor.owner_name, businessName: vendor.business_name
+        });
+        if (nameCheck && nameCheck.result === "mismatch") {
+            return res.status(400).json({
+                error: "name_mismatch",
+                message: nameMismatchMessage(nameCheck, KYC_DOCUMENT_LABELS[documentType] || "document"),
+                name_check: nameCheck
+            });
+        }
+
         // Identity document: National ID, Passport or Driving Licence, with
         // its type, number and expiry, and automatic photo checks.
         let uploaded, idFields = { kind: null, number: null, expires: null }, autoChecks = null;
@@ -329,6 +372,9 @@ exports.uploadMyKycDocument = async (req, res) => {
         } else {
             uploaded = await uploadPrivateDocument(req.file.buffer, req.file.originalname);
         }
+        // Keep the name check result for the admin reviewer.
+        const nameNote = nameCheck || { result: "not_checked" };
+        autoChecks = Object.assign(autoChecks || { checked_at: new Date().toISOString() }, { name_check: nameNote });
 
         await pool.query(
             `INSERT INTO vendor_kyc_documents (vendor_id, document_type, cloudinary_public_id, resource_type, format, original_filename, bytes,
@@ -788,8 +834,13 @@ exports.reviewVendorKycDocumentAdmin = async (req, res) => {
         logActivity(req.user.userId, "vendor_kyc_document_review", "vendor", id,
             `Document ${documentType}: ${decision}`);
 
+        // On hold for documents (migration 145): lifts by itself once every
+        // held document is accepted.
+        const holdReleased = decision === "accepted" ? await releaseHoldIfReady(id, req.user.userId) : false;
+
         res.json({
             message: "Document review recorded.",
+            hold_released: holdReleased,
             decision,
             overall_kyc_status: newOverallStatus,
             auto_flipped: newOverallStatus !== currentStatus
