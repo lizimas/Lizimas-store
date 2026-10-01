@@ -513,6 +513,31 @@ async function vendorHomeNumbers(vendorId) {
     };
 }
 
+// Quick stock change from the vendor Listings table (Oct 2026). Only the
+// vendor's own product, only when stock isn't kept per colour/size (then
+// it's set in Edit), and blocked while on hold by the /products middleware.
+exports.setMyProductStock = async (req, res) => {
+    try {
+        const stock = Number(req.body && req.body.stock);
+        if (!Number.isInteger(stock) || stock < 0 || stock > 1000000) {
+            return res.status(400).json({ error: "Enter a whole number of 0 or more." });
+        }
+        const r = await pool.query(
+            "SELECT id, COALESCE(variant_stock_enabled, false) AS per_variant FROM products WHERE id = $1 AND vendor_id = $2 AND deleted_at IS NULL",
+            [req.params.id, req.vendorId]
+        );
+        if (!r.rows.length) return res.status(404).json({ error: "Product not found." });
+        if (r.rows[0].per_variant) {
+            return res.status(409).json({ error: "This product keeps stock per colour/size - change it in Edit > Variants." });
+        }
+        await pool.query("UPDATE products SET stock = $1 WHERE id = $2", [stock, req.params.id]);
+        logActivity(req.user.userId, "vendor_stock_updated", "product", req.params.id, String(stock));
+        res.json({ message: "Stock updated.", stock });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 exports.getVendorDashboardSummary = async (req, res) => {
     try {
         const vendorId = req.vendorId;

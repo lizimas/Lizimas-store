@@ -136,3 +136,47 @@
 .vcp-home { margin: 16px 24px 0; }
 @media (min-width: 1024px) { body.vsh-on .vcp-home .vcp-card { display: none; } }
 @media (max-width: 760px) { .vcp-home { margin: 12px 14px 0; } }
+
+/* Listings table on computers (vendor-products.js vpTableRow) */
+#vpm-list.vpt-mode { display: block !important; margin: 0 24px; }
+.vpt-wrap { background: #fff; border: 1px solid #eceef2; border-radius: 16px; overflow-x: auto; }
+.vpt { width: 100%; border-collapse: collapse; font-size: 14px; }
+.vpt th { text-align: left; background: #f8f9fb; color: #475467; font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+    padding: 12px 14px; border-bottom: 1px solid #eceef2; white-space: nowrap; }
+.vpt td { padding: 14px; border-bottom: 1px solid #f2f3f6; vertical-align: middle; color: #101828; }
+.vpt tbody tr:last-child td { border-bottom: 0; }
+.vpt tbody tr:hover { background: #fcfcfd; }
+.vpt-check { width: 36px; }
+.vpt-img { width: 64px; }
+.vpt-img img { width: 56px; height: 56px; object-fit: cover; border-radius: 10px; display: block; background: #f6f7f9; }
+.vpt-noimg { display: inline-flex; width: 56px; height: 56px; border-radius: 10px; background: #f2f4f7; color: #98a2b3; font-size: 10.5px; align-items: center; justify-content: center; text-align: center; }
+.vpt-name { min-width: 280px; }
+.vpt-title { font-size: 15px; color: #101828; }
+.vpt-id { color: #98a2b3; font-size: 13px; }
+.vpt-name .vp-qc { margin-left: 4px; vertical-align: 1px; }
+.vpt-sku { font-size: 13px; color: #667085; margin-top: 3px; }
+.vpt-reason { font-size: 12px; color: #b45309; margin-top: 4px; }
+.vpt-cat { color: #344054; min-width: 110px; }
+.vpt-nowrap { white-space: nowrap; }
+.vpt-price { font-weight: 600; }
+.vpt-old { color: #98a2b3; font-size: 12.5px; }
+.vpt-stock { font-weight: 700; }
+.vpt-low { color: #b45309; } .vpt-out { color: #b91c1c; }
+.vpt-live { white-space: nowrap; font-size: 13px; color: #475467; }
+.vpt-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #d0d5dd; margin-right: 6px; }
+.vpt-dot.vpt-on { background: #16a34a; }
+.vpt-switch { margin-top: 6px; }
+.vpt-actions { white-space: nowrap; }
+.vpt-actions button { display: block; width: 76px; margin: 0 0 4px; padding: 4px 8px; border: 1px solid #d0d5dd; background: #fff; border-radius: 7px;
+    font: inherit; font-size: 12.5px; color: #1a1a2e; cursor: pointer; text-align: center; }
+.vpt-actions button:hover { border-color: #1a1a2e; background: #fff8e1; }
+.vpt-actions .vp-danger { color: #b91c1c; }
+.vpt-deleted td { opacity: .55; }
+/* Quality: just the score in the table (click it for the tips). */
+.vpt-quality > :not(button) { display: none !important; }
+.vpt-quality button { font-size: 15px !important; }
+/* Export / filter / add buttons: a toolbar under the table on computers
+   instead of floating over it. */
+@media (min-width: 1024px) {
+    body.vsh-on .vpm-fab { position: static; justify-content: flex-end; padding: 14px 24px 0; }
+}

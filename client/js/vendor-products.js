@@ -591,12 +591,103 @@ function vpMobileCard(p) {
     </div>`;
 }
 
+// --- Listings table on computers (Oct 2026, like the admin Products list):
+// photo, name with #id and status, Seller / Lizimas SKU, category, price,
+// stock, quality, Live / Active, and View / Edit / Stock / Delete.
+// Phones keep the cards above. Same filters, search, selection and pages.
+const vpWide = () => window.matchMedia("(min-width: 1024px)").matches;
+let vpCatNames = null;
+async function vpLoadCategoryNames() {
+    if (vpCatNames) return;
+    vpCatNames = new Map();
+    try {
+        const cats = await (await fetch("/api/categories")).json();
+        if (Array.isArray(cats)) cats.forEach((c) => vpCatNames.set(Number(c.id), c.name));
+    } catch (e) { /* the column shows a dash */ }
+    if (vpWide()) vpRenderMobileList();
+}
+const VP_QC_CLASS = { "Pending QC": "vp-qc-wait", "Not Ready To QC": "vp-qc-warn", Draft: "vp-qc-warn", "Changes Requested": "vp-qc-warn", "Under Review": "vp-qc-bad", Rejected: "vp-qc-bad", Approved: "vp-qc-ok" };
+function vpTableRow(p) {
+    const f = vpFlags(p);
+    const id = Number(p.id);
+    const sel = vendorProductsSelected.has(id);
+    const img = p.image ? `<img src="${vpEsc(p.image)}" alt="" loading="lazy">` : '<span class="vpt-noimg">No photo</span>';
+    const price = p.sale_price
+        ? `<div class="vpt-price">${vpMoney(p.sale_price)}</div><s class="vpt-old">${vpMoney(p.price)}</s>`
+        : `<div class="vpt-price">${vpMoney(p.price)}</div>`;
+    const cat = vpCatNames && p.category_id ? vpCatNames.get(Number(p.category_id)) : null;
+    const stock = Number(p.stock) || 0;
+    return `<tr class="${f.deleted ? "vpt-deleted" : ""}">
+        <td class="vpt-check"><button type="button" class="vpm-check${sel ? " vpm-checked" : ""}" aria-label="Select ${vpEsc(p.name)}" ${f.deleted ? "disabled" : ""} onclick="vpToggleSelect(${id})">${sel ? VP_ICON.check : ""}</button></td>
+        <td class="vpt-img">${img}</td>
+        <td class="vpt-name"><div><span class="vpt-title">${vpEsc(p.name)}</span> <span class="vpt-id">#${id}</span>
+                <span class="vp-qc ${VP_QC_CLASS[f.qc] || ""}">${vpEsc(f.qc)}</span>${f.pendingDeletion ? ' <span class="vp-qc vp-qc-warn">Pending Deletion</span>' : ""}</div>
+            <div class="vpt-sku">Seller SKU: ${p.sku ? vpEsc(p.sku) : "&mdash;"} &middot; Lizimas SKU: ${p.lizimas_sku ? vpEsc(p.lizimas_sku) : "&mdash;"}</div>
+            ${f.reason ? `<div class="vpt-reason">${vpEsc(f.reason)}</div>` : ""}</td>
+        <td class="vpt-cat">${cat ? vpEsc(cat) : "&mdash;"}</td>
+        <td class="vpt-nowrap">${price}${p.subsidy_price ? `<div class="vpm-subsidy">Subsidy ${vpMoney(p.subsidy_price)}</div>` : ""}</td>
+        <td class="vpt-stock${stock <= 0 ? " vpt-out" : stock < 10 ? " vpt-low" : ""}">${stock}</td>
+        <td class="vpt-quality">${typeof vendorQualityScoreBadge === "function" ? vendorQualityScoreBadge(p) : "&mdash;"}</td>
+        <td class="vpt-live">${f.live ? '<span class="vpt-dot vpt-on"></span>Live' : '<span class="vpt-dot"></span>Not live'}
+            <div class="vpt-switch">${f.deleted ? '<span class="vp-muted">Deleted</span>' : vpActiveSwitch(p, f)}</div></td>
+        <td class="vpt-actions">${f.deleted ? '<span class="vp-muted">&mdash;</span>' : `
+            <button type="button" onclick="vpViewProduct(${id})"${f.live ? "" : ' title="Not live on the store yet - opens a preview in Edit"'}>View</button>
+            <button type="button" onclick="vmEditProduct(${id})">Edit</button>
+            <button type="button" onclick="vpQuickStock(${id})">Stock</button>
+            <button type="button" class="vp-danger" onclick="vpDeleteOne(${id})">Delete</button>`}</td>
+    </tr>`;
+}
+function vpTableHtml(pageRows) {
+    if (!pageRows.length) return '<div class="vpm-empty">No products to display!</div>';
+    return `<div class="vpt-wrap"><table class="vpt"><thead><tr><th></th><th></th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Quality</th><th>Live / Active</th><th>Actions</th></tr></thead>
+        <tbody>${pageRows.map(vpTableRow).join("")}</tbody></table></div>`;
+}
+function vpViewProduct(id) {
+    const p = vpAllProducts.find((x) => Number(x.id) === Number(id));
+    if (!p) return;
+    if (vpFlags(p).live) window.open("/product/" + Number(id), "_blank", "noopener");
+    else vmEditProduct(Number(id));
+}
+async function vpQuickStock(id) {
+    const p = vpAllProducts.find((x) => Number(x.id) === Number(id));
+    if (!p) return;
+    const val = prompt(`Stock for "${p.name}" (current: ${Number(p.stock) || 0})`, String(Number(p.stock) || 0));
+    if (val === null) return;
+    const stock = Number(String(val).trim());
+    if (!Number.isInteger(stock) || stock < 0) { alert("Enter a whole number of 0 or more."); return; }
+    try {
+        const res = await fetch(`${API_URL}/api/vendors/products/${Number(id)}/stock`, {
+            method: "PATCH", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${getVendorToken()}` },
+            body: JSON.stringify({ stock })
+        });
+        const r = await res.json().catch(() => ({}));
+        if (!res.ok) { alert(r.message || r.error || "Could not update the stock."); return; }
+        p.stock = stock;
+        const cached = (vendorProductsCache || []).find((x) => Number(x.id) === Number(id));
+        if (cached) cached.stock = stock;
+        vpRenderMobileList();
+    } catch (e) {
+        alert("Could not update the stock. Please try again.");
+    }
+}
+let vpWasWide = null;
+window.addEventListener("resize", () => {
+    const w = vpWide();
+    if (vpWasWide !== null && w !== vpWasWide) vpRenderMobileList();
+    vpWasWide = w;
+});
+
 function vpRenderMobileList() {
     const list = document.getElementById("vpm-list");
     if (!list) return;
     const rows = vpRows();
     const { pageRows, start } = vpPageRows(rows);
-    list.innerHTML = pageRows.length ? pageRows.map(vpMobileCard).join("") : '<div class="vpm-empty">No products to display!</div>';
+    const wide = vpWide();
+    vpWasWide = wide;
+    if (wide) vpLoadCategoryNames();
+    list.classList.toggle("vpt-mode", wide);
+    list.innerHTML = wide ? vpTableHtml(pageRows)
+        : (pageRows.length ? pageRows.map(vpMobileCard).join("") : '<div class="vpm-empty">No products to display!</div>');
     const pager = document.getElementById("vpm-pager");
     if (pager) pager.innerHTML = vpPagerHtml(rows.length, start, pageRows.length, true);
     const all = document.getElementById("vpm-check-all");

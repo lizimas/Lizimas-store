@@ -233,6 +233,7 @@ router.patch("/products/bulk", requireVendorPermission("vc_product_manager", "vc
 router.post("/products", requireVendorPermission("vc_product_manager"), upload.productPhotos.array("images", 20), addProduct);
 router.post("/products/import", requireVendorPermission("vc_product_manager"), csvUpload.single("file"), importVendorProducts);
 router.put("/products/:id", requireVendorPermission("vc_product_manager", "vc_product_update"), upload.productPhotos.array("images", 20), updateProduct);
+router.patch("/products/:id/stock", requireVendorPermission("vc_product_manager", "vc_product_update"), require("../controllers/vendorController").setMyProductStock);
 router.delete("/products/:id", requireVendorPermission("vc_product_manager"), deleteProduct);
 router.get("/products/:id/images", getProductImages);
 router.patch("/products/:id/images/order", updateImageOrder);
