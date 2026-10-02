@@ -17,6 +17,7 @@ router.get('/sitemap.xml', async (req, res) => {
       { url: '/help', priority: '0.5', changefreq: 'monthly' },
       { url: '/returns', priority: '0.5', changefreq: 'monthly' },
       { url: '/vendor-requirements', priority: '0.8', changefreq: 'monthly' },
+      { url: '/kyc-documents', priority: '0.7', changefreq: 'monthly' },
       { url: '/vendor-register', priority: '0.8', changefreq: 'monthly' },
       { url: '/vendor-policies', priority: '0.5', changefreq: 'monthly' },
       { url: '/report', priority: '0.3', changefreq: 'monthly' },
