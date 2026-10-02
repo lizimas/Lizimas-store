@@ -5590,7 +5590,7 @@ function vendorProductSummary() {
     const agreed = !!(document.getElementById("product-authenticity-confirm") || {}).checked;
     return [
         { label: "Product name", value: val("product-name") || "Missing", ok: !!val("product-name"), step: 1 },
-        { label: "SKU", value: vdSkuBase(val("product-sku")) ? vdSkuBase(val("product-sku")) + "-" + VD_SKU_SUFFIX : "Missing", ok: !!vdSkuBase(val("product-sku")), step: 1 },
+        { label: "SKU", value: vdSkuBase(val("product-sku")) ? vdSkuBase(val("product-sku")) + VD_SKU_SUFFIX : "Missing", ok: !!vdSkuBase(val("product-sku")), step: 1 },
         { label: "Category", value: hasCat ? catLabel : "Missing", ok: hasCat, step: 1 },
         { label: "Brand", value: val("product-brand") || "-", step: 1 },
         { label: "Photos", value: n + " of " + VD_MAX_PHOTOS + " (at least " + min + ")", ok: n >= min && n <= VD_MAX_PHOTOS, step: 1 },

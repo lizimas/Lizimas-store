@@ -181,7 +181,7 @@ exports.addProduct = async (req, res) => {
         const draft = wantsDraft(req.body);
         const status = draft ? "draft" : (["product_staff", "vendor", "vendor_staff"].includes(req.user.role) ? "pending" : "approved");
 
-        // Vendors must give their own SKU; it always ends in -ULZMS and is
+        // Vendors must give their own SKU; it always ends in ULZMS and is
         // never made automatically (a draft may be saved without one).
         const isVendorUser = ["vendor", "vendor_staff"].includes(req.user.role);
         let vendorSku = null;
