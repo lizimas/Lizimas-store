@@ -59,7 +59,6 @@ const VM_NAV_FALLBACK = {
 // into #vm-desk-host and its usual loader runs (the hidden sidebar button's
 // click handler), so nothing is re-implemented.
 const VM_DESK_TABS = {
-    overview: "Performance Overview",
     inventory: "Inventory",
     returns: "Returns",
     refunds: "Returns & Refunds",
@@ -105,7 +104,7 @@ function vmDeskToolsCard() {
     const chev = '<span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>';
     const rows = Object.keys(VM_DESK_TABS).filter(t => document.getElementById(`tab-${t}`)).map(t =>
         `<button class="vm-list-row" onclick="vmOpenDeskTab('${t}')"><span class="vm-list-row-label">${VM_DESK_TABS[t].replace(/&/g, "&amp;")}</span>${chev}</button>`).join("");
-    return `<div class="vm-card vm-desk-only" style="padding:4px 16px;">
+    return `<div class="vm-card vm-desk-only vsh-hide-desk" style="padding:4px 16px;">
         <div class="vm-group-header"><span class="vm-group-header-label">More tools</span></div>
         ${rows}
         <a class="vm-list-row" href="../seller-guide" target="_blank" rel="noopener" style="text-decoration:none; color:inherit;"><span class="vm-list-row-label">Seller Guide</span>${chev}</a>
@@ -2410,12 +2409,17 @@ function vmRenderProfile(v, notices) {
 
     const noticesCard = `<div class="vm-card"><div class="vm-card-title">Notices</div>${notices.length === 0 ? '<div style="font-size:12.5px; color:#888;">No notices on your account.</div>' : notices.map(vmNoticeCard).join("")}</div>`;
 
+    // On a computer the left menu already has Promotions, Account Statements,
+    // Settings and the rest, so only Verification stays on the Profile page
+    // there (class vsh-hide-desk hides the others when the menu is showing).
     const moreCard = `<div class="vm-card" style="padding:4px 16px;">
         <button class="vm-list-row" onclick="vmShowScreen('verification')">
             <span class="vm-list-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="12" r="2.5"/><path d="M14 10h4M14 14h3"/></svg></span>
             <span class="vm-list-row-label">Identity &amp; Business Verification</span>
             <span class="vm-list-row-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
         </button>
+    </div>
+    <div class="vm-card vsh-hide-desk" style="padding:4px 16px;">
         <button class="vm-list-row" onclick="vmShowScreen('promotions')">
             <span class="vm-list-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 13v-2Z"/><path d="M11.6 16.8 13 21h-3l-1.4-4.8"/></svg></span>
             <span class="vm-list-row-label">Promotions</span>
@@ -2449,7 +2453,7 @@ function vmRenderProfile(v, notices) {
     </div>
     `;
 
-    const logoutRow = `<div class="vm-card" style="padding:4px 16px; margin-top:14px;"><button class="vm-list-row vm-danger" onclick="vendorLogout()">
+    const logoutRow = `<div class="vm-card vsh-hide-desk" style="padding:4px 16px; margin-top:14px;"><button class="vm-list-row vm-danger" onclick="vendorLogout()">
         <span class="vm-list-row-label">Logout</span>
     </button></div>`;
 

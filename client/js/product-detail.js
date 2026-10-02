@@ -1068,7 +1068,7 @@ function reportProduct() {
 
 
 /* ------------------------------------------------------------------
-   Page layout helpers (Sept 2026 redesign: Jumia-style right column,
+   Page layout helpers (Sept 2026 redesign: marketplace-style right column,
    Lulu-style details panel under the photos).
    ------------------------------------------------------------------ */
 
@@ -1082,7 +1082,7 @@ function pdStore(key, value) {
     return null;
 }
 
-// "8 items in stock" with a bar, like Jumia. Plenty of stock just says
+// "8 items in stock" with a bar, as large stores do. Plenty of stock just says
 // "In stock"; none says "Out of stock".
 function pdRenderStock(product) {
     const el = document.getElementById("pd-stock");

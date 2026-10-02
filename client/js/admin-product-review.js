@@ -4,7 +4,7 @@
 //    flag), search by name or SKU, thumbnails, bulk approve/reject, pages.
 //    Cards on phones.
 // 2. The review sections used by admin-product-view.js: overview, pricing
-//    with price comparison (similar Lizimas items + Jumia prices recorded by
+//    with price comparison (similar Lizimas items + market prices recorded by
 //    admin), seller information, compliance checks, internal notes,
 //    approval history, and the decision panel (Approve · Request Changes ·
 //    Reject · Under Investigation · Save as Draft) with the reason dropdown.
@@ -336,23 +336,23 @@
         const ref = x.market_reference;
         const req = x.market_required
             ? `<div class="pr-req${x.market_missing ? " is-missing" : ""}">${x.market_missing
-                ? `Required: products from ${ugx(x.market_threshold)} need Jumia prices (last ${x.market_max_age_days} days) before approval.`
-                : "Jumia check done - required for this price."}</div>` : "";
+                ? `Required: products from ${ugx(x.market_threshold)} need market prices (last ${x.market_max_age_days} days) before approval.`
+                : "Market check done - required for this price."}</div>` : "";
         const market = `<div class="pr-pcard">
-            <div class="pr-pcard-title pr-row-between">2. External comparison <small class="pr-muted">Jumia Uganda</small>
-                <a class="pr-btn pr-plain pr-sm" href="${esc(x.market_search.jumia_url)}" target="_blank" rel="noopener noreferrer">Search Jumia ↗</a></div>
+            <div class="pr-pcard-title pr-row-between">2. External comparison <small class="pr-muted">Market prices</small>
+                <a class="pr-btn pr-plain pr-sm" href="${esc(x.market_search.search_url)}" target="_blank" rel="noopener noreferrer">Search market prices ↗</a></div>
             <p class="pr-muted" style="margin-top:0;">Search: "${esc(x.market_search.term)}"</p>
             ${req}
             ${last ? priceRows(last, sell) + flagPill(last.result) +
                 `<p class="pr-muted">Last checked by ${esc(last.checked_by_name || "admin")} · ${esc(day(last.checked_at))}${x.market.length > 1 ? ` · ${x.market.length} checks saved` : ""}</p>`
-              : ref ? `<div class="pr-ref"><b>Reference</b> - no Jumia prices for this product yet. Latest for a similar product
+              : ref ? `<div class="pr-ref"><b>Reference</b> - no market prices for this product yet. Latest for a similar product
                     (<button type="button" class="pr-link" data-review="${ref.product_id}">${esc(ref.name)}</button>, ${esc(day(ref.checked_at))}):
                     ${priceRows(ref, sell)}${flagPill(ref.result)}</div>`
-              : '<p class="pr-muted">No Jumia prices recorded yet.</p>'}
+              : '<p class="pr-muted">No market prices recorded yet.</p>'}
             <div class="pr-mform">
-                <div class="pr-subhead" style="margin-top:6px;">Fastest: paste the Jumia results page</div>
-                <p class="pr-muted" style="margin-top:0;">Open Search Jumia, refine the results if needed, press <kbd>Cmd</kbd>+<kbd>A</kbd> then <kbd>Cmd</kbd>+<kbd>C</kbd> (Ctrl on Windows), and paste below.</p>
-                <textarea class="pr-in" rows="3" data-pr="paste" placeholder="Paste the Jumia page here…"></textarea>
+                <div class="pr-subhead" style="margin-top:6px;">Fastest: paste the results page</div>
+                <p class="pr-muted" style="margin-top:0;">Open Search market prices, refine the results if needed, press <kbd>Cmd</kbd>+<kbd>A</kbd> then <kbd>Cmd</kbd>+<kbd>C</kbd> (Ctrl on Windows), and paste below.</p>
+                <textarea class="pr-in" rows="3" data-pr="paste" placeholder="Paste the results page here…"></textarea>
                 <button type="button" class="pr-btn pr-plain" data-pr="read-paste">Read prices</button>
                 <span class="pr-muted" data-pr="paste-msg" aria-live="polite"></span>
                 <div class="pr-subhead">Or type them</div>
@@ -486,7 +486,7 @@
                 const body = { action, reason_code: sel.value || undefined, reason_text: q("text").value.trim() };
                 const err = q("err"); err.textContent = "";
                 if (action === "approve" && b.dataset.needsMarket) {
-                    err.textContent = `Record Jumia prices first - required for products from ${ugx(r.pricing.market_threshold)}.`;
+                    err.textContent = `Record market prices first - required for products from ${ugx(r.pricing.market_threshold)}.`;
                     const t = overlay.querySelector("#pr-pricing"); if (t) t.scrollIntoView({ behavior: "smooth" });
                     return;
                 }
@@ -530,7 +530,7 @@
         if (readPaste) readPaste.onclick = async () => {
             const pasted = q("paste").value;
             const msg = q("paste-msg");
-            if (!pasted.trim()) { msg.textContent = "Paste the Jumia page first."; return; }
+            if (!pasted.trim()) { msg.textContent = "Paste the results page first."; return; }
             msg.textContent = "Reading…";
             try {
                 const out = await call(`${API}/${p.id}/market-price`, "POST", { pasted, dry_run: true });
@@ -545,11 +545,11 @@
             try { await call(`${API}/${p.id}/cost`, "PUT", { cost_price: q("cost").value.trim() }); toast("Cost price saved."); reopen("pr-pricing"); }
             catch (e) { toast(e.message, true); }
         };
-        // Approval needs Jumia prices for higher-priced products.
+        // Approval needs market prices for higher-priced products.
         if (r.pricing.market_missing) {
             overlay.querySelectorAll('[data-act="approve"]').forEach((b) => {
                 b.dataset.needsMarket = "1";
-                b.title = "Record Jumia prices first (Pricing section)";
+                b.title = "Record market prices first (Pricing section)";
             });
         }
 
@@ -557,7 +557,7 @@
         if (saveMarket) saveMarket.onclick = async () => {
             const body = {};
             overlay.querySelectorAll("[data-m]").forEach((i) => { body[i.dataset.m] = i.value.trim(); });
-            body.source = "jumia.ug";
+            body.source = "market";
             try { await call(`${API}/${p.id}/market-price`, "POST", body); reopen("pr-pricing"); }
             catch (e) { q("market-msg").textContent = e.message; }
         };

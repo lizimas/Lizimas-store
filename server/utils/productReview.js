@@ -70,7 +70,7 @@ function validateDecision(product, input) {
         return { ok: false, error: "Add a short note on why this is under investigation (internal)." };
     }
     if (action === "approve" && needsMarketCheck(product.price, product.last_market_check_at, input.now)) {
-        return { ok: false, error: `Products from UGX ${MARKET_CHECK_THRESHOLD.toLocaleString("en-US")} need Jumia prices recorded (in the last ${MARKET_CHECK_MAX_AGE_DAYS} days) before approval - see Pricing.` };
+        return { ok: false, error: `Products from UGX ${MARKET_CHECK_THRESHOLD.toLocaleString("en-US")} need market prices recorded (in the last ${MARKET_CHECK_MAX_AGE_DAYS} days) before approval - see Pricing.` };
     }
     const reason = code ? REASON_BY_CODE[code] : null;
     const vendorMessage = [reason && reason.code !== "other" ? reason.vendor : "", text].filter(Boolean).join(" ");
@@ -121,8 +121,8 @@ function combinedVerdict(internalFlag, marketFlagValue) {
     const a = side(internalFlag), b = side(marketFlagValue);
     if (a && a === b) {
         return a === "low"
-            ? { tone: "bad", text: "Both Lizimas and Jumia say this price is low - check it's genuine before approving." }
-            : { tone: "bad", text: "Both Lizimas and Jumia say this price is high - consider asking the seller to lower it." };
+            ? { tone: "bad", text: "Both Lizimas and the market check say this price is low - check it's genuine before approving." }
+            : { tone: "bad", text: "Both Lizimas and the market check say this price is high - consider asking the seller to lower it." };
     }
     return null;
 }
@@ -137,7 +137,7 @@ function priceStats(prices, price, minCount) {
     return out;
 }
 
-// Products at or above this price need Jumia prices recorded (within
+// Products at or above this price need market prices recorded (within
 // MARKET_CHECK_MAX_AGE_DAYS) before they can be approved.
 const MARKET_CHECK_THRESHOLD = 100000;
 const MARKET_CHECK_MAX_AGE_DAYS = 30;
@@ -219,7 +219,7 @@ function marketSearchTerm(product) {
     const words = keyWords(String(product.name || "").replace(new RegExp(brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), "")).slice(0, 4);
     return [brand, ...words, attr].filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 120);
 }
-function jumiaSearchUrl(term) {
+function marketSearchUrl(term) {
     return "https://www.jumia.ug/catalog/?q=" + encodeURIComponent(term).replace(/%20/g, "+");
 }
 
@@ -231,7 +231,7 @@ function validateMarketCheck(input) {
     if (low != null && low > typ) return { ok: false, error: "Lowest can't be above typical." };
     if (high != null && high < typ) return { ok: false, error: "Highest can't be below typical." };
     return { ok: true, value: { lowest_price: low, typical_price: typ, highest_price: high, product_count: cnt,
-        source: String(input.source || "jumia.ug").slice(0, 50), search_term: String(input.search_term || "").slice(0, 255) || null } };
+        source: String(input.source || "market").slice(0, 50), search_term: String(input.search_term || "").slice(0, 255) || null } };
 }
 
 // A pasted list of SKUs ("YD-8203, YD-8209 YD-8210" or one per line) ->
@@ -251,5 +251,5 @@ module.exports = {
     STATUS_LABELS, REASONS, REASON_BY_CODE, FLAGS, ACTIONS,
     validateDecision, priceFlag, priceStats, median, marketFlag, combinedVerdict, FLAG_INFO,
     MARKET_CHECK_THRESHOLD, MARKET_CHECK_MAX_AGE_DAYS, needsMarketCheck, parsePastedPrices, margin,
-    keyWords, keyAttribute, similarity, marketSearchTerm, jumiaSearchUrl, validateMarketCheck
+    keyWords, keyAttribute, similarity, marketSearchTerm, marketSearchUrl, validateMarketCheck
 };

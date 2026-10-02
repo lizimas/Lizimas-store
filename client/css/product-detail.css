@@ -420,7 +420,7 @@ body { margin: 0; font-family: sans-serif; background: #fff; padding-bottom: 70p
 
 /* ==================================================================
    Page layout (Sept 2026). Desktop: product card + details panel on the
-   left, Jumia-style column on the right (delivery & returns, seller, a
+   left, marketplace-style column on the right (delivery & returns, seller, a
    small buy card and chat that stay in view). Phone: one column - photos,
    buy box, delivery & seller, then the details tabs.
    ================================================================== */

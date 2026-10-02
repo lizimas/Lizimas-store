@@ -215,3 +215,6 @@ button.vsh-brand:hover .vsh-logo { box-shadow: 0 0 0 4px rgba(244,180,0,.25); }
 .vsh-acct-item { padding: 10px 14px; font-size: 13.5px; }
 .vsh-acct-item[data-vsh="logout"] { color: #b42318; }
 .vm-header-brand { cursor: pointer; }
+/* On a computer the left menu is the one place for navigation: rows that
+   repeat it on the Profile page are shown on phones only. */
+@media (min-width: 1024px) { body.vsh-on .vsh-hide-desk { display: none !important; } }

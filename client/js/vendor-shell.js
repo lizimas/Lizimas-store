@@ -46,23 +46,25 @@
         ["add-product", "list", "Add Products", () => vmShowScreen("add-product"), "sub"],
         ["consignments", "list", "Fulfilment by Lizimas", () => vmShowScreen("consignments"), "sub"],
         ["import-products", "list", "Import Products", () => vmShowScreen("import-products"), "sub"],
+        ["desk:inventory", "list", "Inventory", () => vmOpenDeskTab("inventory"), "sub"],
         ["stock-recommendation", "bulb", "Stock Recommendation", () => vmShowScreen("stock-recommendation")],
         ["promotions", "tag", "Promotions", () => vmShowScreen("promotions")],
         ["ads", "ads", "Advertise your Products", () => vmShowScreen("ads")],
         ["wallet", "sheet", "Account Statements", () => vmShowScreen("wallet")],
-        ["desk:refunds", "returns", "Returns & Refunds", () => vmOpenDeskTab("refunds")],
+        ["desk:refunds", "returns", "Returns & Refunds", () => vmOpenDeskTab("refunds"), "sub", "returns"],
+        ["desk:returns", "returns", "Awaiting Collection", () => vmOpenDeskTab("returns"), "sub", "returns"],
         ["desk:reports", "chart", "Analytics", () => vmOpenDeskTab("reports")],
         ["desk:reviews", "star", "Reviews", () => vmOpenDeskTab("reviews")],
         ["desk:messages", "chat", "Messages", () => vmOpenDeskTab("messages")],
         // account block
         ["feedback", "smile", "Give us your feedback!", () => vmOpenDeskTab("messages"), "acct"],
-        ["verification", "shield", "Verification", () => vmShowScreen("verification"), "acct"],
-        ["commissions-fees", "percent", "Commissions & Fees", () => vmShowScreen("commissions-fees"), "acct"],
         ["settings", "gear", "Settings", () => vmShowScreen("settings"), "acct"],
         ["account", "user", "Profile", () => vmShowScreen("account"), "acct"],
-        ["help", "help", "Help & Support", () => window.open("../seller-guide", "_blank", "noopener"), "acct"],
         ["logout", "out", "Logout", () => { if (typeof vendorLogout === "function") vendorLogout(); }, "acct"]
     ];
+    // Each menu item appears once. Lists that open: Products and Returns.
+    const GROUPS = { products: ["Products", "list"], returns: ["Returns", "returns"] };
+    const groupOf = (i) => i[4] === "sub" ? (i[5] || "products") : null;
     const SUBS = ITEMS.filter(i => i[4] === "sub").map(i => i[0]);
     let current = "home";
     const item = ([key, icon, label], cls, withIcon) =>
@@ -74,14 +76,21 @@
         side.id = "vsh-side";
         side.className = "vsh-side";
         side.setAttribute("aria-label", "Vendor menu");
-        const main = ITEMS.filter(i => !i[4]);
-        const before = main.slice(0, 1), after = main.slice(1);
+        // In menu order: a list's heading is placed where its first item sits.
+        let navHtml = "";
+        const placed = new Set();
+        ITEMS.forEach(i => {
+            if (i[4] === "acct" || i[4] === "hidden") return;
+            const g = groupOf(i);
+            if (!g) { navHtml += item(i, "", true); return; }
+            if (placed.has(g)) return;
+            placed.add(g);
+            navHtml += `<button type="button" class="vsh-item vsh-group" data-group="${g}" aria-expanded="false">${ico(GROUPS[g][1])}<span>${esc(GROUPS[g][0])}</span>${ico("chev", 18)}</button>` +
+                `<div class="vsh-subs" data-subs="${g}" hidden>` + ITEMS.filter(x => groupOf(x) === g).map(x => item(x, "vsh-sub", false)).join("") + "</div>";
+        });
         side.innerHTML =
             '<button type="button" class="vsh-brand" data-vsh="home" title="Go to the home page" aria-label="Lizimas Vendor - go to the home page"><span class="vsh-logo">LV</span><span>Lizimas <b>Vendor</b></span></button>' +
-            '<nav class="vsh-nav">' + before.map(i => item(i, "", true)).join("") +
-                `<button type="button" class="vsh-item vsh-group" id="vsh-products-group" aria-expanded="false">${ico("list")}<span>Products</span>${ico("chev", 18)}</button>` +
-                '<div class="vsh-subs" id="vsh-products-subs" hidden>' + ITEMS.filter(i => i[4] === "sub").map(i => item(i, "vsh-sub", false)).join("") + "</div>" +
-                after.map(i => item(i, "", true)).join("") + "</nav>" +
+            '<nav class="vsh-nav">' + navHtml + "</nav>" +
             '<div class="vsh-foot">' +
                 '<div class="vsh-comp" id="vsh-comp"></div>' +
                 `<button type="button" class="vsh-shop-btn" data-shop>${ico("store", 20)}<span>My Storefront</span></button>` +
@@ -89,11 +98,12 @@
                 '<div class="vsh-acct-menu" id="vsh-acct-menu" hidden>' + ITEMS.filter(i => i[4] === "acct").map(i => item(i, "vsh-acct-item", false)).join("") + "</div>" +
             "</div>";
         document.body.appendChild(side);
-        const openGroup = (on) => { const g = document.getElementById("vsh-products-group"), box = document.getElementById("vsh-products-subs"); box.hidden = !on; g.setAttribute("aria-expanded", on ? "true" : "false"); g.classList.toggle("open", on); };
+        const openGroup = (name, on) => { const g = side.querySelector(`[data-group="${name}"]`), box = side.querySelector(`[data-subs="${name}"]`); if (!g || !box) return; box.hidden = !on; g.setAttribute("aria-expanded", on ? "true" : "false"); g.classList.toggle("open", on); };
         const openAcct = (on) => { const g = document.getElementById("vsh-acct"), box = document.getElementById("vsh-acct-menu"); box.hidden = !on; g.setAttribute("aria-expanded", on ? "true" : "false"); g.classList.toggle("open", on); if (on) box.scrollIntoView({ block: "nearest" }); };
         side._openGroup = openGroup;
         side.addEventListener("click", (e) => {
-            if (e.target.closest("#vsh-products-group")) { openGroup(document.getElementById("vsh-products-subs").hidden); return; }
+            const head = e.target.closest("[data-group]");
+            if (head) { openGroup(head.dataset.group, side.querySelector(`[data-subs="${head.dataset.group}"]`).hidden); return; }
             if (e.target.closest("#vsh-acct")) { openAcct(document.getElementById("vsh-acct-menu").hidden); return; }
             if (e.target.closest("[data-shop]")) { current = "desk:storefront"; vmOpenDeskTab("storefront"); mark(); return; }
             const b = e.target.closest("[data-vsh]");
@@ -123,8 +133,9 @@
         document.querySelectorAll(".vsh-item[data-vsh]").forEach(b => b.classList.toggle("on", b.dataset.vsh === current));
         const shop = document.querySelector(".vsh-shop-btn"); if (shop) shop.classList.toggle("on", current === "desk:storefront");
         const side = document.getElementById("vsh-side");
-        if (side && side._openGroup && SUBS.includes(current)) side._openGroup(true);
-        const g = document.getElementById("vsh-products-group"); if (g) g.classList.toggle("has-on", SUBS.includes(current));
+        const cur = ITEMS.find(i => i[0] === current), curGroup = cur ? groupOf(cur) : null;
+        if (side && side._openGroup && curGroup) side._openGroup(curGroup, true);
+        document.querySelectorAll(".vsh-group").forEach(g => g.classList.toggle("has-on", g.dataset.group === curGroup));
         const it = ITEMS.find(i => i[0] === current);
         const t = document.getElementById("vsh-top-title");
         if (t) t.textContent = current === "desk:storefront" ? "My Storefront" : it ? it[2] : "";

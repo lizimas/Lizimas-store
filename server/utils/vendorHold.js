@@ -25,7 +25,7 @@ function vendorSellableSql(alias) {
 // in the environment switches the limit off.
 const PENDING_ORDER_LIMIT = (() => {
     const n = Number(process.env.PENDING_ORDER_LIMIT);
-    return Number.isInteger(n) && n >= 0 ? n : 5;
+    return Number.isInteger(n) && n >= 0 ? n : 15;
 })();
 // Orders that count: paid for, not cancelled / shipped / delivered, with an
 // item the vendor has not handed over yet.

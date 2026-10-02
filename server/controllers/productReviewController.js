@@ -136,7 +136,7 @@ async function priceComparison(product) {
     const term = R.marketSearchTerm(product);
     const range = (m) => ({ lowest: m.lowest_price, typical: m.typical_price, highest: m.highest_price });
     const marketRows = market.map((m) => ({ ...m, result: R.marketFlag(product.price, range(m)) }));
-    // No Jumia prices for this product yet: show the latest ones recorded for a
+    // No market prices for this product yet: show the latest ones recorded for a
     // very similar product (same size/capacity) as a reference.
     let reference = null;
     if (!market.length) {
@@ -160,7 +160,7 @@ async function priceComparison(product) {
         market_missing: R.needsMarketCheck(product.price, last),
         market_threshold: R.MARKET_CHECK_THRESHOLD,
         market_max_age_days: R.MARKET_CHECK_MAX_AGE_DAYS,
-        market_search: { term, jumia_url: R.jumiaSearchUrl(term) }
+        market_search: { term, search_url: R.marketSearchUrl(term) }
     };
 }
 
@@ -423,7 +423,7 @@ exports.addMarketPrice = async (req, res) => {
         // "Paste the results page": read the prices out of the pasted text.
         if (body.pasted) {
             const parsed = R.parsePastedPrices(body.pasted);
-            if (parsed.prices.length < 1) return res.status(400).json({ error: "No prices found in what you pasted. On the Jumia results page press Cmd+A (select all), Cmd+C (copy), then paste here." });
+            if (parsed.prices.length < 1) return res.status(400).json({ error: "No prices found in what you pasted. On the results page press Cmd+A (select all), Cmd+C (copy), then paste here." });
             const result = R.marketFlag(product.price, parsed);
             if (body.dry_run) return res.json({ parsed: { ...parsed, prices: parsed.prices.slice(0, 60) }, result });
             Object.assign(body, { lowest_price: parsed.lowest, typical_price: parsed.typical, highest_price: parsed.highest, product_count: parsed.prices.length });

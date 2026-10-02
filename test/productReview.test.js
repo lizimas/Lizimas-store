@@ -52,7 +52,7 @@ test("both comparisons agreeing gives a stronger warning", () => {
     assert.equal(R.combinedVerdict(undefined, "high"), null);
 });
 
-test("products from UGX 100,000 need a recent Jumia check before approval", () => {
+test("products from UGX 100,000 need a recent market check before approval", () => {
     const now = Date.parse("2026-09-29T12:00:00Z");
     assert.equal(R.needsMarketCheck(99000, null, now), false);
     assert.equal(R.needsMarketCheck(132000, null, now), true);
@@ -60,7 +60,7 @@ test("products from UGX 100,000 need a recent Jumia check before approval", () =
     assert.equal(R.needsMarketCheck(132000, "2026-08-01T00:00:00Z", now), true);
     const blocked = R.validateDecision({ status: "pending", price: 132000 }, { action: "approve", now });
     assert.equal(blocked.ok, false);
-    assert.match(blocked.error, /Jumia prices/);
+    assert.match(blocked.error, /market prices/);
     assert.equal(R.validateDecision({ status: "pending", price: 132000, last_market_check_at: "2026-09-28T00:00:00Z" }, { action: "approve", now }).ok, true);
     assert.equal(R.validateDecision({ status: "pending", price: 50000 }, { action: "approve", now }).ok, true);
 });
@@ -95,7 +95,7 @@ test("key attribute and market search words", () => {
     assert.equal(R.keyAttribute("Phone 128GB"), "128GB");
     const t = R.marketSearchTerm({ name: "COCOSMILE Thermal Water Bottle with Cup Lid, 570ml", brand: "COCOSMILE" });
     assert.equal(t, "COCOSMILE thermal water bottle cup 570ml");
-    assert.equal(R.jumiaSearchUrl("a b"), "https://www.jumia.ug/catalog/?q=a+b");
+    assert.equal(R.marketSearchUrl("a b"), "https://www.jumia.ug/catalog/?q=a+b");
     assert.ok(R.similarity("DUDU Water Bottle with Straw, 350ml", "DUDU Water Bottle with Straw, 530ml") > 0.9);
 });
 
