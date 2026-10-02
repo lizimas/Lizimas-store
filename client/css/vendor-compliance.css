@@ -102,3 +102,8 @@
 .vd-certs-list label { display: flex; gap: 10px; align-items: flex-start; padding: 9px 12px; font-size: 13.5px; font-weight: 400; color: #222; cursor: pointer; }
 .vd-certs-list label:hover { background: #f5f6f8; }
 .vd-certs-list input { margin-top: 2px; accent-color: #f4b400; }
+
+.vd-cert-row { border-bottom: 1px solid #f3f4f6; }
+.vd-cert-proof { padding: 2px 12px 10px 36px; font-size: 12.5px; color: #555; }
+.vd-cert-proof[hidden] { display: none; }
+.vd-cert-proof input[type=file] { font-size: 12px; max-width: 100%; margin-top: 4px; }

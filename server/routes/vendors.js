@@ -215,6 +215,11 @@ router.post("/me/payment-instruments/:id/evidence", upload.kycDocument.single("d
 router.get("/me/payment-instruments/:id/evidence/url", getMyPaymentInstrumentEvidenceUrl);
 router.get("/orders", requireVendorPermission("vc_order_manager", "vc_order_viewer"), getMyVendorOrders);
 router.patch("/order-items/:orderItemId/stage", requireVendorPermission("vc_order_manager"), advanceVendorOrderStage);
+// Orders panel: bulk actions and export history.
+router.post("/order-items/bulk", requireVendorPermission("vc_order_manager"), require("../controllers/vendorController").bulkVendorOrderItems);
+router.get("/me/order-exports", requireVendorPermission("vc_order_manager", "vc_order_viewer"), require("../controllers/vendorController").listVendorOrderExports);
+router.post("/me/order-exports", requireVendorPermission("vc_order_manager", "vc_order_viewer"), require("../controllers/vendorController").saveVendorOrderExport);
+router.get("/me/order-exports/:id", requireVendorPermission("vc_order_manager", "vc_order_viewer"), require("../controllers/vendorController").downloadVendorOrderExport);
 router.get("/dashboard-summary", getVendorDashboardSummary);
 router.get("/me/product-tier", getMyProductTierStatus);
 router.get("/me/stock-recommendations", requireVendorPermission("vc_product_manager", "vc_product_viewer", "vc_product_update"), getMyStockRecommendations);
@@ -243,6 +248,11 @@ router.delete("/products/images/:imageId", deleteProductImage);
 // scoped to the vendor's own products via the same canEditProduct ownership
 // check the admin-only routes at /api/products/... rely on internally.
 router.post("/products/:id/options", saveProductOptions);
+// Certifications: each needs its certificate uploaded, then admin approval.
+const productCertificates = require("../controllers/productCertificateController");
+router.get("/products/:id/certificates", productCertificates.listMyProductCertificates);
+router.post("/products/:id/certificates", requireVendorPermission("vc_product_manager", "vc_product_update"), upload.kycDocument.single("document"), productCertificates.uploadMyProductCertificate);
+router.delete("/products/:id/certificates/:certId", requireVendorPermission("vc_product_manager", "vc_product_update"), productCertificates.deleteMyProductCertificate);
 router.post("/products/:id/variants/generate", generateProductVariants);
 router.patch("/products/:id/variant-stock", setVariantStockMode);
 router.patch("/products/:id/variants/stock", updateVariantStock);

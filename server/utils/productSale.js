@@ -5,6 +5,10 @@
 // read those. See migrations/146_product_sale_and_certifications.sql.
 const { calculatePricing } = require("./commissionEngine");
 
+// A sale up to this % off goes live by itself; a bigger one waits for an
+// admin to approve it in Promotions (Ryan, Oct 2026).
+const AUTO_APPROVE_MAX_PERCENT = 30;
+
 // "2026-10-05" (a day) or a full timestamp -> Date, or null.
 function parseDay(value, endOfDay) {
     const t = String(value == null ? "" : value).trim();
@@ -56,11 +60,16 @@ async function syncProductSale(db, { productId, vendorId, categoryId, customerPr
     if (other.rows.length) {
         return { note: "This product already has a promotion from the Promotions page, so the sale price was saved but is not running." };
     }
+    const percentOff = Math.round((1 - customerSale / Number(customerPrice)) * 1000) / 10;
+    const auto = percentOff <= AUTO_APPROVE_MAX_PERCENT;
     await db.query(
         `INSERT INTO vendor_promotions (vendor_id, product_id, original_price, proposed_sale_price, starts_at, ends_at, status, reviewed_at, source)
-         VALUES ($1, $2, $3, $4, $5, $6, 'approved', now(), 'product_form')`,
-        [vendorId, productId, customerPrice, customerSale, sale.startsAt, sale.endsAt]);
-    return { note: null, customerSale };
+         VALUES ($1, $2, $3, $4, $5, $6, $7::varchar, CASE WHEN $7::varchar = 'approved' THEN now() END, 'product_form')`,
+        [vendorId, productId, customerPrice, customerSale, sale.startsAt, sale.endsAt, auto ? "approved" : "pending"]);
+    return {
+        note: auto ? null : `This sale is ${Math.round(percentOff)}% off. Sales above ${AUTO_APPROVE_MAX_PERCENT}% off are checked by Lizimas Store first - it will start once it is approved.`,
+        customerSale, percentOff, status: auto ? "approved" : "pending"
+    };
 }
 
-module.exports = { readSaleFields, syncProductSale, parseDay };
+module.exports = { readSaleFields, syncProductSale, parseDay, AUTO_APPROVE_MAX_PERCENT };

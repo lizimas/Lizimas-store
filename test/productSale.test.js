@@ -35,7 +35,16 @@ test("a sale becomes an approved promotion at the customer price", async () => {
     assert.strictEqual(r.customerSale, 46000);
     const insert = db.calls.find(([s]) => s.startsWith("INSERT INTO vendor_promotions"));
     assert.deepStrictEqual(insert[1].slice(0, 4), [3, 7, 57500, 46000]);
-    assert.match(insert[0], /'approved', now\(\), 'product_form'/);
+    assert.strictEqual(insert[1][6], "approved");   // 20% off: goes live by itself
+    assert.strictEqual(r.status, "approved");
+    assert.match(insert[0], /'product_form'/);
+
+    // More than 30% off waits for an admin.
+    const big = fakeDb(false);
+    const r2 = await syncProductSale(big, { productId: 7, vendorId: 3, categoryId: 2, customerPrice: 57500,
+        sale: { vendorPrice: 30000, startsAt: new Date("2026-10-05"), endsAt: new Date("2026-10-12") } }, pricing);
+    assert.strictEqual(big.calls.find(([s]) => s.startsWith("INSERT INTO vendor_promotions"))[1][6], "pending");
+    assert.match(r2.note, /40% off.*above 30%/);
 });
 
 test("clearing the sale removes it; another promotion keeps the sale from running", async () => {

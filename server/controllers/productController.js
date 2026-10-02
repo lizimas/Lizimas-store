@@ -273,13 +273,22 @@ exports.addProduct = async (req, res) => {
         const newProduct = product.rows[0];
         // Certifications (optional) and the Sale Price from the product form.
         let saleNote = null;
-        if (req.body.certifications !== undefined) {
+        // Vendors' certifications come only from approved certificates
+        // (productCertificateController.js); staff can still set them here.
+        if (req.body.certifications !== undefined && !isVendorUser) {
             const certs = Certifications.clean(req.body.certifications);
             await pool.query(`UPDATE products SET certifications = $2 WHERE id = $1`, [newProduct.id, certs]);
             newProduct.certifications = certs;
         }
         if (saleFields.sent && vendorId) {
-            saleNote = (await syncProductSale(pool, { productId: newProduct.id, vendorId, categoryId: category_id, customerPrice: newProduct.price, sale: saleFields.sale })).note;
+            // The product is already saved: a problem with the sale must not
+            // make the whole save look failed.
+            try {
+                saleNote = (await syncProductSale(pool, { productId: newProduct.id, vendorId, categoryId: category_id, customerPrice: newProduct.price, sale: saleFields.sale })).note;
+            } catch (saleError) {
+                console.error("Product sale sync failed:", saleError.message);
+                saleNote = "The product was saved, but the sale price could not be set. Open the product and save it again.";
+            }
         }
         if (Object.keys(extra).length) Object.assign(newProduct, await saveExtraFields(pool, newProduct.id, extra));
         if (measured.provided) {
@@ -1463,14 +1472,19 @@ exports.updateProduct = async (req, res) => {
 
         const product = await pool.query(updateQuery, params);
         let saleNote = null;
-        if (product.rows[0] && req.body.certifications !== undefined) {
+        if (product.rows[0] && req.body.certifications !== undefined && !isVendorEditor) {
             const certs = Certifications.clean(req.body.certifications);
             await pool.query(`UPDATE products SET certifications = $2 WHERE id = $1`, [id, certs]);
             product.rows[0].certifications = certs;
         }
         if (product.rows[0] && saleFields.sent && product.rows[0].vendor_id) {
-            saleNote = (await syncProductSale(pool, { productId: Number(id), vendorId: product.rows[0].vendor_id,
-                categoryId: product.rows[0].category_id, customerPrice: product.rows[0].price, sale: saleFields.sale })).note;
+            try {
+                saleNote = (await syncProductSale(pool, { productId: Number(id), vendorId: product.rows[0].vendor_id,
+                    categoryId: product.rows[0].category_id, customerPrice: product.rows[0].price, sale: saleFields.sale })).note;
+            } catch (saleError) {
+                console.error("Product sale sync failed:", saleError.message);
+                saleNote = "The product was saved, but the sale price could not be set. Open the product and save it again.";
+            }
         }
         if (product.rows[0] && Object.keys(extra).length) Object.assign(product.rows[0], await saveExtraFields(pool, id, extra));
         // Approval history: a seller's edit sends it back for review.

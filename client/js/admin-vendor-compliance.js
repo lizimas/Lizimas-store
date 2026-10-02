@@ -144,6 +144,7 @@
         container.innerHTML =
             '<div class="vc-toolbar">' +
                 '<div class="vc-tabs" role="tablist" id="vc-tabs"></div>' +
+                '<button type="button" class="vc-btn-outline" id="vc-certs">' + svg("file", 16) + ' Product certificates <span class="vc-tab-n" id="vc-certs-n" hidden></span></button>' +
                 '<button type="button" class="vc-btn vc-btn-gold" id="vc-export">' + svg("download", 16) + " Export</button>" +
             "</div>" +
             '<label class="vc-search">' + svg("search") +
@@ -153,6 +154,8 @@
         const q = container.querySelector("#vc-q");
         q.addEventListener("input", () => { state.q = q.value; state.page = 1; renderTable(); });
         container.querySelector("#vc-export").addEventListener("click", exportCsv);
+        container.querySelector("#vc-certs").addEventListener("click", showProductCertificates);
+        refreshCertCount();
         container.addEventListener("click", onTableClick);
     }
 
@@ -733,6 +736,60 @@
             if (b.dataset.d === "history") return showDocVersions(type);
             reviewDoc(type, b.dataset.d);
         });
+    }
+
+    // Product certificates: a vendor ticks a certification on a product and
+    // uploads the certificate; it shows on the product once approved here.
+    async function refreshCertCount() {
+        const n = document.getElementById("vc-certs-n");
+        if (!n) return;
+        try {
+            const r = await call("GET", "/api/admin/product-certificates?status=pending");
+            n.textContent = r.pending || "";
+            n.hidden = !r.pending;
+        } catch (e) { n.hidden = true; }
+    }
+    async function showProductCertificates() {
+        let list = [];
+        try { list = (await call("GET", "/api/admin/product-certificates?status=pending")).certificates || []; }
+        catch (e) { toast("Could not load the certificates.", true); return; }
+        const when = (v) => v ? new Date(v).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" }) : "-";
+        const row = (c) =>
+            '<div data-cert-row="' + Number(c.id) + '" style="display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; border:1px solid #e6e8ee; border-radius:10px; padding:10px 12px;">' +
+                '<div style="min-width:0; flex:1 1 240px;"><strong>' + esc(c.certification) + "</strong>" +
+                    '<div style="font-size:12.5px; color:#667085; word-break:break-word;">' + esc(c.product_name) + " (#" + Number(c.product_id) + ") &middot; " + esc(c.business_name) +
+                        " &middot; uploaded " + esc(when(c.uploaded_at)) + "</div></div>" +
+                '<div style="display:flex; gap:6px;">' +
+                    '<button type="button" class="vc-btn-outline vc-btn-sm" data-cert-act="view" data-cert-id="' + Number(c.id) + '">View</button>' +
+                    '<button type="button" class="vc-btn vc-btn-green vc-btn-sm" data-cert-act="approved" data-cert-id="' + Number(c.id) + '">Approve</button>' +
+                    '<button type="button" class="vc-btn-outline vc-btn-sm vc-btn-danger" data-cert-act="rejected" data-cert-id="' + Number(c.id) + '">Reject</button></div></div>';
+        const html = list.length
+            ? '<p style="margin-top:0;">Check each certificate is real, valid and for this product. An approved certification shows on the product page.</p><div style="display:grid; gap:8px;">' + list.map(row).join("") + "</div>"
+            : "<p>No product certificates are waiting for review.</p>";
+        await ask({ title: "Product certificates", html: html, ok: "Close", wide: true, onOpen: (back) => {
+            back.addEventListener("click", async (e) => {
+                const b = e.target.closest("[data-cert-act]");
+                if (!b) return;
+                const id = b.dataset.certId, act = b.dataset.certAct;
+                try {
+                    if (act === "view") {
+                        const r = await call("GET", "/api/admin/product-certificates/" + id + "/url");
+                        if (r && r.url) window.open(r.url, "_blank", "noopener");
+                        return;
+                    }
+                    let reason = "";
+                    if (act === "rejected") {
+                        reason = (window.prompt("Why is this certificate not accepted? The vendor will see this.") || "").trim();
+                        if (!reason) return;
+                    }
+                    await call("PATCH", "/api/admin/product-certificates/" + id, { decision: act, reason: reason });
+                    const el = back.querySelector('[data-cert-row="' + id + '"]');
+                    if (el) el.remove();
+                    toast(act === "approved" ? "Approved - it now shows on the product." : "Rejected.");
+                } catch (err) { toast(err.message || "Could not save.", true); }
+            });
+        } });
+        refreshCertCount();
     }
 
     // Earlier uploads of a document (kept when the vendor uploads again).

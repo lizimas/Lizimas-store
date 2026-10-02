@@ -2481,7 +2481,7 @@ async function editVendorProduct(id) {
     if (window.LzPackage) LzPackage.fill("product", product);
     document.getElementById("product-warranty-months").value = product.warranty_months || "";
     vdSetSaleFields(product);
-    vdRenderCerts(product.certifications || []);
+    vdLoadCerts(product.id);
     document.getElementById("product-brand").value = product.brand || "";
     document.getElementById("product-gtin").value = product.gtin || "";
     document.getElementById("product-mpn").value = product.mpn || "";
@@ -2563,27 +2563,92 @@ async function vdPreviewSale(customerPrice, categoryId) {
         note.style.display = "block";
     } catch (e) { note.style.display = "none"; }
 }
-function vdRenderCerts(selected) {
+// Certifications: each ticked one needs its certificate (photo or PDF),
+// which Lizimas Store approves before it shows on the product.
+let vdCertRecords = [];          // certificates already uploaded for this product
+const vdCertFiles = {};          // certification -> File chosen but not uploaded yet
+function vdRenderCerts(records) {
     const list = document.getElementById("product-certs-list");
     if (!list || !window.LzCertifications) return;
-    const on = new Set(LzCertifications.clean(selected));
-    list.innerHTML = LzCertifications.LIST.map((c) => `<label><input type="checkbox" value="${vendorEsc(c)}"${on.has(c) ? " checked" : ""} onchange="vdCertsSummary()"> ${vendorEsc(c)}</label>`).join("");
+    vdCertRecords = Array.isArray(records) ? records.filter((r) => r && r.certification) : [];
+    Object.keys(vdCertFiles).forEach((k) => delete vdCertFiles[k]);
+    const have = new Map(vdCertRecords.map((r) => [r.certification, r]));
+    list.innerHTML = LzCertifications.LIST.map((c, i) => {
+        const rec = have.get(c);
+        const st = rec ? { pending: ["In review", "#b7791f"], approved: ["Approved", "#15803d"], rejected: ["Not accepted", "#b91c1c"] }[rec.status] : null;
+        return `<div class="vd-cert-row"><label><input type="checkbox" value="${vendorEsc(c)}" data-cert-i="${i}"${rec ? " checked" : ""} onchange="vdCertToggle(this)"> ${vendorEsc(c)}`
+            + (st ? ` <span style="font-weight:700; color:${st[1]}; font-size:12px;">${st[0]}</span>` : "") + `</label>`
+            + `<div class="vd-cert-proof" id="vd-cert-proof-${i}"${rec && rec.status !== "rejected" ? " hidden" : (rec ? "" : " hidden")}>`
+            + (rec && rec.status === "rejected" ? `<div style="color:#b91c1c; margin-bottom:4px;">${vendorEsc(rec.rejection_reason || "Not accepted")} - upload a valid certificate.</div>` : "")
+            + `<span>Upload the certificate (photo or PDF):</span> <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onchange="vdCertFile(${i}, this)"></div></div>`;
+    }).join("");
     const box = document.getElementById("product-certs"); if (box) box.open = false;
     vdCertsSummary();
 }
+async function vdLoadCerts(productId) {
+    vdRenderCerts([]);
+    if (!productId) return;
+    try {
+        const r = await vendorAuthorizedFetch("/api/vendors/products/" + productId + "/certificates");
+        if (r && Array.isArray(r.certificates)) vdRenderCerts(r.certificates);
+    } catch (e) { /* the form still works; certificates can be added after saving */ }
+}
+function vdCertToggle(input) {
+    const proof = document.getElementById("vd-cert-proof-" + input.dataset.certI);
+    const rec = vdCertRecords.find((r) => r.certification === input.value);
+    if (proof) proof.hidden = !input.checked || !!(rec && rec.status !== "rejected");
+    if (!input.checked) delete vdCertFiles[input.value];
+    vdCertsSummary();
+}
+function vdCertFile(i, input) {
+    const c = LzCertifications.LIST[i];
+    if (input.files && input.files[0]) vdCertFiles[c] = input.files[0]; else delete vdCertFiles[c];
+}
 function vdPickedCerts() {
-    return Array.from(document.querySelectorAll("#product-certs-list input:checked")).map((i) => i.value);
+    return Array.from(document.querySelectorAll("#product-certs-list input[type=checkbox]:checked")).map((i) => i.value);
+}
+// The ticked certifications that still have no certificate attached.
+function vdCertsMissingProof() {
+    return vdPickedCerts().filter((c) => {
+        const rec = vdCertRecords.find((r) => r.certification === c);
+        return !vdCertFiles[c] && (!rec || rec.status === "rejected");
+    });
 }
 function vdCertsSummary() {
     const s = document.getElementById("product-certs-summary");
     const picked = vdPickedCerts();
     if (s) s.textContent = picked.length ? picked.join(", ") : "Certification(s) that the product holds";
 }
+// After the product is saved: upload new certificates, remove unticked ones.
+async function vdSaveCerts(productId) {
+    const picked = new Set(vdPickedCerts());
+    const problems = [];
+    for (const rec of vdCertRecords) {
+        if (!picked.has(rec.certification)) {
+            try { await vendorAuthorizedFetch("/api/vendors/products/" + productId + "/certificates/" + rec.id, { method: "DELETE" }); } catch (e) { problems.push(rec.certification); }
+        }
+    }
+    for (const c of picked) {
+        const file = vdCertFiles[c];
+        if (!file) continue;
+        const fd = new FormData();
+        fd.append("certification", c);
+        fd.append("document", file);
+        try {
+            const res = await fetch(`${API_URL}/api/vendors/products/${productId}/certificates`, { method: "POST", headers: { "Authorization": `Bearer ${getVendorToken()}` }, body: fd });
+            const j = await res.json().catch(() => ({}));
+            if (!res.ok) problems.push(c + (j.error ? " (" + j.error + ")" : ""));
+        } catch (e) { problems.push(c); }
+    }
+    return problems;
+}
 document.addEventListener("DOMContentLoaded", () => vdRenderCerts([]));
 
 async function submitVendorProductForm(opts) {
     const asDraft = !!(opts && opts.draft);
     if (!asDraft) { const saleMsg = vdSaleProblem(); if (saleMsg) { alert(saleMsg); return; } }
+    const noProof = vdCertsMissingProof();
+    if (noProof.length) { alert("Upload the certificate for: " + noProof.join(", ") + ".\nOr untick it if the product does not have that certification."); return; }
     const id = document.getElementById("product-id").value;
     const name = document.getElementById("product-name").value.trim();
     const sku = vdSkuBase(document.getElementById("product-sku").value);
@@ -2660,7 +2725,6 @@ async function submitVendorProductForm(opts) {
     formData.append("sale_price", (document.getElementById("product-sale-price") || {}).value || "");
     formData.append("sale_start", (document.getElementById("product-sale-start") || {}).value || "");
     formData.append("sale_end", (document.getElementById("product-sale-end") || {}).value || "");
-    formData.append("certifications", JSON.stringify(vdPickedCerts()));
     formData.append("brand", brand);
     formData.append("gtin", gtin);
     formData.append("mpn", mpn);
@@ -2698,6 +2762,10 @@ async function submitVendorProductForm(opts) {
 
         const savedProductId = data.product ? data.product.id : id;
         if (savedProductId) await vdSavePhotoOrder(savedProductId, data.image_records || []);
+        if (savedProductId) {
+            const certProblems = await vdSaveCerts(savedProductId);
+            if (certProblems.length) alert("The product was saved, but these certificates could not be uploaded: " + certProblems.join(", ") + ". Open the product and try again.");
+        }
         const specsPayload = collectVendorSpecRows();
         if (savedProductId && specsPayload.length > 0) {
             try {
@@ -5604,7 +5672,8 @@ function vendorProductSummary() {
         { label: "Specifications", value: document.querySelectorAll("#specs-list input").length / 2 + " rows", step: 3 },
         { label: "Packed weight", value: weight ? weight + " kg" : (isNew ? "Missing" : "-"), ok: isNew ? !!weight : undefined, step: 3 },
         { label: "Warranty", value: val("product-warranty-months") ? val("product-warranty-months") + " months" : "None", step: 3 },
-        { label: "Certifications", value: vdPickedCerts().length ? vdPickedCerts().join(", ") : "None", step: 3 },
+        { label: "Certifications", value: vdPickedCerts().length ? vdPickedCerts().join(", ") + (vdCertsMissingProof().length ? " - certificate missing" : "") : "None",
+            ok: vdPickedCerts().length ? !vdCertsMissingProof().length : undefined, step: 3 },
         { label: "Authenticity statement", value: agreed ? "Confirmed" : "Tick the box below", ok: agreed }
     ];
 }

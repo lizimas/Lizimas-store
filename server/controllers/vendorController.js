@@ -631,7 +631,13 @@ exports.getMyVendorOrders = async (req, res) => {
                     p.name AS product_name, p.image AS product_image,
                     o.status AS order_status, o.created_at,
                     oi.handover_status, oi.handed_over_at, oi.rejection_reason,
-                    oi.vendor_fulfilment_stage, oi.sku, oi.dropoff_point_id, dp.name AS dropoff_point_name
+                    oi.vendor_fulfilment_stage, oi.sku, oi.dropoff_point_id, dp.name AS dropoff_point_name,
+                    -- Orders panel (Oct 2026). to_jsonb() so a column that
+                    -- isn't there yet reads as null instead of failing.
+                    p.sku AS product_sku, p.fulfillment_type, o.payment_method,
+                    to_jsonb(oi)->>'label_printed_at' AS label_printed_at,
+                    to_jsonb(oi)->>'delivered_at' AS delivered_at,
+                    to_jsonb(o)->>'updated_at' AS order_updated_at
              FROM order_items oi
              JOIN products p ON p.id = oi.product_id
              JOIN orders o ON o.id = oi.order_id
@@ -2613,6 +2619,84 @@ exports.unescalateVendorMessageAdmin = async (req, res) => {
             return res.status(404).json({ error: "Message thread not found." });
         }
         res.json({ message: "Thread un-escalated.", thread: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+
+// --- Orders panel: bulk actions and export history (Oct 2026) --------------
+
+// POST /order-items/bulk { action: "ready" | "printed", ids: [] }
+//   ready   - moves the vendor's own pending items straight to Ready for
+//             Handover ("Set status to ready to ship")
+//   printed - records that a label was printed for them
+exports.bulkVendorOrderItems = async (req, res) => {
+    try {
+        const vendorId = req.vendorId;
+        if (!vendorId) return res.status(404).json({ error: "No vendor profile found for this account." });
+        const ids = Array.isArray(req.body.ids) ? [...new Set(req.body.ids.map(Number).filter(Number.isInteger))].slice(0, 500) : [];
+        if (!ids.length) return res.status(400).json({ error: "Select at least one order item." });
+        const action = req.body.action;
+        if (action === "printed") {
+            const r = await pool.query(
+                `UPDATE order_items oi SET label_printed_at = now()
+                   FROM products p WHERE p.id = oi.product_id AND p.vendor_id = $1 AND oi.id = ANY($2::int[]) RETURNING oi.id`,
+                [vendorId, ids]);
+            return res.json({ updated: r.rowCount });
+        }
+        if (action === "ready") {
+            const r = await pool.query(
+                `UPDATE order_items oi SET vendor_fulfilment_stage = 'ready_for_handover'
+                   FROM products p, orders o
+                  WHERE p.id = oi.product_id AND o.id = oi.order_id AND p.vendor_id = $1 AND oi.id = ANY($2::int[])
+                    AND o.status <> 'cancelled'
+                    AND (oi.handover_status IS NULL OR oi.handover_status IN ('pending_handover', 'rejected'))
+                    AND COALESCE(oi.vendor_fulfilment_stage, 'new') IN ('new', 'accepted', 'processing')
+                  RETURNING oi.id`,
+                [vendorId, ids]);
+            return res.json({ updated: r.rowCount, skipped: ids.length - r.rowCount,
+                message: `${r.rowCount} item(s) set to Ready to Ship.` + (ids.length - r.rowCount ? ` ${ids.length - r.rowCount} could not be changed (already past that stage, or cancelled).` : "") });
+        }
+        res.status(400).json({ error: "action must be ready or printed." });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+const ORDER_EXPORTS_KEPT = 20;
+exports.listVendorOrderExports = async (req, res) => {
+    try {
+        const r = await pool.query(
+            "SELECT id, file_name, row_count, created_at FROM vendor_order_exports WHERE vendor_id = $1 ORDER BY created_at DESC LIMIT $2",
+            [req.vendorId, ORDER_EXPORTS_KEPT]);
+        res.json({ exports: r.rows });
+    } catch (error) {
+        if (error.code === "42P01") return res.json({ exports: [] });
+        res.status(500).json({ error: error.message });
+    }
+};
+exports.saveVendorOrderExport = async (req, res) => {
+    try {
+        const csv = String(req.body.csv || "");
+        const fileName = String(req.body.file_name || "").replace(/[^A-Za-z0-9._-]/g, "").slice(0, 80) || "orders.csv";
+        if (!csv || csv.length > 2 * 1024 * 1024) return res.status(400).json({ error: "The export is empty or too large to keep." });
+        const r = await pool.query(
+            "INSERT INTO vendor_order_exports (vendor_id, file_name, row_count, csv) VALUES ($1, $2, $3, $4) RETURNING id, file_name, row_count, created_at",
+            [req.vendorId, fileName, Math.max(0, Number(req.body.row_count) || 0), csv]);
+        await pool.query(
+            `DELETE FROM vendor_order_exports WHERE vendor_id = $1 AND id NOT IN (
+                SELECT id FROM vendor_order_exports WHERE vendor_id = $1 ORDER BY created_at DESC LIMIT $2)`, [req.vendorId, ORDER_EXPORTS_KEPT]);
+        res.status(201).json({ export: r.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+exports.downloadVendorOrderExport = async (req, res) => {
+    try {
+        const r = await pool.query("SELECT file_name, csv FROM vendor_order_exports WHERE id = $1 AND vendor_id = $2", [req.params.id, req.vendorId]);
+        if (!r.rows.length) return res.status(404).json({ error: "That export is no longer kept." });
+        res.json({ file_name: r.rows[0].file_name, csv: r.rows[0].csv });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
