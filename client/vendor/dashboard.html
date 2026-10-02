@@ -7,7 +7,7 @@
 <meta charset="UTF-8">
 <title>Lizimas Store — Vendor Dashboard</title>
 <link rel="stylesheet" href="../css/admin.css?v=47">
-<link rel="stylesheet" href="../css/vendor-compliance.css?v=5">
+<link rel="stylesheet" href="../css/vendor-compliance.css?v=6">
 <link rel="stylesheet" href="../css/vendor-shell.css?v=3">
 <link rel="stylesheet" href="../css/vendor-desktop.css?v=8">
 <link rel="stylesheet" href="../css/vendor-mobile.css?v=101">
@@ -1213,19 +1213,25 @@
                                 <h4>Description</h4>
                                 <div class="field-row">
                                     <div>
-                                        <label style="font-size:13px; font-weight:600; color:#333;">Description</label>
-                                        <textarea id="product-description" data-lz-count rows="10" placeholder="Features, condition, intended use, and everything included in the box" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;"></textarea>
+                                        <label style="font-size:13px; font-weight:600; color:#333;">Product description <span style="color:#b7791f;">*</span></label>
+                                        <div id="product-description-editor"></div>
+                                        <textarea id="product-description" hidden aria-hidden="true" tabindex="-1" style="display:none !important;"></textarea>
                                     </div>
                                 </div>
                                 <div style="margin-top:14px;">
-                                    <label style="font-size:13px; font-weight:600; color:#333; display:block; margin-bottom:4px;">Rich Content <span style="font-weight:400; color:#888;">(optional &mdash; add photo/text blocks below the short description above, same as staff listings)</span></label>
-                                    <div id="desc-blocks-editor"></div>
+                                    <label style="font-size:13px; font-weight:600; color:#333;">Highlights <span style="color:#b7791f;">*</span></label>
+                                    <div id="product-highlights-editor"></div>
                                 </div>
+                                <details style="margin-top:14px;">
+                                    <summary style="cursor:pointer; font-size:13px; font-weight:600; color:#333;">More layout blocks <span style="font-weight:400; color:#888;">(optional &mdash; full-width photo, text and video blocks shown below the description)</span></summary>
+                                    <div id="desc-blocks-editor" style="margin-top:8px;"></div>
+                                </details>
                             </div>
 
                             <div class="product-form-section" data-step="3">
                                 <h4>Specifications</h4>
                                 <p style="font-size:12px; color:#666; margin-top:-6px;">Optional key/value facts shown on the product page (e.g. Material: Cotton, Battery Life: 10 hours) &mdash; the same structure staff and admin listings use, so your products read consistently on the storefront.</p>
+                                <div id="specs-template" hidden></div>
                                 <div id="specs-list" style="display:flex; flex-direction:column; gap:6px;"></div>
                                 <button type="button" onclick="addVendorSpecRow()" style="margin-top:8px; padding:8px 12px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer;">+ Add Specification</button>
 
@@ -1247,6 +1253,29 @@
     <input type="hidden" id="product-package-size" value="Small">
     <p class="lz-pack-note" id="product-package-tier-note" aria-live="polite"></p>
 </div>
+                                    </div>
+                                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:12px;">
+                                        <div>
+                                            <label style="font-size:13px; font-weight:600; color:#333;">Model</label>
+                                            <input type="text" id="product-model" maxlength="120" placeholder="Ex: MD-1234" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                        </div>
+                                        <div>
+                                            <label style="font-size:13px; font-weight:600; color:#333;">Production country</label>
+                                            <input type="text" id="product-production-country" maxlength="80" list="product-country-list" placeholder="Ex: China" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                            <datalist id="product-country-list"><option>Uganda</option><option>Kenya</option><option>Tanzania</option><option>Rwanda</option><option>South Africa</option><option>Nigeria</option><option>Egypt</option><option>China</option><option>India</option><option>Turkey</option><option>United Arab Emirates</option><option>Vietnam</option><option>Thailand</option><option>Indonesia</option><option>Malaysia</option><option>Japan</option><option>South Korea</option><option>Taiwan</option><option>Germany</option><option>France</option><option>Italy</option><option>Spain</option><option>United Kingdom</option><option>United States</option><option>Brazil</option></datalist>
+                                        </div>
+                                        <div>
+                                            <label style="font-size:13px; font-weight:600; color:#333;">Condition</label>
+                                            <select id="product-condition" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;"><option value="new">New</option><option value="pre_used">Pre-Used</option><option value="refurbished">Refurbished</option></select>
+                                        </div>
+                                    </div>
+                                    <div style="margin-bottom:12px;">
+                                        <label style="font-size:13px; font-weight:600; color:#333;">What's in the box</label>
+                                        <div id="product-box-editor"></div>
+                                    </div>
+                                    <div style="margin-bottom:12px;">
+                                        <label style="font-size:13px; font-weight:600; color:#333;">Product warranty</label>
+                                        <div id="product-warranty-editor"></div>
                                     </div>
                                     <div style="display:flex; gap:12px;">
                                         <div style="flex:1;">
@@ -1990,6 +2019,8 @@
     <script src="../js/prepare-picked-file.js?v=11"></script>
     <script src="../js/lz-image-checks.js?v=6"></script>
     <script src="../js/lz-certifications.js?v=1"></script>
+    <script src="../js/lz-rich-editor.js?v=1"></script>
+    <script src="../js/lz-category-specs.js?v=1"></script>
     <script src="../js/lz-id-ocr.js?v=4"></script>
     <script src="../js/lz-table.js?v=6"></script>
     <script src="../js/lz-spec-tools.js?v=2"></script>
@@ -2002,7 +2033,7 @@
 <script src="../js/lz-variants-table.js?v=2"></script>
 <script src="../js/lz-product-preview.js?v=2"></script>
 <script src="../js/description-blocks.js?v=14"></script>
-    <script src="../js/vendor-dashboard.js?v=48"></script>
+    <script src="../js/vendor-dashboard.js?v=49"></script>
     <script src="../js/vendor-statements.js?v=4"></script>
 <script src="../js/vendor-mobile.js?v=19"></script>
 <script src="../js/vendor-compliance.js?v=2"></script>

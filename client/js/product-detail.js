@@ -122,6 +122,7 @@ async function loadProductDetail() {
             if (pdDiscountBadgeEl) pdDiscountBadgeEl.hidden = true;
         }
         document.getElementById("pd-description").textContent = product.description || "No description available.";
+        pdRenderRich(product);
 
         loadReviews(id);
 
@@ -790,6 +791,48 @@ function updateSizeAvailability() {
     if (clearedSize) { pdSelectedSizeId = null; pdSelectedSizeName = null; }
 }
 
+// Rich text written in the product form's editor. The server has already
+// rebuilt this HTML from an allow-list (server/utils/richText.js).
+const PD_RICH_CSS = ".pd-rich{font-size:15px;line-height:1.65;color:#222;overflow-wrap:anywhere}.pd-rich p{margin:0 0 10px}.pd-rich h2{font-size:20px;margin:14px 0 8px}.pd-rich h3{font-size:17px;margin:12px 0 8px}.pd-rich h4{font-size:15.5px;margin:10px 0 6px}"
+    + ".pd-rich ul,.pd-rich ol{margin:0 0 10px;padding-left:24px}.pd-rich blockquote{margin:0 0 10px;padding:4px 14px;border-left:4px solid #d5d8de;color:#4b5563;font-style:italic}.pd-rich a{color:#1d4ed8;text-decoration:underline}"
+    + ".pd-rich table{border-collapse:collapse;width:100%;margin:0 0 10px;display:block;overflow-x:auto}.pd-rich td,.pd-rich th{border:1px solid #d5d8de;padding:7px 9px;vertical-align:top}.pd-rich th{background:#f3f4f6}"
+    + ".pd-rich figure{margin:0 0 12px;clear:both}.pd-rich figure img{max-width:100%;height:auto;display:block}.pd-rich figure.lzr-center img{margin:0 auto}.pd-rich figure.lzr-side{float:right;max-width:45%;margin:0 0 10px 16px;clear:none}"
+    + ".pd-rich figcaption{font-size:12.5px;color:#555;text-align:center;padding:6px 4px}.pd-rich figure.lzr-media iframe{width:100%;aspect-ratio:16/9;border:0;display:block}"
+    + ".pd-rich .lzr-in1{margin-left:28px}.pd-rich .lzr-in2{margin-left:56px}.pd-rich .lzr-in3{margin-left:84px}.pd-rich .lzr-in4{margin-left:112px}.pd-rich::after{content:'';display:block;clear:both}"
+    + ".pd-rich-title{font-size:16px;font-weight:700;margin:18px 0 8px;color:#1a1a2e}@media(max-width:700px){.pd-rich figure.lzr-side{float:none;max-width:100%;margin:0 0 12px}}";
+function pdRenderRich(product) {
+    if (!document.getElementById("pd-rich-style")) {
+        const st = document.createElement("style");
+        st.id = "pd-rich-style"; st.textContent = PD_RICH_CSS;
+        document.head.appendChild(st);
+    }
+    const cond = { new: "New", pre_used: "Pre-Used", refurbished: "Refurbished" }[product.item_condition];
+    window.pdExtraSpecRows = [["Model", product.model], ["Production country", product.production_country], ["Condition", cond]]
+        .filter(function (r) { return r[1]; }).map(function (r) { return [r[0], String(r[1])]; });
+
+    const descEl = document.getElementById("pd-description");
+    document.querySelectorAll(".pd-rich-extra").forEach(function (n) { n.remove(); });
+    if (descEl && product.description_html) {
+        const box = document.createElement("div");
+        box.className = "pd-rich pd-rich-extra";
+        box.innerHTML = product.description_html;
+        descEl.textContent = "";
+        descEl.hidden = true;
+        descEl.parentNode.insertBefore(box, descEl);
+    } else if (descEl) descEl.hidden = false;
+    [["What's in the box", product.box_contents_html], ["Warranty", product.warranty_html]].forEach(function (pair) {
+        if (!pair[1] || !descEl) return;
+        const wrap = document.createElement("div");
+        wrap.className = "pd-rich-extra";
+        const h = document.createElement("h3");
+        h.className = "pd-rich-title"; h.textContent = pair[0];
+        const body = document.createElement("div");
+        body.className = "pd-rich"; body.innerHTML = pair[1];
+        wrap.appendChild(h); wrap.appendChild(body);
+        descEl.parentNode.appendChild(wrap);
+    });
+}
+
 function pdEscape(str) {
     return String(str)
         .replace(/&/g, "&amp;")
@@ -811,6 +854,10 @@ function renderSpecs(specs, sizes) {
         if (spec.value && spec.value.toString().trim() !== "") {
             rows.push([String(spec.label), String(spec.value).trim()]);
         }
+    });
+    // Model, production country and condition from the product form.
+    (window.pdExtraSpecRows || []).forEach(function (r) {
+        if (!rows.some(function (x) { return x[0].toLowerCase() === r[0].toLowerCase(); })) rows.push(r);
     });
 
     // Nothing to show is not worth a heading and an apology. Hide the whole
@@ -1165,6 +1212,21 @@ async function pdSetupDelivery(productId) {
 function pdBuildHighlights(product) {
     const list = document.getElementById("pd-highlights");
     if (!list) return;
+    // Highlights written in the product form's editor come first.
+    const oldRich = document.getElementById("pd-highlights-rich");
+    if (oldRich) oldRich.remove();
+    if (product.highlights_html) {
+        const box = document.createElement("div");
+        box.id = "pd-highlights-rich"; box.className = "pd-rich";
+        box.innerHTML = product.highlights_html;
+        list.hidden = true;
+        list.parentNode.insertBefore(box, list);
+        const richTab = document.querySelector('.pd-dtab[data-sec="pd-highlights-section"]');
+        if (richTab) richTab.hidden = false;
+        document.getElementById("pd-highlights-section").dataset.empty = "";
+        return;
+    }
+    list.hidden = false;
     const items = [];
     String(product.description || "").split(/\r?\n/).forEach(line => {
         const m = line.match(/^\s*(?:[-*\u2022\u2023\u25AA\u25CF\u2713\u2714\u2705]|\d+[.)])\s+(.{3,160})$/);

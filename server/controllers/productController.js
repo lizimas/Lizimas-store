@@ -1,6 +1,7 @@
 const pool = require("../config/database");
 const { generateSku, withSkuSuffix } = require("../utils/sku");
 const { readSaleFields, syncProductSale } = require("../utils/productSale");
+const { readProductDetails, saveProductDetails } = require("../utils/richText");
 const Certifications = require("../../client/js/lz-certifications.js");
 const cloudinary = require("../config/cloudinary");
 const { logActivity } = require("../utils/activityLog");
@@ -156,10 +157,15 @@ async function saveExtraFields(db, productId, extra) {
 // Add product (with optional multiple image uploads)
 exports.addProduct = async (req, res) => {
     try {
-        const { name, category_id, description, stock, package_size,
+        const { name, category_id, stock, package_size,
                 material, color, sleeve, style, length, fit, pattern, care_instructions, occasion,
                 warranty_months, brand, gtin, mpn, desired_payout, sku } = req.body;
         let { price } = req.body;
+        // Rich text from the form's editor is rebuilt from an allow-list;
+        // the plain description is taken from it (utils/richText.js).
+        const details = readProductDetails(req.body);
+        if (!details.ok) return res.status(400).json({ error: details.error });
+        const description = details.descriptionText !== undefined ? details.descriptionText : req.body.description;
 
         // Delivery tier is calculated from the packed weight/dimensions
         // (migrations/130); a sent package_size is only the fallback.
@@ -273,6 +279,10 @@ exports.addProduct = async (req, res) => {
         const newProduct = product.rows[0];
         // Certifications (optional) and the Sale Price from the product form.
         let saleNote = null;
+        if (details.sent) {
+            await saveProductDetails(pool, newProduct.id, details.columns);
+            Object.assign(newProduct, details.columns);
+        }
         // Vendors' certifications come only from approved certificates
         // (productCertificateController.js); staff can still set them here.
         if (req.body.certifications !== undefined && !isVendorUser) {
@@ -1358,11 +1368,14 @@ exports.updateProduct = async (req, res) => {
             return res.status(permission.status).json({ error: permission.error });
         }
 
-        const { name, category_id, description, stock, package_size,
+        const { name, category_id, stock, package_size,
                 material, color, sleeve, style, length, fit, pattern, care_instructions, occasion,
                 warranty_months, brand, gtin, mpn, desired_payout, sku } = req.body;
         let { price } = req.body;
         const draft = wantsDraft(req.body);
+        const details = readProductDetails(req.body);
+        if (!details.ok) return res.status(400).json({ error: details.error });
+        const description = details.descriptionText !== undefined ? details.descriptionText : req.body.description;
 
         // Delivery tier is calculated from the packed weight/dimensions
         // (migrations/130); a sent package_size is only the fallback.
@@ -1472,6 +1485,10 @@ exports.updateProduct = async (req, res) => {
 
         const product = await pool.query(updateQuery, params);
         let saleNote = null;
+        if (product.rows[0] && details.sent) {
+            await saveProductDetails(pool, id, details.columns);
+            Object.assign(product.rows[0], details.columns);
+        }
         if (product.rows[0] && req.body.certifications !== undefined && !isVendorEditor) {
             const certs = Certifications.clean(req.body.certifications);
             await pool.query(`UPDATE products SET certifications = $2 WHERE id = $1`, [id, certs]);

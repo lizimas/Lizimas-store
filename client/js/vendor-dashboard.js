@@ -1500,6 +1500,7 @@ function resetVendorProductForm() {
     if (categorySelect) categorySelect.value = "";
     syncProductCategoryButtonLabel();
     document.getElementById("product-description").value = "";
+    vdSetRichFields(null);
     document.getElementById("product-payout").value = "";
     vdSetSaleFields(null);
     vdRenderCerts([]);
@@ -1525,6 +1526,8 @@ function resetVendorProductForm() {
     document.getElementById("product-form-status").textContent = "";
     const specsList = document.getElementById("specs-list");
     if (specsList) specsList.innerHTML = "";
+    const specsTemplate = document.getElementById("specs-template");
+    if (specsTemplate) { specsTemplate.innerHTML = ""; specsTemplate.hidden = true; }
     const specsTableWrap = document.getElementById("vendor-specs-table-wrap");
     if (specsTableWrap) specsTableWrap.innerHTML = "";
     hideVendorVariantsPanel();
@@ -1838,8 +1841,14 @@ function addVendorSpecRow(label, value) {
 }
 
 function collectVendorSpecRows() {
-    const rows = document.querySelectorAll("#specs-list > div");
     const specs = [];
+    // Fields for the chosen category first (only the ones filled in), then
+    // the vendor's own rows.
+    document.querySelectorAll("#specs-template .vd-cat-field").forEach(field => {
+        const value = field.querySelector(".spec-value-input").value.trim();
+        if (value) specs.push({ label: field.dataset.label, value });
+    });
+    const rows = document.querySelectorAll("#specs-list > div");
     rows.forEach(row => {
         const label = row.querySelector(".spec-label-input").value.trim();
         const value = row.querySelector(".spec-value-input").value.trim();
@@ -1847,6 +1856,52 @@ function collectVendorSpecRows() {
     });
     return specs;
 }
+
+// --- Specification fields that depend on the category (lz-category-specs.js)
+function vdCategoryPath(id) {
+    const byId = new Map((staffCategories || []).map(c => [Number(c.id), c]));
+    const names = [];
+    let c = byId.get(Number(id)), guard = 0;
+    while (c && guard++ < 8) { names.unshift(c.name); c = byId.get(Number(c.parent_id)); }
+    return names;
+}
+let vdCatSpecsBusy = false;
+function vdRenderCatSpecs() {
+    const host = document.getElementById("specs-template");
+    const select = document.getElementById("product-category");
+    if (!host || !select || !window.LzCategorySpecs || vdCatSpecsBusy) return;
+    vdCatSpecsBusy = true;
+    try {
+        const path = vdCategoryPath(select.value);
+        const tpl = LzCategorySpecs.forPath(path);
+        // Keep what is already typed, and take over matching rows from the list below.
+        const have = new Map();
+        host.querySelectorAll(".vd-cat-field").forEach(fl => { const v = fl.querySelector(".spec-value-input").value.trim(); if (v) have.set(fl.dataset.label.toLowerCase(), v); });
+        const wanted = new Set(tpl.fields.map(x => x.label.toLowerCase()));
+        document.querySelectorAll("#specs-list > div").forEach(row => {
+            const l = row.querySelector(".spec-label-input"), v = row.querySelector(".spec-value-input");
+            if (l && v && wanted.has(l.value.trim().toLowerCase())) { if (v.value.trim()) have.set(l.value.trim().toLowerCase(), v.value.trim()); row.remove(); }
+        });
+        // A filled-in field that the new category doesn't have goes back to the list so nothing typed is lost.
+        have.forEach((v, k) => { if (!wanted.has(k)) { const old = host.querySelector('.vd-cat-field[data-key="' + CSS.escape(k) + '"]'); if (old) addVendorSpecRow(old.dataset.label, v); } });
+        if (!tpl.fields.length) { host.innerHTML = ""; host.hidden = true; return; }
+        host.hidden = false;
+        host.innerHTML = `<div class="vd-cat-title">Specifications for ${vendorEsc(path[path.length - 1] || tpl.group)} <span>(fill in what applies - empty ones are left out)</span></div><div class="vd-cat-grid">`
+            + tpl.fields.map((x, i) => `<label class="vd-cat-field" data-label="${vendorEsc(x.label)}" data-key="${vendorEsc(x.label.toLowerCase())}"><span>${vendorEsc(x.label)}</span>
+                <input type="text" class="spec-value-input" maxlength="200" placeholder="${vendorEsc(x.hint)}"${x.options ? ` list="vd-cat-opt-${i}"` : ""}>
+                ${x.options ? `<datalist id="vd-cat-opt-${i}">${x.options.map(o => `<option>${vendorEsc(o)}</option>`).join("")}</datalist>` : ""}</label>`).join("") + "</div>";
+        host.querySelectorAll(".vd-cat-field").forEach(fl => { const v = have.get(fl.dataset.key); if (v) fl.querySelector(".spec-value-input").value = v; });
+    } finally { vdCatSpecsBusy = false; }
+}
+document.addEventListener("DOMContentLoaded", () => {
+    const select = document.getElementById("product-category");
+    if (select) select.addEventListener("change", vdRenderCatSpecs);
+    const list = document.getElementById("specs-list");
+    if (list && window.MutationObserver) {
+        let t = null;
+        new MutationObserver(() => { if (vdCatSpecsBusy) return; clearTimeout(t); t = setTimeout(vdRenderCatSpecs, 150); }).observe(list, { childList: true });
+    }
+});
 
 // Splits one pasted line into a label/value pair. Excel copy/paste of two
 // adjacent columns produces tab-separated text, so that's tried first;
@@ -2472,6 +2527,7 @@ async function editVendorProduct(id) {
     if (_low) _low.value = product.low_stock_threshold === null || product.low_stock_threshold === undefined ? "" : product.low_stock_threshold;
     if (window.LzFormSteps) LzFormSteps.reset(document.getElementById("vendor-product-steps"));
     document.getElementById("product-description").value = product.description || "";
+    vdSetRichFields(product);
     // Older listings (added before the commission engine) never recorded
     // vendor_desired_payout - fall back to the current price so the field
     // isn't blank, though re-saving will recompute it from that number.
@@ -2529,6 +2585,52 @@ function vdSkuBase(v) {
     if (s.endsWith(VD_SKU_SUFFIX)) s = s.slice(0, -VD_SKU_SUFFIX.length).replace(/-+$/, "");
     return s;
 }
+
+// --- Rich text: Product description, Highlights, What's in the box and
+// Product warranty (client/js/lz-rich-editor.js) ----------------------------
+const vdRich = {};
+async function vdUploadEditorImage(file) {
+    const fd = new FormData();
+    fd.append("image", file);
+    const res = await fetch(`${API_URL}/api/vendors/products/description-blocks/image`, { method: "POST", headers: { "Authorization": `Bearer ${getVendorToken()}` }, body: fd });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !j.image_url) throw new Error(j.message || j.error || "The picture could not be uploaded.");
+    return j.image_url;
+}
+// Keeps the hidden plain-text description in step with the editor (the
+// review step and older code read it).
+function vdSyncDescription() {
+    const t = document.getElementById("product-description");
+    if (t && vdRich.description) t.value = vdRich.description.getText();
+}
+function vdMountRichEditors() {
+    if (!window.LzRichEditor || vdRich.description) return;
+    const make = (id, placeholder, onChange) => {
+        const host = document.getElementById(id);
+        return host ? LzRichEditor.mount(host, { placeholder, uploadImage: vdUploadEditorImage, onChange }) : null;
+    };
+    vdRich.description = make("product-description-editor", "Include only product-related information. Write clearly and concisely, and make sure the description matches your product photos. No testimonials, quotes or promotion of other products.", vdSyncDescription);
+    vdRich.highlights = make("product-highlights-editor", "Key features in bullet points, at least 4 for a good listing. Ex: Lightweight design - Noise cancellation - 20-hour battery life - Wireless connectivity");
+    vdRich.box = make("product-box-editor", "Ex: 1x Headphone, 1x Charging Cable, 1x User Manual [everything included in the package]");
+    vdRich.warranty = make("product-warranty-editor", "Ex: 1 year limited warranty [the warranty terms covering the product]");
+    if (!vdRich.description || !vdRich.highlights || !vdRich.box || !vdRich.warranty) { Object.keys(vdRich).forEach((k) => delete vdRich[k]); }
+}
+function vdSetRichFields(product) {
+    vdMountRichEditors();
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    set("product-model", (product && product.model) || "");
+    set("product-production-country", (product && product.production_country) || "");
+    set("product-condition", (product && product.item_condition) || "new");
+    if (!vdRich.description) { setTimeout(vdRenderCatSpecs, 500); return; }
+    if (product && product.description_html) vdRich.description.setHTML(product.description_html);
+    else vdRich.description.setText(product ? product.description : "");    // older listings: plain text
+    vdRich.highlights.setHTML((product && product.highlights_html) || "");
+    vdRich.box.setHTML((product && product.box_contents_html) || "");
+    vdRich.warranty.setHTML((product && product.warranty_html) || "");
+    vdSyncDescription();
+    setTimeout(vdRenderCatSpecs, 500);      // after the category and saved specifications are in place
+}
+document.addEventListener("DOMContentLoaded", vdMountRichEditors);
 
 // --- Sale Price + dates and Certifications on the product form -------------
 function vdSetSaleFields(product) {
@@ -2654,7 +2756,14 @@ async function submitVendorProductForm(opts) {
     const sku = vdSkuBase(document.getElementById("product-sku").value);
     if (!sku && !asDraft) { alert("Enter the SKU (your own stock code). " + VD_SKU_SUFFIX + " is added at the end automatically."); return; }
     const category_id = document.getElementById("product-category").value;
+    vdSyncDescription();
     const description = document.getElementById("product-description").value.trim();
+    if (!asDraft && vdRich.description && vdRich.highlights) {
+        const missing = [];
+        if (vdRich.description.isEmpty()) { missing.push("Product description"); vdRich.description.setError("This field is required."); }
+        if (vdRich.highlights.isEmpty()) { missing.push("Highlights"); vdRich.highlights.setError("This field is required."); }
+        if (missing.length) { alert("Please fill in: " + missing.join(" and ") + "."); return; }
+    }
     const desiredPayout = document.getElementById("product-payout").value;
     const stock = document.getElementById("product-stock").value;
     const packageSize = document.getElementById("product-package-size").value;
@@ -2722,6 +2831,15 @@ async function submitVendorProductForm(opts) {
     formData.append("package_size", packageSize);
     if (window.LzPackage) LzPackage.appendTo(formData, "product");
     formData.append("warranty_months", warrantyMonths);
+    if (vdRich.description) {
+        formData.append("description_html", vdRich.description.getHTML());
+        formData.append("highlights_html", vdRich.highlights.getHTML());
+        formData.append("box_contents_html", vdRich.box.getHTML());
+        formData.append("warranty_html", vdRich.warranty.getHTML());
+    }
+    formData.append("model", (document.getElementById("product-model") || {}).value || "");
+    formData.append("production_country", (document.getElementById("product-production-country") || {}).value || "");
+    formData.append("item_condition", (document.getElementById("product-condition") || {}).value || "new");
     formData.append("sale_price", (document.getElementById("product-sale-price") || {}).value || "");
     formData.append("sale_start", (document.getElementById("product-sale-start") || {}).value || "");
     formData.append("sale_end", (document.getElementById("product-sale-end") || {}).value || "");
@@ -5669,6 +5787,7 @@ function vendorProductSummary() {
             : "No sale", ok: val("product-sale-price") ? !vdSaleProblem() : undefined, step: 2 },
         { label: "Stock", value: val("product-stock") || "Missing", ok: val("product-stock") !== "", step: 2 },
         { label: "Description", value: desc ? desc.length + " characters" : "Missing", ok: !!desc, step: 2 },
+        { label: "Highlights", value: vdRich.highlights && !vdRich.highlights.isEmpty() ? "Added" : "Missing", ok: !!(vdRich.highlights && !vdRich.highlights.isEmpty()), step: 2 },
         { label: "Specifications", value: document.querySelectorAll("#specs-list input").length / 2 + " rows", step: 3 },
         { label: "Packed weight", value: weight ? weight + " kg" : (isNew ? "Missing" : "-"), ok: isNew ? !!weight : undefined, step: 3 },
         { label: "Warranty", value: val("product-warranty-months") ? val("product-warranty-months") + " months" : "None", step: 3 },
