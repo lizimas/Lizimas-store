@@ -71,3 +71,23 @@
     .vcp-banner { flex-wrap: wrap; }
     .vcp-banner-btn { width: 100%; justify-content: center; }
 }
+
+/* The identity form never pushes wider than its card. */
+.vrd-form, .vrd-main, .vrd-extra { min-width: 0; }
+.vrd-form details > div { grid-template-columns: minmax(0, 1fr); }
+.vrd-form label { min-width: 0; overflow-wrap: anywhere; }
+.vrd-form select, .vrd-form input { max-width: 100%; box-sizing: border-box; }
+
+/* Phones: cards run edge to edge and the form uses the full card width. */
+@media (max-width: 700px) {
+    #vm-verification-host { padding: 0 !important; }
+    #vm-verification-host #vendor-kyc-panel { margin: 0 !important; padding: 14px 12px !important; border-radius: 0 !important; border-left: 0 !important; border-right: 0 !important; box-shadow: none !important; }
+    #vm-verification-host .admin-page-subtitle { margin-left: 0 !important; margin-right: 0 !important; padding-left: 0 !important; padding-right: 0 !important; }
+    .vcp-banner { padding: 12px 14px; }
+    .vcp-card { padding: 14px 12px; }
+    .vrd-row { padding: 14px 12px; gap: 12px; }
+    .vrd-form, .vrd-extra { grid-column: 1 / -1; }
+    .vrd-form details > div { max-width: none !important; }
+    .vrd-form #vd-id-submit, .vrd-act .vrd-btn { width: 100%; justify-self: stretch !important; }
+    .vrd-act { width: 100%; align-items: stretch; }
+}

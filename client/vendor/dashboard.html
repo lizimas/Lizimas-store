@@ -7,7 +7,7 @@
 <meta charset="UTF-8">
 <title>Lizimas Store — Vendor Dashboard</title>
 <link rel="stylesheet" href="../css/admin.css?v=47">
-<link rel="stylesheet" href="../css/vendor-compliance.css?v=2">
+<link rel="stylesheet" href="../css/vendor-compliance.css?v=3">
 <link rel="stylesheet" href="../css/vendor-shell.css?v=2">
 <link rel="stylesheet" href="../css/vendor-desktop.css?v=8">
 <link rel="stylesheet" href="../css/vendor-mobile.css?v=11">
@@ -434,9 +434,6 @@
 
     <div class="vm-screen" id="vm-screen-add-product">
         <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Add Product</span></div>
-        <div class="vm-card vm-add-product-intro">
-            Same form as the desktop Vendor Center. Follow the <a href="../vendor-policies#content-images" target="_blank">Content &amp; Image Guidelines</a>: accurate name and description, your desired payout in UGX (Lizimas calculates the customer price), and at least three clear photos of the actual item. New listings are reviewed before they go live.
-        </div>
         <div id="vm-add-product-host" class="vm-add-product-host"></div>
     </div>
 
@@ -959,7 +956,7 @@
                         <div style="font-size:12.5px; color:#555; margin:0 0 10px; max-width:720px; line-height:1.55;">
                             <p style="margin:0 0 6px;">Upload a .csv, .xlsx or .xls file to add or update several products at once. <a href="javascript:void(0)" onclick="vdDownloadImportTemplate()">Download a template</a>.</p>
                             <p style="margin:0 0 6px;"><b>Required:</b> <code>name</code>, <code>desired_payout</code> (what you want to earn per unit). <b>Usually:</b> <code>stock</code>, <code>description</code>, <code>category</code> (an existing category name), <code>weight_kg</code>, <code>length_cm</code>, <code>width_cm</code>, <code>height_cm</code>. <b>Optional:</b> <code>sku</code>, <code>brand</code>, <code>warranty_months</code>, <code>gtin</code>, <code>mpn</code>, <code>material</code>, <code>color</code>, <code>sleeve</code>, <code>style</code>, <code>length</code>, <code>fit</code>, <code>pattern</code>, <code>care_instructions</code>, <code>occasion</code>.</p>
-                            <p style="margin:0 0 6px;"><b>Photos:</b> put at least 3 photo links in the <code>images</code> column, separated by <code>|</code>. Each photo is downloaded and checked like an uploaded one (at least 800&times;800, under 5MB, sharp, well lit). A product that ends up with fewer than 3 good photos is saved as a <b>draft</b> - open it, add photos and submit it. Up to 100 rows with photo links per file.</p>
+                            <p style="margin:0 0 6px;"><b>Photos:</b> put the photo links in the <code>images</code> column, separated by <code>|</code>. Each photo is downloaded and checked like an uploaded one (at least 800&times;800, under 5MB, sharp, well lit). A product that ends up with fewer than 3 good photos is saved as a <b>draft</b> - open it, add photos and submit it. Up to 100 rows with photo links per file.</p>
                             <p style="margin:0;">Give a row an <code>id</code> or a <code>sku</code> that matches one of your products to update it; anything else creates a new listing. New and changed listings go to Lizimas for approval, same as adding one by hand.</p>
                         </div>
                         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
@@ -1082,7 +1079,7 @@
                     <p class="admin-page-subtitle">
                         Follow the <a href="../vendor-policies#content-images" target="_blank">Content &amp; Image Guidelines</a>:
                         use an accurate name and description, list everything included, enter your desired payout in UGX (Lizimas
-                        calculates the customer price for you), and at least three clear photos that show the actual item. New listings are reviewed before they go live.
+                        calculates the customer price for you), and clear photos that show the actual item. New listings are reviewed before they go live.
                     </p>
 
                     <!-- The same form is shown on phones: vendor-mobile.js moves this wrapper into the Add Product screen. -->
@@ -1100,11 +1097,11 @@
                                 <div class="field-row">
                                     <div>
                                         <label style="font-size:13px; font-weight:600; color:#333;">Product Name</label>
-                                        <input type="text" id="product-name" placeholder="Accurate, specific name (include colour/size/spec if relevant)" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                        <input type="text" id="product-name" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                                     </div>
                                     <div>
-                                        <label style="font-size:13px; font-weight:600; color:#333;">SKU <span style="font-weight:400; color:#888;">(your own stock code, optional)</span></label>
-                                        <input type="text" id="product-sku" placeholder="e.g. your own internal product code" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                        <label style="font-size:13px; font-weight:600; color:#333;">SKU <span style="font-weight:400; color:#888;">(your own stock code, required)</span></label>
+                                        <div style="display:flex; align-items:stretch;"><input type="text" id="product-sku" required maxlength="50" autocomplete="off" style="padding:10px; border:1px solid #ccc; border-right:0; border-radius:8px 0 0 8px; flex:1; min-width:0; box-sizing:border-box; text-transform:uppercase;"><span style="display:flex; align-items:center; padding:0 12px; background:#f3f4f6; border:1px solid #ccc; border-radius:0 8px 8px 0; font-weight:700; color:#1a1a2e; font-size:13px;">-ULZMS</span></div>
                                     </div>
                                     <div>
                                         <label style="font-size:13px; font-weight:600; color:#333;">Category</label>
@@ -1133,11 +1130,11 @@
                                 </div>
                             </div>
 
-                            <div class="product-form-section" data-step="2">
+                            <div class="product-form-section" data-step="1">
                                 <h4>Images</h4>
                                 <div class="field-row">
                                     <div>
-                                        <label style="font-size:13px; font-weight:600; color:#333;">Photos <span style="font-weight:400; color:#888;">(at least 3 required — each at least 800×800 pixels and under 5MB; sharp, well lit, plain background, no watermarks)</span></label>
+                                        <label style="font-size:13px; font-weight:600; color:#333;">Photos <span style="font-weight:400; color:#888;">(each at least 800×800 pixels and under 5MB; sharp, well lit, plain background, no watermarks)</span></label>
                                         <div class="drag-drop-zone" id="product-image-dropzone">
                                             Drag &amp; drop images here, or click to browse
                                         </div>
@@ -1147,7 +1144,7 @@
                                 </div>
                             </div>
 
-                            <div class="product-form-section" data-step="3">
+                            <div class="product-form-section" data-step="2">
                                 <h4>Pricing &amp; Stock</h4>
                                 <div class="field-row">
                                     <div style="display:flex; gap:12px;">
@@ -1172,7 +1169,7 @@
                                 </div>
                             </div>
 
-                            <div class="product-form-section" data-step="4">
+                            <div class="product-form-section" data-step="2">
                                 <h4>Description</h4>
                                 <div class="field-row">
                                     <div>
@@ -1186,7 +1183,7 @@
                                 </div>
                             </div>
 
-                            <div class="product-form-section" data-step="5">
+                            <div class="product-form-section" data-step="3">
                                 <h4>Specifications</h4>
                                 <p style="font-size:12px; color:#666; margin-top:-6px;">Optional key/value facts shown on the product page (e.g. Material: Cotton, Battery Life: 10 hours) &mdash; the same structure staff and admin listings use, so your products read consistently on the storefront.</p>
                                 <div id="specs-list" style="display:flex; flex-direction:column; gap:6px;"></div>
@@ -1195,7 +1192,7 @@
                                 <div class="lz-spec-tools" data-add="addVendorSpecRow" data-table-id="vendor-specs-table-wrap"></div>
                             </div>
 
-                            <div class="product-form-section" data-step="5">
+                            <div class="product-form-section" data-step="3">
                                 <h4>Shipping &amp; Warranty</h4>
                                 <div class="field-row">
                                     <div>
@@ -1220,7 +1217,7 @@
                                 </div>
                             </div>
 
-                            <div class="product-form-section" data-step="6" data-review="1">
+                            <div class="product-form-section" data-step="4" data-review="1">
                                 <h4>Review &amp; Submit</h4>
                                 <div class="lzfs-review" id="vendor-product-review"></div>
                         <label style="font-size:13px; display:flex; gap:8px; align-items:flex-start; background:#FFF8E1; padding:10px; border-radius:8px; margin-top:20px;">
@@ -1944,7 +1941,7 @@
     <script src="../js/seller-panel.js?v=1"></script>
     <script src="../js/photo-crop.js?v=1"></script>
     <script src="../js/prepare-picked-file.js?v=11"></script>
-    <script src="../js/lz-image-checks.js?v=5"></script>
+    <script src="../js/lz-image-checks.js?v=6"></script>
     <script src="../js/lz-id-ocr.js?v=4"></script>
     <script src="../js/lz-table.js?v=6"></script>
     <script src="../js/lz-spec-tools.js?v=2"></script>
@@ -1957,12 +1954,12 @@
 <script src="../js/lz-variants-table.js?v=2"></script>
 <script src="../js/lz-product-preview.js?v=2"></script>
 <script src="../js/description-blocks.js?v=14"></script>
-    <script src="../js/vendor-dashboard.js?v=41"></script>
+    <script src="../js/vendor-dashboard.js?v=43"></script>
     <script src="../js/vendor-statements.js?v=4"></script>
 <script src="../js/vendor-mobile.js?v=18"></script>
 <script src="../js/vendor-compliance.js?v=2"></script>
 <script src="../js/vendor-shell.js?v=1"></script>
-<script src="../js/vendor-products.js?v=6"></script>
+<script src="../js/vendor-products.js?v=7"></script>
 <script src="../js/vendor-consignments.js?v=1"></script>
 <script src="../js/vendor-promo-monitor.js?v=2"></script>
 <script src="../js/vendor-shop-setup.js?v=5"></script>

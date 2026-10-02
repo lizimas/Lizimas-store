@@ -19,7 +19,7 @@
     "use strict";
 
     const RULES = {
-        MIN_IMAGES: 3,
+        MIN_IMAGES: 1,
         MAX_IMAGES_VENDOR: 8,       // vendors (Ryan, Sept 2026)
         MAX_IMAGES_STORE: 20,       // admin / Lizimas Store
         MAX_BYTES: 5 * 1024 * 1024,
@@ -318,7 +318,7 @@
         const limit = max || RULES.MAX_IMAGES_VENDOR;
         if (n > limit) return `${limit === RULES.MAX_IMAGES_VENDOR ? "Vendors can upload" : "A product can have"} up to ${limit} photos - this product would have ${n}. Remove ${n - limit} first.`;
         return n >= RULES.MIN_IMAGES ? null
-            : `Add at least ${RULES.MIN_IMAGES} photos of the product (${n} added so far).`;
+            : `Add at least ${RULES.MIN_IMAGES} photo${RULES.MIN_IMAGES === 1 ? "" : "s"} of the product (${n} added so far).`;
     }
 
     function rejectionText(reasons) {

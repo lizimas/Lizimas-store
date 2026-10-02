@@ -5,9 +5,9 @@ const assert = require("node:assert");
 const Checks = require("../client/js/lz-image-checks.js");
 const Grid = require("../client/js/lz-photo-grid.js");
 
-test("vendor photo count: at least 3, at most 8", () => {
-    assert.match(Checks.countMessage(2), /at least 3/);
-    assert.strictEqual(Checks.countMessage(3), null);
+test("vendor photo count: at least 1, at most 8", () => {
+    assert.match(Checks.countMessage(0), /at least 1 photo /);
+    assert.strictEqual(Checks.countMessage(1), null);
     assert.strictEqual(Checks.countMessage(8), null);
     assert.match(Checks.countMessage(9), /up to 8 photos/);
 });

@@ -135,7 +135,7 @@ function vpFlags(p) {
     let reason = "";
     if (!live) {
         if (deleted) reason = "Deleted";
-        else if (draft) reason = "Draft - add at least 3 good photos, then save to submit it";
+        else if (draft) reason = "Draft - add a good photo, then save to submit it";
         else if (notReady) reason = `Not ready for QC - add ${missing.join(", ")}`;
         else if (pending) reason = "Waiting for quality check (QC)";
         else if (rejected) reason = `Rejected in QC${p.rejection_reason ? ": " + p.rejection_reason : ""}`;

@@ -1,5 +1,5 @@
 const pool = require("../config/database");
-const { generateSku } = require("../utils/sku");
+const { generateSku, withSkuSuffix } = require("../utils/sku");
 const cloudinary = require("../config/cloudinary");
 const { logActivity } = require("../utils/activityLog");
 const { publicProductRow, readExtraProductFields, cleanColorInput, variantCombos, suggestVariantSku } = require("../utils/productForm");
@@ -179,6 +179,17 @@ exports.addProduct = async (req, res) => {
         const draft = wantsDraft(req.body);
         const status = draft ? "draft" : (["product_staff", "vendor", "vendor_staff"].includes(req.user.role) ? "pending" : "approved");
 
+        // Vendors must give their own SKU; it always ends in -ULZMS and is
+        // never made automatically (a draft may be saved without one).
+        const isVendorUser = ["vendor", "vendor_staff"].includes(req.user.role);
+        let vendorSku = null;
+        if (isVendorUser) {
+            const s = withSkuSuffix(sku);
+            if (!s.ok) return res.status(400).json({ error: s.error });
+            if (!s.sku && !draft) return res.status(400).json({ error: "Enter the SKU (your own stock code) for this product." });
+            vendorSku = s.sku;
+        }
+
         // Vendor-submitted products carry a vendor_id so they can be scoped to
         // that vendor's own listings/orders/payouts, separately from created_by
         // (which just records who clicked "add").
@@ -252,7 +263,7 @@ exports.addProduct = async (req, res) => {
                 packageSize, warrantyMonths,
                 brand || null, gtin || null, mpn || null, vendorId,
                 pricingSnapshot.vendor_desired_payout, pricingSnapshot.commission_rate_applied,
-                pricingSnapshot.fixed_fee_applied, pricingSnapshot.commission_rule_id, sku || generateSku(brand, vendorId)]
+                pricingSnapshot.fixed_fee_applied, pricingSnapshot.commission_rule_id, isVendorUser ? vendorSku : (sku || generateSku(brand, vendorId))]
         );
 
         const newProduct = product.rows[0];
@@ -1411,9 +1422,16 @@ exports.updateProduct = async (req, res) => {
         // Only when the form sends a SKU: older admin/staff forms didn't,
         // and every edit there used to blank the product's SKU.
         if (sku !== undefined) {
+            let skuValue = String(sku).trim() || null;
+            if (["vendor", "vendor_staff"].includes(req.user.role)) {
+                const s = withSkuSuffix(sku);
+                if (!s.ok) return res.status(400).json({ error: s.error });
+                if (!s.sku && !draft) return res.status(400).json({ error: "Enter the SKU (your own stock code) for this product." });
+                skuValue = s.sku;
+            }
             const skuParam = params.length + 1;
             updateQuery += `, sku=$${skuParam}`;
-            params.push(String(sku).trim() || null);
+            params.push(skuValue);
         }
 
         const nextParam = params.length + 1;
@@ -1577,7 +1595,7 @@ exports.importVendorProducts = async (req, res) => {
     // than partially importing past the vendor's cap.
     const wouldBeNewCount = rows.filter((row) => {
         const rowExistingId = row.id ? Number(row.id) : null;
-        const rowSku = row.sku !== undefined ? String(row.sku).trim() : "";
+        const rowSku = (withSkuSuffix(row.sku).sku) || "";
         if (rowExistingId) return !byId.has(rowExistingId);
         if (rowSku) return !bySku.has(rowSku.toLowerCase());
         return true;
@@ -1637,7 +1655,9 @@ exports.importVendorProducts = async (req, res) => {
             const description = String(row.description || "").trim();
             const categoryName = String(row.category || "").trim();
             const existingId = row.id ? Number(row.id) : null;
-            const sku = row.sku !== undefined ? String(row.sku).trim() : "";
+            const skuCheck = withSkuSuffix(row.sku);
+            if (!skuCheck.ok) { results.errors.push({ row: rowNum, name: name || "(missing)", errors: [skuCheck.error] }); results.skipped++; continue; }
+            const sku = skuCheck.sku || "";
             const stockRaw = row.stock === "" || row.stock === undefined ? "0" : String(row.stock).trim();
             const stock = Number(stockRaw);
             const payoutRaw = row.desired_payout !== undefined ? String(row.desired_payout).trim() : "";
@@ -1790,6 +1810,12 @@ exports.importVendorProducts = async (req, res) => {
                 noteImportPhotos(results, rowNum, name, photos, rowStatus, have.n + photos.kept.length, minPhotos);
                 results.updated++;
             } else {
+                // New listings need the vendor's own SKU - none is made automatically.
+                if (!sku) {
+                    results.errors.push({ row: rowNum, name, errors: ["Add a SKU (your own stock code) in the sku column."] });
+                    results.skipped++;
+                    continue;
+                }
                 const inserted = await client.query(
                     `INSERT INTO products (
                         name, description, price, stock, category_id, created_by, status, vendor_id,
@@ -1800,7 +1826,7 @@ exports.importVendorProducts = async (req, res) => {
                      RETURNING id, sku`,
                     [
                         name, description, pricing.customerPrice, stock, categoryId, req.user.userId, vendorId,
-                        sku || generateSku(brand, vendorId), brand || null, gtin || null, mpn || null, material || null, color || null,
+                        sku, brand || null, gtin || null, mpn || null, material || null, color || null,
                         sleeve || null, style || null, length || null, fit || null, pattern || null,
                         careInstructions || null, occasion || null, warrantyMonths, packageSize || "Small",
                         photos.kept.length ? photos.kept[0].url : null,

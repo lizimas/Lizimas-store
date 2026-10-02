@@ -41,4 +41,19 @@ function generateSku(brand, vendorId) {
     return prefix + randomCode(10) + "LZMS";
 }
 
-module.exports = { generateSku, getBrandPrefix };
+// Vendor SKUs: the vendor's own code plus the fixed suffix, e.g.
+// "TV-55A" -> "TV-55A-ULZMS". No automatic codes (Ryan, Oct 2026).
+const VENDOR_SKU_SUFFIX = "ULZMS";
+// -> { ok, sku } | { ok: false, error }. An empty value gives { ok: true, sku: null }.
+function withSkuSuffix(raw) {
+    let s = String(raw == null ? "" : raw).trim().toUpperCase().replace(/\s+/g, "-");
+    if (s.endsWith(VENDOR_SKU_SUFFIX)) s = s.slice(0, -VENDOR_SKU_SUFFIX.length);
+    s = s.replace(/-+$/, "");
+    if (!s) return { ok: true, sku: null };
+    if (s.length > 50 || !/^[A-Z0-9][A-Z0-9._\/-]*$/.test(s)) {
+        return { ok: false, error: "The SKU can only use letters, numbers and - . / _ (up to 50 characters)." };
+    }
+    return { ok: true, sku: s + "-" + VENDOR_SKU_SUFFIX };
+}
+
+module.exports = { generateSku, getBrandPrefix, withSkuSuffix, VENDOR_SKU_SUFFIX };

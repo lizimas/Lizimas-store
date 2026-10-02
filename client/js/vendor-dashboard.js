@@ -1639,7 +1639,8 @@ async function renderVendorImagePreviews(fileList) {
             '<div style="margin-top:8px;">Please upload a clear, high-quality photo to keep quality high on Lizimas Store.</div>';
         preview.appendChild(card);
     }
-    if (notes.length > 0) {
+    // "Accepted, but could be better" notes are no longer shown (Ryan, Oct 2026).
+    if (false && notes.length > 0) {
         const card = document.createElement("div");
         card.className = "vd-photo-notes";
         card.style.cssText = "width:100%; box-sizing:border-box; background:#FFFBEB; border:1px solid #FDE68A; color:#92400E; border-radius:8px; padding:10px 12px; margin-bottom:8px; font-size:13px;";
@@ -1704,11 +1705,11 @@ function renderVendorPhotoOrderList(statusText) {
     if (zone) zone.style.display = "none";
 
     const n = vdAllImages.length, min = vdPhotoMin();
-    const countLine = n >= min ? "" : (n + " of " + min + " photos minimum - add " + (min - n) + " more.");
+    const countLine = n >= min ? "" : "Add at least " + min + " photo" + (min === 1 ? "" : "s") + ".";
     LzPhotoGrid.render(block, {
         items: vdAllImages.map(im => ({ key: im.key, url: im.url, isNew: vdIsNew(im.key) })),
         max: VD_MAX_PHOTOS,
-        note: "Vendors can upload up to " + VD_MAX_PHOTOS + " photos." + (countLine ? " " + countLine : ""),
+        note: countLine,
         busy: vdDeleteInFlight,
         status: statusText || "",
         onMove: (from, to) => moveVendorPhotoOrder(from, to),
@@ -2463,7 +2464,7 @@ async function editVendorProduct(id) {
 
     document.getElementById("product-id").value = product.id;
     document.getElementById("product-name").value = product.name || "";
-    document.getElementById("product-sku").value = product.sku || "";
+    document.getElementById("product-sku").value = vdSkuBase(product.sku);
     const _low = document.getElementById("product-low-stock");
     if (_low) _low.value = product.low_stock_threshold === null || product.low_stock_threshold === undefined ? "" : product.low_stock_threshold;
     if (window.LzFormSteps) LzFormSteps.reset(document.getElementById("vendor-product-steps"));
@@ -2515,11 +2516,21 @@ async function deleteVendorProduct(id) {
     }
 }
 
+// Every SKU ends in the fixed Lizimas suffix; the vendor types only their
+// own code and the server adds the suffix (utils/sku.js withSkuSuffix).
+const VD_SKU_SUFFIX = "ULZMS";
+function vdSkuBase(v) {
+    let s = String(v || "").trim().toUpperCase();
+    if (s.endsWith(VD_SKU_SUFFIX)) s = s.slice(0, -VD_SKU_SUFFIX.length).replace(/-+$/, "");
+    return s;
+}
+
 async function submitVendorProductForm(opts) {
     const asDraft = !!(opts && opts.draft);
     const id = document.getElementById("product-id").value;
     const name = document.getElementById("product-name").value.trim();
-    const sku = document.getElementById("product-sku").value.trim();
+    const sku = vdSkuBase(document.getElementById("product-sku").value);
+    if (!sku && !asDraft) { alert("Enter the SKU (your own stock code). " + VD_SKU_SUFFIX + " is added at the end automatically."); return; }
     const category_id = document.getElementById("product-category").value;
     const description = document.getElementById("product-description").value.trim();
     const desiredPayout = document.getElementById("product-payout").value;
@@ -5521,26 +5532,27 @@ function vendorProductSummary() {
         { label: "Product name", value: val("product-name") || "Missing", ok: !!val("product-name"), step: 1 },
         { label: "Category", value: hasCat ? catLabel : "Missing", ok: hasCat, step: 1 },
         { label: "Brand", value: val("product-brand") || "-", step: 1 },
-        { label: "Photos", value: n + " of " + VD_MAX_PHOTOS + " (at least " + min + ")", ok: n >= min && n <= VD_MAX_PHOTOS, step: 2 },
-        { label: "Your payout", value: val("product-payout") ? "UGX " + Number(val("product-payout")).toLocaleString() : "Missing", ok: !!val("product-payout"), step: 3 },
-        { label: "Customer pays", value: customer && customer !== "-" ? "UGX " + customer : "-", step: 3 },
-        { label: "Stock", value: val("product-stock") || "Missing", ok: val("product-stock") !== "", step: 3 },
-        { label: "Description", value: desc ? desc.length + " characters" : "Missing", ok: !!desc, step: 4 },
-        { label: "Specifications", value: document.querySelectorAll("#specs-list input").length / 2 + " rows", step: 5 },
-        { label: "Packed weight", value: weight ? weight + " kg" : (isNew ? "Missing" : "-"), ok: isNew ? !!weight : undefined, step: 5 },
-        { label: "Warranty", value: val("product-warranty-months") ? val("product-warranty-months") + " months" : "None", step: 5 },
+        { label: "Photos", value: n + " of " + VD_MAX_PHOTOS + " (at least " + min + ")", ok: n >= min && n <= VD_MAX_PHOTOS, step: 1 },
+        { label: "Your payout", value: val("product-payout") ? "UGX " + Number(val("product-payout")).toLocaleString() : "Missing", ok: !!val("product-payout"), step: 2 },
+        { label: "Customer pays", value: customer && customer !== "-" ? "UGX " + customer : "-", step: 2 },
+        { label: "Stock", value: val("product-stock") || "Missing", ok: val("product-stock") !== "", step: 2 },
+        { label: "Description", value: desc ? desc.length + " characters" : "Missing", ok: !!desc, step: 2 },
+        { label: "Specifications", value: document.querySelectorAll("#specs-list input").length / 2 + " rows", step: 3 },
+        { label: "Packed weight", value: weight ? weight + " kg" : (isNew ? "Missing" : "-"), ok: isNew ? !!weight : undefined, step: 3 },
+        { label: "Warranty", value: val("product-warranty-months") ? val("product-warranty-months") + " months" : "None", step: 3 },
         { label: "Authenticity statement", value: agreed ? "Confirmed" : "Tick the box below", ok: agreed }
     ];
 }
 
 function vendorProductValidate(step) {
     const val = id => { const el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; };
-    if (step === 1 && (!val("product-name") || !val("product-category"))) return "Add the product name and choose a category to continue.";
-    if (step === 2) {
+    if (step === 1) {
+        if (!val("product-name") || !val("product-category")) return "Add the product name and choose a category to continue.";
+        if (!vdSkuBase(val("product-sku"))) return "Enter the SKU (your own stock code) to continue.";
         const n = vdAllImages.length, min = vdPhotoMin();
-        if (n < min) return "Add at least " + min + " photos to continue (" + n + " so far).";
+        if (n < min) return "Add at least " + min + " photo" + (min === 1 ? "" : "s") + " to continue.";
     }
-    if (step === 3 && (!val("product-payout") || val("product-stock") === "")) return "Add your payout and stock to continue.";
+    if (step === 2 && (!val("product-payout") || val("product-stock") === "")) return "Add your payout and stock to continue.";
     return null;
 }
 
@@ -5548,7 +5560,7 @@ function vendorProductStepsMount() {
     const root = document.getElementById("vendor-product-steps");
     if (!root || !window.LzFormSteps) return;
     LzFormSteps.mount(root, {
-        titles: ["Basic", "Photos", "Pricing", "Description", "Specs & Shipping", "Review & Submit"],
+        titles: ["Product & Photos", "Price & Description", "Specs & Shipping", "Review & Submit"],
         summary: vendorProductSummary,
         validate: vendorProductValidate
     });

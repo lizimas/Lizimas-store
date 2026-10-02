@@ -171,7 +171,7 @@ async function compliance(product, images) {
     // Image quality: count + stored photo hashes; size notes were given at upload.
     const n = images.length;
     add("images", "Photos", n >= 3 ? "ok" : n ? "warn" : "fail",
-        n ? `${n} photo${n === 1 ? "" : "s"}${n < 3 ? " - vendors need at least 3" : ""}` : "No photos");
+        n ? `${n} photo${n === 1 ? "" : "s"}` : "No photos");
     if (product.quality_score != null) {
         add("quality", "Listing quality score", product.quality_score >= 70 ? "ok" : product.quality_score >= 40 ? "warn" : "fail", `${product.quality_score}/100`);
     }

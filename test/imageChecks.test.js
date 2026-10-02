@@ -131,8 +131,9 @@ test("size, resolution, count and repeated-file rules before upload", () => {
     assert.deepEqual(byName["small.jpg"], ["low_resolution"]);
     assert.deepEqual(byName["big.jpg"], ["too_large"]);
     assert.deepEqual(byName["copy.jpg"], ["same_file"]);
-    assert.equal(preUploadCheck([ok], 1).countError, "Add at least 3 photos of the product (2 added so far).");
-    assert.equal(preUploadCheck([ok], 2).ok, true);
+    // One photo is enough (Oct 2026: the "at least 3" rule was removed).
+    assert.equal(preUploadCheck([ok], 0).ok, true);
+    assert.equal(preUploadCheck([], 0).countError, "Add at least 1 photo of the product (0 added so far).");
 });
 
 test("duplicate photos across listings are flagged as a warning", async () => {
@@ -167,9 +168,8 @@ test("uploadCheckedPhotos: good photos upload; a blurry one is rejected and remo
     assert.match(bad.body.message, /blurry\.jpg: Image is too blurry/);
     assert.equal(destroyed.length, 3, "every photo from the rejected upload is removed");
 
-    const tooFew = await uploadCheckedPhotos([f("1.jpg", 1)], { existingCount: 0 }, deps);
-    assert.equal(tooFew.ok, false);
-    assert.match(tooFew.body.count_error, /at least 3 photos/);
+    const one = await uploadCheckedPhotos([f("1.jpg", 1)], { existingCount: 0 }, deps);
+    assert.equal(one.ok, true, "a single photo is accepted");
 });
 
 test("preview that cannot be fetched does not block the vendor", async () => {
