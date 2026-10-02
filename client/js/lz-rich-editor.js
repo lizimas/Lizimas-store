@@ -36,6 +36,7 @@
         side: I('<rect x="12" y="6" width="9" height="8" rx="1"/><path d="M3 7h6M3 11h6M3 18h18"/>'),
         caption: I('<rect x="4" y="5" width="16" height="10" rx="1"/><path d="M7 19h10"/>'),
         alt: I('<path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><path d="m4 4 16 16"/>'),
+        cards: I('<rect x="2.5" y="6" width="8" height="12" rx="1.2"/><rect x="13.5" y="6" width="8" height="12" rx="1.2"/><path d="M4.5 15h4M15.5 15h4"/>'),
         para: I('<path d="M19 6v6a3 3 0 0 1-3 3H6"/><path d="m9 12-3 3 3 3"/>', ' stroke-width="2.4"'),
         ok: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#15803d" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
         no: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#b91c1c" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>'
@@ -92,6 +93,41 @@
 .lzr .lzr-para:hover { background: #2563d8 !important; }
 .lzr .lzr-para svg { width: 12px; height: 12px; }
 .lzr-tip { position: absolute; z-index: 40; background: #333; color: #fff; font-size: 11.5px; padding: 4px 8px; border-radius: 3px; white-space: nowrap; pointer-events: none; }
+.lzr-body ul.lzr-cards { list-style: none; display: flex; gap: 10px; overflow-x: auto; margin: 6px 0 12px; padding: 8px; background: #f7f8fa; outline: 3px solid transparent; transition: outline-color .12s; cursor: pointer; }
+.lzr-body ul.lzr-cards:hover { outline: 3px solid #ffc83d; }
+.lzr-body ul.lzr-cards > li { flex: 0 0 190px; background: #fff; border: 1px solid #e2e4e8; border-radius: 8px; padding: 9px; margin: 0; }
+.lzr-body ul.lzr-cards h4 { font-size: 13.5px; margin: 0 0 4px; } .lzr-body ul.lzr-cards p { font-size: 12px; margin: 0 0 6px; color: #4b5563; }
+.lzr-body ul.lzr-cards figure { margin: 0; outline: 0 !important; } .lzr-body ul.lzr-cards img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; }
+.lzr-body ul.lzr-cards.lzr-show { display: block; background: #0b0b12; padding: 14px; }
+.lzr-body ul.lzr-cards.lzr-show > li { background: none; border: 0; text-align: center; display: flex; flex-direction: column; padding: 10px 0 16px; }
+.lzr-body ul.lzr-cards.lzr-show h4 { color: #fff; font-size: 18px; order: 0; } .lzr-body ul.lzr-cards.lzr-show p { color: #d1d5db; order: 2; }
+.lzr-body ul.lzr-cards.lzr-show figure { display: contents; } .lzr-body ul.lzr-cards.lzr-show figcaption { order: 1; background: none; color: #fff; font-weight: 700; font-size: 13.5px; }
+.lzr-body ul.lzr-cards.lzr-show img { order: 3; aspect-ratio: auto; max-width: 420px; margin: 0 auto; }
+.lzr-cdlg-lay { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.lzr-cdlg .lzr-cdlg-lay button { flex: 1 1 200px; width: auto !important; min-height: 0 !important; height: auto !important; margin: 0 !important; text-align: left; padding: 8px 11px !important; border: 1.5px solid #ccced1 !important; border-radius: 7px !important; background: #fff !important; color: #333 !important; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 700; line-height: 1.35; }
+.lzr-cdlg .lzr-cdlg-lay button small { display: block; font-weight: 400; font-size: 11.5px; color: #555; }
+.lzr-cdlg .lzr-cdlg-lay button.on { border-color: #f4b400 !important; background: #fffaeb !important; }
+.lzr-cdlg { position: fixed; inset: 0; z-index: 100000; background: rgba(15,18,30,.55); display: flex; align-items: center; justify-content: center; padding: 14px; font-family: inherit; }
+.lzr-cdlg-box { background: #fff; border-radius: 10px; width: 100%; max-width: 680px; max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 18px 50px rgba(0,0,0,.3); }
+.lzr-cdlg-head { padding: 14px 18px 10px; border-bottom: 1px solid #e5e7eb; } .lzr-cdlg-head b { font-size: 16px; color: #1a1a2e; } .lzr-cdlg-head div { font-size: 12.5px; color: #555; margin-top: 3px; line-height: 1.45; }
+.lzr-cdlg-list { padding: 12px 18px; overflow-y: auto; flex: 1 1 auto; }
+.lzr-cdlg-row { display: flex; gap: 12px; padding: 10px; border: 1px solid #e2e4e8; border-radius: 8px; margin-bottom: 10px; background: #fafbfc; }
+.lzr-cdlg-row img { width: 96px; height: 96px; object-fit: cover; border-radius: 6px; flex: 0 0 auto; background: #eee; }
+.lzr-cdlg-f { flex: 1 1 auto; min-width: 0; display: grid; gap: 6px; }
+.lzr-cdlg-f label { font-size: 11px; color: #555; display: block; margin: 0 0 2px; font-weight: 600; }
+.lzr-cdlg .lzr-cdlg-f input, .lzr-cdlg .lzr-cdlg-f textarea { width: 100% !important; box-sizing: border-box; border: 1px solid #b8bcc4 !important; border-radius: 4px !important; padding: 7px 9px !important; font-size: 13.5px !important; font-family: inherit; margin: 0 !important; background: #fff; min-height: 0 !important; }
+.lzr-cdlg .lzr-cdlg-f input { height: 34px !important; } .lzr-cdlg .lzr-cdlg-f textarea { height: 54px !important; resize: vertical; }
+.lzr-cdlg-side { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; }
+.lzr-cdlg .lzr-cdlg-side button { width: 30px !important; height: 30px !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important; border: 1px solid #ccced1 !important; background: #fff !important; border-radius: 4px !important; cursor: pointer; font-size: 14px; color: #333; }
+.lzr-cdlg .lzr-cdlg-side button:disabled { opacity: .35; cursor: default; } .lzr-cdlg .lzr-cdlg-side button[data-a=del] { color: #b91c1c; }
+.lzr-cdlg-empty { text-align: center; color: #6b7280; font-size: 13px; padding: 22px 0; }
+.lzr-cdlg-msg { font-size: 12.5px; color: #555; padding: 0 18px 6px; min-height: 16px; } .lzr-cdlg-msg.bad { color: #e53935; }
+.lzr-cdlg-foot { display: flex; gap: 8px; align-items: center; padding: 10px 18px 14px; border-top: 1px solid #e5e7eb; flex-wrap: wrap; }
+.lzr-cdlg .lzr-cdlg-foot button { width: auto !important; height: 38px !important; min-height: 0 !important; margin: 0 !important; padding: 0 16px !important; border-radius: 6px !important; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.lzr-cdlg .lzr-cdlg-foot [data-a=add] { background: #fff !important; border: 1px solid #1a1a2e !important; color: #1a1a2e !important; margin-right: auto !important; }
+.lzr-cdlg .lzr-cdlg-foot [data-a=cancel] { background: #fff !important; border: 1px solid #ccced1 !important; color: #333 !important; }
+.lzr-cdlg .lzr-cdlg-foot [data-a=save] { background: #1a1a2e !important; border: 1px solid #1a1a2e !important; color: #f4b400 !important; }
+@media (max-width: 560px) { .lzr-cdlg-row { flex-wrap: wrap; } .lzr-cdlg-row img { width: 72px; height: 72px; } .lzr-cdlg-side { flex-direction: row; width: 100%; justify-content: flex-end; } }
 .lzr-err { color: #e53935; font-size: 11.5px; margin: 4px 10px 0; }
 @media (max-width: 700px) { .lzr .lzr-bar select.lzr-block { min-width: 104px; } .lzr-sep { margin: 0 2px; } .lzr-body figure.lzr-side { float: none; max-width: 100%; margin: 6px 0 12px; } }`;
 
@@ -106,7 +142,7 @@
     // Light clean-up for the editing surface (pasted or source HTML). The
     // server is the real filter.
     const KEEP = new Set(["P", "H2", "H3", "H4", "BR", "STRONG", "B", "EM", "I", "U", "A", "UL", "OL", "LI", "BLOCKQUOTE", "FIGURE", "FIGCAPTION", "IMG", "TABLE", "THEAD", "TBODY", "TR", "TH", "TD", "IFRAME"]);
-    const KEEP_CLASS = /^(lzr-img|lzr-left|lzr-center|lzr-side|lzr-media|lzr-in[1-4])$/;
+    const KEEP_CLASS = /^(lzr-cards|lzr-show|lzr-img|lzr-left|lzr-center|lzr-side|lzr-media|lzr-in[1-4])$/;
     function tidy(html) {
         const doc = new DOMParser().parseFromString("<div>" + String(html || "") + "</div>", "text/html");
         const root = doc.body.firstChild;
@@ -130,7 +166,7 @@
                         || (name === "src" && tag === "IMG" && /^https:\/\//i.test(v))
                         || (name === "src" && tag === "IFRAME" && /^https:\/\/www\.youtube(-nocookie)?\.com\/embed\/[\w-]{6,20}$/.test(v))
                         || (name === "alt" && tag === "IMG") || ((name === "colspan" || name === "rowspan") && /^\d{1,2}$/.test(v))
-                        || (name === "class" && (tag === "P" || tag === "FIGURE"));
+                        || (name === "class" && (tag === "P" || tag === "FIGURE" || tag === "UL"));
                     if (!ok) n.removeAttribute(a.name);
                 });
                 if (n.className) { n.className = n.className.split(/\s+/).filter((c) => KEEP_CLASS.test(c)).join(" "); if (!n.className) n.removeAttribute("class"); }
@@ -164,7 +200,7 @@
             <span class="lzr-sep"></span>
             ${btn("outdent", ICON.outdent, "Decrease indent")}${btn("indent", ICON.indent, "Increase indent")}
             <span class="lzr-sep"></span>
-            ${btn("image", ICON.image, "Insert image")}${btn("quote", ICON.quote, "Block quote")}${btn("table", ICON.table, "Insert table", ICON.caret)}${btn("media", ICON.media, "Insert media", ICON.caret)}
+            ${btn("image", ICON.image, "Insert image")}${btn("cards", ICON.cards, "Photo cards (photos with a heading and a few words, side by side)")}${btn("quote", ICON.quote, "Block quote")}${btn("table", ICON.table, "Insert table", ICON.caret)}${btn("media", ICON.media, "Insert media", ICON.caret)}
             ${btn("undo", ICON.undo, "Undo")}${btn("redo", ICON.redo, "Redo")}
             <input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
         </div>
@@ -182,6 +218,7 @@
         host.appendChild(errEl);
         const st = { undo: [], redo: [], last: "", sel: null, range: null, source: false, timer: null };
         const blank = () => !body.textContent.trim() && !body.querySelector("img,iframe,table");
+        const lockCards = () => body.querySelectorAll("ul.lzr-cards").forEach((u) => u.setAttribute("contenteditable", "false"));
         const refreshBlank = () => body.classList.toggle("lzr-blank", blank() && body.innerHTML !== "");
         function snapshot(force) {
             const h = body.innerHTML;
@@ -191,7 +228,7 @@
             refreshBlank(); if (wrap.classList.contains("lzr-bad") && !blank()) { wrap.classList.remove("lzr-bad"); errEl.textContent = ""; errEl.hidden = true; }
             if (opts.onChange) opts.onChange();
         }
-        function restore(h) { clearSel(); body.innerHTML = h; st.last = h; refreshBlank(); if (opts.onChange) opts.onChange(); }
+        function restore(h) { clearSel(); body.innerHTML = h; lockCards(); st.last = h; refreshBlank(); if (opts.onChange) opts.onChange(); }
         const saveRange = () => { const s = window.getSelection(); if (s.rangeCount && body.contains(s.anchorNode)) st.range = s.getRangeAt(0).cloneRange(); };
         function useRange() {
             body.focus();
@@ -302,7 +339,8 @@
             const fb = document.createElement("div");
             fb.className = "lzr-pop lzr-figbar";
             const fbtn = (act, icon, title, on) => `<button type="button" class="lzr-btn${on ? " lzr-on" : ""}" data-fig="${act}" title="${title}" aria-label="${title}">${icon}</button>`;
-            fb.innerHTML = isImg
+            const isCards = target.classList.contains("lzr-cards");
+            fb.innerHTML = isCards ? fbtn("editcards", '<span style="font-size:12.5px; font-weight:600;">Edit photo cards</span>', "Edit photo cards") + '<span class="lzr-sep"></span>' + fbtn("remove", ICON.no, "Remove photo cards") : isImg
                 ? fbtn("left", ICON.left, "Left aligned image", target.classList.contains("lzr-left")) + fbtn("center", ICON.center, "Centered image", target.classList.contains("lzr-center")) + fbtn("side", ICON.side, "Side image", target.classList.contains("lzr-side"))
                     + '<span class="lzr-sep"></span>' + fbtn("caption", ICON.caption, target.querySelector("figcaption") ? "Toggle caption off" : "Toggle caption on", !!target.querySelector("figcaption")) + fbtn("alt", ICON.alt, "Change image text alternative")
                     + '<span class="lzr-sep"></span>' + fbtn("remove", ICON.no, "Remove image")
@@ -313,6 +351,7 @@
                 const b = e.target.closest("[data-fig]");
                 if (!b) return;
                 const act = b.dataset.fig;
+                if (act === "editcards") { clearSel(); openCards(target); return; }
                 if (["left", "center", "side"].includes(act)) { target.classList.remove("lzr-left", "lzr-center", "lzr-side"); target.classList.add("lzr-" + act); }
                 else if (act === "caption") {
                     const c = target.querySelector("figcaption");
@@ -329,6 +368,93 @@
                 snapshot(); selectBlock(target);
             };
             wrap.appendChild(fb); place(fb, target, "bar");
+        }
+
+        // ---- photo cards: photos side by side, each with a heading, a short
+        // description and a few words under the photo. Shoppers swipe through
+        // them. Kept as <ul class="lzr-cards"><li><h4><p><figure>...; edited in
+        // a small window, never typed into directly. ----
+        const MAX_CARDS = 12;
+        function readCards(ul) {
+            return Array.from(ul.children).filter((li) => li.tagName === "LI" && li.querySelector("img")).map((li) => ({
+                src: li.querySelector("img").getAttribute("src"),
+                heading: (li.querySelector("h4") || {}).textContent || "",
+                text: (li.querySelector("p") || {}).textContent || "",
+                caption: (li.querySelector("figcaption") || {}).textContent || ""
+            }));
+        }
+        function cardsInner(cards) {
+            return cards.map((c) => "<li>" + (c.heading.trim() ? "<h4>" + esc(c.heading.trim()) + "</h4>" : "") + (c.text.trim() ? "<p>" + esc(c.text.trim()) + "</p>" : "")
+                + '<figure class="lzr-img"><img src="' + esc(c.src) + '" alt="' + esc(c.heading.trim() || c.caption.trim()) + '">' + (c.caption.trim() ? "<figcaption>" + esc(c.caption.trim()) + "</figcaption>" : "") + "</figure></li>").join("");
+        }
+        function openCards(ul) {
+            closePop();
+            const cards = ul ? readCards(ul) : [];
+            let show = !!(ul && ul.classList.contains("lzr-show"));
+            const dlg = document.createElement("div");
+            dlg.className = "lzr-cdlg";
+            dlg.innerHTML = `<div class="lzr-cdlg-box" role="dialog" aria-modal="true" aria-label="Photo cards">
+                <div class="lzr-cdlg-head"><b>Photo cards</b><div>Add 3 or more photos. Give each one a heading, a short description and a few words under the photo. Then choose how shoppers see them.</div>
+                <div class="lzr-cdlg-lay"><button type="button" data-lay="swipe">Swipe cards<small>Side by side, shoppers swipe through them</small></button><button type="button" data-lay="show">Feature showcase<small>Dark full-width sections with a "Top features" summary</small></button></div></div>
+                <div class="lzr-cdlg-list"></div><div class="lzr-cdlg-msg" role="status"></div>
+                <div class="lzr-cdlg-foot"><button type="button" data-a="add">+ Add photos</button><button type="button" data-a="cancel">Cancel</button><button type="button" data-a="save">Save</button>
+                <input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden></div></div>`;
+            const list = dlg.querySelector(".lzr-cdlg-list"), msg = dlg.querySelector(".lzr-cdlg-msg"), pick = dlg.querySelector('input[type="file"]');
+            const say = (t, bad) => { msg.textContent = t || ""; msg.classList.toggle("bad", !!bad); };
+            const drawLay = () => dlg.querySelectorAll("[data-lay]").forEach((b) => b.classList.toggle("on", (b.dataset.lay === "show") === show));
+            const draw = () => {
+                list.innerHTML = cards.length ? cards.map((c, i) => `<div class="lzr-cdlg-row" data-i="${i}"><img src="${esc(c.src)}" alt="">
+                    <div class="lzr-cdlg-f"><div><label>Heading</label><input type="text" data-k="heading" maxlength="60" value="${esc(c.heading)}" placeholder="e.g. Long battery life"></div>
+                    <div><label>Short description</label><textarea data-k="text" maxlength="220" placeholder="One or two sentences about this">${esc(c.text)}</textarea></div>
+                    <div><label>A few words (under the photo; in a showcase, the summary line)</label><input type="text" data-k="caption" maxlength="90" value="${esc(c.caption)}" placeholder="e.g. Charges fully in 45 minutes"></div></div>
+                    <div class="lzr-cdlg-side"><button type="button" data-a="up" title="Move earlier" aria-label="Move earlier"${i === 0 ? " disabled" : ""}>&#8593;</button><button type="button" data-a="down" title="Move later" aria-label="Move later"${i === cards.length - 1 ? " disabled" : ""}>&#8595;</button><button type="button" data-a="del" title="Remove this photo" aria-label="Remove this photo">&#10005;</button></div></div>`).join("")
+                    : '<div class="lzr-cdlg-empty">No photos yet. Press "Add photos" and choose 3 or more.</div>';
+            };
+            const close = () => { dlg.remove(); document.removeEventListener("keydown", onKey, true); };
+            const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
+            list.addEventListener("input", (e) => { const row = e.target.closest(".lzr-cdlg-row"), k = e.target.dataset.k; if (row && k) cards[Number(row.dataset.i)][k] = e.target.value; });
+            dlg.addEventListener("click", async (e) => {
+                const lay = e.target.closest("[data-lay]");
+                if (lay) { show = lay.dataset.lay === "show"; drawLay(); return; }
+                const b = e.target.closest("[data-a]");
+                if (!b) return;
+                const a = b.dataset.a, row = b.closest(".lzr-cdlg-row"), i = row ? Number(row.dataset.i) : -1;
+                if (a === "cancel") return close();
+                if (a === "add") { if (cards.length >= MAX_CARDS) return say("That is the most photos one set can hold (" + MAX_CARDS + ").", true); pick.value = ""; pick.click(); return; }
+                if (a === "up" && i > 0) { cards.splice(i - 1, 0, cards.splice(i, 1)[0]); draw(); }
+                if (a === "down" && i < cards.length - 1) { cards.splice(i + 1, 0, cards.splice(i, 1)[0]); draw(); }
+                if (a === "del") { cards.splice(i, 1); draw(); }
+                if (a === "save") {
+                    if (!cards.length) { if (ul) { ul.remove(); snapshot(); } return close(); }
+                    if (cards.length < 2) return say("Add at least 2 photos, 3 or more looks best.", true);
+                    let node = ul;
+                    if (!node) node = document.createElement("ul");
+                    node.className = show ? "lzr-cards lzr-show" : "lzr-cards";
+                    node.innerHTML = cardsInner(cards);
+                    node.setAttribute("contenteditable", "false");
+                    close();
+                    if (ul) snapshot(); else insertBlock(node);
+                }
+            });
+            pick.addEventListener("change", async () => {
+                const files = Array.from(pick.files || []);
+                if (!files.length) return;
+                if (!opts.uploadImage) return say("Pictures can't be added here.", true);
+                const problems = [];
+                let n = 0;
+                for (const file of files) {
+                    if (cards.length >= MAX_CARDS) { problems.push("only " + MAX_CARDS + " photos fit in one set"); break; }
+                    if (file.size > 5 * 1024 * 1024) { problems.push(file.name + " is larger than 5MB"); continue; }
+                    say("Uploading photo " + (++n) + " of " + files.length + "...");
+                    try { const url = await opts.uploadImage(file); if (url) { cards.push({ src: url, heading: "", text: "", caption: "" }); draw(); } }
+                    catch (err) { problems.push(file.name + ": " + ((err && err.message) || "could not be uploaded")); }
+                }
+                say(problems.length ? problems.join(". ") + "." : "", problems.length > 0);
+                list.scrollTop = list.scrollHeight;
+            });
+            document.addEventListener("keydown", onKey, true);
+            document.body.appendChild(dlg);
+            draw(); drawLay();
         }
 
         function insertBlock(node) {
@@ -385,8 +511,8 @@
         function setSource(on) {
             st.source = on;
             clearSel(); closePop();
-            if (on) { srcBox.value = blank() ? "" : body.innerHTML.replace(/ class="lzr-sel"| lzr-sel/g, "").replace(/<\/(p|h2|h3|h4|ul|ol|li|blockquote|figure|table|thead|tbody|tr)>(?=<)/g, "</$1>\n").replace(/<(ul|ol|tbody|thead|tr|table)>(?=<)/g, "<$1>\n"); }
-            else { body.innerHTML = tidy(srcBox.value); snapshot(true); }
+            if (on) { srcBox.value = blank() ? "" : body.innerHTML.replace(/ class="lzr-sel"| lzr-sel| contenteditable="false"/g, "").replace(/<\/(p|h2|h3|h4|ul|ol|li|blockquote|figure|table|thead|tbody|tr)>(?=<)/g, "</$1>\n").replace(/<(ul|ol|tbody|thead|tr|table)>(?=<)/g, "<$1>\n"); }
+            else { body.innerHTML = tidy(srcBox.value); lockCards(); snapshot(true); }
             body.hidden = on; srcBox.hidden = !on;
             bar.querySelectorAll(".lzr-btn, .lzr-block").forEach((el) => { if (el.dataset.cmd !== "source") el.disabled = on; });
             bar.querySelector('[data-cmd="source"]').classList.toggle("lzr-on", on);
@@ -426,6 +552,7 @@
                 });
             }
             if (cmd === "image") { saveRange(); fileInput.value = ""; fileInput.click(); return; }
+            if (cmd === "cards") { saveRange(); openCards(null); return; }
             if (cmd === "table") {
                 saveRange();
                 const p = popAt(b, '<div><div class="lzr-grid-label">Choose the size</div><div class="lzr-grid">' + Array.from({ length: 100 }, (_, i) => `<i data-r="${Math.floor(i / 10) + 1}" data-c="${(i % 10) + 1}"></i>`).join("") + '</div></div>');
@@ -476,17 +603,20 @@
             const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
         });
         body.addEventListener("blur", () => { clearTimeout(st.timer); snapshot(); });
+        body.addEventListener("dblclick", (e) => { const c = e.target.closest("ul.lzr-cards"); if (c && body.contains(c)) { e.preventDefault(); clearSel(); openCards(c); } });
         body.addEventListener("click", (e) => {
-            const fig = e.target.closest("figure.lzr-img, figure.lzr-media");
-            const tbl = !fig && e.target.closest("table");
-            if (fig && body.contains(fig)) { if (!e.target.closest("figcaption")) e.preventDefault(); selectBlock(fig); }
+            const cards = e.target.closest("ul.lzr-cards");
+            const fig = !cards && e.target.closest("figure.lzr-img, figure.lzr-media");
+            const tbl = !cards && !fig && e.target.closest("table");
+            if (cards && body.contains(cards)) { e.preventDefault(); selectBlock(cards); }
+            else if (fig && body.contains(fig)) { if (!e.target.closest("figcaption")) e.preventDefault(); selectBlock(fig); }
             else if (tbl && body.contains(tbl)) selectBlock(tbl);
             else clearSel();
             closePop();
         });
         body.addEventListener("mousemove", (e) => {
             if (st.sel) return;
-            const blk = e.target.closest && (e.target.closest("figure.lzr-img, figure.lzr-media") || e.target.closest("table"));
+            const blk = e.target.closest && (e.target.closest("ul.lzr-cards") || e.target.closest("figure.lzr-img, figure.lzr-media") || e.target.closest("table"));
             if (!blk || !body.contains(blk)) { if (!e.target.closest || !e.target.closest(".lzr-para")) { st.hover = null; wrap.querySelectorAll(".lzr-para, .lzr-tip").forEach((n) => n.remove()); } return; }
             const r = blk.getBoundingClientRect(), where = e.clientY < r.top + r.height / 2 ? "before" : "after";
             if (st.hover === blk && st.hoverWhere === where) return;
@@ -520,12 +650,13 @@
                 if (st.source) setSource(false);
                 clearTimeout(st.timer);
                 const c = body.cloneNode(true);
-                c.querySelectorAll(".lzr-sel").forEach((n) => n.classList.remove("lzr-sel"));
+                c.querySelectorAll(".lzr-sel").forEach((n) => { n.classList.remove("lzr-sel"); if (!n.className) n.removeAttribute("class"); });
+                c.querySelectorAll("ul.lzr-cards").forEach((n) => { n.removeAttribute("contenteditable"); n.removeAttribute("style"); });
                 c.querySelectorAll("figcaption").forEach((n) => { if (!n.textContent.trim()) n.remove(); });
                 return blank() ? "" : c.innerHTML.trim();
             },
             setHTML(html) { clearSel(); closePop(); if (st.source) { st.source = false; body.hidden = false; srcBox.hidden = true; bar.querySelectorAll(".lzr-btn, .lzr-block").forEach((el) => { el.disabled = false; }); bar.querySelector('[data-cmd="source"]').classList.remove("lzr-on"); }
-                body.innerHTML = tidy(html || ""); st.undo = []; st.redo = []; st.last = body.innerHTML; refreshBlank(); refreshBar(); api.setError(""); wrap.classList.remove("lzr-bad"); },
+                body.innerHTML = tidy(html || ""); lockCards(); st.undo = []; st.redo = []; st.last = body.innerHTML; refreshBlank(); refreshBar(); api.setError(""); wrap.classList.remove("lzr-bad"); },
             setText(text) { const t = String(text || "").trim(); api.setHTML(t ? t.split(/\r?\n\r?\n+/).map((p) => "<p>" + esc(p).replace(/\r?\n/g, "<br>") + "</p>").join("") : ""); },
             getText() { return (st.source ? tidy(srcBox.value).replace(/<[^>]+>/g, " ") : body.innerText || "").replace(/\u00a0/g, " ").replace(/[ \t]+\n/g, "\n").trim(); },
             isEmpty() { if (st.source) setSource(false); return blank(); },

@@ -799,7 +799,71 @@ const PD_RICH_CSS = ".pd-rich{font-size:15px;line-height:1.65;color:#222;overflo
     + ".pd-rich figure{margin:0 0 12px;clear:both}.pd-rich figure img{max-width:100%;height:auto;display:block}.pd-rich figure.lzr-center img{margin:0 auto}.pd-rich figure.lzr-side{float:right;max-width:45%;margin:0 0 10px 16px;clear:none}"
     + ".pd-rich figcaption{font-size:12.5px;color:#555;text-align:center;padding:6px 4px}.pd-rich figure.lzr-media iframe{width:100%;aspect-ratio:16/9;border:0;display:block}"
     + ".pd-rich .lzr-in1{margin-left:28px}.pd-rich .lzr-in2{margin-left:56px}.pd-rich .lzr-in3{margin-left:84px}.pd-rich .lzr-in4{margin-left:112px}.pd-rich::after{content:'';display:block;clear:both}"
+    + ".pd-cards{position:relative;margin:4px 0 16px;clear:both}.pd-rich ul.lzr-cards{list-style:none;display:flex;gap:14px;overflow-x:auto;margin:0;padding:4px 2px 12px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:#f4b400 #eef0f3}"
+    + ".pd-rich ul.lzr-cards::-webkit-scrollbar{height:6px}.pd-rich ul.lzr-cards::-webkit-scrollbar-thumb{background:#f4b400;border-radius:3px}.pd-rich ul.lzr-cards::-webkit-scrollbar-track{background:#eef0f3;border-radius:3px}"
+    + ".pd-rich ul.lzr-cards>li{flex:0 0 min(78%,290px);scroll-snap-align:start;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;box-shadow:0 1px 4px rgba(26,26,46,.06);display:flex;flex-direction:column}"
+    + ".pd-rich ul.lzr-cards h4{font-size:15.5px;margin:0 0 6px;color:#1a1a2e}.pd-rich ul.lzr-cards p{font-size:13.5px;line-height:1.5;margin:0 0 10px;color:#4b5563}.pd-rich ul.lzr-cards figure{margin:auto 0 0}"
+    + ".pd-rich ul.lzr-cards img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px}.pd-rich ul.lzr-cards figcaption{font-size:12.5px;color:#555;padding:7px 2px 0}"
+    + ".pd-cards-nav{position:absolute;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;border:0;background:#1a1a2e;color:#f4b400;font-size:20px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25);z-index:2;display:flex;align-items:center;justify-content:center;padding:0}"
+    + ".pd-cards-nav[hidden]{display:none}.pd-cards-nav.prev{left:-8px}.pd-cards-nav.next{right:-8px}@media(max-width:700px){.pd-cards-nav{display:none}}"
+    + ".pd-show{background:#0b0b12;color:#fff;border-radius:14px;padding:30px 18px 10px;margin:6px 0 18px;clear:both}.pd-show-title{font-size:26px;font-weight:800;text-align:center;margin:0 0 20px;color:#fff}"
+    + ".pd-show-top{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:0 0 14px}.pd-show-top button{text-align:left;background:#1b1b24;border:1px solid #3a3a48;border-radius:10px;padding:16px;color:#fff;cursor:pointer;font-family:inherit}"
+    + ".pd-show-top button:hover{border-color:#f4b400}.pd-show-top b{display:block;font-size:16px;margin:0 0 6px}.pd-show-top span{font-size:13.5px;color:#d1d5db;line-height:1.45}"
+    + ".pd-rich ul.lzr-cards.lzr-show{display:block;overflow:visible;padding:0;margin:0}.pd-rich ul.lzr-cards.lzr-show>li{background:none;border:0;box-shadow:none;border-radius:0;padding:26px 0;text-align:center;scroll-margin-top:90px}"
+    + ".pd-rich ul.lzr-cards.lzr-show h4{order:0;font-size:26px;color:#fff;margin:0 0 14px}.pd-rich ul.lzr-cards.lzr-show figure{display:contents}.pd-rich ul.lzr-cards.lzr-show figcaption{order:1;font-size:17px;font-weight:700;color:#fff;padding:0 0 12px}"
+    + ".pd-rich ul.lzr-cards.lzr-show p{order:2;font-size:14.5px;color:#d1d5db;max-width:900px;margin:0 auto 18px}.pd-rich ul.lzr-cards.lzr-show img{order:3;aspect-ratio:auto;object-fit:contain;max-width:100%;width:auto;margin:0 auto;border-radius:10px}"
+    + "@media(max-width:700px){.pd-show{padding:22px 12px 4px}.pd-show-title,.pd-rich ul.lzr-cards.lzr-show h4{font-size:21px}.pd-rich ul.lzr-cards.lzr-show figcaption{font-size:15px}}"
     + ".pd-rich-title{font-size:16px;font-weight:700;margin:18px 0 8px;color:#1a1a2e}@media(max-width:700px){.pd-rich figure.lzr-side{float:none;max-width:100%;margin:0 0 12px}}";
+// Photo cards (ul.lzr-cards) scroll sideways; on a computer they also get
+// arrow buttons, shown only when there is more to see on that side.
+function pdSetUpCards(root) {
+    root.querySelectorAll("ul.lzr-cards").forEach(function (ul) {
+        if (ul.parentNode.classList.contains("pd-cards") || ul.parentNode.classList.contains("pd-show")) return;
+        if (ul.classList.contains("lzr-show")) {
+            // Feature showcase: a dark panel, a "Top features" summary, then one section per photo.
+            const panel = document.createElement("div");
+            panel.className = "pd-show";
+            ul.parentNode.insertBefore(panel, ul);
+            const items = Array.prototype.filter.call(ul.children, function (li) { return li.querySelector("h4"); });
+            if (items.length > 1) {
+                const t = document.createElement("div");
+                t.className = "pd-show-title"; t.textContent = "Top " + items.length + " features";
+                const grid = document.createElement("div");
+                grid.className = "pd-show-top";
+                items.forEach(function (li) {
+                    const b = document.createElement("button"), h = document.createElement("b"), cap = li.querySelector("figcaption");
+                    b.type = "button"; h.textContent = li.querySelector("h4").textContent; b.appendChild(h);
+                    if (cap) { const sp = document.createElement("span"); sp.textContent = cap.textContent; b.appendChild(sp); }
+                    b.onclick = function () { li.scrollIntoView({ behavior: "smooth", block: "start" }); };
+                    grid.appendChild(b);
+                });
+                panel.appendChild(t); panel.appendChild(grid);
+            }
+            panel.appendChild(ul);
+            return;
+        }
+        const wrap = document.createElement("div");
+        wrap.className = "pd-cards";
+        ul.parentNode.insertBefore(wrap, ul);
+        wrap.appendChild(ul);
+        const mk = function (cls, label, sign) {
+            const b = document.createElement("button");
+            b.type = "button"; b.className = "pd-cards-nav " + cls; b.setAttribute("aria-label", label);
+            b.textContent = sign > 0 ? "\u203A" : "\u2039";
+            b.onclick = function () { ul.scrollBy({ left: sign * Math.max(240, ul.clientWidth * 0.8), behavior: "smooth" }); };
+            wrap.appendChild(b);
+            return b;
+        };
+        const prev = mk("prev", "Earlier photos", -1), next = mk("next", "More photos", 1);
+        const sync = function () { prev.hidden = ul.scrollLeft < 8; next.hidden = ul.scrollLeft + ul.clientWidth > ul.scrollWidth - 8; };
+        ul.addEventListener("scroll", sync, { passive: true });
+        window.addEventListener("resize", sync);
+        if (window.ResizeObserver) new ResizeObserver(sync).observe(ul);   // the tab may be closed when this runs
+        ul.querySelectorAll("img").forEach(function (im) { im.addEventListener("load", sync); });
+        sync(); setTimeout(sync, 400);
+    });
+}
+
 function pdRenderRich(product) {
     if (!document.getElementById("pd-rich-style")) {
         const st = document.createElement("style");
@@ -819,6 +883,7 @@ function pdRenderRich(product) {
         descEl.textContent = "";
         descEl.hidden = true;
         descEl.parentNode.insertBefore(box, descEl);
+        pdSetUpCards(box);
     } else if (descEl) descEl.hidden = false;
     [["What's in the box", product.box_contents_html], ["Warranty", product.warranty_html]].forEach(function (pair) {
         if (!pair[1] || !descEl) return;

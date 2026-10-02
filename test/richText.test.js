@@ -42,3 +42,8 @@ test("plain text for search and the feed", () => {
     const html = clean("<h2>Samsung</h2><p>Great &amp; fast.</p><ul><li>12GB RAM</li><li>5000mAh battery</li></ul>");
     assert.strictEqual(toPlainText(html), "Samsung\nGreat & fast.\n\n- 12GB RAM\n- 5000mAh battery");
 });
+
+test("photo cards keep their structure and classes", () => {
+    const src = '<ul class="lzr-cards lzr-show evil" contenteditable="false"><li><h4>Fast</h4><p>Charges quickly.</p><figure class="lzr-img"><img src="https://a.b/c.jpg" alt="Fast"><figcaption>45 minutes</figcaption></figure></li></ul>';
+    assert.strictEqual(clean(src), '<ul class="lzr-cards lzr-show"><li><h4>Fast</h4><p>Charges quickly.</p><figure class="lzr-img"><img src="https://a.b/c.jpg" alt="Fast" loading="lazy"><figcaption>45 minutes</figcaption></figure></li></ul>');
+});

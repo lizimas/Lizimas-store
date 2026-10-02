@@ -3,19 +3,20 @@
 // trusted - it is taken apart and rebuilt here from an allow-list, so only
 // these tags and attributes can ever reach the product page:
 //   p h2 h3 h4 br strong b em i u a ul ol li blockquote
+//   ul.lzr-cards (photo cards: li > h4, p, figure)
 //   figure figcaption img  table thead tbody tr th td  iframe (YouTube only)
 // Every attribute value is checked, then re-written with its quotes
 // escaped; every piece of text is escaped. Anything else is dropped.
 
 const ALLOWED = {
     p: ["class"], h2: [], h3: [], h4: [], br: [], strong: [], b: [], em: [], i: [], u: [],
-    a: ["href"], ul: [], ol: [], li: [], blockquote: [],
+    a: ["href"], ul: ["class"], ol: [], li: [], blockquote: [],
     figure: ["class"], figcaption: [], img: ["src", "alt"],
     table: [], thead: [], tbody: [], tr: [], th: ["colspan", "rowspan"], td: ["colspan", "rowspan"],
     iframe: ["src"]
 };
 const VOID = new Set(["br", "img"]);
-const CLASSES = new Set(["lzr-img", "lzr-left", "lzr-center", "lzr-side", "lzr-media", "lzr-in1", "lzr-in2", "lzr-in3", "lzr-in4"]);
+const CLASSES = new Set(["lzr-cards", "lzr-show", "lzr-img", "lzr-left", "lzr-center", "lzr-side", "lzr-media", "lzr-in1", "lzr-in2", "lzr-in3", "lzr-in4"]);
 const YOUTUBE = /^https:\/\/www\.youtube(?:-nocookie)?\.com\/embed\/[A-Za-z0-9_-]{6,20}$/;
 const MAX_HTML = 60000;
 
