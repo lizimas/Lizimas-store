@@ -119,3 +119,8 @@
 .vmc-rate { display: inline-block; min-width: 52px; text-align: center; padding: 3px 10px; border-radius: 999px; background: #fff4cf; color: #8a5a00; font-weight: 700; }
 .vmc-note { margin-top: 12px !important; font-size: 12.5px; }
 @media (max-width: 760px) { .vmc-cards, .vmc-calc-row { grid-template-columns: minmax(0, 1fr); } .vmc-table th, .vmc-table td { padding: 9px 10px; } }
+
+/* Order limit notice */
+.vh-limit { margin-top: 14px; padding: 13px 16px; border-radius: 10px; background: #fff8e1; border: 1px solid #f4b400; color: #6b4a00; font-size: 13.5px; line-height: 1.55; }
+.vh-limit-hit { background: #fef2f2; border-color: #dc2626; color: #8a1c14; }
+.vh-limit button { margin-left: 6px; height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: #1a1a2e; color: #f4b400; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; width: auto; }

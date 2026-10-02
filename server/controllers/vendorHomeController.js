@@ -2,6 +2,7 @@
 // their 7 / 30 / 90 days switch. Revenue and items sold are compared with the
 // period just before, and the daily revenue feeds the small chart.
 const pool = require("../config/database");
+const { pendingOrderStatus } = require("../utils/vendorHold");
 
 const RANGES = [7, 30, 90];
 function rangeDays(value) {
@@ -45,6 +46,9 @@ exports.getBusinessMetrics = async (req, res) => {
                    FROM products WHERE vendor_id = $1 AND deleted_at IS NULL`,
                 [vendorId, String(days)])
         ]);
+        // Order limit: at the limit the shop's products are off the store until an order is handed over.
+        let orderLimit = null;
+        try { orderLimit = await pendingOrderStatus(pool, vendorId); } catch (e) { console.warn("Order limit:", e.message); }
         const t = totals.rows[0], l = live.rows[0];
         res.json({
             days,
@@ -52,6 +56,7 @@ exports.getBusinessMetrics = async (req, res) => {
             items_sold: t.items, items_change: changePct(t.items, t.items_before),
             orders: t.orders,
             live: l.live, live_change: changePct(l.live, l.live_before), total_products: l.total,
+            order_limit: orderLimit,
             daily: daily.rows.map((r) => ({ day: r.day, revenue: Number(r.revenue) }))
         });
     } catch (error) {

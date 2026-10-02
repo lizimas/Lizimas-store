@@ -161,6 +161,18 @@
                 `<div class="vh-metric"><span>Items Sold</span><strong>${Number(m.items_sold || 0).toLocaleString()}</strong>${trend(m.items_change, m.items_sold > 0)}</div>` +
                 `<div class="vh-metric"><span>Assortment Live</span><strong>${Number(m.live || 0).toLocaleString()}<small> of ${Number(m.total_products || 0).toLocaleString()}</small></strong>${trend(m.live_change, false)}</div>`;
             if (ch) ch.innerHTML = chart(m.daily, m.days);
+            // Order limit notice: at the limit the products are hidden from the store.
+            const ol = m.order_limit, old = document.getElementById("vh-limit");
+            if (old) old.remove();
+            if (ol && ol.limit > 0 && ol.pending >= ol.limit - 1) {
+                const box = document.createElement("div");
+                box.id = "vh-limit"; box.className = "vh-limit" + (ol.hit ? " vh-limit-hit" : "");
+                box.innerHTML = ol.hit
+                    ? `<strong>Your products are hidden from the store.</strong> You have ${ol.pending} paid orders waiting to be handed over and the limit is ${ol.limit}. Hand over at least one order and your products come back by themselves. <button type="button" onclick="vmShowScreen('orders')">Open orders</button>`
+                    : `<strong>You are one order away from the order limit.</strong> ${ol.pending} paid orders are waiting to be handed over; at ${ol.limit} your products are hidden from the store until you hand one over. <button type="button" onclick="vmShowScreen('orders')">Open orders</button>`;
+                const hero = document.querySelector(".vh-hero");
+                if (hero) hero.insertAdjacentElement("afterend", box);
+            }
         } catch (e) {
             host.querySelectorAll("strong").forEach((s) => { s.textContent = "-"; });
             if (ch) ch.innerHTML = "";

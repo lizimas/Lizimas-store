@@ -2607,7 +2607,7 @@ async function vmLoadCommissionRates() {
         const ex = vmCommissionPrice(50000, def.commission_rate, def.fixed_processing_fee) || { customer: 0, commission: 0, payout: 50000 };
         const feeTxt = Number(def.fixed_processing_fee) > 0 ? " + " + vmFmtUgx(def.fixed_processing_fee) : "";
         el.innerHTML = `<div class="vmc">
-            <p class="vmc-lead">Commissions are charged based on the category of the product you sell. You type <strong>your own price</strong> on the product form; Lizimas Store adds its commission on top, and that total is what the customer sees. The commission is taken only when an order is delivered.</p>
+            <p class="vmc-lead">Commissions are charged based on the category of the product you sell. You type <strong>your own price</strong> on the product form; Lizimas Store adds its commission on top, and that total is what the customer sees. The commission is taken only when an order is delivered. <strong>Commission rates are inclusive of VAT (18%).</strong></p>
             <div class="vmc-cards">
                 <section class="vmc-card"><h4>How the customer price is worked out</h4>
                     <div class="vmc-formula">Customer price = (Your price + Processing fee) &divide; (1 &minus; Commission)</div>

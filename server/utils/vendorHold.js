@@ -16,7 +16,37 @@
 // product whose vendor_id is not null.
 function vendorSellableSql(alias) {
     const a = alias || "vendors";
-    return `${a}.status = 'approved' AND COALESCE(${a}.documents_hold, false) = false`;
+    return `${a}.status = 'approved' AND COALESCE(${a}.documents_hold, false) = false${pendingLimitSql(a)}`;
+}
+
+// Order limit (Ryan, Oct 2026): a shop with this many paid orders still
+// waiting to be handed over is taken off the store until at least one of
+// them is handed over - then it comes back by itself. PENDING_ORDER_LIMIT=0
+// in the environment switches the limit off.
+const PENDING_ORDER_LIMIT = (() => {
+    const n = Number(process.env.PENDING_ORDER_LIMIT);
+    return Number.isInteger(n) && n >= 0 ? n : 5;
+})();
+// Orders that count: paid for, not cancelled / shipped / delivered, with an
+// item the vendor has not handed over yet.
+const PENDING_ORDERS_BY_VENDOR_SQL = `
+    SELECT plp.vendor_id, COUNT(DISTINCT plo.id) AS pending_orders
+      FROM order_items ploi
+      JOIN orders plo ON plo.id = ploi.order_id
+      JOIN products plp ON plp.id = ploi.product_id
+     WHERE plp.vendor_id IS NOT NULL
+       AND plo.status IN ('paid', 'processing')
+       AND (ploi.handover_status IS NULL OR ploi.handover_status = 'pending_handover')
+     GROUP BY plp.vendor_id`;
+function pendingLimitSql(alias) {
+    if (!PENDING_ORDER_LIMIT) return "";
+    return ` AND ${alias}.id NOT IN (SELECT pl.vendor_id FROM (${PENDING_ORDERS_BY_VENDOR_SQL}) pl WHERE pl.pending_orders >= ${PENDING_ORDER_LIMIT})`;
+}
+// -> { limit, pending, hit } for one vendor (db: pool or client).
+async function pendingOrderStatus(db, vendorId) {
+    const r = await db.query(`SELECT COALESCE((SELECT pl.pending_orders FROM (${PENDING_ORDERS_BY_VENDOR_SQL}) pl WHERE pl.vendor_id = $1), 0)::int AS n`, [vendorId]);
+    const pending = r.rows[0].n;
+    return { limit: PENDING_ORDER_LIMIT, pending, hit: PENDING_ORDER_LIMIT > 0 && pending >= PENDING_ORDER_LIMIT };
 }
 
 const HOLD_BLOCKED_MESSAGE =
@@ -44,4 +74,4 @@ function canUploadKycDocument({ kycEditable, holdDocuments, docStatus }, type) {
     return !docStatus || docStatus === "rejected" || docStatus === "action_required";
 }
 
-module.exports = { vendorSellableSql, HOLD_BLOCKED_MESSAGE, holdReadyToRelease, canUploadKycDocument };
+module.exports = { vendorSellableSql, PENDING_ORDER_LIMIT, pendingOrderStatus, HOLD_BLOCKED_MESSAGE, holdReadyToRelease, canUploadKycDocument };
