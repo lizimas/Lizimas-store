@@ -1,5 +1,7 @@
 const pool = require("../config/database");
 const { generateSku, withSkuSuffix } = require("../utils/sku");
+const { readSaleFields, syncProductSale } = require("../utils/productSale");
+const Certifications = require("../../client/js/lz-certifications.js");
 const cloudinary = require("../config/cloudinary");
 const { logActivity } = require("../utils/activityLog");
 const { publicProductRow, readExtraProductFields, cleanColorInput, variantCombos, suggestVariantSku } = require("../utils/productForm");
@@ -189,6 +191,8 @@ exports.addProduct = async (req, res) => {
             if (!s.sku && !draft) return res.status(400).json({ error: "Enter the SKU (your own stock code) for this product." });
             vendorSku = s.sku;
         }
+        const saleFields = isVendorUser ? readSaleFields(req.body, desired_payout) : { ok: true, sent: false, sale: null };
+        if (!saleFields.ok) return res.status(400).json({ error: saleFields.error });
 
         // Vendor-submitted products carry a vendor_id so they can be scoped to
         // that vendor's own listings/orders/payouts, separately from created_by
@@ -267,6 +271,16 @@ exports.addProduct = async (req, res) => {
         );
 
         const newProduct = product.rows[0];
+        // Certifications (optional) and the Sale Price from the product form.
+        let saleNote = null;
+        if (req.body.certifications !== undefined) {
+            const certs = Certifications.clean(req.body.certifications);
+            await pool.query(`UPDATE products SET certifications = $2 WHERE id = $1`, [newProduct.id, certs]);
+            newProduct.certifications = certs;
+        }
+        if (saleFields.sent && vendorId) {
+            saleNote = (await syncProductSale(pool, { productId: newProduct.id, vendorId, categoryId: category_id, customerPrice: newProduct.price, sale: saleFields.sale })).note;
+        }
         if (Object.keys(extra).length) Object.assign(newProduct, await saveExtraFields(pool, newProduct.id, extra));
         if (measured.provided) {
             await saveMeasurements(pool, newProduct.id, measured.value);
@@ -306,7 +320,7 @@ exports.addProduct = async (req, res) => {
             ? "Product submitted and is pending admin approval."
             : "Product added successfully";
 
-        res.json({ message, product: redactCommissionForVendor(req.user.role, newProduct), images: imagePaths, image_records: imageRecords, image_warnings: imageWarnings });
+        res.json({ message, sale_note: saleNote, product: redactCommissionForVendor(req.user.role, newProduct), images: imagePaths, image_records: imageRecords, image_warnings: imageWarnings });
 
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -1443,7 +1457,21 @@ exports.updateProduct = async (req, res) => {
             params.push(id);
         }
 
+        const isVendorEditor = ["vendor", "vendor_staff"].includes(req.user.role);
+        const saleFields = isVendorEditor ? readSaleFields(req.body, desired_payout) : { ok: true, sent: false, sale: null };
+        if (!saleFields.ok) return res.status(400).json({ error: saleFields.error });
+
         const product = await pool.query(updateQuery, params);
+        let saleNote = null;
+        if (product.rows[0] && req.body.certifications !== undefined) {
+            const certs = Certifications.clean(req.body.certifications);
+            await pool.query(`UPDATE products SET certifications = $2 WHERE id = $1`, [id, certs]);
+            product.rows[0].certifications = certs;
+        }
+        if (product.rows[0] && saleFields.sent && product.rows[0].vendor_id) {
+            saleNote = (await syncProductSale(pool, { productId: Number(id), vendorId: product.rows[0].vendor_id,
+                categoryId: product.rows[0].category_id, customerPrice: product.rows[0].price, sale: saleFields.sale })).note;
+        }
         if (product.rows[0] && Object.keys(extra).length) Object.assign(product.rows[0], await saveExtraFields(pool, id, extra));
         // Approval history: a seller's edit sends it back for review.
         if (product.rows[0] && prevStatus && !draft && prevStatus !== "pending" && prevStatus !== "draft") {
@@ -1503,7 +1531,7 @@ exports.updateProduct = async (req, res) => {
             ? "Product updated and is pending admin approval."
             : "Product updated successfully";
 
-        res.json({ message, product: redactCommissionForVendor(req.user.role, product.rows[0]), images: newImagePaths, image_records: imageRecords, image_warnings: imageWarnings });
+        res.json({ message, sale_note: saleNote, product: redactCommissionForVendor(req.user.role, product.rows[0]), images: newImagePaths, image_records: imageRecords, image_warnings: imageWarnings });
 
     } catch (error) {
         res.status(500).json({ error: error.message });

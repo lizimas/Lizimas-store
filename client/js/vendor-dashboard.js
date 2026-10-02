@@ -1501,6 +1501,8 @@ function resetVendorProductForm() {
     syncProductCategoryButtonLabel();
     document.getElementById("product-description").value = "";
     document.getElementById("product-payout").value = "";
+    vdSetSaleFields(null);
+    vdRenderCerts([]);
     document.getElementById("product-stock").value = "";
     hideVendorPricingPreview();
     document.getElementById("product-package-size").value = "Small";
@@ -2443,6 +2445,7 @@ async function updateVendorPricingPreview() {
         // server only ever sends customerPrice/vendorPayout to this endpoint.
         document.getElementById("preview-customer-price").textContent = Number(result.customerPrice).toLocaleString();
         document.getElementById("preview-payout").textContent = Number(result.vendorPayout).toLocaleString();
+        vdPreviewSale(Number(result.customerPrice), categoryId);
         previewEl.style.display = "block";
         errorEl.style.display = "none";
     } catch (error) {
@@ -2477,6 +2480,8 @@ async function editVendorProduct(id) {
     document.getElementById("product-package-size").value = product.package_size || "Small";
     if (window.LzPackage) LzPackage.fill("product", product);
     document.getElementById("product-warranty-months").value = product.warranty_months || "";
+    vdSetSaleFields(product);
+    vdRenderCerts(product.certifications || []);
     document.getElementById("product-brand").value = product.brand || "";
     document.getElementById("product-gtin").value = product.gtin || "";
     document.getElementById("product-mpn").value = product.mpn || "";
@@ -2525,8 +2530,60 @@ function vdSkuBase(v) {
     return s;
 }
 
+// --- Sale Price + dates and Certifications on the product form -------------
+function vdSetSaleFields(product) {
+    const day = (v) => { if (!v) return ""; const d = new Date(v); return isNaN(d) ? "" : new Date(d.getTime() + 3 * 3600000).toISOString().slice(0, 10); };
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    set("product-sale-price", product && product.sale_vendor_price ? Number(product.sale_vendor_price) : "");
+    set("product-sale-start", product ? day(product.sale_starts_at) : "");
+    set("product-sale-end", product ? day(product.sale_ends_at) : "");
+    const note = document.getElementById("preview-sale"); if (note) note.style.display = "none";
+}
+// A message when the sale fields don't make sense, else null.
+function vdSaleProblem() {
+    const v = (id) => String((document.getElementById(id) || {}).value || "").trim();
+    const sale = v("product-sale-price");
+    if (!sale) return null;
+    if (!(Number(sale) > 0) || Number(sale) >= Number(v("product-payout"))) return "The sale price must be lower than the price.";
+    if (!v("product-sale-end")) return "Choose the sale end date.";
+    if (v("product-sale-start") && v("product-sale-end") < v("product-sale-start")) return "The sale end date must be after the sale start date.";
+    return null;
+}
+async function vdPreviewSale(customerPrice, categoryId) {
+    const note = document.getElementById("preview-sale");
+    if (!note) return;
+    const sale = Number((document.getElementById("product-sale-price") || {}).value);
+    if (!(sale > 0) || vdSaleProblem() === "The sale price must be lower than the price.") { note.style.display = "none"; return; }
+    try {
+        const r = await vendorAuthorizedFetch("/api/vendors/pricing/preview", { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ desired_payout: sale, category_id: categoryId || null }) });
+        if (r.error || !(Number(r.customerPrice) < customerPrice)) { note.style.display = "none"; return; }
+        const off = Math.round((1 - Number(r.customerPrice) / customerPrice) * 100);
+        note.textContent = "During the sale customers pay UGX " + Number(r.customerPrice).toLocaleString() + (off > 0 ? " (" + off + "% off)" : "");
+        note.style.display = "block";
+    } catch (e) { note.style.display = "none"; }
+}
+function vdRenderCerts(selected) {
+    const list = document.getElementById("product-certs-list");
+    if (!list || !window.LzCertifications) return;
+    const on = new Set(LzCertifications.clean(selected));
+    list.innerHTML = LzCertifications.LIST.map((c) => `<label><input type="checkbox" value="${vendorEsc(c)}"${on.has(c) ? " checked" : ""} onchange="vdCertsSummary()"> ${vendorEsc(c)}</label>`).join("");
+    const box = document.getElementById("product-certs"); if (box) box.open = false;
+    vdCertsSummary();
+}
+function vdPickedCerts() {
+    return Array.from(document.querySelectorAll("#product-certs-list input:checked")).map((i) => i.value);
+}
+function vdCertsSummary() {
+    const s = document.getElementById("product-certs-summary");
+    const picked = vdPickedCerts();
+    if (s) s.textContent = picked.length ? picked.join(", ") : "Certification(s) that the product holds";
+}
+document.addEventListener("DOMContentLoaded", () => vdRenderCerts([]));
+
 async function submitVendorProductForm(opts) {
     const asDraft = !!(opts && opts.draft);
+    if (!asDraft) { const saleMsg = vdSaleProblem(); if (saleMsg) { alert(saleMsg); return; } }
     const id = document.getElementById("product-id").value;
     const name = document.getElementById("product-name").value.trim();
     const sku = vdSkuBase(document.getElementById("product-sku").value);
@@ -2600,6 +2657,10 @@ async function submitVendorProductForm(opts) {
     formData.append("package_size", packageSize);
     if (window.LzPackage) LzPackage.appendTo(formData, "product");
     formData.append("warranty_months", warrantyMonths);
+    formData.append("sale_price", (document.getElementById("product-sale-price") || {}).value || "");
+    formData.append("sale_start", (document.getElementById("product-sale-start") || {}).value || "");
+    formData.append("sale_end", (document.getElementById("product-sale-end") || {}).value || "");
+    formData.append("certifications", JSON.stringify(vdPickedCerts()));
     formData.append("brand", brand);
     formData.append("gtin", gtin);
     formData.append("mpn", mpn);
@@ -2633,9 +2694,7 @@ async function submitVendorProductForm(opts) {
         }
 
         statusEl.textContent = data.message || "Saved.";
-        if (Array.isArray(data.image_warnings) && data.image_warnings.length) {
-            alert("Saved. Notes on your photos:\n\n" + data.image_warnings.map(w => "• " + w.name + ": " + w.notes.map(n => n.text).join("; ")).join("\n"));
-        }
+        if (data.sale_note) alert("Saved. About the sale price: " + data.sale_note);
 
         const savedProductId = data.product ? data.product.id : id;
         if (savedProductId) await vdSavePhotoOrder(savedProductId, data.image_records || []);
@@ -5534,7 +5593,7 @@ function vendorProductSummary() {
         { label: "Category", value: hasCat ? catLabel : "Missing", ok: hasCat, step: 1 },
         { label: "Brand", value: val("product-brand") || "-", step: 1 },
         { label: "Photos", value: n + " of " + VD_MAX_PHOTOS + " (at least " + min + ")", ok: n >= min && n <= VD_MAX_PHOTOS, step: 1 },
-        { label: "Your payout", value: val("product-payout") ? "UGX " + Number(val("product-payout")).toLocaleString() : "Missing", ok: !!val("product-payout"), step: 2 },
+        { label: "Price", value: val("product-payout") ? "UGX " + Number(val("product-payout")).toLocaleString() : "Missing", ok: !!val("product-payout"), step: 2 },
         { label: "Customer pays", value: customer && customer !== "-" ? "UGX " + customer : "-", step: 2 },
         { label: "Stock", value: val("product-stock") || "Missing", ok: val("product-stock") !== "", step: 2 },
         { label: "Description", value: desc ? desc.length + " characters" : "Missing", ok: !!desc, step: 2 },
@@ -5553,7 +5612,8 @@ function vendorProductValidate(step) {
         const n = vdAllImages.length, min = vdPhotoMin();
         if (n < min) return "Add at least " + min + " photo" + (min === 1 ? "" : "s") + " to continue.";
     }
-    if (step === 2 && (!val("product-payout") || val("product-stock") === "")) return "Add your payout and stock to continue.";
+    if (step === 2 && (!val("product-payout") || val("product-stock") === "")) return "Add the price and stock to continue.";
+    if (step === 2) { const saleMsg = vdSaleProblem(); if (saleMsg) return saleMsg; }
     return null;
 }
 

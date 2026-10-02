@@ -143,6 +143,24 @@ async function loadProductDetail() {
                 warrantyEl.innerHTML = "";
             }
         }
+        // Certifications the product holds (only shown when it has any).
+        if (warrantyEl && warrantyEl.parentNode) {
+            let certEl = document.getElementById("pd-certifications");
+            const certs = Array.isArray(product.certifications) ? product.certifications.filter(Boolean) : [];
+            if (certs.length) {
+                if (!certEl) {
+                    certEl = document.createElement("div");
+                    certEl.id = "pd-certifications";
+                    certEl.style.cssText = "margin-top:8px; font-size:13px; color:#333; line-height:1.5;";
+                    warrantyEl.parentNode.insertBefore(certEl, warrantyEl.nextSibling);
+                }
+                certEl.textContent = "";
+                const b = document.createElement("strong");
+                b.textContent = "Certifications: ";
+                certEl.appendChild(b);
+                certEl.appendChild(document.createTextNode(certs.join(", ")));
+            } else if (certEl) certEl.remove();
+        }
         const idEl = document.getElementById("pd-item-id");
         if (idEl) idEl.textContent = "Item ID: " + product.id;
 

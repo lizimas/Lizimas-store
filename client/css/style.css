@@ -5052,8 +5052,13 @@ body.sheet-open {
     border-radius: 2px;
 }
 
+/* The wrapper is a span too: without this it drew a 4th line. */
 .ls-burger-top .ls-burger-lines {
     display: block;
+    width: auto;
+    height: auto;
+    margin: 0;
+    background: none;
 }
 
 

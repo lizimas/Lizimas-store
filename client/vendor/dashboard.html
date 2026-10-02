@@ -7,7 +7,7 @@
 <meta charset="UTF-8">
 <title>Lizimas Store — Vendor Dashboard</title>
 <link rel="stylesheet" href="../css/admin.css?v=47">
-<link rel="stylesheet" href="../css/vendor-compliance.css?v=3">
+<link rel="stylesheet" href="../css/vendor-compliance.css?v=4">
 <link rel="stylesheet" href="../css/vendor-shell.css?v=3">
 <link rel="stylesheet" href="../css/vendor-desktop.css?v=8">
 <link rel="stylesheet" href="../css/vendor-mobile.css?v=99">
@@ -1143,7 +1143,7 @@
                                 <div class="field-row">
                                     <div style="display:flex; gap:12px;">
                                         <div style="flex:1;">
-                                            <label style="font-size:13px; font-weight:600; color:#333;">Your Payout (UGX) <span style="font-weight:400; color:#888;">(what you want to earn per unit)</span></label>
+                                            <label style="font-size:13px; font-weight:600; color:#333;">Price (UGX) <span style="color:#b7791f;">*</span> <span style="font-weight:400; color:#888;">(your price per unit - Lizimas adds its commission for the customer)</span></label>
                                             <input type="number" id="product-payout" min="0" oninput="scheduleVendorPricingPreview()" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                                         </div>
                                         <div style="flex:1;">
@@ -1155,9 +1155,24 @@
                                             <input type="number" id="product-low-stock" min="0" placeholder="10" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                                         </div>
                                     </div>
+                                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:10px;">
+                                        <div>
+                                            <label style="font-size:13px; font-weight:600; color:#333;">Sale Price (UGX) <span style="font-weight:400; color:#888;">(optional)</span></label>
+                                            <input type="number" id="product-sale-price" min="0" oninput="scheduleVendorPricingPreview()" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                        </div>
+                                        <div>
+                                            <label style="font-size:13px; font-weight:600; color:#333;">Sale Start Date</label>
+                                            <input type="date" id="product-sale-start" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                        </div>
+                                        <div>
+                                            <label style="font-size:13px; font-weight:600; color:#333;">Sale End Date</label>
+                                            <input type="date" id="product-sale-end" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                                        </div>
+                                    </div>
                                     <div id="pricing-preview" style="display:none; background:#F0F4FF; border:1px solid #C7D2FE; border-radius:8px; padding:12px; font-size:13px; color:#333;">
                                         <div style="font-size:15px; font-weight:700;">Customer pays: UGX <span id="preview-customer-price">-</span></div>
                                         <div style="margin-top:4px; color:#555;">You receive: UGX <span id="preview-payout">-</span></div>
+                                        <div id="preview-sale" style="display:none; margin-top:6px; color:#166534; font-weight:600;"></div>
                                     </div>
                                     <p id="pricing-preview-error" style="display:none; font-size:12px; color:#B45309; background:#FFFBEB; border-radius:6px; padding:8px;"></p>
                                 </div>
@@ -1207,6 +1222,13 @@
                                             <label style="font-size:13px; font-weight:600; color:#333;">Warranty (months)</label>
                                             <input type="number" id="product-warranty-months" min="0" placeholder="Leave blank if none" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
                                         </div>
+                                    </div>
+                                    <div style="margin-top:12px;">
+                                        <label style="font-size:13px; font-weight:600; color:#333;">Certifications <span style="font-weight:400; color:#888;">(only if the product has them - otherwise leave empty)</span></label>
+                                        <details id="product-certs" class="vd-certs">
+                                            <summary id="product-certs-summary">Certification(s) that the product holds</summary>
+                                            <div id="product-certs-list" class="vd-certs-list"></div>
+                                        </details>
                                     </div>
                                 </div>
                             </div>
@@ -1936,6 +1958,7 @@
     <script src="../js/photo-crop.js?v=1"></script>
     <script src="../js/prepare-picked-file.js?v=11"></script>
     <script src="../js/lz-image-checks.js?v=6"></script>
+    <script src="../js/lz-certifications.js?v=1"></script>
     <script src="../js/lz-id-ocr.js?v=4"></script>
     <script src="../js/lz-table.js?v=6"></script>
     <script src="../js/lz-spec-tools.js?v=2"></script>
@@ -1948,7 +1971,7 @@
 <script src="../js/lz-variants-table.js?v=2"></script>
 <script src="../js/lz-product-preview.js?v=2"></script>
 <script src="../js/description-blocks.js?v=14"></script>
-    <script src="../js/vendor-dashboard.js?v=44"></script>
+    <script src="../js/vendor-dashboard.js?v=45"></script>
     <script src="../js/vendor-statements.js?v=4"></script>
 <script src="../js/vendor-mobile.js?v=19"></script>
 <script src="../js/vendor-compliance.js?v=2"></script>

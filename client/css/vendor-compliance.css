@@ -91,3 +91,14 @@
     .vrd-form #vd-id-submit, .vrd-act .vrd-btn { width: 100%; justify-self: stretch !important; }
     .vrd-act { width: 100%; align-items: stretch; }
 }
+
+/* Certifications dropdown on the product form */
+.vd-certs { margin-top: 4px; border: 1px solid #ccc; border-radius: 8px; background: #fff; }
+.vd-certs > summary { list-style: none; cursor: pointer; padding: 10px 34px 10px 10px; font-size: 13.5px; color: #555; position: relative; }
+.vd-certs > summary::-webkit-details-marker { display: none; }
+.vd-certs > summary::after { content: ""; position: absolute; right: 12px; top: 50%; margin-top: -3px; border: 6px solid transparent; border-top-color: #555; }
+.vd-certs[open] > summary { border-bottom: 1px solid #eee; }
+.vd-certs-list { max-height: 260px; overflow-y: auto; padding: 4px 0; }
+.vd-certs-list label { display: flex; gap: 10px; align-items: flex-start; padding: 9px 12px; font-size: 13.5px; font-weight: 400; color: #222; cursor: pointer; }
+.vd-certs-list label:hover { background: #f5f6f8; }
+.vd-certs-list input { margin-top: 2px; accent-color: #f4b400; }
