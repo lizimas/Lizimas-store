@@ -363,6 +363,28 @@ exports.closeCycleAndGenerateStatements = async (req, res) => {
                 });
             }
 
+            // 4b. Payouts the vendor asked for during the cycle (paid, or still
+            //     waiting) - vendors can be paid straight after delivery, so
+            //     that money must not be paid a second time by this statement.
+            //     Statement payouts themselves (statement_id set) and rejected
+            //     requests are not counted.
+            const { rows: earlyRows } = await client.query(
+                `SELECT id, amount, status FROM vendor_payouts
+                  WHERE vendor_id = $1 AND statement_id IS NULL AND status IN ('requested', 'paid')
+                    AND requested_at >= $2 AND requested_at < $3::date + INTERVAL '1 day'`,
+                [vendorId, cycle.period_start, cycle.period_end]
+            );
+            for (const ep of earlyRows) {
+                const amt = Number(ep.amount);
+                adjustments -= amt;
+                lines.push({
+                    line_type: "adjustment",
+                    reference_id: ep.id,
+                    description: `Payout on request #${ep.id} (${ep.status === "paid" ? "already paid" : "requested, being paid separately"})`,
+                    amount: -amt
+                });
+            }
+
             // 5. Compute amount due
             const amountDue = openingBalance + earnings - commissions - refunds + adjustments;
 

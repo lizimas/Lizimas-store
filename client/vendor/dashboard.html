@@ -8,9 +8,9 @@
 <title>Lizimas Store — Vendor Dashboard</title>
 <link rel="stylesheet" href="../css/admin.css?v=47">
 <link rel="stylesheet" href="../css/vendor-compliance.css?v=3">
-<link rel="stylesheet" href="../css/vendor-shell.css?v=2">
+<link rel="stylesheet" href="../css/vendor-shell.css?v=3">
 <link rel="stylesheet" href="../css/vendor-desktop.css?v=8">
-<link rel="stylesheet" href="../css/vendor-mobile.css?v=11">
+<link rel="stylesheet" href="../css/vendor-mobile.css?v=99">
 <link rel="stylesheet" href="../css/vendor-wide.css?v=1">
 <link rel="stylesheet" href="/css/desc-blocks.css?v=3">
 </head>
@@ -36,39 +36,44 @@
     <div class="vm-screen" id="vm-screen-products">
         <div class="vm-pm-title">Product Management</div>
         <div id="vm-product-tier-status" style="font-size:11.5px; color:#888; margin:-6px 16px 8px;"></div>
-        <button class="vm-list-row" style="margin:0 14px 8px; border-radius:10px;" onclick="vmShowScreen('import-products')">
-            <span>Import products (CSV / Excel)</span>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-        <button class="vm-list-row" style="margin:0 14px 8px; border-radius:10px;" onclick="vmShowScreen('consignments')">
-            <span>Fulfillment by Lizimas</span>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
         <div class="vpm-filters">
-            <div class="vpm-label">Status</div>
+            <div class="vpm-label">Status:</div>
             <div class="vpm-pills" id="vpm-pills"></div>
-            <div class="vpm-applied" id="vpm-applied"><span class="vpm-label">Country</span><button type="button" class="vpm-chip" onclick="vpOpenFilterSheet()">Uganda</button></div>
-            <label class="vpm-search"><input type="search" placeholder="Search by product name" oninput="vpSetSearch('name', this.value)" aria-label="Search by product name"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></label>
-            <label class="vpm-search"><input type="search" placeholder="Search by Seller SKU" oninput="vpSetSearch('sku', this.value)" aria-label="Search by Seller SKU"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></label>
-            <div class="vpm-actions-row">
-                <button type="button" class="vpm-check" id="vpm-check-all" aria-label="Select all on this page" onclick="vpMobileToggleAll()"></button>
-                <div class="vpm-select-wrap"><select id="vpm-action" class="vpm-select" aria-label="Product actions" onchange="vpMobileSetAction(this.value)"><option value="">Product actions</option><option value="activate">Activate</option><option value="deactivate">Deactivate</option><option value="delete">Delete</option></select><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></div>
-                <button type="button" class="vpm-go" id="vpm-go" aria-label="Apply product action" disabled onclick="vpMobileGo()"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></button>
-            </div>
+            <label class="vpm-search"><input type="search" placeholder="Search by Product Name" oninput="vpSetSearch('name', this.value)" aria-label="Search by product name or SKU"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></label>
+            <button type="button" class="vpm-country" onclick="vpOpenFilterSheet()"><span class="vpm-country-label">Countries *</span><span>Uganda</span><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 9h12l-6 7z"/></svg></button>
+            <div class="vpm-applied" id="vpm-applied"></div>
         </div>
         <div class="vpm-panel">
+            <div class="vpm-bulk">
+                <div class="vpm-bulk-top"><button type="button" class="vpm-check" id="vpm-check-all" aria-label="Select all on this page" onclick="vpMobileToggleAll()"></button><span id="vpm-bulk-text">Select items to apply bulk actions</span></div>
+                <div class="vpm-bulk-actions">
+                    <button type="button" class="vpm-bulk-btn" id="vpm-activate" disabled onclick="vpBulk('activate')">Activate <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v9"/><path d="M6.4 6.4a8 8 0 1 0 11.2 0"/></svg></button>
+                    <div class="vp-dd vpm-more-dd">
+                        <button type="button" class="vpm-bulk-btn vpm-bulk-more" data-vp-menu onclick="vpToggleMenu('vpm-more-menu', event)">More Actions <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
+                        <div id="vpm-more-menu" class="vp-menu" hidden>
+                            <button type="button" onclick="vpBulk('deactivate')">Deactivate selected</button>
+                            <button type="button" onclick="vpBulk('delete')">Delete selected</button>
+                            <button type="button" onclick="vpCloseMenus(); vpOpenFilterSheet()">Filter by date, stock or visibility</button>
+                            <button type="button" onclick="vpCloseMenus(); vmShowScreen('consignments')">Fulfillment by Lizimas</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div id="vpm-list"></div>
             <div class="vpm-pager" id="vpm-pager"></div>
         </div>
         <div class="vpm-fab">
-            <div class="vp-dd vpm-export-dd">
-                <button type="button" class="vpm-export" data-vp-menu onclick="vpToggleMenu('vpm-export-menu', event)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg> Export <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-                <div id="vpm-export-menu" class="vp-menu vp-menu-up" hidden>
-                    <button type="button" onclick="vpExportCsv()">Export this view (.csv)</button>
+            <div class="vpm-fab-bar">
+                <button type="button" class="vpm-fab-btn vpm-fab-grey" aria-label="Table filters - choose what each product shows" onclick="vpOpenColumnsPanel(event)"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></button>
+                <button type="button" class="vpm-fab-btn" aria-label="Add product" onclick="vmShowScreen('add-product')"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+                <div class="vp-dd">
+                    <button type="button" class="vpm-fab-btn vpm-fab-solid" aria-label="Import or export products" data-vp-menu onclick="vpToggleMenu('vpm-export-menu', event)"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg></button>
+                    <div id="vpm-export-menu" class="vp-menu vp-menu-up" hidden>
+                        <button type="button" onclick="vpExportCsv()">Export this view (.csv)</button>
+                        <button type="button" onclick="vpCloseMenus(); vmShowScreen('import-products')">Import products (CSV / Excel)</button>
+                    </div>
                 </div>
             </div>
-            <button type="button" class="vpm-fab-btn" aria-label="Filters" onclick="vpOpenFilterSheet()"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></svg></button>
-            <button type="button" class="vpm-fab-btn" aria-label="Add product" onclick="vmShowScreen('add-product')"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
         </div>
     </div>
 
@@ -284,18 +289,7 @@
     <!-- Commissions and Fees --------------------------------------------------- -->
     <div class="vm-screen" id="vm-screen-commissions-fees">
         <div class="vm-header vm-header-compact"><button class="vm-back-btn" data-vm-back><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button><span class="vm-header-title">Commissions and Fees</span></div>
-        <div class="vm-card">
-            <div class="vm-card-title">How pricing works on Lizimas</div>
-            <div style="font-size:12.5px; color:#444; line-height:1.7;">
-                When you add a product, you enter the amount <strong>you want to be paid</strong> &mdash; Lizimas works out the customer-facing price from that, never the other way around. Marketplace charges are already built into that calculation, so the payout you set is exactly what lands in your Wallet once an order is delivered.
-            </div>
-        </div>
-        <div class="vm-card">
-            <div class="vm-card-title">Where to see the numbers</div>
-            <div style="font-size:12.5px; color:#444; line-height:1.7;">
-                Every order shows its Sale amount, Marketplace charges, and Net payable in your Wallet and on Home &mdash; always in UGX, never as a percentage. Rates vary by product category and are set by Lizimas; if you'd like the specifics for a category you sell in, reach out from Give us your feedback in the Menu.
-            </div>
-        </div>
+        <div class="vm-card"><div class="vm-card-title">Lizimas Store commission</div><div id="vm-commission-rates"><div class="vm-loading-state">Loading...</div></div></div>
     </div>
 
     <!-- Holiday Mode ---------------------------------------------------------- -->
@@ -1342,7 +1336,7 @@
                 <section id="tab-wallet" class="tab-content hidden">
                     <h2 class="admin-page-title">Account Statements</h2>
                     <p class="admin-page-subtitle">
-                        Your earnings are paid out on a weekly cycle (Monday to Sunday). Each closed cycle generates a statement you can download, and Lizimas sends your MoMo payout after admin review.
+                        Money from an order is yours as soon as the order is delivered: request a payout from your Wallet at any time, without waiting for the end of the week. Each week (Monday to Sunday) also closes with a statement you can download; anything already paid to you on request is taken off that statement.
                     </p>
 
                     <div style="display:flex; gap:8px; margin-bottom:16px; border-bottom:1px solid #e5e7eb; padding-bottom:0;">
@@ -1954,12 +1948,12 @@
 <script src="../js/lz-variants-table.js?v=2"></script>
 <script src="../js/lz-product-preview.js?v=2"></script>
 <script src="../js/description-blocks.js?v=14"></script>
-    <script src="../js/vendor-dashboard.js?v=43"></script>
+    <script src="../js/vendor-dashboard.js?v=44"></script>
     <script src="../js/vendor-statements.js?v=4"></script>
-<script src="../js/vendor-mobile.js?v=18"></script>
+<script src="../js/vendor-mobile.js?v=19"></script>
 <script src="../js/vendor-compliance.js?v=2"></script>
 <script src="../js/vendor-shell.js?v=1"></script>
-<script src="../js/vendor-products.js?v=7"></script>
+<script src="../js/vendor-products.js?v=8"></script>
 <script src="../js/vendor-consignments.js?v=1"></script>
 <script src="../js/vendor-promo-monitor.js?v=2"></script>
 <script src="../js/vendor-shop-setup.js?v=5"></script>

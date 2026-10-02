@@ -3392,6 +3392,7 @@ async function loadVendorWallet() {
             <p style="font-size:13px; color:#666; margin:0 0 14px;">
                 MoMo number on file: ${data.momoNumber ? vendorEsc(data.momoNumber) : '<span style="color:#DC2626;">none - add one in Account before requesting a payout</span>'}
                 &middot; Minimum payout: ${vendorFmtUgx(data.minPayout)}
+                <br>Money from an order is added to your Available Balance as soon as the order is delivered - you can request a payout straight away.
             </p>
             <button id="vendor-request-payout-btn" onclick="requestVendorPayout()"
                 style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer;"

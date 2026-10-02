@@ -165,7 +165,9 @@ function vpRows() {
     const sku = vpState.sku.trim().toLowerCase();
     return vpAllProducts.filter((p) => {
         if (!test(vpFlags(p))) return false;
-        if (name && !String(p.name || "").toLowerCase().includes(name)) return false;
+        // The one search box finds a product by its name or either SKU.
+        if (name && !String(p.name || "").toLowerCase().includes(name) && !String(p.sku || "").toLowerCase().includes(name)
+            && !String(p.lizimas_sku || "").toLowerCase().includes(name)) return false;
         if (sku && !String(p.sku || "").toLowerCase().includes(sku) && !String(p.lizimas_sku || "").toLowerCase().includes(sku)) return false;
         if (vpState.from || vpState.to) {
             const d = vpLocalDate(p.created_at);
@@ -442,6 +444,7 @@ function vpApplyColumns() {
     vpColumns = { ...vpColumnsDraft };
     vpCloseColumnsPanel();
     renderVendorProductsTable();
+    vpRenderMobileList();
 }
 
 function vpSaveColumnsDefault() {
@@ -560,14 +563,11 @@ function renderVendorProductsTable() {
 function vpRenderMobile() {
     const pills = document.getElementById("vpm-pills");
     if (!pills) return;
-    pills.innerHTML = VP_FILTER_GROUPS.flat().map(([key, label]) => {
+    // "All" on its own line, then each group of statuses in its own tinted box.
+    pills.innerHTML = VP_FILTER_GROUPS.map((group, i) => `<div class="vpm-pill-group${i === 0 ? " vpm-pill-group-all" : ""}">` + group.map(([key, label]) => {
         const active = vpState.filter === key;
-        return `<button type="button" class="vpm-pill${active ? " vpm-pill-active" : ""}" onclick="setVendorProductsFilter('${key}')">${active ? VP_ICON.check : ""}${label} (${vpCount(key)})</button>`;
-    }).join("");
-    const activePill = pills.querySelector(".vpm-pill-active");
-    if (activePill && activePill.scrollIntoView && pills.scrollWidth > pills.clientWidth) {
-        pills.scrollLeft = Math.max(0, activePill.offsetLeft - 16);
-    }
+        return `<button type="button" class="vpm-pill${active ? " vpm-pill-active" : ""}" aria-pressed="${active}" title="${vpCount(key)} product(s)" onclick="setVendorProductsFilter('${key}')">${label}</button>`;
+    }).join("") + "</div>").join("");
     vpRenderChips();
     vpRenderMobileList();
 }
@@ -575,17 +575,26 @@ function vpRenderMobile() {
 function vpMobileCard(p) {
     const f = vpFlags(p);
     const sel = vendorProductsSelected.has(Number(p.id));
-    const price = p.sale_price
+    // Table Filters decide which of these each card shows.
+    const on = vpColumnsOn();
+    const bits = [];
+    if (on.price !== false) bits.push(p.sale_price && on.sale !== false
         ? `<span class="vpm-price">${vpMoney(p.sale_price)}</span> <s class="vpm-old">${vpMoney(p.price)}</s>`
-        : `<span class="vpm-price">${vpMoney(p.price)}</span>`;
+        : `<span class="vpm-price">${vpMoney(p.price)}</span>`);
+    else if (on.sale && p.sale_price) bits.push(`<span class="vpm-price">Sale ${vpMoney(p.sale_price)}</span>`);
+    if (on.promo && p.promo_price) bits.push(`<span class="vpm-subsidy">Promo ${vpMoney(p.promo_price)}</span>`);
+    if (on.subsidy !== false && p.subsidy_price) bits.push(`<span class="vpm-subsidy">Subsidy ${vpMoney(p.subsidy_price)}</span>`);
+    const price = bits.join(" ");
+    const extra = (on.created && p.created_at ? `<div class="vpm-sku">Created: ${vpEsc(vpLocalDate(p.created_at) || "")}</div>` : "")
+        + (on.deletion && f.pendingDeletion ? `<div class="vpm-sku">Deletion: waiting for review</div>` : "");
     return `<div class="vpm-card${f.deleted ? " vpm-card-deleted" : ""}">
         <button type="button" class="vpm-check${sel ? " vpm-checked" : ""}" aria-label="Select ${vpEsc(p.name)}" ${f.deleted ? "disabled" : ""} onclick="vpToggleSelect(${Number(p.id)})">${sel ? VP_ICON.check : ""}</button>
         <div class="vpm-card-body">
             <div class="vpm-card-top"><div class="vpm-name">${vpEsc(p.name)}</div>${f.deleted ? "" : `<button type="button" class="vp-kebab" data-vp-menu aria-label="More actions" onclick="vpOpenRowMenu(${Number(p.id)}, event)">${VP_ICON.dots}</button>`}</div>
             <div class="vpm-sku">Seller SKU: ${p.sku ? vpEsc(p.sku) : "&mdash;"}</div>
-            <div class="vpm-sku">Lizimas SKU: ${p.lizimas_sku ? vpEsc(p.lizimas_sku) : "&mdash;"}</div>
-            <div class="vpm-prices">${price}${p.subsidy_price ? ` <span class="vpm-subsidy">Subsidy ${vpMoney(p.subsidy_price)}</span>` : ""}</div>
-            <div class="vpm-meta"><span>Qty ${Number(p.stock) || 0}</span><span class="vp-qc ${{ "Pending QC": "vp-qc-wait", "Not Ready To QC": "vp-qc-warn", Draft: "vp-qc-warn", "Changes Requested": "vp-qc-warn", "Under Review": "vp-qc-bad", Rejected: "vp-qc-bad", Approved: "vp-qc-ok" }[f.qc]}">${f.qc}</span>${f.pendingDeletion ? '<span class="vp-qc vp-qc-warn">Pending Deletion</span>' : ""}</div>
+            ${on.lizimas_sku ? `<div class="vpm-sku">Lizimas SKU: ${p.lizimas_sku ? vpEsc(p.lizimas_sku) : "&mdash;"}</div>` : ""}${extra}
+            <div class="vpm-prices">${price}</div>
+            <div class="vpm-meta">${on.qty !== false ? `<span>Qty ${Number(p.stock) || 0}</span>` : ""}<span class="vp-qc ${{ "Pending QC": "vp-qc-wait", "Not Ready To QC": "vp-qc-warn", Draft: "vp-qc-warn", "Changes Requested": "vp-qc-warn", "Under Review": "vp-qc-bad", Rejected: "vp-qc-bad", Approved: "vp-qc-ok" }[f.qc]}">${f.qc}</span>${f.pendingDeletion ? '<span class="vp-qc vp-qc-warn">Pending Deletion</span>' : ""}</div>
             <div class="vpm-foot"><div>${vpVisibleCell(f, true)}</div><div class="vpm-active">${f.deleted ? '<span class="vp-muted">Deleted</span>' : `<span>Active</span>${vpActiveSwitch(p, f)}`}</div></div>
         </div>
     </div>`;
@@ -687,7 +696,7 @@ function vpRenderMobileList() {
     if (wide) vpLoadCategoryNames();
     list.classList.toggle("vpt-mode", wide);
     list.innerHTML = wide ? vpTableHtml(pageRows)
-        : (pageRows.length ? pageRows.map(vpMobileCard).join("") : '<div class="vpm-empty">No products to display!</div>');
+        : (pageRows.length ? pageRows.map(vpMobileCard).join("") : '<div class="vpm-empty">No records found !</div>');
     const pager = document.getElementById("vpm-pager");
     if (pager) pager.innerHTML = vpPagerHtml(rows.length, start, pageRows.length, true);
     const all = document.getElementById("vpm-check-all");
@@ -709,6 +718,11 @@ function vpMobileToggleAll() {
 function vpRefreshMobileGo() {
     const go = document.getElementById("vpm-go");
     if (go) go.disabled = !(vpState.mAction && vendorProductsSelected.size > 0);
+    const n = vendorProductsSelected.size;
+    const act = document.getElementById("vpm-activate");
+    if (act) act.disabled = n === 0;
+    const txt = document.getElementById("vpm-bulk-text");
+    if (txt) txt.textContent = n ? n + " selected" : "Select items to apply bulk actions";
 }
 
 function vpMobileSetAction(v) {
@@ -854,7 +868,7 @@ function vpRenderChips() {
     if (!host) return;
     const date = vpState.from || vpState.to ? `<span class="vpm-label">Date</span><button type="button" class="vpm-chip" onclick="vpOpenFilterSheet()">${vpState.from || "&hellip;"} / ${vpState.to || "&hellip;"}</button>` : "";
     const cur = vpState.currency === "usd" ? `<span class="vpm-label">Currency</span><button type="button" class="vpm-chip" onclick="vpOpenFilterSheet()">USD</button>` : "";
-    host.innerHTML = `<span class="vpm-label">Country</span><button type="button" class="vpm-chip" onclick="vpOpenFilterSheet()">Uganda</button>${date}${cur}`;
+    host.innerHTML = date + cur;
 }
 
 function vpCloseFilterSheet() {

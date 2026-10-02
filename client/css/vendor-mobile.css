@@ -813,3 +813,38 @@ table.vc-table { display: table; }
 .vm-add-product-host .drag-drop-zone { padding: 26px 12px; font-size: 15px; }
 .vm-add-product-host h4 { font-size: 16px; }
 .vm-add-product-host table { display: block; overflow-x: auto; }
+
+/* Product Management layout (Oct 2026): grouped status boxes, one search,
+   Countries, bulk bar, and three floating buttons - navy and gold. */
+.vm-pm-title { font-size: 22px; }
+.vpm-pills { display: flex; flex-wrap: wrap; gap: 8px; overflow: visible; padding: 8px 0 12px; }
+.vpm-pill-group { display: flex; flex-wrap: wrap; gap: 8px; background: #fbf3dc; border-radius: 22px; padding: 8px 10px; }
+.vpm-pill-group-all { flex-basis: 100%; background: none; padding: 0; }
+.vpm-pill { padding: 5px 13px; font-size: 13.5px; border-color: #c9ccd3; }
+.vpm-pill-active { background: #fff3cd; border-color: var(--vm-gold); color: #7a5900; }
+.vpm-search { border-radius: 8px; margin-bottom: 12px; }
+.vpm-search input::placeholder { font-style: normal; }
+.vpm-country { position: relative; display: flex; align-items: center; justify-content: space-between; width: 100%; height: 52px; background: #fff;
+    border: 1px solid #dcdfe4; border-radius: 8px; padding: 12px 16px 0; margin-bottom: 12px; font: 15px sans-serif; font-family: inherit; color: #222; cursor: pointer; }
+.vpm-country-label { position: absolute; top: -8px; left: 12px; background: #fff; padding: 0 5px; font-size: 11px; font-style: italic; color: #6b7280; }
+.vpm-country svg { color: #946c00; }
+.vpm-applied { margin-bottom: 0; }
+.vpm-applied:empty { display: none; }
+.vpm-panel { margin: 0 14px 150px; padding: 0; border-radius: 8px; box-shadow: 0 1px 4px rgba(16,24,40,.12); overflow: visible; }
+.vpm-bulk { padding: 14px 16px 10px; border-bottom: 1px solid #eef0f3; background: #fafafb; border-radius: 8px 8px 0 0; }
+.vpm-bulk-top { display: flex; align-items: center; gap: 12px; font-size: 14.5px; color: #8a8f98; }
+.vpm-bulk-actions { display: flex; align-items: center; margin-top: 10px; }
+.vpm-bulk-actions > * { flex: 1; }
+.vpm-bulk-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; background: none; border: 0; padding: 8px 4px;
+    font: 500 14.5px sans-serif; font-family: inherit; color: var(--vm-navy); cursor: pointer; }
+.vpm-bulk-btn:disabled { color: #9ca0a8; cursor: default; }
+.vpm-more-dd { border-left: 1px solid #d5d8de; }
+.vpm-more-dd .vp-menu { left: auto; right: 0; }
+#vpm-list { padding: 0 12px; }
+.vpm-pager { padding: 0 12px 10px; }
+.vpm-fab { bottom: 76px; padding-bottom: 10px; }
+.vpm-fab-bar { display: flex; gap: 10px; background: #fff; border-radius: 26px; padding: 10px 14px; box-shadow: 0 4px 16px rgba(16,24,40,.18); }
+.vpm-fab-btn { width: 48px; height: 44px; border-radius: 8px; }
+.vpm-fab-grey { border-color: #cfd2d8; color: #555; }
+.vpm-fab-solid { background: var(--vm-gold); border-color: var(--vm-gold); color: var(--vm-navy); }
+.vpm-fab .vp-menu { left: auto; right: 0; }

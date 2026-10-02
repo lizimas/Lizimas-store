@@ -111,7 +111,7 @@ const {
     getMyReturns
 } = require("../controllers/fulfilmentController");
 
-const { previewPricing } = require("../controllers/commissionController");
+const { previewPricing, listCommissionRules } = require("../controllers/commissionController");
 const { getVendorReviews, respondToReview } = require("../controllers/reviewController");
 const {
     listChannelApplications, createChannelApplication, deleteChannelApplication,
@@ -328,6 +328,9 @@ router.post("/messages/:id/replies", replyToVendorMessage);
 // Lizimas' cut, and the customer-facing price - before the vendor submits
 // anything.
 router.post("/pricing/preview", previewPricing);
+// The same commission table the admin panel shows (read only), for the
+// vendor's Commissions and Fees page.
+router.get("/commission-rates", listCommissionRules);
 
 // Channel product linking (Settings > Applications on the vendor side):
 // connect/disconnect a vendor's Vendor Center Application, push

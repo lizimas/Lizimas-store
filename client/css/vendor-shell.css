@@ -178,5 +178,6 @@
 /* Export / filter / add buttons: a toolbar under the table on computers
    instead of floating over it. */
 @media (min-width: 1024px) {
-    body.vsh-on .vpm-fab { position: static; justify-content: flex-end; padding: 14px 24px 0; }
+    body.vsh-on .vpm-fab { position: sticky; bottom: 18px; justify-content: center; padding: 14px 24px 0; }
+    body.vsh-on .vpm-panel { margin: 0 24px 40px; }
 }

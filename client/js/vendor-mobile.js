@@ -145,6 +145,7 @@ function vmShowScreen(name, opts) {
     if (name === "promotions-propose") vmLoadPromotions();
     if (name === "promo-campaigns") vcLoadCampaigns("vm-promo-campaigns", "cards");
     if (name === "wallet") vmLoadWallet();
+    if (name === "commissions-fees") vmLoadCommissionRates();
     if (name === "users") vmLoadUsers();
     if (name === "consignments") vmLoadConsignments();
     if (name === "stock-recommendation") vmLoadStockRecommendations();
@@ -2056,7 +2057,8 @@ function vmRenderWallet(data) {
         <div class="vm-stat-row">${vmStatTile("Requested", vmFmtUgx(b.requestedTotal))}${vmStatTile("Paid Out to Date", vmFmtUgx(b.paidOutTotal))}</div>
         <div style="font-size:12px; color:#666; margin:12px 0 14px; line-height:1.5;">
             MoMo number on file: ${data.momoNumber ? vendorEsc(data.momoNumber) : '<span style="color:var(--vm-red);">none - add one in Profile first</span>'}<br>
-            Minimum payout: ${vmFmtUgx(data.minPayout)}
+            Minimum payout: ${vmFmtUgx(data.minPayout)}<br>
+            Money from an order is added to your Available Balance as soon as the order is delivered - you can request a payout straight away.
         </div>
         <button class="vm-btn-primary" id="vm-request-payout-btn" onclick="vmRequestPayout()" ${data.eligibility.allowed ? "" : "disabled"}>Request Payout</button>
         ${!data.eligibility.allowed ? `<div class="vm-btn-help">${vendorEsc(data.eligibility.reason)}</div>` : ""}
@@ -2549,4 +2551,36 @@ async function vmEditProduct(id) {
     }
     const screen = document.getElementById("vm-screen-add-product");
     if (screen) screen.scrollTop = 0;
+}
+
+
+// --- Commissions and Fees: the commission table from the admin panel -------
+// (GET /api/vendors/commission-rates, read only). Main categories are
+// listed; a subcategory is listed only when its rate differs from its parent.
+async function vmLoadCommissionRates() {
+    const el = document.getElementById("vm-commission-rates");
+    if (!el) return;
+    try {
+        const d = await vendorAuthorizedFetch("/api/vendors/commission-rates");
+        if (!d || d.error) { el.innerHTML = `<div class="vm-loading-state">${vendorEsc((d && d.error) || "Could not load the commission rates.")}</div>`; return; }
+        const pct = (r) => r == null ? "-" : (Math.round(Number(r) * 10000) / 100) + "%";
+        const fee = (f) => Number(f) > 0 ? vmFmtUgx(Number(f)) : "None";
+        const cats = d.categories || [];
+        const byId = new Map(cats.map((c) => [c.category_id, c]));
+        const same = (a, b) => b && Number(a.effective_rate) === Number(b.effective_rate) && Number(a.effective_fixed_fee) === Number(b.effective_fixed_fee);
+        const pathOf = (c) => { const p = []; let x = c, n = 0; while (x && n++ < 8) { p.unshift(x.category_name); x = byId.get(x.parent_id); } return p.join(" > "); };
+        const rows = cats.filter((c) => c.parent_id == null || !same(c, byId.get(c.parent_id)));
+        const row = "display:grid; grid-template-columns:minmax(0,1fr) 92px 78px; gap:8px; padding:9px 2px; border-top:1px solid #eef0f3; font-size:12.5px;";
+        el.innerHTML = `
+            <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:10px;">
+                These are the commission rates set by Lizimas Store. The rate for a product is taken from its category.
+                ${d.default ? `Any category not listed uses the standard rate: <strong>${pct(d.default.commission_rate)}</strong>${Number(d.default.fixed_processing_fee) > 0 ? ` plus ${fee(d.default.fixed_processing_fee)} per item` : ""}.` : ""}
+            </div>
+            <div style="${row} font-size:11.5px; color:#6b7280; text-transform:uppercase; border-top:0;"><span>Category</span><span>Commission</span><span>Fixed fee</span></div>
+            ${rows.map((c) => `<div style="${row}"><span>${vendorEsc(pathOf(c))}</span><strong style="color:#1a1a2e;">${pct(c.effective_rate)}</strong><span>${fee(c.effective_fixed_fee)}</span></div>`).join("")
+                || `<div style="${row}">No categories yet.</div>`}`;
+    } catch (e) {
+        console.error("vmLoadCommissionRates error:", e);
+        el.innerHTML = '<div class="vm-loading-state">Could not load the commission rates.</div>';
+    }
 }
