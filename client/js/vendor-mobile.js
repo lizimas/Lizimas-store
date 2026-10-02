@@ -2554,31 +2554,83 @@ async function vmEditProduct(id) {
 }
 
 
-// --- Commissions and Fees: the commission table from the admin panel -------
-// (GET /api/vendors/commission-rates, read only). Main categories are
-// listed; a subcategory is listed only when its rate differs from its parent.
+// --- Commissions and Fees (Oct 2026), set out the way the Vendor Center the
+// store is modelled on does: what the commission is charged on, the price
+// formula with a worked example, a calculator, then the rate for each
+// category path. Data: GET /api/vendors/commission-rates (read only - the
+// rates are the ones set in the admin panel).
+let vmCommissionData = null;
+function vmCommissionPrice(price, rate, fee) {
+    price = Number(price) || 0; rate = Number(rate) || 0; fee = Number(fee) || 0;
+    if (!(price > 0) || rate >= 1) return null;
+    const customer = Math.round((price + fee) / (1 - rate) / 100) * 100;     // to the nearest UGX 100, as the server does
+    return { customer, commission: customer - fee - price, fee, payout: price };
+}
+function vmCommissionCalc() {
+    const d = vmCommissionData, out = document.getElementById("vmc-result");
+    if (!d || !out) return;
+    const sel = document.getElementById("vmc-cat"), priceEl = document.getElementById("vmc-price");
+    const c = (d.categories || []).find((x) => String(x.category_id) === String(sel.value));
+    const rate = c ? c.effective_rate : d.default ? d.default.commission_rate : 0;
+    const fee = c ? c.effective_fixed_fee : d.default ? d.default.fixed_processing_fee : 0;
+    const r = vmCommissionPrice(priceEl.value, rate, fee);
+    const pct = (Math.round(Number(rate) * 10000) / 100) + "%";
+    out.innerHTML = !r ? `<span class="vmc-muted">Type your price to see what the customer pays. Commission for this category: <strong>${pct}</strong>.</span>`
+        : `<div class="vmc-out"><div><span>Customer pays</span><strong>${vmFmtUgx(r.customer)}</strong></div>
+           <div><span>Lizimas commission (${pct})</span><strong class="vmc-red">&minus; ${vmFmtUgx(r.commission)}</strong></div>
+           ${Number(fee) > 0 ? `<div><span>Processing fee</span><strong class="vmc-red">&minus; ${vmFmtUgx(fee)}</strong></div>` : ""}
+           <div class="vmc-total"><span>You receive</span><strong class="vmc-green">${vmFmtUgx(r.payout)}</strong></div></div>`;
+}
+function vmCommissionFilter() {
+    const q = (document.getElementById("vmc-search").value || "").trim().toLowerCase();
+    let shown = 0;
+    document.querySelectorAll("#vmc-table tbody tr").forEach((tr) => { const hit = !q || tr.dataset.name.includes(q); tr.hidden = !hit; if (hit) shown++; });
+    const none = document.getElementById("vmc-none"); if (none) none.hidden = shown > 0;
+}
 async function vmLoadCommissionRates() {
     const el = document.getElementById("vm-commission-rates");
     if (!el) return;
     try {
         const d = await vendorAuthorizedFetch("/api/vendors/commission-rates");
         if (!d || d.error) { el.innerHTML = `<div class="vm-loading-state">${vendorEsc((d && d.error) || "Could not load the commission rates.")}</div>`; return; }
+        vmCommissionData = d;
         const pct = (r) => r == null ? "-" : (Math.round(Number(r) * 10000) / 100) + "%";
         const fee = (f) => Number(f) > 0 ? vmFmtUgx(Number(f)) : "None";
         const cats = d.categories || [];
         const byId = new Map(cats.map((c) => [c.category_id, c]));
         const same = (a, b) => b && Number(a.effective_rate) === Number(b.effective_rate) && Number(a.effective_fixed_fee) === Number(b.effective_fixed_fee);
-        const pathOf = (c) => { const p = []; let x = c, n = 0; while (x && n++ < 8) { p.unshift(x.category_name); x = byId.get(x.parent_id); } return p.join(" > "); };
-        const rows = cats.filter((c) => c.parent_id == null || !same(c, byId.get(c.parent_id)));
-        const row = "display:grid; grid-template-columns:minmax(0,1fr) 92px 78px; gap:8px; padding:9px 2px; border-top:1px solid #eef0f3; font-size:12.5px;";
-        el.innerHTML = `
-            <div style="font-size:12.5px; color:#444; line-height:1.6; margin-bottom:10px;">
-                These are the commission rates set by Lizimas Store. The rate for a product is taken from its category.
-                ${d.default ? `Any category not listed uses the standard rate: <strong>${pct(d.default.commission_rate)}</strong>${Number(d.default.fixed_processing_fee) > 0 ? ` plus ${fee(d.default.fixed_processing_fee)} per item` : ""}.` : ""}
+        const pathOf = (c) => { const p = []; let x = c, n = 0; while (x && n++ < 8) { p.unshift(x.category_name); x = byId.get(x.parent_id); } return p; };
+        // Main categories, plus any subcategory whose rate differs from its parent's.
+        const rows = cats.filter((c) => c.parent_id == null || !same(c, byId.get(c.parent_id))).map((c) => ({ c, path: pathOf(c) }))
+            .sort((a, b) => a.path.join(" > ").localeCompare(b.path.join(" > ")));
+        const def = d.default || { commission_rate: 0, fixed_processing_fee: 0 };
+        const ex = vmCommissionPrice(50000, def.commission_rate, def.fixed_processing_fee) || { customer: 0, commission: 0, payout: 50000 };
+        const feeTxt = Number(def.fixed_processing_fee) > 0 ? " + " + vmFmtUgx(def.fixed_processing_fee) : "";
+        el.innerHTML = `<div class="vmc">
+            <p class="vmc-lead">Commissions are charged based on the category of the product you sell. You type <strong>your own price</strong> on the product form; Lizimas Store adds its commission on top, and that total is what the customer sees. The commission is taken only when an order is delivered.</p>
+            <div class="vmc-cards">
+                <section class="vmc-card"><h4>How the customer price is worked out</h4>
+                    <div class="vmc-formula">Customer price = (Your price + Processing fee) &divide; (1 &minus; Commission)</div>
+                    <p>Example at the standard rate of <strong>${pct(def.commission_rate)}</strong>: your price ${vmFmtUgx(50000)}${feeTxt} &rarr; the customer pays <strong>${vmFmtUgx(ex.customer)}</strong>. The result is rounded to the nearest UGX 100.</p></section>
+                <section class="vmc-card"><h4>What you are paid</h4>
+                    <div class="vmc-formula">You receive = Customer price &times; (1 &minus; Commission) &minus; Processing fee</div>
+                    <p>In the same example Lizimas keeps <strong>${vmFmtUgx(ex.commission)}</strong> and you receive <strong>${vmFmtUgx(ex.payout)}</strong> once the order is delivered. A sale price follows the same rule.</p></section>
             </div>
-            <div style="${row} font-size:11.5px; color:#6b7280; text-transform:uppercase; border-top:0;"><span>Category</span><span>Commission</span><span>Fixed fee</span></div>
-            ${rows.map((c) => `<div style="${row}"><span>${vendorEsc(pathOf(c))}</span><strong style="color:#1a1a2e;">${pct(c.effective_rate)}</strong><span>${fee(c.effective_fixed_fee)}</span></div>`).join("")
-                || `<div style="${row}">No categories yet.</div>`}`;
+            <section class="vmc-card vmc-calc"><h4>Commission calculator</h4>
+                <div class="vmc-calc-row">
+                    <label>Category<select id="vmc-cat" onchange="vmCommissionCalc()"><option value="">Standard rate (${pct(def.commission_rate)})</option>${rows.map((r) => `<option value="${r.c.category_id}">${vendorEsc(r.path.join(" > "))} (${pct(r.c.effective_rate)})</option>`).join("")}</select></label>
+                    <label>Your price (UGX)<input type="number" id="vmc-price" min="0" step="100" inputmode="numeric" placeholder="Ex: 50000" oninput="vmCommissionCalc()"></label>
+                </div>
+                <div id="vmc-result"></div></section>
+            <div class="vmc-table-head"><h4>Commission by category</h4><input type="search" id="vmc-search" placeholder="Search a category" oninput="vmCommissionFilter()" aria-label="Search a category"></div>
+            <div class="vmc-table-wrap"><table class="vmc-table" id="vmc-table"><thead><tr><th>Category path</th><th>Commission</th><th>Processing fee</th></tr></thead><tbody>
+                ${rows.map((r) => `<tr data-name="${vendorEsc(r.path.join(" > ").toLowerCase())}"><td>${r.path.map((n, i) => i === r.path.length - 1 ? `<strong>${vendorEsc(n)}</strong>` : `<span class="vmc-muted">${vendorEsc(n)} &rsaquo; </span>`).join("")}</td>
+                    <td><span class="vmc-rate">${pct(r.c.effective_rate)}</span></td><td>${fee(r.c.effective_fixed_fee)}</td></tr>`).join("") || '<tr><td colspan="3">No categories yet.</td></tr>'}
+            </tbody></table></div>
+            <p class="vmc-muted" id="vmc-none" hidden>No category matches that search.</p>
+            <p class="vmc-note">A subcategory is listed only when its rate is different from its main category. Any category not listed uses the standard rate of <strong>${pct(def.commission_rate)}</strong>${Number(def.fixed_processing_fee) > 0 ? " plus " + fee(def.fixed_processing_fee) + " per item" : ""}. Rates can change; the rate that applies to a sale is the one in force when the order is placed.</p>
+        </div>`;
+        vmCommissionCalc();
     } catch (e) {
         console.error("vmLoadCommissionRates error:", e);
         el.innerHTML = '<div class="vm-loading-state">Could not load the commission rates.</div>';

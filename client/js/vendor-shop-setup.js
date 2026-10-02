@@ -111,25 +111,27 @@ async function vssLoadHome(el) {
     if (data.error) { el.innerHTML = `<div class="vm-loading-state">${vendorEsc(data.error)}</div>`; return; }
     vssData = data;
 
-    // Fully set up and approved: Home is the live KPI dashboard again, with
-    // the setup tiles kept underneath so details stay editable.
-    if (data.all_completed && data.account.status === "approved") {
-        let kpiHtml = "";
-        try {
-            const summary = await vendorAuthorizedFetch("/api/vendors/dashboard-summary");
-            if (!summary.error) kpiHtml = vmRenderHomeKpi({ business_name: data.account.business_name, owner_name: data.account.owner_name }, summary);
-        } catch (e) { console.error("dashboard-summary error:", e); }
-        el.innerHTML = kpiHtml + `<div id="vss-root"></div>`;
-        vssRender({ compact: true });
-        return;
-    }
-
-    el.innerHTML = `<div id="vss-root"></div>`;
-    if (!vssActiveStep) {
+    // Home always opens on the Vendor Center dashboard (vendor-home.js): the
+    // greeting, Yours to do, Business metrics, Seller score and Learn how to
+    // do. The shop set-up sections follow underneath - in full while a
+    // section is still pending, as compact tiles once everything is done.
+    const done = data.all_completed && data.account.status === "approved";
+    let homeHtml = "";
+    try {
+        const summary = await vendorAuthorizedFetch("/api/vendors/dashboard-summary");
+        if (!summary.error) {
+            homeHtml = window.VendorHome
+                ? VendorHome.render(data.account, summary, data)
+                : (done ? vmRenderHomeKpi({ business_name: data.account.business_name, owner_name: data.account.owner_name }, summary) : "");
+        }
+    } catch (e) { console.error("dashboard-summary error:", e); }
+    el.innerHTML = homeHtml + `<div id="vss-root"></div>`;
+    if (!done && !vssActiveStep) {
         const firstPending = data.steps.find((s) => !s.completed);
         vssActiveStep = firstPending ? firstPending.key : "shop";
     }
-    vssRender({ compact: false });
+    vssRender({ compact: done });
+    if (homeHtml && window.VendorHome) VendorHome.afterRender();
 }
 
 async function vssRefresh() {
@@ -248,7 +250,7 @@ function vssShopForm() {
     const shopIdBlock = `<div class="vss-field"><div class="vss-label-row"><span class="vss-label">Shop ID</span></div>
         <div class="vss-input vss-input-locked vss-copy-row"><span>${a.shop_id ? vssV(a.shop_id) : "Assigned at approval"}</span>${a.shop_id ? `<button type="button" class="vss-copy" onclick="vssCopy('${vssV(a.shop_id)}', this)" aria-label="Copy Shop ID"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>` : ""}</div></div>`;
     const shop = vssSection("Shop Details", "Manage your shop on Lizimas Store from below",
-        vssField({ label: "Shop Name", value: a.business_name, readonly: true, required: true, hint: "Contact support to change your shop name." })
+        vssField({ id: "vss-shop-name", label: "Shop Name", value: a.business_name, placeholder: "Shop name", required: true, hint: "You can change your shop name. Your Shop ID always stays the same." })
         + shopIdBlock);
 
     const comms = vssSection("Communication Details", "Choose the contact preference for communications from Lizimas Store. We'll send communications and contact you on the details below.",
@@ -270,8 +272,18 @@ function vssCopy(text, btn) {
     if (navigator.clipboard) navigator.clipboard.writeText(text).then(done).catch(() => {});
 }
 
-function vssSaveShop() {
+async function vssSaveShop() {
     const addr = vssReadAddress("cc");
+    // The shop name has its own rule (PATCH /me/shop-name); the Shop ID is never sent.
+    const newName = vssVal("vss-shop-name").replace(/\s+/g, " ");
+    if (document.getElementById("vss-shop-name") && newName !== String(vssData.account.business_name || "").trim()) {
+        try {
+            const r = await vendorAuthorizedFetch("/api/vendors/me/shop-name", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ business_name: newName }) });
+            if (!r || r.error) { vssStatus("vss-shop-status", (r && r.error) || "Could not update the shop name.", "error"); return false; }
+            vssData.account.business_name = r.vendor.business_name;
+            ["vsh-me-name", "vsh-acct-name", "vd-shop-name-input"].forEach((id) => { const el = document.getElementById(id); if (el) { if ("value" in el && el.tagName === "INPUT") el.value = r.vendor.business_name; else el.textContent = r.vendor.business_name; } });
+        } catch (e) { vssStatus("vss-shop-status", "Could not update the shop name.", "error"); return false; }
+    }
     return vssSave("/api/vendors/me/shop-setup/shop-info", {
         contact_name: vssVal("vss-contact-name"),
         contact_email: vssVal("vss-contact-email"),

@@ -163,6 +163,14 @@ async function computeSellerScore(vendorId) {
         isNew: score == null,
         averageRating: ratingN > 0 ? Math.round(Number(ratingRes.rows[0].avg_rating) * 10) / 10 : null,
         reviewCount: ratingN,
+        // The numbers behind the labels, for the bars on the Vendor Center home page.
+        details: {
+            shippingScore: shippingScore == null ? null : Math.round(shippingScore),
+            avgShippingHours: shippingN >= MIN_SAMPLES.shipping ? Math.round(Number(shippingRes.rows[0].avg_hours) * 10) / 10 : null,
+            qualityReturnRate: qualityScore == null ? null : Math.round((100 - qualityScore) * 10) / 10,
+            cancellationRate: cancellationRate == null ? null : Math.round(cancellationRate * 10) / 10,
+            ratingScore: ratingScore == null ? null : Math.round(ratingScore)
+        },
         performance: {
             shipping: labelForScore(shippingScore),
             quality: labelForScore(qualityScore),

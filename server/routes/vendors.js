@@ -223,6 +223,8 @@ router.get("/me/order-exports", requireVendorPermission("vc_order_manager", "vc_
 router.post("/me/order-exports", requireVendorPermission("vc_order_manager", "vc_order_viewer"), require("../controllers/vendorController").saveVendorOrderExport);
 router.get("/me/order-exports/:id", requireVendorPermission("vc_order_manager", "vc_order_viewer"), require("../controllers/vendorController").downloadVendorOrderExport);
 router.get("/dashboard-summary", getVendorDashboardSummary);
+// Business metrics on the home page (7 / 30 / 90 days).
+router.get("/me/business-metrics", require("../controllers/vendorHomeController").getBusinessMetrics);
 router.get("/me/product-tier", getMyProductTierStatus);
 router.get("/me/stock-recommendations", requireVendorPermission("vc_product_manager", "vc_product_viewer", "vc_product_update"), getMyStockRecommendations);
 router.get("/me/stock-overview", requireVendorPermission("vc_product_manager", "vc_product_viewer", "vc_product_update"), getMyStockOverview);

@@ -28,23 +28,45 @@
         store: '<path d="M4 9.5 5.5 4h13L20 9.5M4 9.5V20h16V9.5M4 9.5c0 1.4 1.1 2.5 2.7 2.5S9.3 10.9 9.3 9.5c0 1.4 1.2 2.5 2.7 2.5s2.7-1.1 2.7-2.5c0 1.4 1.1 2.5 2.6 2.5S20 10.9 20 9.5"/>'
     };
     const ico = (n, s) => `<svg viewBox="0 0 24 24" width="${s || 22}" height="${s || 22}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
+    // Menu in the Vendor Center order: Orders, Products (with its own list),
+    // Stock Recommendation, Promotions, Advertise, Account Statements, then
+    // the Lizimas extras. The account block at the bottom holds feedback,
+    // Settings, Profile and Logout. The logo opens the home page.
+    I.list = '<rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M8 9h.01M8 12h.01M8 15h.01M11 9h5M11 12h5M11 15h5"/>';
+    I.bulb = '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3Z"/>';
+    I.sheet = '<rect x="4" y="3.5" width="16" height="17" rx="1.5"/><path d="M8 16v-3M12 16V9M16 16v-5"/>';
+    I.out = '<path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"/>';
+    I.user = '<circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.5 5.4"/>';
+    I.smile = '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 1.3 2.2 2 3.5 2s2.5-.7 3.5-2M9 9.5h.01M15 9.5h.01"/>';
+    I.percent = '<path d="M19 5 5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/>';
     const ITEMS = [
-        ["home", "home", "Overview", () => vmShowScreen("home")],
-        ["products", "tag", "Listings", () => vmShowScreen("products")],
+        ["home", "home", "Overview", () => vmShowScreen("home"), "hidden"],
         ["orders", "bag", "Orders", () => vmShowScreen("orders")],
+        ["products", "list", "Manage Products", () => vmShowScreen("products"), "sub"],
+        ["add-product", "list", "Add Products", () => vmShowScreen("add-product"), "sub"],
+        ["consignments", "list", "Fulfilment by Lizimas", () => vmShowScreen("consignments"), "sub"],
+        ["import-products", "list", "Import Products", () => vmShowScreen("import-products"), "sub"],
+        ["stock-recommendation", "bulb", "Stock Recommendation", () => vmShowScreen("stock-recommendation")],
+        ["promotions", "tag", "Promotions", () => vmShowScreen("promotions")],
+        ["ads", "ads", "Advertise your Products", () => vmShowScreen("ads")],
+        ["wallet", "sheet", "Account Statements", () => vmShowScreen("wallet")],
         ["desk:refunds", "returns", "Returns & Refunds", () => vmOpenDeskTab("refunds")],
-        ["wallet", "wallet", "Payouts", () => vmShowScreen("wallet")],
-        ["promotions", "promo", "Promotions", () => vmShowScreen("promotions")],
-        ["ads", "ads", "Advertise", () => vmShowScreen("ads")],
         ["desk:reports", "chart", "Analytics", () => vmOpenDeskTab("reports")],
         ["desk:reviews", "star", "Reviews", () => vmOpenDeskTab("reviews")],
-        ["desk:storefront", "store", "Storefront", () => vmOpenDeskTab("storefront")],
         ["desk:messages", "chat", "Messages", () => vmOpenDeskTab("messages")],
-        ["verification", "shield", "Verification", () => vmShowScreen("verification")],
-        ["account", "gear", "Settings", () => vmShowScreen("account")],
-        ["help", "help", "Help & Support", () => window.open("../seller-guide", "_blank", "noopener")]
+        // account block
+        ["feedback", "smile", "Give us your feedback!", () => vmOpenDeskTab("messages"), "acct"],
+        ["verification", "shield", "Verification", () => vmShowScreen("verification"), "acct"],
+        ["commissions-fees", "percent", "Commissions & Fees", () => vmShowScreen("commissions-fees"), "acct"],
+        ["settings", "gear", "Settings", () => vmShowScreen("settings"), "acct"],
+        ["account", "user", "Profile", () => vmShowScreen("account"), "acct"],
+        ["help", "help", "Help & Support", () => window.open("../seller-guide", "_blank", "noopener"), "acct"],
+        ["logout", "out", "Logout", () => { if (typeof vendorLogout === "function") vendorLogout(); }, "acct"]
     ];
+    const SUBS = ITEMS.filter(i => i[4] === "sub").map(i => i[0]);
     let current = "home";
+    const item = ([key, icon, label], cls, withIcon) =>
+        `<button type="button" class="vsh-item${cls ? " " + cls : ""}" data-vsh="${key}">${withIcon ? ico(icon) : ""}<span>${esc(label)}</span><i class="vsh-count" id="vsh-count-${key.replace(":", "-")}" hidden></i></button>`;
 
     function build() {
         if (document.getElementById("vsh-side")) return;
@@ -52,17 +74,32 @@
         side.id = "vsh-side";
         side.className = "vsh-side";
         side.setAttribute("aria-label", "Vendor menu");
+        const main = ITEMS.filter(i => !i[4]);
+        const before = main.slice(0, 1), after = main.slice(1);
         side.innerHTML =
-            '<div class="vsh-brand"><span class="vsh-logo">LV</span><span>Lizimas <b>Vendor</b></span></div>' +
-            '<nav class="vsh-nav">' + ITEMS.map(([key, icon, label]) =>
-                `<button type="button" class="vsh-item" data-vsh="${key}">${ico(icon)}<span>${esc(label)}</span><i class="vsh-count" id="vsh-count-${key.replace(":", "-")}" hidden></i></button>`).join("") + "</nav>" +
-            '<div class="vsh-comp" id="vsh-comp"></div>';
+            '<button type="button" class="vsh-brand" data-vsh="home" title="Go to the home page" aria-label="Lizimas Vendor - go to the home page"><span class="vsh-logo">LV</span><span>Lizimas <b>Vendor</b></span></button>' +
+            '<nav class="vsh-nav">' + before.map(i => item(i, "", true)).join("") +
+                `<button type="button" class="vsh-item vsh-group" id="vsh-products-group" aria-expanded="false">${ico("list")}<span>Products</span>${ico("chev", 18)}</button>` +
+                '<div class="vsh-subs" id="vsh-products-subs" hidden>' + ITEMS.filter(i => i[4] === "sub").map(i => item(i, "vsh-sub", false)).join("") + "</div>" +
+                after.map(i => item(i, "", true)).join("") + "</nav>" +
+            '<div class="vsh-foot">' +
+                '<div class="vsh-comp" id="vsh-comp"></div>' +
+                `<button type="button" class="vsh-shop-btn" data-shop>${ico("store", 20)}<span>My Storefront</span></button>` +
+                `<button type="button" class="vsh-acct" id="vsh-acct" aria-expanded="false"><span class="vsh-avatar vsh-avatar-sm" id="vsh-acct-avatar">LV</span><span class="vsh-acct-text"><b id="vsh-acct-name">Your shop</b><small id="vsh-acct-mail"></small></span>${ico("chev", 18)}</button>` +
+                '<div class="vsh-acct-menu" id="vsh-acct-menu" hidden>' + ITEMS.filter(i => i[4] === "acct").map(i => item(i, "vsh-acct-item", false)).join("") + "</div>" +
+            "</div>";
         document.body.appendChild(side);
+        const openGroup = (on) => { const g = document.getElementById("vsh-products-group"), box = document.getElementById("vsh-products-subs"); box.hidden = !on; g.setAttribute("aria-expanded", on ? "true" : "false"); g.classList.toggle("open", on); };
+        const openAcct = (on) => { const g = document.getElementById("vsh-acct"), box = document.getElementById("vsh-acct-menu"); box.hidden = !on; g.setAttribute("aria-expanded", on ? "true" : "false"); g.classList.toggle("open", on); if (on) box.scrollIntoView({ block: "nearest" }); };
+        side._openGroup = openGroup;
         side.addEventListener("click", (e) => {
+            if (e.target.closest("#vsh-products-group")) { openGroup(document.getElementById("vsh-products-subs").hidden); return; }
+            if (e.target.closest("#vsh-acct")) { openAcct(document.getElementById("vsh-acct-menu").hidden); return; }
+            if (e.target.closest("[data-shop]")) { current = "desk:storefront"; vmOpenDeskTab("storefront"); mark(); return; }
             const b = e.target.closest("[data-vsh]");
             if (!b) return;
-            const item = ITEMS.find(i => i[0] === b.dataset.vsh);
-            if (item) { current = item[0] === "help" ? current : item[0]; item[3](); mark(); }
+            const it = ITEMS.find(i => i[0] === b.dataset.vsh);
+            if (it) { if (!["help", "logout"].includes(it[0])) current = it[0] === "feedback" ? "desk:messages" : it[0]; it[3](); mark(); }
         });
 
         const top = document.createElement("header");
@@ -83,10 +120,14 @@
     }
 
     function mark() {
-        document.querySelectorAll(".vsh-item").forEach(b => b.classList.toggle("on", b.dataset.vsh === current));
-        const item = ITEMS.find(i => i[0] === current);
+        document.querySelectorAll(".vsh-item[data-vsh]").forEach(b => b.classList.toggle("on", b.dataset.vsh === current));
+        const shop = document.querySelector(".vsh-shop-btn"); if (shop) shop.classList.toggle("on", current === "desk:storefront");
+        const side = document.getElementById("vsh-side");
+        if (side && side._openGroup && SUBS.includes(current)) side._openGroup(true);
+        const g = document.getElementById("vsh-products-group"); if (g) g.classList.toggle("has-on", SUBS.includes(current));
+        const it = ITEMS.find(i => i[0] === current);
         const t = document.getElementById("vsh-top-title");
-        if (t) t.textContent = item ? item[2] : "";
+        if (t) t.textContent = current === "desk:storefront" ? "My Storefront" : it ? it[2] : "";
     }
 
     // Keep the menu in step with whatever opened a screen.
@@ -97,8 +138,12 @@
             const r = orig.apply(this, arguments);
             if (name !== "desk") {
                 const direct = ITEMS.find(i => i[0] === name);
-                current = direct ? name : (["add-product", "import-products", "consignments", "stock-recommendation"].includes(name) ? "products"
-                    : ["settings", "users", "holiday-mode", "channel", "channel-import", "channel-export", "pickers", "commissions-fees"].includes(name) ? "account" : current);
+                current = direct ? name
+                    : ["consignments-create", "pickers", "pickers-create", "pickers-edit"].includes(name) ? "consignments"
+                    : ["promo-campaigns", "promotions-propose", "promo-monitoring"].includes(name) ? "promotions"
+                    : ["ads-create"].includes(name) ? "ads"
+                    : ["statement-detail"].includes(name) ? "wallet"
+                    : ["users", "users-create", "users-edit", "holiday-mode", "channel", "channel-create", "channel-import", "channel-export"].includes(name) ? "settings" : current;
                 mark();
             }
             return r;
@@ -124,9 +169,17 @@
             if (me && !me.error) {
                 const name = me.business_name || "Your shop";
                 document.getElementById("vsh-me-name").textContent = name;
+                const an = document.getElementById("vsh-acct-name"), am = document.getElementById("vsh-acct-mail"), av = document.getElementById("vsh-acct-avatar");
+                if (an) an.textContent = name;
+                if (am) am.textContent = me.email || me.contact_email || "";
+                if (av) av.textContent = name.replace(/[^A-Za-z0-9\s]/g, " ").trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase() || "LV";
                 document.getElementById("vsh-avatar").textContent = name.replace(/[^A-Za-z0-9\s]/g, " ").trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase() || "LV";
             }
         } catch (e) { /* keep defaults */ }
+        try {
+            const am = document.getElementById("vsh-acct-mail");
+            if (am && !am.textContent) { const su = await vendorAuthorizedFetch("/api/vendors/me/shop-setup"); if (su && su.account && su.account.email) am.textContent = su.account.email; }
+        } catch (e) { /* the name alone is fine */ }
         refreshCompliance();
         refreshBell();
     }
@@ -140,6 +193,7 @@
         const s = window.LzVendorComplianceUi.summary(k);
         const badge = document.getElementById("vsh-count-verification");
         if (badge) { const n = s.missing + s.redo; badge.textContent = n; badge.hidden = !n; badge.classList.toggle("red", !!s.held); }
+        box.hidden = !!s.verified;      // nothing to chase once verified
         box.innerHTML = s.verified
             ? `<div class="vsh-comp-head">${ico("shield", 20)} Compliance</div><div class="vsh-comp-big vsh-green">Fully Verified</div>
                <div class="vsh-comp-sub">${s.approved}/${s.total} requirements completed</div><div class="vsh-bar"><span style="width:100%" class="vsh-bar-green"></span></div>
@@ -188,6 +242,12 @@
             p.querySelector(".vsh-notifs-list").innerHTML = '<p class="vsh-empty">Could not load notifications.</p>';
         }
     }
+
+    // The "Lizimas Vendor" badge at the top of the phone screens opens the home page too.
+    document.addEventListener("click", (e) => {
+        const brand = e.target.closest && e.target.closest(".vm-header-brand");
+        if (brand && typeof vmShowScreen === "function") { current = "home"; vmShowScreen("home"); mark(); }
+    });
 
     function start() {
         build();
