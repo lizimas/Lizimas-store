@@ -8,6 +8,7 @@
 <title>Lizimas Store — Vendor Dashboard</title>
 <link rel="stylesheet" href="../css/admin.css?v=47">
 <link rel="stylesheet" href="../css/vendor-compliance.css?v=6">
+<link rel="stylesheet" href="../css/lz-product-form.css?v=1">
 <link rel="stylesheet" href="../css/vendor-shell.css?v=3">
 <link rel="stylesheet" href="../css/vendor-desktop.css?v=8">
 <link rel="stylesheet" href="../css/vendor-mobile.css?v=101">
@@ -1110,205 +1111,227 @@
                     <!-- The same form is shown on phones: vendor-mobile.js moves this wrapper into the Add Product screen. -->
                     <div id="vd-product-form-wrap">
 
-                    <div class="panel">
+                    <div class="panel lzj-panel">
                         <input type="hidden" id="product-id">
                         <!-- Step by step (client/js/lz-form-steps.js): on a computer every
                              step shows with a steps bar on top; on a phone one step per
                              screen with Back / Continue. Field ids are unchanged. -->
-                        <div class="product-form-sections" id="vendor-product-steps">
+                        <div class="product-form-sections lzj" id="vendor-product-steps">
 
-                            <div class="product-form-section" data-step="1">
-                                <h4>Basic Information</h4>
-                                <div class="field-row">
-                                    <div>
-                                        <label style="font-size:13px; font-weight:600; color:#333;">Product Name</label>
-                                        <input type="text" id="product-name" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
+                            <!-- 1. Product Information -->
+                            <div class="product-form-section lzj-sec" data-step="1">
+                                <h4>Product Information</h4>
+                                <div class="drag-drop-zone" id="product-image-dropzone">Drag &amp; drop images here, or click to browse</div>
+                                <input type="file" id="product-images" accept="image/*" multiple class="hidden">
+                                <div class="drag-drop-preview-grid" id="product-image-preview"></div>
+                                <p class="lzj-note">Images need to be at least 800&times;800 pixels and under 5MB. White backgrounds are recommended. No watermarks. The first image is the main one.</p>
+
+                                <div class="lzj-row lzj-c2">
+                                    <div class="lzj-f">
+                                        <label for="product-name">Name <b>*</b></label>
+                                        <input type="text" id="product-name" autocomplete="off">
                                     </div>
-                                    <div>
-                                        <label style="font-size:13px; font-weight:600; color:#333;">SKU <span style="font-weight:400; color:#888;">(your own stock code, required)</span></label>
-                                        <div style="display:flex; align-items:stretch;"><input type="text" id="product-sku" required maxlength="50" autocomplete="off" style="padding:10px; border:1px solid #ccc; border-right:0; border-radius:8px 0 0 8px; flex:1; min-width:0; box-sizing:border-box; text-transform:uppercase;"><span style="display:flex; align-items:center; padding:0 12px; background:#f3f4f6; border:1px solid #ccc; border-radius:0 8px 8px 0; font-weight:700; color:#1a1a2e; font-size:13px;">ULZMS</span></div>
-                                    </div>
-                                    <div>
-                                        <label style="font-size:13px; font-weight:600; color:#333;">Category</label>
-                                        <button type="button" id="product-category-btn" onclick="openProductCategoryPicker()" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; background:#fff; text-align:left; font-size:14px; color:#333; display:flex; align-items:center; justify-content:space-between; cursor:pointer; box-sizing:border-box;">
+                                    <div class="lzj-f">
+                                        <label>Category <b>*</b></label>
+                                        <button type="button" id="product-category-btn" class="lzj-pick" onclick="openProductCategoryPicker()">
                                             <span id="product-category-btn-label" style="color:#999;">Select a category</span>
-                                            <span style="color:#F5C518;">&#128269;</span>
+                                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
                                         </button>
                                         <select id="product-category" onchange="scheduleVendorPricingPreview()" style="display:none;"></select>
                                     </div>
-                                    <div style="display:flex; gap:12px;">
-                                        <div style="flex:1;">
-                                            <label style="font-size:13px; font-weight:600; color:#333;">Brand <span style="font-weight:400; color:#888;">(if applicable)</span></label>
-                                            <input type="text" id="product-brand" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
+                                </div>
+                                <div class="lzj-row lzj-c4">
+                                    <div class="lzj-f">
+                                        <label for="product-brand">Brand</label>
+                                        <input type="text" id="product-brand" placeholder="Brand">
                                     </div>
-                                    <div style="display:flex; gap:12px;">
-                                        <div style="flex:1;">
-                                            <label style="font-size:13px; font-weight:600; color:#333;">GTIN <span style="font-weight:400; color:#888;">(barcode, optional)</span></label>
-                                            <input type="text" id="product-gtin" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
-                                        <div style="flex:1;">
-                                            <label style="font-size:13px; font-weight:600; color:#333;">MPN <span style="font-weight:400; color:#888;">(manufacturer part no., optional)</span></label>
-                                            <input type="text" id="product-mpn" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
+                                    <div class="lzj-f">
+                                        <label for="product-color">Color</label>
+                                        <input type="text" id="product-color" maxlength="60" placeholder="Main color of the product">
+                                        <small>Improves listing quality</small>
+                                    </div>
+                                    <div class="lzj-f">
+                                        <label for="product-color-family">Color family</label>
+                                        <select id="product-color-family"><option value="">Ex: Black</option><option>Black</option><option>White</option><option>Blue</option><option>Red</option><option>Grey</option><option>Brown</option><option>Green</option><option>Pink</option><option>Silver</option><option>Gold</option><option>Beige</option><option>Yellow</option><option>Orange</option><option>Purple</option><option>Transparent</option><option>Multi</option><option>Not Applicable</option><option>Navy Blue</option><option>Dark Blue</option><option>Dark Grey</option><option>Dark Brown</option><option>Dark Green</option><option>Off-White</option><option>Rose Gold</option><option>Burgundy</option><option>Gray</option><option>Fuchsia</option><option>Lilac</option><option>Plum</option><option>Turquoise</option><option>Turquoise Blue</option><option>Turquoise Green</option><option>Peach</option><option>Raspberry</option><option>Ruby Red</option><option>Magenta</option><option>Metallic</option><option>Metallic Blue</option><option>Copper</option><option>Bronze</option><option>Camel</option><option>Sand</option><option>Ivory</option><option>Mocha</option><option>Pale Purple</option><option>Cream</option><option>Nature Green</option><option>Lime Green</option><option>Brick</option><option>Sunset Orange</option><option>Hot Chocolate</option><option>Soft Black</option><option>Matte Black</option><option>Dark Silver</option><option>Light Silver</option><option>Blue Sky</option><option>Greyish Blue</option><option>Grey & Blue</option><option>Brown Marble</option><option>Grey/Beige</option><option>White and Red</option><option>White – Black</option><option>White & Blue</option><option>White/Purple</option><option>White / Pink / Purple</option><option>Red/Grey</option><option>Black/Green</option><option>Black / White</option><option>Blue & Black</option><option>Blue Shark</option><option>Power Blue</option><option>Vibrant Green</option><option>Neon Colors</option><option>American Beauty</option><option>Animal Prints</option><option>Arctic white</option><option>Black/Gold</option><option>Black Night</option><option>Black/Pink</option><option>Brown & Black</option></select>
+                                        <small>Improves listing quality</small>
+                                    </div>
+                                    <div class="lzj-f">
+                                        <label for="product-weight-kg">Weight (kg) <b>*</b></label>
+                                        <input type="number" id="product-weight-kg" class="lz-pack-input" min="0.01" step="0.01" inputmode="decimal" placeholder="Ex: 1.2 [packed weight, for shipping]">
                                     </div>
                                 </div>
-                            </div>
 
-                            <div class="product-form-section" data-step="1">
-                                <h4>Images</h4>
-                                <div class="field-row">
-                                    <div>
-                                        <label style="font-size:13px; font-weight:600; color:#333;">Photos <span style="font-weight:400; color:#888;">(each at least 800×800 pixels and under 5MB; sharp, well lit, plain background, no watermarks)</span></label>
-                                        <div class="drag-drop-zone" id="product-image-dropzone">
-                                            Drag &amp; drop images here, or click to browse
-                                        </div>
-                                        <input type="file" id="product-images" accept="image/*" multiple class="hidden">
-                                        <div class="drag-drop-preview-grid" id="product-image-preview"></div>
-                                    </div>
+                                <div class="lzj-f">
+                                    <label>Product description <b>*</b></label>
+                                    <div id="product-description-editor"></div>
+                                    <textarea id="product-description" hidden aria-hidden="true" tabindex="-1" style="display:none !important;"></textarea>
                                 </div>
-                            </div>
-
-                            <div class="product-form-section" data-step="2">
-                                <h4>Pricing &amp; Stock</h4>
-                                <div class="field-row">
-                                    <div style="display:flex; gap:12px;">
-                                        <div style="flex:1;">
-                                            <label style="font-size:13px; font-weight:600; color:#333;">Price (UGX) <span style="color:#b7791f;">*</span> <span style="font-weight:400; color:#888;">(your price per unit - Lizimas adds its commission for the customer)</span></label>
-                                            <input type="number" id="product-payout" min="0" oninput="scheduleVendorPricingPreview()" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
-                                        <div style="flex:1;">
-                                            <label style="font-size:13px; font-weight:600; color:#333;">Stock</label>
-                                            <input type="number" id="product-stock" min="0" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
-                                        <div style="flex:1;">
-                                            <label style="font-size:13px; font-weight:600; color:#333;">Low stock alert <span style="font-weight:400; color:#888;">(blank = 10)</span></label>
-                                            <input type="number" id="product-low-stock" min="0" placeholder="10" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
-                                    </div>
-                                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:10px;">
-                                        <div>
-                                            <label style="font-size:13px; font-weight:600; color:#333;">Sale Price (UGX) <span style="font-weight:400; color:#888;">(optional)</span></label>
-                                            <input type="number" id="product-sale-price" min="0" oninput="scheduleVendorPricingPreview()" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
-                                        <div>
-                                            <label style="font-size:13px; font-weight:600; color:#333;">Sale Start Date</label>
-                                            <input type="date" id="product-sale-start" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
-                                        <div>
-                                            <label style="font-size:13px; font-weight:600; color:#333;">Sale End Date</label>
-                                            <input type="date" id="product-sale-end" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
-                                    </div>
-                                    <div id="pricing-preview" style="display:none; background:#F0F4FF; border:1px solid #C7D2FE; border-radius:8px; padding:12px; font-size:13px; color:#333;">
-                                        <div style="font-size:15px; font-weight:700;">Customer pays: UGX <span id="preview-customer-price">-</span></div>
-                                        <div style="margin-top:4px; color:#555;">You receive: UGX <span id="preview-payout">-</span></div>
-                                        <div id="preview-sale" style="display:none; margin-top:6px; color:#166534; font-weight:600;"></div>
-                                    </div>
-                                    <p id="pricing-preview-error" style="display:none; font-size:12px; color:#B45309; background:#FFFBEB; border-radius:6px; padding:8px;"></p>
-                                </div>
-                            </div>
-
-                            <div class="product-form-section" data-step="2">
-                                <h4>Description</h4>
-                                <div class="field-row">
-                                    <div>
-                                        <label style="font-size:13px; font-weight:600; color:#333;">Product description <span style="color:#b7791f;">*</span></label>
-                                        <div id="product-description-editor"></div>
-                                        <textarea id="product-description" hidden aria-hidden="true" tabindex="-1" style="display:none !important;"></textarea>
-                                    </div>
-                                </div>
-                                <div style="margin-top:14px;">
-                                    <label style="font-size:13px; font-weight:600; color:#333;">Highlights <span style="color:#b7791f;">*</span></label>
+                                <div class="lzj-f">
+                                    <label>Highlights <b>*</b></label>
                                     <div id="product-highlights-editor"></div>
                                 </div>
-                                <details style="margin-top:14px;">
-                                    <summary style="cursor:pointer; font-size:13px; font-weight:600; color:#333;">More layout blocks <span style="font-weight:400; color:#888;">(optional &mdash; full-width photo, text and video blocks shown below the description)</span></summary>
+                                <details class="lzj-more">
+                                    <summary>More layout blocks <span>(optional &mdash; full-width photo, text and video blocks shown below the description)</span></summary>
                                     <div id="desc-blocks-editor" style="margin-top:8px;"></div>
                                 </details>
                             </div>
 
-                            <div class="product-form-section" data-step="3">
-                                <h4>Specifications</h4>
-                                <p style="font-size:12px; color:#666; margin-top:-6px;">Optional key/value facts shown on the product page (e.g. Material: Cotton, Battery Life: 10 hours) &mdash; the same structure staff and admin listings use, so your products read consistently on the storefront.</p>
-                                <div id="specs-template" hidden></div>
-                                <div id="specs-list" style="display:flex; flex-direction:column; gap:6px;"></div>
-                                <button type="button" onclick="addVendorSpecRow()" style="margin-top:8px; padding:8px 12px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer;">+ Add Specification</button>
-
-                                <div class="lz-spec-tools" data-add="addVendorSpecRow" data-table-id="vendor-specs-table-wrap"></div>
-                            </div>
-
-                            <div class="product-form-section" data-step="3">
-                                <h4>Shipping &amp; Warranty</h4>
-                                <div class="field-row">
-                                    <div>
-                                        <div class="lz-pack" data-lz-pack="product">
-    <div class="lz-pack-title">Packed weight &amp; size</div>
-    <div class="lz-pack-grid">
-        <label class="lz-pack-field"><span>Weight (kg) *</span><input type="number" id="product-weight-kg" class="lz-pack-input" min="0.01" step="0.01" inputmode="decimal" placeholder="e.g. 1.5"></label>
-        <label class="lz-pack-field"><span>Length (cm)</span><input type="number" id="product-length-cm" class="lz-pack-input" min="0.1" step="0.1" inputmode="decimal" placeholder="L"></label>
-        <label class="lz-pack-field"><span>Width (cm)</span><input type="number" id="product-width-cm" class="lz-pack-input" min="0.1" step="0.1" inputmode="decimal" placeholder="W"></label>
-        <label class="lz-pack-field"><span>Height (cm)</span><input type="number" id="product-height-cm" class="lz-pack-input" min="0.1" step="0.1" inputmode="decimal" placeholder="H"></label>
-    </div>
-    <input type="hidden" id="product-package-size" value="Small">
-    <p class="lz-pack-note" id="product-package-tier-note" aria-live="polite"></p>
-</div>
-                                    </div>
-                                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:12px;">
-                                        <div>
-                                            <label style="font-size:13px; font-weight:600; color:#333;">Model</label>
-                                            <input type="text" id="product-model" maxlength="120" placeholder="Ex: MD-1234" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
-                                        <div>
-                                            <label style="font-size:13px; font-weight:600; color:#333;">Production country</label>
-                                            <input type="text" id="product-production-country" maxlength="80" list="product-country-list" placeholder="Ex: China" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                            <datalist id="product-country-list"><option>Uganda</option><option>Kenya</option><option>Tanzania</option><option>Rwanda</option><option>South Africa</option><option>Nigeria</option><option>Egypt</option><option>China</option><option>India</option><option>Turkey</option><option>United Arab Emirates</option><option>Vietnam</option><option>Thailand</option><option>Indonesia</option><option>Malaysia</option><option>Japan</option><option>South Korea</option><option>Taiwan</option><option>Germany</option><option>France</option><option>Italy</option><option>Spain</option><option>United Kingdom</option><option>United States</option><option>Brazil</option></datalist>
-                                        </div>
-                                        <div>
-                                            <label style="font-size:13px; font-weight:600; color:#333;">Condition</label>
-                                            <select id="product-condition" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;"><option value="new">New</option><option value="pre_used">Pre-Used</option><option value="refurbished">Refurbished</option></select>
-                                        </div>
-                                    </div>
-                                    <div style="margin-bottom:12px;">
-                                        <label style="font-size:13px; font-weight:600; color:#333;">What's in the box</label>
-                                        <div id="product-box-editor"></div>
-                                    </div>
-                                    <div style="margin-bottom:12px;">
-                                        <label style="font-size:13px; font-weight:600; color:#333;">Product warranty</label>
-                                        <div id="product-warranty-editor"></div>
-                                    </div>
-                                    <div style="display:flex; gap:12px;">
-                                        <div style="flex:1;">
-                                            <label style="font-size:13px; font-weight:600; color:#333;">Warranty (months)</label>
-                                            <input type="number" id="product-warranty-months" min="0" placeholder="Leave blank if none" style="padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box;">
-                                        </div>
-                                    </div>
-                                    <div style="margin-top:12px;">
-                                        <label style="font-size:13px; font-weight:600; color:#333;">Certifications <span style="font-weight:400; color:#888;">(only if the product has them - you upload the certificate for each one, and it shows after Lizimas Store approves it)</span></label>
-                                        <details id="product-certs" class="vd-certs">
-                                            <summary id="product-certs-summary">Certification(s) that the product holds</summary>
-                                            <div id="product-certs-list" class="vd-certs-list"></div>
-                                        </details>
+                            <!-- 2. Variants: the first card is the product itself; more cards are its other sizes / versions -->
+                            <div class="product-form-section lzj-sec" data-step="2">
+                                <div class="lzj-vhead">
+                                    <h4>Variants</h4>
+                                    <div class="lzj-vtools">
+                                        <button type="button" class="lzj-tool" id="vdv-collapse"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg><span>Collapse All</span></button>
+                                        <label class="lzj-tool"><input type="checkbox" id="vdv-all"><span>Select All</span></label>
+                                        <button type="button" class="lzj-tool lzj-tool-act" id="vdv-dates" disabled><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Edit Date</span></button>
+                                        <button type="button" class="lzj-tool lzj-tool-act" id="vdv-bulk" disabled><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg><span>Bulk Edit</span></button>
                                     </div>
                                 </div>
+                                <div id="vdv-panel" class="lzj-vpanel" hidden></div>
+
+                                <div id="vdv-cards">
+                                    <div class="lzj-card" data-main="1">
+                                        <div class="lzj-card-head">
+                                            <input type="checkbox" class="vdv-pick" aria-label="Select this variation">
+                                            <span class="lzj-card-title">Variation (...), Quantity (0)</span>
+                                            <button type="button" class="lzj-card-fold" aria-label="Collapse or expand"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg></button>
+                                        </div>
+                                        <div class="lzj-card-body">
+                                            <div class="lzj-row lzj-c4">
+                                                <div class="lzj-f">
+                                                    <label for="product-variation-name">Variation</label>
+                                                    <input type="text" id="product-variation-name" class="vdv-name" maxlength="50" placeholder="...">
+                                                    <small>Ex: XL, 128GB. Leave empty when the product has one version.</small>
+                                                </div>
+                                                <div class="lzj-f">
+                                                    <label for="product-sku">Seller SKU <b>*</b></label>
+                                                    <div class="lzj-affix"><input type="text" id="product-sku" class="vdv-sku" required maxlength="50" autocomplete="off" placeholder="Seller SKU" style="text-transform:uppercase;"><span>ULZMS</span></div>
+                                                </div>
+                                                <div class="lzj-f">
+                                                    <label for="product-gtin">GTIN Barcode</label>
+                                                    <input type="text" id="product-gtin" class="vdv-gtin" placeholder="GTIN Barcode">
+                                                </div>
+                                                <div class="lzj-f">
+                                                    <label for="product-stock">Quantity <b>*</b></label>
+                                                    <input type="number" id="product-stock" class="vdv-qty" min="0" placeholder="Quantity">
+                                                </div>
+                                            </div>
+                                            <div class="lzj-row lzj-c4">
+                                                <div class="lzj-f">
+                                                    <label for="product-payout">Price <b>*</b></label>
+                                                    <div class="lzj-affix"><input type="number" id="product-payout" class="vdv-price" min="0" placeholder="Price" oninput="scheduleVendorPricingPreview()"><span>UGX</span></div>
+                                                </div>
+                                                <div class="lzj-f">
+                                                    <label for="product-sale-price">Sale Price</label>
+                                                    <div class="lzj-affix"><input type="number" id="product-sale-price" class="vdv-sale" min="0" placeholder="Sale Price" oninput="scheduleVendorPricingPreview()"><span>UGX</span></div>
+                                                </div>
+                                                <div class="lzj-f">
+                                                    <label for="product-sale-start">Sale Start Date</label>
+                                                    <input type="date" id="product-sale-start" class="vdv-start">
+                                                </div>
+                                                <div class="lzj-f">
+                                                    <label for="product-sale-end">Sale End Date</label>
+                                                    <input type="date" id="product-sale-end" class="vdv-end">
+                                                </div>
+                                            </div>
+                                            <div id="pricing-preview" class="lzj-preview" style="display:none;">
+                                                <div style="font-size:14px; font-weight:700;">Customer pays: UGX <span id="preview-customer-price">-</span></div>
+                                                <div style="margin-top:3px; color:#555;">You receive: UGX <span id="preview-payout">-</span> <span style="color:#888;">(your price - Lizimas adds its commission for the customer)</span></div>
+                                                <div id="preview-sale" style="display:none; margin-top:5px; color:#166534; font-weight:600;"></div>
+                                            </div>
+                                            <p id="pricing-preview-error" style="display:none; font-size:12px; color:#B45309; background:#FFFBEB; border-radius:4px; padding:8px; margin:0;"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" id="vdv-add" class="lzj-addvar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> ADD VARIATION</button>
+                                <p class="lzj-note" id="vdv-note">Add a variation for each other size or version you sell (for example S, M, L or 64GB, 128GB). Each one has its own SKU, quantity and price.</p>
                             </div>
 
-                            <div class="product-form-section" data-step="4" data-review="1">
+                            <!-- 3. Product Specification -->
+                            <div class="product-form-section lzj-sec" data-step="3">
+                                <h4>Product Specification</h4>
+                                <div class="lzj-row lzj-c3">
+                                    <div class="lzj-f">
+                                        <label for="product-model">Model</label>
+                                        <input type="text" id="product-model" maxlength="120" placeholder="Ex: MD-1234 [model ID or manufacturer part number]">
+                                    </div>
+                                    <div class="lzj-f">
+                                        <label for="product-production-country">Production country</label>
+                                        <input type="text" id="product-production-country" maxlength="80" list="product-country-list" placeholder="Ex: China [where the product is made]">
+                                        <datalist id="product-country-list"><option>Uganda</option><option>Kenya</option><option>Tanzania</option><option>Rwanda</option><option>South Africa</option><option>Nigeria</option><option>Egypt</option><option>China</option><option>India</option><option>Turkey</option><option>United Arab Emirates</option><option>Vietnam</option><option>Thailand</option><option>Indonesia</option><option>Malaysia</option><option>Japan</option><option>South Korea</option><option>Taiwan</option><option>Germany</option><option>France</option><option>Italy</option><option>Spain</option><option>United Kingdom</option><option>United States</option><option>Brazil</option></datalist>
+                                    </div>
+                                    <div class="lzj-f">
+                                        <label for="product-condition">Condition</label>
+                                        <select id="product-condition"><option value="new">New</option><option value="pre_used">Pre-Used</option><option value="refurbished">Refurbished</option></select>
+                                    </div>
+                                </div>
+                                <div id="specs-template" hidden></div>
+
+                                <div class="lzj-f">
+                                    <label>What's in the box</label>
+                                    <div id="product-box-editor"></div>
+                                </div>
+                                <div class="lzj-f">
+                                    <label>Product warranty</label>
+                                    <div id="product-warranty-editor"></div>
+                                </div>
+
+                                <div class="lzj-row lzj-c3">
+                                    <div class="lzj-f">
+                                        <label for="product-warranty-months">Warranty (months)</label>
+                                        <input type="number" id="product-warranty-months" min="0" placeholder="Leave blank if none">
+                                    </div>
+                                    <div class="lzj-f">
+                                        <label for="product-mpn">MPN</label>
+                                        <input type="text" id="product-mpn" placeholder="Manufacturer part number (optional)">
+                                    </div>
+                                    <div class="lzj-f">
+                                        <label for="product-low-stock">Low stock alert</label>
+                                        <input type="number" id="product-low-stock" min="0" placeholder="10">
+                                    </div>
+                                </div>
+                                <div class="lz-pack" data-lz-pack="product">
+                                    <div class="lzj-row lzj-c3">
+                                        <div class="lzj-f"><label for="product-length-cm">Packed length (cm)</label><input type="number" id="product-length-cm" class="lz-pack-input" min="0.1" step="0.1" inputmode="decimal" placeholder="L"></div>
+                                        <div class="lzj-f"><label for="product-width-cm">Packed width (cm)</label><input type="number" id="product-width-cm" class="lz-pack-input" min="0.1" step="0.1" inputmode="decimal" placeholder="W"></div>
+                                        <div class="lzj-f"><label for="product-height-cm">Packed height (cm)</label><input type="number" id="product-height-cm" class="lz-pack-input" min="0.1" step="0.1" inputmode="decimal" placeholder="H"></div>
+                                    </div>
+                                    <input type="hidden" id="product-package-size" value="Small">
+                                    <p class="lz-pack-note" id="product-package-tier-note" aria-live="polite"></p>
+                                </div>
+
+                                <div class="lzj-f">
+                                    <label>Certifications <span>(only if the product has them - you upload the certificate for each one, and it shows after Lizimas Store approves it)</span></label>
+                                    <details id="product-certs" class="vd-certs">
+                                        <summary id="product-certs-summary">Certification(s) that the product holds</summary>
+                                        <div id="product-certs-list" class="vd-certs-list"></div>
+                                    </details>
+                                </div>
+
+                                <details class="lzj-more" id="vd-more-specs">
+                                    <summary>More specifications <span>(optional &mdash; your own label and value rows, paste from Excel, or a table)</span></summary>
+                                    <div id="specs-list" style="display:flex; flex-direction:column; gap:6px; margin-top:10px;"></div>
+                                    <button type="button" class="lzj-ghost" onclick="addVendorSpecRow()">+ Add Specification</button>
+                                    <div class="lz-spec-tools" data-add="addVendorSpecRow" data-table-id="vendor-specs-table-wrap"></div>
+                                </details>
+                            </div>
+
+                            <!-- 4. Review & Submit -->
+                            <div class="product-form-section lzj-sec" data-step="4" data-review="1">
                                 <h4>Review &amp; Submit</h4>
                                 <div class="lzfs-review" id="vendor-product-review"></div>
-                        <label style="font-size:13px; display:flex; gap:8px; align-items:flex-start; background:#FFF8E1; padding:10px; border-radius:8px; margin-top:20px;">
-                            <input type="checkbox" id="product-authenticity-confirm" style="margin-top:3px;">
-                            <span>I confirm this product is authentic, accurately described, and that I can provide invoices/supplier documentation if Lizimas Store requests proof of authenticity (<a href="../vendor-policies#anti-counterfeit" target="_blank">Anti-Counterfeit Policy</a>).</span>
-                        </label>
-
-                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
-                            <button type="button" onclick="submitVendorProductForm({ draft: true })" style="flex:1 1 140px; background:#fff; color:#1a1a2e; border:1.5px solid #1a1a2e; border-radius:8px; padding:12px; cursor:pointer; font-weight:600;">Save as Draft</button>
-                            <button type="button" onclick="vendorPreviewProduct()" style="flex:1 1 140px; background:#fff; color:#1a1a2e; border:1.5px solid #1a1a2e; border-radius:8px; padding:12px; cursor:pointer; font-weight:600;">Preview</button>
-                        </div>
-                        <button id="product-submit-btn" onclick="submitVendorProductForm()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:12px; cursor:pointer; font-weight:600; margin-top:8px; width:100%;">Submit for Approval</button>
-                        <p id="product-form-status" style="font-size:13px; color:#666;"></p>
+                                <label class="lzj-confirm">
+                                    <input type="checkbox" id="product-authenticity-confirm">
+                                    <span>I confirm this product is authentic, accurately described, and that I can provide invoices/supplier documentation if Lizimas Store requests proof of authenticity (<a href="../vendor-policies#anti-counterfeit" target="_blank">Anti-Counterfeit Policy</a>).</span>
+                                </label>
+                                <p id="product-form-status" style="font-size:13px; color:#b42318; margin:10px 0 0;"></p>
                             </div>
 
+                        </div>
+                        <div class="lzj-foot" id="vd-product-foot">
+                            <button type="button" class="lzj-btn2" onclick="submitVendorProductForm({ draft: true })">Save as Draft</button>
+                            <button type="button" class="lzj-btn2" onclick="vendorPreviewProduct()">Preview</button>
+                            <button type="button" class="lzj-btn1" id="product-submit-btn" onclick="submitVendorProductForm()">Submit</button>
                         </div>
                     </div>
 
@@ -1728,9 +1751,19 @@
                          on their own profile; read-only here,
                          assigned once at approval - see vendorController.js's
                          approveVendor/generateShopId. -->
+                    <div class="panel" id="vd-shop-name-panel">
+                        <h3 style="margin:0 0 4px;">Shop Name</h3>
+                        <p style="font-size:12.5px; color:#888; margin:0 0 10px;">The name customers see on your store and products. You can change it; your Shop ID below always stays the same.</p>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                            <input type="text" id="vd-shop-name-input" maxlength="60" autocomplete="organization" aria-label="Shop name" style="flex:1 1 240px; max-width:420px; padding:10px 12px; border:1px solid #ccc; border-radius:8px; font-size:14px; box-sizing:border-box;">
+                            <button type="button" id="vd-shop-name-save" onclick="vdSaveShopName()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 18px; font-weight:600; cursor:pointer;">Save name</button>
+                        </div>
+                        <p id="vd-shop-name-status" style="font-size:12.5px; margin:8px 0 0;" aria-live="polite"></p>
+                    </div>
+
                     <div class="panel" id="vd-shop-id-panel">
                         <h3 style="margin:0 0 4px;">Shop ID</h3>
-                        <p style="font-size:12.5px; color:#888; margin:0 0 10px;">Your Lizimas Store seller identifier - use it when contacting support.</p>
+                        <p style="font-size:12.5px; color:#888; margin:0 0 10px;">Your Lizimas Store seller identifier - use it when contacting support. It is given once and cannot be changed.</p>
                         <div id="vd-shop-id-value" style="font-size:18px; font-weight:700; color:var(--vd-navy); letter-spacing:0.5px;">Loading...</div>
                     </div>
 
@@ -2019,7 +2052,7 @@
     <script src="../js/prepare-picked-file.js?v=11"></script>
     <script src="../js/lz-image-checks.js?v=6"></script>
     <script src="../js/lz-certifications.js?v=1"></script>
-    <script src="../js/lz-rich-editor.js?v=1"></script>
+    <script src="../js/lz-rich-editor.js?v=2"></script>
     <script src="../js/lz-category-specs.js?v=2"></script>
     <script src="../js/lz-id-ocr.js?v=4"></script>
     <script src="../js/lz-table.js?v=6"></script>
@@ -2033,7 +2066,8 @@
 <script src="../js/lz-variants-table.js?v=2"></script>
 <script src="../js/lz-product-preview.js?v=2"></script>
 <script src="../js/description-blocks.js?v=14"></script>
-    <script src="../js/vendor-dashboard.js?v=50"></script>
+    <script src="../js/vendor-dashboard.js?v=51"></script>
+    <script src="../js/vendor-variations.js?v=1"></script>
     <script src="../js/vendor-statements.js?v=4"></script>
 <script src="../js/vendor-mobile.js?v=19"></script>
 <script src="../js/vendor-compliance.js?v=2"></script>

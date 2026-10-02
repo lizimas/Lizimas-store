@@ -405,6 +405,7 @@ function loadProductIntoForm(product) {
     document.getElementById("product-name").value = product.name;
     renderCategorySelect(product.category_id);
     document.getElementById("product-description").value = product.description || "";
+    if (window.LzProductExtras) LzProductExtras.fill(product);
     document.getElementById("product-price").value = product.price;
     document.getElementById("product-stock").value = product.stock;
     document.getElementById("product-package-size").value = product.package_size || "Small";
@@ -429,6 +430,7 @@ function resetProductForm() {
     document.getElementById("product-id").value = "";
     document.getElementById("product-name").value = "";
     document.getElementById("product-description").value = "";
+    if (window.LzProductExtras) LzProductExtras.fill(null);
     document.getElementById("product-price").value = "";
     document.getElementById("product-stock").value = "";
     document.getElementById("product-package-size").value = "Small";
@@ -505,6 +507,7 @@ async function submitProductForm() {
     formData.append("name", name);
     formData.append("category_id", category_id);
     formData.append("description", description);
+    if (window.LzProductExtras) LzProductExtras.appendTo(formData);
     formData.append("price", price);
     formData.append("stock", stock);
     formData.append("package_size", packageSize);

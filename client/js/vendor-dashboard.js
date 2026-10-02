@@ -152,6 +152,8 @@ async function loadVendorStatus() {
         // so a not-yet-approved vendor sees a plain explanatory placeholder.
         const shopIdEl = document.getElementById("vd-shop-id-value");
         if (shopIdEl) shopIdEl.textContent = v.shop_id || "Assigned once your shop is approved";
+        const shopNameInput = document.getElementById("vd-shop-name-input");
+        if (shopNameInput && document.activeElement !== shopNameInput) shopNameInput.value = v.business_name || "";
 
         const banner = document.getElementById("vendor-status-banner");
         const s = vendorStatusLabel(v.status);
@@ -1078,6 +1080,7 @@ async function loadVendorCategories() {
 // puts a nicer picker button in front of it and keeps the button's label
 // in sync with whatever the hidden select's value actually is.
 function syncProductCategoryButtonLabel() {
+    { const _pick = document.getElementById("product-category-btn"), _sel = document.getElementById("product-category"); if (_pick && _sel && _sel.value && typeof vdMarkField === "function") { vdMarkField(_pick, ""); if (typeof vdRefreshStepMarks === "function") vdRefreshStepMarks(); } }
     const select = document.getElementById("product-category");
     const label = document.getElementById("product-category-btn-label");
     if (!select || !label) return;
@@ -1521,7 +1524,10 @@ function resetVendorProductForm() {
     vdAllImages = [];
     const _vdPreview = document.getElementById("product-image-preview"); if (_vdPreview) _vdPreview.innerHTML = "";
     renderVendorPhotoOrderList();
-    document.getElementById("product-submit-btn").textContent = "Submit for Approval";
+    document.getElementById("product-submit-btn").textContent = "Submit";
+    ["product-color", "product-color-family"].forEach(cid => { const el = document.getElementById(cid); if (el) el.value = ""; });
+    if (window.VdVariations) VdVariations.reset();
+    vdClearFieldMarks();
     if (window.LzFormSteps) LzFormSteps.reset(document.getElementById("vendor-product-steps"));
     document.getElementById("product-form-status").textContent = "";
     const specsList = document.getElementById("specs-list");
@@ -1696,6 +1702,7 @@ function vdRebuildAllImages() {
 }
 
 function renderVendorPhotoOrderList(statusText) {
+    if (typeof vdRefreshStepMarks === "function") setTimeout(vdRefreshStepMarks, 0);
     const preview = document.getElementById("product-image-preview");
     if (!preview) return;
     let block = document.getElementById("vd-photo-order");
@@ -1842,6 +1849,11 @@ function addVendorSpecRow(label, value) {
 
 function collectVendorSpecRows() {
     const specs = [];
+    // Color and Color family (Product Information) are kept as specifications.
+    [["product-color", "Color"], ["product-color-family", "Color family"]].forEach(([cid, label]) => {
+        const el = document.getElementById(cid);
+        if (el && el.value.trim()) specs.push({ label, value: el.value.trim() });
+    });
     // Fields for the chosen category first (only the ones filled in), then
     // the vendor's own rows.
     document.querySelectorAll("#specs-template .vd-cat-field").forEach(field => {
@@ -1874,6 +1886,19 @@ function vdRenderCatSpecs() {
     try {
         const path = vdCategoryPath(select.value);
         const tpl = LzCategorySpecs.forPath(path);
+        // Color family has its own box under Product Information.
+        const ownBoxes = { "color": document.getElementById("product-color"), "color family": document.getElementById("product-color-family") };
+        if (ownBoxes["color family"]) tpl.fields = tpl.fields.filter(x => x.label.toLowerCase() !== "color family");
+        document.querySelectorAll("#specs-list > div").forEach(row => {
+            const l = row.querySelector(".spec-label-input"), v = row.querySelector(".spec-value-input");
+            const box = l && ownBoxes[l.value.trim().toLowerCase()];
+            if (!box || !v) return;
+            if (v.value.trim()) {
+                if (box.tagName === "SELECT" && !Array.from(box.options).some(o => o.value === v.value.trim() || o.textContent === v.value.trim())) box.add(new Option(v.value.trim(), v.value.trim()));
+                box.value = v.value.trim();
+            }
+            row.remove();
+        });
         // Keep what is already typed, and take over matching rows from the list below.
         const have = new Map();
         host.querySelectorAll(".vd-cat-field").forEach(fl => { const v = fl.querySelector(".spec-value-input").value.trim(); if (v) have.set(fl.dataset.label.toLowerCase(), v); });
@@ -2548,6 +2573,9 @@ async function editVendorProduct(id) {
     document.getElementById("product-submit-btn").textContent = "Save Changes";
     document.getElementById("product-form-status").textContent = "Editing an approved product returns it to pending review.";
     scheduleVendorPricingPreview();
+    ["product-color", "product-color-family"].forEach(cid => { const el = document.getElementById(cid); if (el) el.value = ""; });
+    vdClearFieldMarks();
+    if (window.VdVariations) VdVariations.load(product.id);
     loadVendorVariantOptions(product.id);
     loadVendorProductSpecs(product.id);
     loadVendorProductImagesIntoForm(product.id);
@@ -2746,6 +2774,74 @@ async function vdSaveCerts(productId) {
 }
 document.addEventListener("DOMContentLoaded", () => vdRenderCerts([]));
 
+// --- Required boxes, the Vendor Center way: red outline + a line under the box.
+function vdMarkField(el, message) {
+    const f = el && el.closest ? el.closest(".lzj-f") : null;
+    if (!f) return;
+    f.classList.toggle("lzj-bad", !!message);
+    let m = f.querySelector(":scope > .lzj-msg");
+    if (!message) { if (m) m.remove(); return; }
+    if (!m) { m = document.createElement("span"); m.className = "lzj-msg"; f.appendChild(m); }
+    m.textContent = message;
+}
+function vdClearFieldMarks() {
+    document.querySelectorAll("#vendor-product-steps .lzj-bad").forEach(f => { f.classList.remove("lzj-bad"); const m = f.querySelector(":scope > .lzj-msg"); if (m) m.remove(); });
+    document.querySelectorAll("#vd-product-form-wrap .lzfs-step.lzfs-miss").forEach(b => b.classList.remove("lzfs-miss"));
+    const note = document.getElementById("vd-photo-msg"); if (note) note.remove();
+    Object.keys(vdRich).forEach(k => { if (vdRich[k] && vdRich[k].setError) vdRich[k].setError(""); });
+}
+// -> the first element that still needs filling in, or null.
+function vdMarkRequired(isNew) {
+    vdClearFieldMarks();
+    const need = "This field is required.";
+    let first = null;
+    const steps = new Set();
+    const bad = (el, message, step) => { if (!el) return; vdMarkField(el, message || need); steps.add(step); if (!first) first = el; };
+    const box = id => document.getElementById(id);
+    const empty = id => !box(id) || !String(box(id).value || "").trim();
+    // 1. Product Information
+    const min = vdPhotoMin();
+    if (vdAllImages.length < min) {
+        const grid = box("product-image-preview");
+        if (grid && !box("vd-photo-msg")) { const p = document.createElement("p"); p.id = "vd-photo-msg"; p.className = "lzj-msg"; p.style.margin = "4px 0 0"; p.textContent = "Add at least " + min + " image" + (min === 1 ? "" : "s") + "."; grid.insertAdjacentElement("afterend", p); }
+        steps.add(1); if (!first) first = grid;
+    }
+    if (empty("product-name")) bad(box("product-name"), null, 1);
+    if (empty("product-category")) bad(box("product-category-btn"), null, 1);
+    if (isNew && empty("product-weight-kg")) bad(box("product-weight-kg"), null, 1);
+    if (vdRich.description && vdRich.description.isEmpty()) { vdRich.description.setError(need); steps.add(1); if (!first) first = box("product-description-editor"); }
+    if (vdRich.highlights && vdRich.highlights.isEmpty()) { vdRich.highlights.setError(need); steps.add(1); if (!first) first = box("product-highlights-editor"); }
+    // 2. Variants
+    if (!vdSkuBase(box("product-sku").value)) bad(box("product-sku"), null, 2);
+    if (!(Number(box("product-payout").value) > 0)) bad(box("product-payout"), null, 2);
+    if (empty("product-stock")) bad(box("product-stock"), null, 2);
+    const saleMsg = vdSaleProblem();
+    if (saleMsg) bad(box("product-sale-price"), saleMsg, 2);
+    if (window.VdVariations && VdVariations.count() > 1 && empty("product-variation-name")) bad(box("product-variation-name"), null, 2);
+    // 4. Review
+    if (!box("product-authenticity-confirm").checked) { steps.add(4); if (!first) first = box("product-authenticity-confirm"); const st = box("product-form-status"); if (st) st.textContent = "Please confirm the authenticity statement to continue."; }
+    document.querySelectorAll("#vd-product-form-wrap .lzfs-step").forEach(b => b.classList.toggle("lzfs-miss", steps.has(Number(b.dataset.go))));
+    return first;
+}
+document.addEventListener("input", e => {
+    const f = e.target.closest && e.target.closest("#vendor-product-steps .lzj-f.lzj-bad");
+    if (f && !e.target.closest("#vdv-cards .lzj-card:not([data-main])")) vdMarkField(e.target, "");
+    vdRefreshStepMarks();
+});
+// A step stops being red once nothing in it is outlined any more.
+function vdRefreshStepMarks() {
+    const photoMsg = document.getElementById("vd-photo-msg");
+    if (photoMsg && vdAllImages.length >= vdPhotoMin()) photoMsg.remove();
+    document.querySelectorAll("#vd-product-form-wrap .lzfs-step.lzfs-miss").forEach(b => {
+        const step = b.dataset.go;
+        const still = document.querySelector('#vendor-product-steps > .product-form-section[data-step="' + step + '"] .lzj-bad, #vendor-product-steps > .product-form-section[data-step="' + step + '"] .lzr-bad, #vendor-product-steps > .product-form-section[data-step="' + step + '"] #vd-photo-msg');
+        const unticked = step === "4" && !(document.getElementById("product-authenticity-confirm") || {}).checked;
+        if (!still && !unticked) b.classList.remove("lzfs-miss");
+    });
+}
+document.addEventListener("change", vdRefreshStepMarks);
+document.addEventListener("keyup", e => { if (e.target.closest && e.target.closest("#vendor-product-steps .lzr")) vdRefreshStepMarks(); });
+
 async function submitVendorProductForm(opts) {
     const asDraft = !!(opts && opts.draft);
     if (!asDraft) { const saleMsg = vdSaleProblem(); if (saleMsg) { alert(saleMsg); return; } }
@@ -2754,15 +2850,23 @@ async function submitVendorProductForm(opts) {
     const id = document.getElementById("product-id").value;
     const name = document.getElementById("product-name").value.trim();
     const sku = vdSkuBase(document.getElementById("product-sku").value);
-    if (!sku && !asDraft) { alert("Enter the SKU (your own stock code). " + VD_SKU_SUFFIX + " is added at the end automatically."); return; }
     const category_id = document.getElementById("product-category").value;
     vdSyncDescription();
     const description = document.getElementById("product-description").value.trim();
-    if (!asDraft && vdRich.description && vdRich.highlights) {
-        const missing = [];
-        if (vdRich.description.isEmpty()) { missing.push("Product description"); vdRich.description.setError("This field is required."); }
-        if (vdRich.highlights.isEmpty()) { missing.push("Highlights"); vdRich.highlights.setError("This field is required."); }
-        if (missing.length) { alert("Please fill in: " + missing.join(" and ") + "."); return; }
+    // Every box that is still needed is outlined in red with "This field is
+    // required." under it, and the steps on the left show where they are.
+    if (!asDraft) {
+        const firstBad = vdMarkRequired(!id);
+        if (firstBad) {
+            const st = document.getElementById("product-form-status");
+            if (st) { st.style.color = "#b42318"; st.textContent = "Fill in the boxes outlined in red, then press Submit again."; }
+            if (firstBad.scrollIntoView) firstBad.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+        }
+    } else vdClearFieldMarks();
+    if (window.VdVariations) {
+        const variationProblem = VdVariations.problem();
+        if (variationProblem) { const st = document.getElementById("product-form-status"); if (st) { st.style.color = "#b42318"; st.textContent = variationProblem; } return; }
     }
     const desiredPayout = document.getElementById("product-payout").value;
     const stock = document.getElementById("product-stock").value;
@@ -2884,8 +2988,14 @@ async function submitVendorProductForm(opts) {
             const certProblems = await vdSaveCerts(savedProductId);
             if (certProblems.length) alert("The product was saved, but these certificates could not be uploaded: " + certProblems.join(", ") + ". Open the product and try again.");
         }
+        // The variation cards, now that the product has an id and a price.
+        let variationProblemAfterSave = null;
+        if (savedProductId && window.VdVariations) {
+            const vr = await VdVariations.save(savedProductId);
+            if (!vr.ok) variationProblemAfterSave = vr.message || "The variations could not be saved.";
+        }
         const specsPayload = collectVendorSpecRows();
-        if (savedProductId && specsPayload.length > 0) {
+        if (savedProductId && (specsPayload.length > 0 || id)) {
             try {
                 await vendorAuthorizedFetch(`/api/vendors/products/${savedProductId}/options`, {
                     method: "POST",
@@ -2912,6 +3022,14 @@ async function submitVendorProductForm(opts) {
             }
         }
 
+        if (variationProblemAfterSave && savedProductId) {
+            // The product itself is saved; stay on it so the variation can be corrected and saved again.
+            document.getElementById("product-id").value = savedProductId;
+            statusEl.style.color = "#b42318";
+            statusEl.textContent = "The product was saved, but the variations were not: " + variationProblemAfterSave;
+            loadVendorProducts();
+            return;
+        }
         if (asDraft && savedProductId) {
             // Stay on the saved draft: later saves update it, and the
             // Variants table can be filled in now.
@@ -5776,7 +5894,8 @@ function vendorProductSummary() {
     const agreed = !!(document.getElementById("product-authenticity-confirm") || {}).checked;
     return [
         { label: "Product name", value: val("product-name") || "Missing", ok: !!val("product-name"), step: 1 },
-        { label: "SKU", value: vdSkuBase(val("product-sku")) ? vdSkuBase(val("product-sku")) + VD_SKU_SUFFIX : "Missing", ok: !!vdSkuBase(val("product-sku")), step: 1 },
+        { label: "SKU", value: vdSkuBase(val("product-sku")) ? vdSkuBase(val("product-sku")) + VD_SKU_SUFFIX : "Missing", ok: !!vdSkuBase(val("product-sku")), step: 2 },
+        { label: "Variations", value: window.VdVariations && VdVariations.count() > 1 ? VdVariations.count() + " variations" : "One version", step: 2 },
         { label: "Category", value: hasCat ? catLabel : "Missing", ok: hasCat, step: 1 },
         { label: "Brand", value: val("product-brand") || "-", step: 1 },
         { label: "Photos", value: n + " of " + VD_MAX_PHOTOS + " (at least " + min + ")", ok: n >= min && n <= VD_MAX_PHOTOS, step: 1 },
@@ -5785,11 +5904,11 @@ function vendorProductSummary() {
         { label: "Sale price", value: val("product-sale-price")
             ? "UGX " + Number(val("product-sale-price")).toLocaleString() + " (" + (val("product-sale-start") || "today") + " to " + (val("product-sale-end") || "?") + ")"
             : "No sale", ok: val("product-sale-price") ? !vdSaleProblem() : undefined, step: 2 },
-        { label: "Stock", value: val("product-stock") || "Missing", ok: val("product-stock") !== "", step: 2 },
-        { label: "Description", value: desc ? desc.length + " characters" : "Missing", ok: !!desc, step: 2 },
-        { label: "Highlights", value: vdRich.highlights && !vdRich.highlights.isEmpty() ? "Added" : "Missing", ok: !!(vdRich.highlights && !vdRich.highlights.isEmpty()), step: 2 },
+        { label: "Quantity", value: val("product-stock") || "Missing", ok: val("product-stock") !== "", step: 2 },
+        { label: "Description", value: desc ? desc.length + " characters" : "Missing", ok: !!desc, step: 1 },
+        { label: "Highlights", value: vdRich.highlights && !vdRich.highlights.isEmpty() ? "Added" : "Missing", ok: !!(vdRich.highlights && !vdRich.highlights.isEmpty()), step: 1 },
         { label: "Specifications", value: document.querySelectorAll("#specs-list input").length / 2 + " rows", step: 3 },
-        { label: "Packed weight", value: weight ? weight + " kg" : (isNew ? "Missing" : "-"), ok: isNew ? !!weight : undefined, step: 3 },
+        { label: "Packed weight", value: weight ? weight + " kg" : (isNew ? "Missing" : "-"), ok: isNew ? !!weight : undefined, step: 1 },
         { label: "Warranty", value: val("product-warranty-months") ? val("product-warranty-months") + " months" : "None", step: 3 },
         { label: "Certifications", value: vdPickedCerts().length ? vdPickedCerts().join(", ") + (vdCertsMissingProof().length ? " - certificate missing" : "") : "None",
             ok: vdPickedCerts().length ? !vdCertsMissingProof().length : undefined, step: 3 },
@@ -5801,11 +5920,11 @@ function vendorProductValidate(step) {
     const val = id => { const el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; };
     if (step === 1) {
         if (!val("product-name") || !val("product-category")) return "Add the product name and choose a category to continue.";
-        if (!vdSkuBase(val("product-sku"))) return "Enter the SKU (your own stock code) to continue.";
         const n = vdAllImages.length, min = vdPhotoMin();
         if (n < min) return "Add at least " + min + " photo" + (min === 1 ? "" : "s") + " to continue.";
     }
-    if (step === 2 && (!val("product-payout") || val("product-stock") === "")) return "Add the price and stock to continue.";
+    if (step === 2 && !vdSkuBase(val("product-sku"))) return "Enter the Seller SKU (your own stock code) to continue.";
+    if (step === 2 && (!val("product-payout") || val("product-stock") === "")) return "Add the price and quantity to continue.";
     if (step === 2) { const saleMsg = vdSaleProblem(); if (saleMsg) return saleMsg; }
     return null;
 }
@@ -5814,7 +5933,8 @@ function vendorProductStepsMount() {
     const root = document.getElementById("vendor-product-steps");
     if (!root || !window.LzFormSteps) return;
     LzFormSteps.mount(root, {
-        titles: ["Product & Photos", "Price & Description", "Specs & Shipping", "Review & Submit"],
+        titles: ["Product Information", "Variants", "Product Specification", "Review & Submit"],
+        actions: [document.getElementById("vd-product-foot")],
         summary: vendorProductSummary,
         validate: vendorProductValidate
     });
@@ -5840,7 +5960,7 @@ async function vendorReopenAfterDraft(productId, message) {
         LzBlockEditor.mount(document.getElementById("desc-blocks-editor"), productId, { tokenKey: "vendorToken", apiBase: "/api/vendors/products" });
     }
     const btn = document.getElementById("product-submit-btn");
-    if (btn) btn.textContent = "Submit for Approval";
+    if (btn) btn.textContent = "Submit";
     await loadVendorVariantOptions(productId);
     const statusEl = document.getElementById("product-form-status");
     if (statusEl) {
@@ -5867,4 +5987,27 @@ function vendorPreviewProduct() {
         description: val("product-description"),
         specs: typeof collectVendorSpecRows === "function" ? collectVendorSpecRows() : []
     });
+}
+
+
+// --- Shop name (Oct 2026): the seller can rename the shop; the Shop ID never changes.
+async function vdSaveShopName() {
+    const input = document.getElementById("vd-shop-name-input"), status = document.getElementById("vd-shop-name-status"), btn = document.getElementById("vd-shop-name-save");
+    if (!input || !status) return;
+    const name = input.value.replace(/\s+/g, " ").trim();
+    const say = (text, ok) => { status.textContent = text; status.style.color = ok ? "#166534" : "#b42318"; };
+    if (name.length < 3) { say("The shop name needs at least 3 characters."); return; }
+    if (btn) btn.disabled = true;
+    try {
+        const data = await vendorAuthorizedFetch("/api/vendors/me/shop-name", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ business_name: name }) });
+        if (!data || data.error) { say((data && data.error) || "Could not update the shop name."); return; }
+        const saved = (data.vendor && data.vendor.business_name) || name;
+        input.value = saved;
+        say("Shop name updated.", true);
+        // The name shown around the dashboard.
+        ["vd-sidebar-profile-name", "vd-avatar-name", "vsh-me-name"].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = saved; });
+        document.querySelectorAll(".vd-shell-user-name, .vs-user-name").forEach(el => { el.textContent = saved; });
+        if (typeof loadVendorStatus === "function") { try { loadVendorStatus(); } catch (e) { /* the page still shows the new name */ } }
+    } catch (e) { say("Could not connect to server."); }
+    finally { if (btn) btn.disabled = false; }
 }

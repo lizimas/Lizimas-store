@@ -127,6 +127,38 @@ exports.updateVendorStorefront = async (req, res) => {
     }
 };
 
+// PATCH /api/vendors/me/shop-name  { business_name }
+// A seller may rename the shop (Oct 2026). The Shop ID (vendors.shop_id) is
+// given once at approval and is never changed here or anywhere else; the
+// store's web address (slug) also stays, so links already shared keep working.
+function cleanShopName(value) {
+    const name = String(value == null ? "" : value).replace(/\s+/g, " ").trim();
+    if (name.length < 3) return { ok: false, error: "The shop name needs at least 3 characters." };
+    if (name.length > 60) return { ok: false, error: "The shop name can be up to 60 characters." };
+    if (!/[A-Za-z0-9]/.test(name) || /[<>]/.test(name)) return { ok: false, error: "The shop name can use letters, numbers, spaces and simple punctuation." };
+    return { ok: true, name };
+}
+exports.cleanShopName = cleanShopName;
+exports.updateMyShopName = async (req, res) => {
+    try {
+        const read = cleanShopName(req.body && req.body.business_name);
+        if (!read.ok) return res.status(400).json({ error: read.error });
+        const violation = findStorefrontContactViolation(read.name);
+        if (violation) return res.status(400).json({ error: `The shop name can't include ${violation}.` });
+        const taken = await pool.query(
+            `SELECT 1 FROM vendors WHERE lower(trim(business_name)) = lower($1) AND id <> $2 LIMIT 1`, [read.name, req.vendorId]);
+        if (taken.rows.length) return res.status(400).json({ error: "Another shop already uses that name. Choose a different one." });
+        const result = await pool.query(
+            `UPDATE vendors SET business_name = $1 WHERE id = $2 RETURNING id, business_name, shop_id, slug`, [read.name, req.vendorId]);
+        if (!result.rows.length) return res.status(404).json({ error: "No vendor profile found for this account." });
+        try { logActivity(req.user.userId, "vendor_shop_renamed", "vendor", req.vendorId, read.name); } catch (e) { /* the log is optional */ }
+        res.json({ message: "Shop name updated.", vendor: result.rows[0] });
+    } catch (error) {
+        console.error("updateMyShopName error:", error.message);
+        res.status(500).json({ error: "Could not update the shop name." });
+    }
+};
+
 // Payout number and address - identity/business-registration numbers
 // moved to the separate, encrypted vendor_kyc table (PATCH
 // /api/vendors/me/kyc) as of the Sept 2026 Vendor KYC rework. Kept

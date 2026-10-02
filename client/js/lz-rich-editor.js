@@ -41,46 +41,59 @@
         no: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#b91c1c" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>'
     };
     const CSS = `
-.lzr { border: 1px solid #cfd3da; border-radius: 6px; background: #fff; position: relative; }
-.lzr.lzr-bad { border-color: #dc2626; }
-.lzr-bar { position: sticky; top: 0; z-index: 15; display: flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 6px 8px; background: #fff; border-bottom: 1px solid #dfe2e7; border-radius: 6px 6px 0 0; }
-.lzr-btn { min-width: 34px; height: 34px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; gap: 2px; background: none; border: 0; border-radius: 5px; color: #1f2430; cursor: pointer; font-family: inherit; }
-.lzr-btn:hover { background: #f1f2f5; } .lzr-btn.lzr-on { background: #fff3cd; color: #7a5900; } .lzr-btn:disabled { color: #c3c7cf; cursor: default; background: none; }
-.lzr-sep { width: 1px; height: 24px; background: #d5d8de; margin: 0 5px; }
-.lzr .lzr-bar select.lzr-block { display: inline-block !important; width: auto !important; flex: 0 0 auto; height: 34px !important; min-width: 132px; margin: 0 !important; border: 0 !important; background: none; font: 15px sans-serif; font-family: inherit; color: #1f2430; padding: 0 6px !important; cursor: pointer; border-radius: 5px; box-shadow: none !important; }
-.lzr .lzr-bar .lzr-btn { width: auto !important; margin: 0 !important; flex: 0 0 auto; }
-.lzr .lzr-bar select.lzr-block:hover { background: #f1f2f5; }
-.lzr-body { min-height: 96px; padding: 12px 14px; outline: none; font-size: 15px; line-height: 1.6; color: #1f2430; overflow-wrap: anywhere; resize: vertical; overflow: auto; }
-.lzr-body:empty::before, .lzr-body.lzr-blank::before { content: attr(data-placeholder); color: #8a8f98; pointer-events: none; position: absolute; left: 14px; right: 14px; }
-.lzr-body p { margin: 0 0 8px; } .lzr-body h2 { font-size: 22px; margin: 6px 0 8px; } .lzr-body h3 { font-size: 18px; margin: 6px 0 8px; } .lzr-body h4 { font-size: 16px; margin: 6px 0 8px; }
+.lzr { position: relative; background: transparent; font-family: inherit; }
+.lzr-bar { position: sticky; top: 0; z-index: 15; display: flex; align-items: center; flex-wrap: wrap; gap: 1px; min-height: 40px; padding: 3px 8px; background: #fff; border: 1px solid #ccced1; border-radius: 4px 4px 0 0; box-sizing: border-box; }
+.lzr .lzr-bar .lzr-btn { width: auto !important; min-width: 32px !important; height: 32px !important; min-height: 0 !important; margin: 0 !important; padding: 0 6px !important; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 1px; background: none !important; border: 0 !important; border-radius: 3px !important; box-shadow: none !important; color: #333; cursor: pointer; font-family: inherit; line-height: 1; }
+.lzr .lzr-btn svg { width: 19px; height: 19px; }
+.lzr .lzr-bar .lzr-btn:hover { background: #f0f0f0 !important; } .lzr .lzr-bar .lzr-btn.lzr-on { background: #f0f7ff !important; color: #2977ff; } .lzr .lzr-bar .lzr-btn:disabled { color: #b9bcc2; cursor: default; background: none !important; }
+.lzr-sep { width: 1px; height: 22px; background: #ccced1; margin: 0 6px; flex: 0 0 auto; }
+.lzr .lzr-bar select.lzr-block { display: inline-block !important; width: auto !important; flex: 0 0 auto; height: 32px !important; min-height: 0 !important; min-width: 138px; margin: 0 2px 0 0 !important; border: 0 !important; background-color: transparent; font-size: 14px !important; font-family: inherit; color: #333; padding: 0 6px !important; cursor: pointer; border-radius: 3px !important; box-shadow: none !important; }
+.lzr .lzr-bar select.lzr-block:hover { background-color: #f0f0f0; }
+.lzr-body { min-height: 95px; margin-top: 2px; padding: 9px 10px; outline: none; font-size: 13.5px; line-height: 1.6; color: #222; overflow-wrap: anywhere; resize: vertical; overflow: auto; background: #fff; border: 1px solid #ccced1; border-radius: 0 0 4px 4px; box-sizing: border-box; }
+.lzr-body:focus { border-color: #2977ff; box-shadow: inset 0 0 0 1px rgba(41,119,255,.25); }
+.lzr.lzr-bad .lzr-bar, .lzr.lzr-bad .lzr-body, .lzr.lzr-bad .lzr-src { border-color: #e53935; }
+.lzr-body:empty::before, .lzr-body.lzr-blank::before { content: attr(data-placeholder); color: #8a8f98; pointer-events: none; position: absolute; left: 11px; right: 11px; }
+.lzr-body p { margin: 0 0 8px; } .lzr-body h2 { font-size: 21px; margin: 6px 0 8px; } .lzr-body h3 { font-size: 17.5px; margin: 6px 0 8px; } .lzr-body h4 { font-size: 15.5px; margin: 6px 0 8px; }
 .lzr-body ul, .lzr-body ol { margin: 0 0 8px; padding-left: 26px; }
-.lzr-body blockquote { margin: 0 0 8px; padding: 4px 14px; border-left: 4px solid #d5d8de; color: #4b5563; font-style: italic; }
+.lzr-body blockquote { margin: 0 0 8px; padding: 4px 14px; border-left: 5px solid #ccced1; color: #4b5563; font-style: italic; }
 .lzr-body a { color: #1d4ed8; text-decoration: underline; }
 .lzr .lzr-body table { display: table !important; border-collapse: collapse !important; width: 100% !important; margin: 0 0 8px !important; box-shadow: none !important; border-radius: 0 !important; background: none !important; table-layout: auto; }
 .lzr .lzr-body thead { display: table-header-group !important; } .lzr .lzr-body tbody { display: table-row-group !important; }
 .lzr .lzr-body tr { display: table-row !important; box-shadow: none !important; border: 0 !important; margin: 0 !important; padding: 0 !important; background: none !important; }
-.lzr .lzr-body td, .lzr .lzr-body th { display: table-cell !important; border: 1px solid #b8bcc4 !important; padding: 6px 8px !important; min-width: 40px; vertical-align: top; text-align: left !important; width: auto !important; font-size: 14.5px; }
+.lzr .lzr-body td, .lzr .lzr-body th { display: table-cell !important; border: 1px solid #bfbfbf !important; padding: 6px 8px !important; min-width: 40px; vertical-align: top; text-align: left !important; width: auto !important; font-size: 13.5px; }
 .lzr .lzr-body td::before, .lzr .lzr-body th::before { content: none !important; }
 .lzr .lzr-body th { background: #f3f4f6 !important; }
 .lzr-body .lzr-in1 { margin-left: 28px; } .lzr-body .lzr-in2 { margin-left: 56px; } .lzr-body .lzr-in3 { margin-left: 84px; } .lzr-body .lzr-in4 { margin-left: 112px; }
-.lzr-body figure { margin: 0 0 10px; position: relative; display: block; clear: both; }
+.lzr-body figure { margin: 6px 0 12px; position: relative; display: block; clear: both; outline: 3px solid transparent; outline-offset: 0; transition: outline-color .12s; }
+.lzr-body figure:hover, .lzr .lzr-body table:hover { outline: 3px solid #ffc83d; }
 .lzr-body figure.lzr-img img { display: block; max-width: 100%; height: auto; }
+.lzr-body figure.lzr-left { width: -moz-fit-content; width: fit-content; max-width: 100%; }
 .lzr-body figure.lzr-center { text-align: center; } .lzr-body figure.lzr-center img { margin: 0 auto; }
-.lzr-body figure.lzr-side { float: right; max-width: 45%; margin: 0 0 10px 16px; clear: none; }
-.lzr-body figcaption { font-size: 12.5px; color: #555; background: #f6f7f9; padding: 6px 8px; text-align: center; outline: none; min-height: 18px; }
+.lzr-body figure.lzr-side { float: right; max-width: 50%; margin: 6px 0 12px 18px; clear: none; }
+.lzr-body figcaption { font-size: 12px; color: #333; background: #f7f7f7; padding: 7px 8px; text-align: center; outline: none; min-height: 18px; }
 .lzr-body figcaption:empty::before { content: "Enter image caption"; color: #9ca0a8; }
+.lzr-body figcaption:focus { background: #fff; box-shadow: inset 0 0 0 1px #2977ff; }
 .lzr-body figure.lzr-media iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; display: block; pointer-events: none; }
-.lzr-body .lzr-sel { outline: 3px solid #f4b400; outline-offset: 1px; }
-.lzr-src { display: block; width: 100%; min-height: 160px; box-sizing: border-box; border: 0; outline: none; padding: 12px 14px; font: 13px ui-monospace, Menlo, monospace; resize: vertical; }
-.lzr-pop { position: absolute; z-index: 30; background: #fff; border: 1px solid #cfd3da; border-radius: 6px; box-shadow: 0 4px 14px rgba(16,24,40,.18); padding: 6px; display: flex; align-items: center; gap: 2px; }
-.lzr-pop input[type=text], .lzr-pop input[type=url] { height: 34px; width: 250px; max-width: 60vw; border: 1px solid #b8bcc4; border-radius: 5px; padding: 0 9px; font: 14px sans-serif; font-family: inherit; }
+.lzr .lzr-body .lzr-sel, .lzr .lzr-body .lzr-sel:hover { outline: 3px solid #2977ff; }
+.lzr-src { width: 100%; min-height: 150px; margin-top: 2px; box-sizing: border-box; border: 1px solid #ccced1; border-radius: 0 0 4px 4px; outline: none; padding: 10px 12px; font: 12.5px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #1f2430; background: #fbfbfc; resize: vertical; white-space: pre-wrap; tab-size: 2; }
+.lzr .lzr-src[hidden], .lzr .lzr-body[hidden] { display: none !important; }
+.lzr .lzr-src:not([hidden]) { display: block !important; }
+.lzr-srcnote { font-size: 11.5px; color: #6b7280; margin: 4px 2px 0; }
+.lzr-pop { position: absolute; z-index: 30; background: #fff; border: 1px solid #ccced1; border-radius: 4px; box-shadow: 0 3px 10px rgba(0,0,0,.16); padding: 4px; display: flex; align-items: center; gap: 1px; }
+.lzr .lzr-pop .lzr-btn { width: auto !important; min-width: 32px !important; height: 32px !important; min-height: 0 !important; margin: 0 !important; padding: 0 6px !important; display: inline-flex; align-items: center; justify-content: center; background: none !important; border: 0 !important; border-radius: 3px !important; box-shadow: none !important; color: #333; cursor: pointer; }
+.lzr .lzr-pop .lzr-btn:hover { background: #f0f0f0 !important; } .lzr .lzr-pop .lzr-btn.lzr-on { background: #f0f7ff !important; color: #2977ff; }
+.lzr-figbar::after { content: ""; position: absolute; left: 50%; bottom: -6px; width: 10px; height: 10px; margin-left: -5px; background: #fff; border-right: 1px solid #ccced1; border-bottom: 1px solid #ccced1; transform: rotate(45deg); }
+.lzr-figbar.lzr-under::after { bottom: auto; top: -6px; transform: rotate(225deg); }
+.lzr-pop input[type=text], .lzr-pop input[type=url] { height: 34px !important; width: 250px !important; max-width: 60vw; border: 1px solid #b8bcc4 !important; border-radius: 4px !important; padding: 0 9px !important; font-size: 13.5px !important; font-family: inherit; margin: 0 !important; }
 .lzr-pop label { font-size: 11px; color: #555; display: block; margin: -2px 0 2px 2px; }
-.lzr-grid { display: grid; grid-template-columns: repeat(8, 18px); gap: 3px; padding: 4px; } .lzr-grid i { width: 18px; height: 18px; border: 1px solid #b8bcc4; border-radius: 2px; display: block; cursor: pointer; } .lzr-grid i.on { background: #fff3cd; border-color: #f4b400; }
-.lzr-grid-label { font-size: 12px; color: #555; text-align: center; padding: 2px 0 0; }
-.lzr-para { position: absolute; z-index: 25; width: 24px; height: 24px; border-radius: 50%; border: 0; background: #1a1a2e; color: #f4b400; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
-.lzr-para svg { width: 14px; height: 14px; }
-.lzr-err { color: #b42318; font-size: 12.5px; margin: 4px 2px 0; }
-@media (max-width: 700px) { .lzr .lzr-bar select.lzr-block { min-width: 104px; } .lzr-sep { margin: 0 2px; } .lzr-body figure.lzr-side { float: none; max-width: 100%; margin: 0 0 10px; } }`;
+.lzr-grid { display: grid; grid-template-columns: repeat(10, 14px); gap: 2px; padding: 6px; } .lzr-grid i { width: 14px; height: 14px; border: 1px solid #bfbfbf; display: block; cursor: pointer; box-sizing: border-box; } .lzr-grid i.on { background: #e1eeff; border-color: #2977ff; }
+.lzr-grid-label { font-size: 12px; color: #333; text-align: center; padding: 0 0 4px; }
+.lzr .lzr-para { position: absolute; z-index: 25; width: 20px !important; height: 20px !important; min-width: 0 !important; min-height: 0 !important; box-sizing: border-box; border-radius: 50% !important; border: 0 !important; background: #3779eb !important; color: #fff !important; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0 !important; margin: 0 !important; box-shadow: 0 0 0 2px #fff; line-height: 1; }
+.lzr .lzr-para:hover { background: #2563d8 !important; }
+.lzr .lzr-para svg { width: 12px; height: 12px; }
+.lzr-tip { position: absolute; z-index: 40; background: #333; color: #fff; font-size: 11.5px; padding: 4px 8px; border-radius: 3px; white-space: nowrap; pointer-events: none; }
+.lzr-err { color: #e53935; font-size: 11.5px; margin: 4px 10px 0; }
+@media (max-width: 700px) { .lzr .lzr-bar select.lzr-block { min-width: 104px; } .lzr-sep { margin: 0 2px; } .lzr-body figure.lzr-side { float: none; max-width: 100%; margin: 6px 0 12px; } }`;
 
     function ensureStyle() {
         if (document.getElementById(STYLE_ID)) return;
@@ -143,7 +156,7 @@
         wrap.className = "lzr";
         const btn = (cmd, icon, title, extra) => `<button type="button" class="lzr-btn" data-cmd="${cmd}" title="${title}" aria-label="${title}">${icon}${extra || ""}</button>`;
         wrap.innerHTML = `<div class="lzr-bar" role="toolbar" aria-label="Text formatting">
-            ${btn("source", ICON.source, "Source")}
+            ${btn("source", ICON.source, "Source (show or hide the HTML)")}
             <select class="lzr-block" aria-label="Paragraph or heading"><option value="p">Paragraph</option><option value="h2">Heading 1</option><option value="h3">Heading 2</option><option value="h4">Heading 3</option></select>
             <span class="lzr-sep"></span>
             ${btn("bold", ICON.bold, "Bold")}${btn("italic", ICON.italic, "Italic")}${btn("link", ICON.link, "Link")}
@@ -153,10 +166,10 @@
             <span class="lzr-sep"></span>
             ${btn("image", ICON.image, "Insert image")}${btn("quote", ICON.quote, "Block quote")}${btn("table", ICON.table, "Insert table", ICON.caret)}${btn("media", ICON.media, "Insert media", ICON.caret)}
             ${btn("undo", ICON.undo, "Undo")}${btn("redo", ICON.redo, "Redo")}
-            <input type="file" accept="image/jpeg,image/png,image/webp" hidden>
+            <input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
         </div>
         <div class="lzr-body" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="${esc(opts.placeholder || "")}"></div>
-        <textarea class="lzr-src" hidden aria-label="HTML source" spellcheck="false"></textarea>`;
+        <textarea class="lzr-src" hidden aria-label="HTML source" spellcheck="false" placeholder="HTML view - type or paste HTML here, then press the first button again to go back to the normal view."></textarea>`;
         host.innerHTML = "";
         host.appendChild(wrap);
         const bar = wrap.querySelector(".lzr-bar"), body = wrap.querySelector(".lzr-body"), srcBox = wrap.querySelector(".lzr-src");
@@ -164,6 +177,9 @@
         if (opts.minHeight) body.style.minHeight = opts.minHeight + "px";
         try { document.execCommand("defaultParagraphSeparator", false, "p"); } catch (e) { /* older browsers */ }
 
+        const errEl = document.createElement("div");
+        errEl.className = "lzr-err"; errEl.hidden = true; errEl.setAttribute("role", "status");
+        host.appendChild(errEl);
         const st = { undo: [], redo: [], last: "", sel: null, range: null, source: false, timer: null };
         const blank = () => !body.textContent.trim() && !body.querySelector("img,iframe,table");
         const refreshBlank = () => body.classList.toggle("lzr-blank", blank() && body.innerHTML !== "");
@@ -172,7 +188,7 @@
             if (!force && h === st.last) return;
             st.undo.push(st.last); if (st.undo.length > 60) st.undo.shift();
             st.redo = []; st.last = h;
-            refreshBlank(); wrap.classList.remove("lzr-bad");
+            refreshBlank(); if (wrap.classList.contains("lzr-bad") && !blank()) { wrap.classList.remove("lzr-bad"); errEl.textContent = ""; errEl.hidden = true; }
             if (opts.onChange) opts.onChange();
         }
         function restore(h) { clearSel(); body.innerHTML = h; st.last = h; refreshBlank(); if (opts.onChange) opts.onChange(); }
@@ -202,7 +218,7 @@
         }
 
         // ---- pop-ups (link, media, table grid, text alternative) ----
-        function closePop() { wrap.querySelectorAll(".lzr-pop").forEach((p) => p.remove()); }
+        function closePop() { wrap.querySelectorAll(".lzr-pop:not(.lzr-figbar)").forEach((p) => p.remove()); }
         function popAt(anchor, html) {
             closePop();
             const p = document.createElement("div");
@@ -228,13 +244,46 @@
         function clearSel() {
             if (st.sel) st.sel.classList.remove("lzr-sel");
             st.sel = null;
-            wrap.querySelectorAll(".lzr-para, .lzr-figbar").forEach((n) => n.remove());
+            wrap.querySelectorAll(".lzr-para, .lzr-figbar, .lzr-tip").forEach((n) => n.remove());
         }
+        // "before" sits on the top edge at the left, "after" on the bottom edge at the right.
         function place(el, target, where) {
             const t = target.getBoundingClientRect(), w = wrap.getBoundingClientRect();
-            if (where === "before") { el.style.top = (t.top - w.top - 12) + "px"; el.style.left = (t.left - w.left + 26) + "px"; }
-            else if (where === "after") { el.style.top = (t.bottom - w.top - 12) + "px"; el.style.left = (t.right - w.left - 60) + "px"; }
-            else { el.style.top = Math.max(bar.offsetHeight + 4, t.top - w.top - 48) + "px"; el.style.left = Math.max(4, t.left - w.left + t.width / 2 - el.offsetWidth / 2) + "px"; }
+            if (where === "before") { el.style.top = (t.top - w.top - 10) + "px"; el.style.left = (t.left - w.left + 36) + "px"; }
+            else if (where === "after") { el.style.top = (t.bottom - w.top - 10) + "px"; el.style.left = (t.right - w.left - 56) + "px"; }
+            else {
+                const above = t.top - w.top - el.offsetHeight - 12, floor = bar.offsetHeight + 6;
+                const under = above < floor && t.height < 140;
+                el.classList.toggle("lzr-under", under);
+                el.style.top = (under ? t.bottom - w.top + 12 : Math.max(floor, above)) + "px";
+                el.style.left = Math.max(4, Math.min(t.left - w.left + t.width / 2 - el.offsetWidth / 2, w.width - el.offsetWidth - 4)) + "px";
+            }
+        }
+        function tip(anchor, text) {
+            wrap.querySelectorAll(".lzr-tip").forEach((n) => n.remove());
+            if (!text) return;
+            const el = document.createElement("div");
+            el.className = "lzr-tip"; el.textContent = text;
+            wrap.appendChild(el);
+            const a = anchor.getBoundingClientRect(), w = wrap.getBoundingClientRect();
+            el.style.top = (a.bottom - w.top + 8) + "px";
+            el.style.left = Math.max(4, Math.min(a.left - w.left - 8, w.width - el.offsetWidth - 4)) + "px";
+        }
+        // The round "insert paragraph" buttons. A block that is only pointed at
+        // shows one (before in its upper half, after in its lower half); a
+        // selected block shows both.
+        function paraButtons(target, which) {
+            wrap.querySelectorAll(".lzr-para").forEach((n) => n.remove());
+            which.forEach((where) => {
+                const title = where === "before" ? "Insert paragraph before block" : "Insert paragraph after block";
+                const b = document.createElement("button");
+                b.type = "button"; b.className = "lzr-para"; b.setAttribute("aria-label", title); b.innerHTML = ICON.para;
+                b.onmousedown = (e) => e.preventDefault();
+                b.onmouseenter = () => tip(b, title);
+                b.onmouseleave = () => tip(b, "");
+                b.onclick = () => newPara(target, where === "before");
+                wrap.appendChild(b); place(b, target, where);
+            });
         }
         function newPara(target, before) {
             const p = document.createElement("p");
@@ -248,13 +297,7 @@
         function selectBlock(target) {
             clearSel(); closePop();
             st.sel = target; target.classList.add("lzr-sel");
-            [["before", "Insert paragraph before block"], ["after", "Insert paragraph after block"]].forEach(([where, title]) => {
-                const b = document.createElement("button");
-                b.type = "button"; b.className = "lzr-para"; b.title = title; b.setAttribute("aria-label", title); b.innerHTML = ICON.para;
-                b.onmousedown = (e) => e.preventDefault();
-                b.onclick = () => newPara(target, where === "before");
-                wrap.appendChild(b); place(b, target, where);
-            });
+            paraButtons(target, ["before", "after"]);
             const isImg = target.classList.contains("lzr-img");
             const fb = document.createElement("div");
             fb.className = "lzr-pop lzr-figbar";
@@ -298,11 +341,15 @@
             if (!node.nextSibling) { const p = document.createElement("p"); p.innerHTML = "<br>"; body.appendChild(p); }
             snapshot();
         }
-        function insertImage(url, alt) {
+        // after: the picture just added before this one (when several are picked together).
+        function insertImage(url, alt, after) {
             const f = document.createElement("figure");
             f.className = "lzr-img lzr-center";
             f.innerHTML = `<img src="${esc(url)}" alt="${esc(alt || "")}">`;
-            insertBlock(f); selectBlock(f);
+            if (after && after.parentNode === body) { body.insertBefore(f, after.nextSibling); snapshot(); }
+            else insertBlock(f);
+            if (!after) selectBlock(f);
+            return f;
         }
         function insertTable(rows, cols) {
             const t = document.createElement("table");
@@ -338,7 +385,7 @@
         function setSource(on) {
             st.source = on;
             clearSel(); closePop();
-            if (on) { srcBox.value = body.innerHTML.replace(/ class="lzr-sel"| lzr-sel/g, ""); }
+            if (on) { srcBox.value = blank() ? "" : body.innerHTML.replace(/ class="lzr-sel"| lzr-sel/g, "").replace(/<\/(p|h2|h3|h4|ul|ol|li|blockquote|figure|table|thead|tbody|tr)>(?=<)/g, "</$1>\n").replace(/<(ul|ol|tbody|thead|tr|table)>(?=<)/g, "<$1>\n"); }
             else { body.innerHTML = tidy(srcBox.value); snapshot(true); }
             body.hidden = on; srcBox.hidden = !on;
             bar.querySelectorAll(".lzr-btn, .lzr-block").forEach((el) => { if (el.dataset.cmd !== "source") el.disabled = on; });
@@ -381,7 +428,7 @@
             if (cmd === "image") { saveRange(); fileInput.value = ""; fileInput.click(); return; }
             if (cmd === "table") {
                 saveRange();
-                const p = popAt(b, '<div><div class="lzr-grid">' + Array.from({ length: 48 }, (_, i) => `<i data-r="${Math.floor(i / 8) + 1}" data-c="${(i % 8) + 1}"></i>`).join("") + '</div><div class="lzr-grid-label">Choose the size</div></div>');
+                const p = popAt(b, '<div><div class="lzr-grid-label">Choose the size</div><div class="lzr-grid">' + Array.from({ length: 100 }, (_, i) => `<i data-r="${Math.floor(i / 10) + 1}" data-c="${(i % 10) + 1}"></i>`).join("") + '</div></div>');
                 const cells = p.querySelectorAll("i"), label = p.querySelector(".lzr-grid-label");
                 p.onmouseover = (ev) => { const c = ev.target.closest("i"); if (!c) return; cells.forEach((x) => x.classList.toggle("on", Number(x.dataset.r) <= Number(c.dataset.r) && Number(x.dataset.c) <= Number(c.dataset.c))); label.textContent = c.dataset.r + " × " + c.dataset.c; };
                 p.onmousedown = (ev) => ev.preventDefault();
@@ -401,19 +448,33 @@
             }
         });
         blockSel.addEventListener("change", () => { exec("formatBlock", blockSel.value); refreshBar(); });
+        // Several pictures can be chosen at once; they go in one after the other, in the order picked.
         fileInput.addEventListener("change", async () => {
-            const file = fileInput.files && fileInput.files[0];
-            if (!file) return;
+            const files = Array.from(fileInput.files || []);
+            if (!files.length) return;
             if (!opts.uploadImage) { api.setError("Pictures can't be added here."); return; }
-            if (file.size > 5 * 1024 * 1024) { api.setError("That picture is larger than 5MB."); return; }
-            api.setError("Uploading the picture...", true);
-            try { const url = await opts.uploadImage(file); api.setError(""); if (url) insertImage(url, ""); }
-            catch (e) { api.setError((e && e.message) || "The picture could not be uploaded."); }
+            const problems = [];
+            let last = null, done = 0;
+            for (const file of files) {
+                if (file.size > 5 * 1024 * 1024) { problems.push(file.name + " is larger than 5MB"); continue; }
+                api.setError("Uploading picture " + (done + 1) + " of " + files.length + "...", true);
+                try { const url = await opts.uploadImage(file); if (url) { last = insertImage(url, "", last); done++; } }
+                catch (e) { problems.push(file.name + ": " + ((e && e.message) || "could not be uploaded")); }
+            }
+            api.setError(problems.length ? problems.join(". ") + "." : "");
+            if (last) selectBlock(last);
         });
 
         body.addEventListener("input", () => { clearTimeout(st.timer); st.timer = setTimeout(() => { snapshot(); refreshBar(); }, 350); refreshBlank(); });
         body.addEventListener("keyup", () => { saveRange(); refreshBar(); });
         body.addEventListener("mouseup", () => { saveRange(); refreshBar(); });
+        // Typing always starts inside a paragraph.
+        body.addEventListener("focus", () => {
+            if (body.innerHTML.trim() !== "") return;
+            body.innerHTML = "<p><br></p>"; st.last = body.innerHTML; refreshBlank();
+            const r = document.createRange(); r.setStart(body.firstChild, 0); r.collapse(true);
+            const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        });
         body.addEventListener("blur", () => { clearTimeout(st.timer); snapshot(); });
         body.addEventListener("click", (e) => {
             const fig = e.target.closest("figure.lzr-img, figure.lzr-media");
@@ -423,6 +484,16 @@
             else clearSel();
             closePop();
         });
+        body.addEventListener("mousemove", (e) => {
+            if (st.sel) return;
+            const blk = e.target.closest && (e.target.closest("figure.lzr-img, figure.lzr-media") || e.target.closest("table"));
+            if (!blk || !body.contains(blk)) { if (!e.target.closest || !e.target.closest(".lzr-para")) { st.hover = null; wrap.querySelectorAll(".lzr-para, .lzr-tip").forEach((n) => n.remove()); } return; }
+            const r = blk.getBoundingClientRect(), where = e.clientY < r.top + r.height / 2 ? "before" : "after";
+            if (st.hover === blk && st.hoverWhere === where) return;
+            st.hover = blk; st.hoverWhere = where;
+            paraButtons(blk, [where]);
+        });
+        wrap.addEventListener("mouseleave", () => { if (!st.sel) { st.hover = null; wrap.querySelectorAll(".lzr-para, .lzr-tip").forEach((n) => n.remove()); } });
         body.addEventListener("keydown", (e) => {
             if (st.sel && (e.key === "Backspace" || e.key === "Delete") && !(e.target.closest && window.getSelection().anchorNode && st.sel.contains(window.getSelection().anchorNode) && st.sel.tagName === "TABLE")
                 && !(window.getSelection().anchorNode && window.getSelection().anchorNode.parentNode && window.getSelection().anchorNode.parentNode.closest && window.getSelection().anchorNode.parentNode.closest("figcaption"))) {
@@ -443,9 +514,6 @@
         });
         document.addEventListener("mousedown", (e) => { if (!wrap.contains(e.target)) { clearSel(); closePop(); } });
 
-        const errEl = document.createElement("div");
-        errEl.className = "lzr-err"; errEl.hidden = true; errEl.setAttribute("role", "status");
-        host.appendChild(errEl);
 
         const api = {
             getHTML() {

@@ -172,6 +172,8 @@ router.get("/fx-rate", async (req, res) => {
     }
 });
 router.patch("/me", requireVendorPermission("vc_shop_manager"), updateMyVendorProfile);
+// The shop name can be changed by the seller; the Shop ID never changes.
+router.patch("/me/shop-name", requireVendorPermission("vc_shop_manager"), require("../controllers/vendorController").updateMyShopName);
 router.patch("/me/storefront", requireVendorPermission("vc_shop_manager"), updateVendorStorefront);
 router.get("/me/shop-status", requireVendorPermission("vc_shop_manager", "vc_shop_viewer"), getVendorShopStatus);
 router.patch("/me/shop-active", requireVendorPermission("vc_shop_manager"), updateVendorShopActive);
@@ -257,6 +259,10 @@ router.post("/products/:id/variants/generate", generateProductVariants);
 router.patch("/products/:id/variant-stock", setVariantStockMode);
 router.patch("/products/:id/variants/stock", updateVariantStock);
 router.get("/products/:id/variant-prices", getVariantPrices);
+// Variations cards on the product form (one size / version each).
+const productVariations = require("../controllers/productVariationsController");
+router.get("/products/:id/variations", productVariations.getVariations);
+router.put("/products/:id/variations", requireVendorPermission("vc_product_manager", "vc_product_update"), productVariations.saveVariations);
 
 router.get("/products/:id/description-blocks", getDescriptionBlocks);
 router.put("/products/:id/description-blocks", saveDescriptionBlocks);
