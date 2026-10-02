@@ -295,6 +295,62 @@ exports.updateMyKyc = async (req, res) => {
 // in-flight or completed review. Stored privately in Cloudinary (see
 // server/utils/cloudinaryUpload.js) - never publicly reachable like
 // every other upload in this codebase.
+const KEPT_DOCUMENT_VERSIONS = 5;
+// Saves the document being replaced as an earlier version and trims the
+// history to the newest KEPT_DOCUMENT_VERSIONS. If the history table isn't
+// there yet (migration 148 not applied) the old file is removed as before.
+async function keepDocumentVersion(vendorId, documentType, prior) {
+    try {
+        await pool.query(
+            `INSERT INTO vendor_kyc_document_versions (vendor_id, document_type, cloudinary_public_id, resource_type, format,
+                                                       original_filename, bytes, uploaded_at, review_status, review_reason, reviewed_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+            [vendorId, documentType, prior.cloudinary_public_id, prior.resource_type, prior.format, prior.original_filename,
+                prior.bytes, prior.uploaded_at, prior.review_status, prior.review_reason, prior.reviewed_at]);
+    } catch (err) {
+        if (err.code === "42P01") return destroyPrivateDocument(prior.cloudinary_public_id, prior.resource_type);
+        throw err;
+    }
+    const old = await pool.query(
+        `DELETE FROM vendor_kyc_document_versions WHERE id IN (
+            SELECT id FROM vendor_kyc_document_versions WHERE vendor_id = $1 AND document_type = $2
+             ORDER BY replaced_at DESC, id DESC OFFSET $3)
+         RETURNING cloudinary_public_id, resource_type`, [vendorId, documentType, KEPT_DOCUMENT_VERSIONS]);
+    for (const row of old.rows) {
+        destroyPrivateDocument(row.cloudinary_public_id, row.resource_type)
+            .catch((e) => console.error("Failed to remove an old KYC document version:", e.message));
+    }
+}
+exports.keepDocumentVersion = keepDocumentVersion;
+
+// Admin: earlier uploads of one document type, newest first.
+exports.listVendorKycDocumentVersionsAdmin = async (req, res) => {
+    try {
+        const rows = await pool.query(
+            `SELECT id, document_type, original_filename, bytes, uploaded_at, review_status, review_reason, reviewed_at, replaced_at
+               FROM vendor_kyc_document_versions WHERE vendor_id = $1 AND document_type = $2
+              ORDER BY replaced_at DESC, id DESC`, [req.params.id, req.query.document_type]);
+        res.json({ versions: rows.rows });
+    } catch (error) {
+        if (error.code === "42P01") return res.json({ versions: [] });
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Admin: a short-lived link to one earlier version.
+exports.getVendorKycDocumentVersionAdmin = async (req, res) => {
+    try {
+        const row = await pool.query(
+            "SELECT cloudinary_public_id, resource_type, format FROM vendor_kyc_document_versions WHERE id = $1 AND vendor_id = $2",
+            [req.params.versionId, req.params.id]);
+        if (!row.rows.length) return res.status(404).json({ error: "That version is no longer on file." });
+        const d = row.rows[0];
+        res.json({ url: privateDocumentViewUrl(d.cloudinary_public_id, d.resource_type, d.format, false) });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 exports.uploadMyKycDocument = async (req, res) => {
     try {
         if (!req.file) {
@@ -344,7 +400,9 @@ exports.uploadMyKycDocument = async (req, res) => {
         }
 
         const priorRow = await pool.query(
-            "SELECT cloudinary_public_id, resource_type FROM vendor_kyc_documents WHERE vendor_id = $1 AND document_type = $2",
+            `SELECT cloudinary_public_id, resource_type, format, original_filename, bytes, uploaded_at, review_status,
+                    COALESCE(rejection_reason, action_required_reason) AS review_reason, reviewed_at
+               FROM vendor_kyc_documents WHERE vendor_id = $1 AND document_type = $2`,
             [vendor.id, documentType]
         );
 
@@ -405,9 +463,11 @@ exports.uploadMyKycDocument = async (req, res) => {
 
         // Best-effort cleanup of the replaced asset - never let a Cloudinary
         // hiccup here block the new document from being saved (already is).
+        // The replaced document is kept as an earlier version for admin
+        // (migration 148); only versions beyond the newest five are removed.
         if (priorRow.rows.length > 0) {
-            destroyPrivateDocument(priorRow.rows[0].cloudinary_public_id, priorRow.rows[0].resource_type)
-                .catch((err) => console.error("Failed to clean up replaced KYC document:", err.message));
+            keepDocumentVersion(vendor.id, documentType, priorRow.rows[0])
+                .catch((err) => console.error("Failed to keep the replaced KYC document:", err.message));
         }
 
         res.json({ message: "Document uploaded.", document_type: documentType, warnings: autoChecks ? autoChecks.warnings : [] });

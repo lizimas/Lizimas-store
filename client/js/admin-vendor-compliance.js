@@ -718,7 +718,8 @@
             '<button type="button" role="menuitem" class="vc-mi vc-mi-green" data-d="approve">' + svg("check", 20) + "<span>Approve</span></button>" +
             '<button type="button" role="menuitem" class="vc-mi vc-mi-red" data-d="name">' + svg("user", 20) + "<span>Reject - names don't match<small>Asks for the proper document</small></span></button>" +
             '<button type="button" role="menuitem" class="vc-mi vc-mi-amber" data-d="reupload">' + svg("upload", 20) + "<span>Ask to re-upload<small>Write the reason</small></span></button>" +
-            '<button type="button" role="menuitem" class="vc-mi vc-mi-red" data-d="reject">' + svg("x", 20) + "<span>Reject<small>Final - for fake or invalid documents</small></span></button>";
+            '<button type="button" role="menuitem" class="vc-mi vc-mi-red" data-d="reject">' + svg("x", 20) + "<span>Reject<small>Final - for fake or invalid documents</small></span></button>" +
+            '<button type="button" role="menuitem" class="vc-mi" data-d="history">' + svg("file", 20) + "<span>Earlier versions<small>Documents this one replaced</small></span></button>";
         document.body.appendChild(menu);
         const r = anchor.getBoundingClientRect();
         let top = r.bottom + 6, left = r.right - menu.offsetWidth;
@@ -729,8 +730,41 @@
             const b = e.target.closest("[data-d]");
             if (!b) return;
             closeMenu();
+            if (b.dataset.d === "history") return showDocVersions(type);
             reviewDoc(type, b.dataset.d);
         });
+    }
+
+    // Earlier uploads of a document (kept when the vendor uploads again).
+    async function showDocVersions(type) {
+        const id = state.profileId;
+        const label = DOC_LABELS[type] || type;
+        let versions = [];
+        try {
+            const r = await call("GET", "/api/admin/vendors/" + id + "/kyc/documents/versions?document_type=" + encodeURIComponent(type));
+            versions = (r && r.versions) || [];
+        } catch (e) { toast("Could not load the earlier versions.", true); return; }
+        const when = (v) => v ? new Date(v).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" }) : "-";
+        const status = { approved: "Approved", rejected: "Rejected", action_required: "Asked to re-upload", pending: "Not reviewed" };
+        const html = versions.length
+            ? '<div style="display:grid; gap:8px;">' + versions.map((v) =>
+                '<div style="display:flex; gap:10px; align-items:center; justify-content:space-between; border:1px solid #e6e8ee; border-radius:10px; padding:10px 12px;">' +
+                    '<div style="min-width:0;"><strong>Uploaded ' + esc(when(v.uploaded_at)) + "</strong>" +
+                        '<div style="font-size:12.5px; color:#667085; word-break:break-word;">' + esc(status[v.review_status] || v.review_status || "-") +
+                            (v.review_reason ? " - " + esc(v.review_reason) : "") + " &middot; replaced " + esc(when(v.replaced_at)) +
+                            (v.original_filename ? " &middot; " + esc(v.original_filename) : "") + "</div></div>" +
+                    '<button type="button" class="vc-btn-outline vc-btn-sm" data-vc-version="' + Number(v.id) + '">View</button></div>').join("") + "</div>"
+            : "<p>No earlier versions. The document on file is the only one this vendor has uploaded.</p>";
+        await ask({ title: label + " - earlier versions", html: html, ok: "Close", wide: true, onOpen: (back) => {
+            back.addEventListener("click", async (e) => {
+                const b = e.target.closest("[data-vc-version]");
+                if (!b) return;
+                try {
+                    const r = await call("GET", "/api/admin/vendors/" + id + "/kyc/documents/versions/" + b.dataset.vcVersion + "/url");
+                    if (r && r.url) window.open(r.url, "_blank", "noopener");
+                } catch (err) { toast("Could not open that version.", true); }
+            });
+        } });
     }
 
     // One document: approve / ask to re-upload / reject.

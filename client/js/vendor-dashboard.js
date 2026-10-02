@@ -5590,16 +5590,21 @@ function vendorProductSummary() {
     const agreed = !!(document.getElementById("product-authenticity-confirm") || {}).checked;
     return [
         { label: "Product name", value: val("product-name") || "Missing", ok: !!val("product-name"), step: 1 },
+        { label: "SKU", value: vdSkuBase(val("product-sku")) ? vdSkuBase(val("product-sku")) + "-" + VD_SKU_SUFFIX : "Missing", ok: !!vdSkuBase(val("product-sku")), step: 1 },
         { label: "Category", value: hasCat ? catLabel : "Missing", ok: hasCat, step: 1 },
         { label: "Brand", value: val("product-brand") || "-", step: 1 },
         { label: "Photos", value: n + " of " + VD_MAX_PHOTOS + " (at least " + min + ")", ok: n >= min && n <= VD_MAX_PHOTOS, step: 1 },
         { label: "Price", value: val("product-payout") ? "UGX " + Number(val("product-payout")).toLocaleString() : "Missing", ok: !!val("product-payout"), step: 2 },
         { label: "Customer pays", value: customer && customer !== "-" ? "UGX " + customer : "-", step: 2 },
+        { label: "Sale price", value: val("product-sale-price")
+            ? "UGX " + Number(val("product-sale-price")).toLocaleString() + " (" + (val("product-sale-start") || "today") + " to " + (val("product-sale-end") || "?") + ")"
+            : "No sale", ok: val("product-sale-price") ? !vdSaleProblem() : undefined, step: 2 },
         { label: "Stock", value: val("product-stock") || "Missing", ok: val("product-stock") !== "", step: 2 },
         { label: "Description", value: desc ? desc.length + " characters" : "Missing", ok: !!desc, step: 2 },
         { label: "Specifications", value: document.querySelectorAll("#specs-list input").length / 2 + " rows", step: 3 },
         { label: "Packed weight", value: weight ? weight + " kg" : (isNew ? "Missing" : "-"), ok: isNew ? !!weight : undefined, step: 3 },
         { label: "Warranty", value: val("product-warranty-months") ? val("product-warranty-months") + " months" : "None", step: 3 },
+        { label: "Certifications", value: vdPickedCerts().length ? vdPickedCerts().join(", ") : "None", step: 3 },
         { label: "Authenticity statement", value: agreed ? "Confirmed" : "Tick the box below", ok: agreed }
     ];
 }

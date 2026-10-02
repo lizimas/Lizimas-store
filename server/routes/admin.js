@@ -400,6 +400,8 @@ router.patch("/vendors/:id/kyc/review", reviewVendorKycAdmin);
 router.patch("/vendors/:id/kyc/ursb", updateVendorUrsbVerification);
 router.patch("/vendors/:id/kyc/documents/:documentType/review", reviewVendorKycDocumentAdmin);
 router.get("/vendors/:id/kyc/documents/url", getVendorKycDocumentAdmin);
+router.get("/vendors/:id/kyc/documents/versions", require("../controllers/vendorKycController").listVendorKycDocumentVersionsAdmin);
+router.get("/vendors/:id/kyc/documents/versions/:versionId/url", require("../controllers/vendorKycController").getVendorKycDocumentVersionAdmin);
 router.get("/vendors/:id/kyc/documents/file", getVendorKycDocumentFileAdmin);
 
 router.get("/brand-authorizations", listBrandAuthorizationsAdmin);
