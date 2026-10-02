@@ -22,6 +22,9 @@
 
 const pool = require("../config/database");
 const { encryptField, decryptField, hashForLookup } = require("../utils/encryption");
+const { readIdentityDetails, saveIdentityDetails, loadIdentityDetails } = require("../utils/identityDetails");
+// The back of the identity document: its own file next to the front, never a requirement of its own.
+const ID_BACK_TYPE = "national_id_back";
 const { isValidAdminKycTransition, canVendorEditKyc, requiredDocumentTypesForKyc, KYC_DOCUMENT_LABELS } = require("../utils/vendorKyc");
 const { logActivity } = require("../utils/activityLog");
 const { uploadPrivateDocument, privateDocumentViewUrl, destroyPrivateDocument } = require("../utils/cloudinaryUpload");
@@ -82,6 +85,7 @@ exports.getMyKyc = async (req, res) => {
         const hold = vendor.documents_hold
             ? { documents: holdTypes, reason: vendor.hold_reason, started_at: vendor.hold_started_at } : null;
         const docStatus = new Map(docRows.rows.map(d => [d.document_type, d.review_status]));
+        const identityDetails = await loadIdentityDetails(pool, vendor.id);
         const uploadableTypes = (editable, required) => [...new Set([...required, ...holdTypes, "tax_certificate"])]
             .filter(t => canUploadKycDocument({ kycEditable: editable, holdDocuments: holdTypes, docStatus: docStatus.get(t) }, t));
 
@@ -89,6 +93,7 @@ exports.getMyKyc = async (req, res) => {
             const required = requiredDocumentTypesForKyc({ accountType: vendor.account_type, requiresWorkPermit: false });
             return res.json({
                 hold,
+                identity_details: identityDetails,
                 uploadable_types: uploadableTypes(true, required),
                 kyc_status: "not_started",
                 identity_verified: false,
@@ -111,6 +116,7 @@ exports.getMyKyc = async (req, res) => {
         const requiredNow = requiredDocumentTypesForKyc({ accountType: vendor.account_type, requiresWorkPermit: kyc.requires_work_permit });
         res.json({
             hold,
+            identity_details: identityDetails,
             uploadable_types: uploadableTypes(canVendorEditKyc(kyc.kyc_status), requiredNow),
             kyc_status: kyc.kyc_status,
             identity_verified: kyc.identity_verified,
@@ -393,6 +399,7 @@ exports.uploadMyKycDocument = async (req, res) => {
         // the shop-setup Company Information step shows the TIN upload to
         // every vendor.
         const allowedTypes = [...new Set([...requiredDocumentTypesForKyc({ accountType: vendor.account_type, requiresWorkPermit: true }), "tax_certificate", ...holdTypes])];
+        if (allowedTypes.includes(ID_DOCUMENT_TYPE)) allowedTypes.push(ID_BACK_TYPE);
         if (!allowedTypes.includes(documentType)) {
             return res.status(400).json({
                 error: `${KYC_DOCUMENT_LABELS[documentType] || documentType} isn't a document type accepted for a ${vendor.account_type} account. Accepted: ${allowedTypes.map((t) => KYC_DOCUMENT_LABELS[t] || t).join(", ")}.`
@@ -409,7 +416,19 @@ exports.uploadMyKycDocument = async (req, res) => {
         // Names on the document must match the account (Oct 2026): the
         // browser sends the text it read; a readable document showing none
         // of the vendor's names is refused here, before anything is stored.
-        const nameCheck = checkDocumentNames({
+        // The details read from the card (front or back), checked before anything is stored.
+        let idDetails = null;
+        if ((documentType === ID_DOCUMENT_TYPE || documentType === ID_BACK_TYPE) && req.body.id_details) {
+            const readDetails = readIdentityDetails(req.body.id_details);
+            if (!readDetails.ok) return res.status(400).json({ error: "id_details_invalid", message: readDetails.error });
+            idDetails = readDetails.value;
+        }
+        if (documentType === ID_BACK_TYPE && !(await pool.query(
+                "SELECT 1 FROM vendor_kyc_documents WHERE vendor_id = $1 AND document_type = $2", [vendor.id, ID_DOCUMENT_TYPE])).rows.length) {
+            return res.status(400).json({ error: "front_first", message: "Upload the front of the ID first, then the back." });
+        }
+
+        const nameCheck = documentType === ID_BACK_TYPE ? null : checkDocumentNames({
             documentType, ocr: parseOcrText(req.body.ocr),
             ownerName: vendor.owner_name, businessName: vendor.business_name,
             otherNames: [vendor.contact_name, vendor.account_type === "individual" ? vendor.business_name : null]
@@ -460,6 +479,13 @@ exports.uploadMyKycDocument = async (req, res) => {
             [vendor.id, documentType, uploaded.public_id, uploaded.resource_type, uploaded.format, req.file.originalname, uploaded.bytes,
                 idFields.kind, idFields.number, idFields.expires, autoChecks ? JSON.stringify(autoChecks) : null]
         );
+
+        // The boxes filled in from the card. A database that hasn't had
+        // migration 155 yet still takes the document itself.
+        if (idDetails) {
+            try { await saveIdentityDetails(pool, vendor.id, idFields.kind, documentType === ID_BACK_TYPE ? "back" : "front", idDetails); }
+            catch (err) { if (err.code !== "42P01") console.error("Could not save the ID details:", err.message); }
+        }
 
         // Best-effort cleanup of the replaced asset - never let a Cloudinary
         // hiccup here block the new document from being saved (already is).
@@ -607,6 +633,7 @@ exports.getVendorKycAdminDetail = async (req, res) => {
             ursb_verified_by: kyc ? kyc.ursb_verified_by : null,
             ursb_evidence_url: kyc ? kyc.ursb_evidence_url : null,
             documents: docRows.rows,
+            identity_details: await loadIdentityDetails(pool, id),
             audit_log: auditRows.rows
         });
     } catch (error) {

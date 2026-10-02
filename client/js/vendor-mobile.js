@@ -2368,7 +2368,10 @@ async function vmLoadProfile() {
             vendorAuthorizedFetch("/api/vendors/compliance-notices")
         ]);
         if (v.error) { el.innerHTML = `<div class="vm-loading-state">${vendorEsc(v.error)}</div>`; return; }
-        el.innerHTML = vmRenderProfile(v, Array.isArray(notices) ? notices : []);
+        // Profile opens on the shop details (vendor-shop-setup.js): Shop, Company,
+        // Shipping, Payment and Additional Information, then the rest below.
+        el.innerHTML = '<div id="vm-profile-setup"></div>' + vmRenderProfile(v, Array.isArray(notices) ? notices : []);
+        if (typeof vssLoadProfile === "function") vssLoadProfile(document.getElementById("vm-profile-setup")).catch((e) => console.error("vssLoadProfile error:", e));
         const momoInput = document.getElementById("vm-momo-input");
         if (momoInput) momoInput.value = v.momo_number || "";
     } catch (error) {
@@ -2457,7 +2460,8 @@ function vmRenderProfile(v, notices) {
         <span class="vm-list-row-label">Logout</span>
     </button></div>`;
 
-    return statusCard + detailsCard + momoCard + moreCard + vmDeskToolsCard() + noticesCard + logoutRow;
+    void statusCard; void detailsCard;      // shown by the shop details above (status, Account Details, Shop Details)
+    return momoCard + moreCard + vmDeskToolsCard() + noticesCard + logoutRow;
 }
 
 function vmFeedback() {

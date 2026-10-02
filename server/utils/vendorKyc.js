@@ -91,7 +91,8 @@ const KYC_DOCUMENT_LABELS = {
     momo_statement: "Mobile Money Statement",
     certificate_of_incorporation: "Certificate of Incorporation",
     form_20: "Form 20 (Particulars of Directors)",
-    work_permit: "Work Permit"
+    work_permit: "Work Permit",
+    national_id_back: "Identity Document - back side"
 };
 
 // Which document types must be on file before a vendor can submit/resubmit

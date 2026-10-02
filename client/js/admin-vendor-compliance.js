@@ -638,6 +638,7 @@
     function tabDocuments(v, kyc) {
         if (kyc.__error) return '<div class="vc-card"><p class="no-data">Could not load the documents: ' + esc(kyc.__error) + "</p></div>";
         const docs = new Map((kyc.documents || []).map(d => [d.document_type, d]));
+        identityDetails = kyc.identity_details || null;        // the boxes read from the ID (front and back)
         const required = (v.required_documents || []).map(d => d.type);
         const extra = [...docs.keys()].filter(t => !required.includes(t));
         const rows = required.concat(extra).map(t => docRow(t, docs.get(t), required.includes(t)));
@@ -671,8 +672,24 @@
     }
     function safeJson(s) { try { return JSON.parse(s); } catch (e) { return null; } }
 
+    let identityDetails = null;
+    // The details the vendor sent with the ID, for the reviewer to compare with the photo.
+    function identityBlock(type) {
+        const d = identityDetails;
+        if (!d) return "";
+        const cell = (k, v) => v ? "<span><em>" + k + "</em> " + esc(v) + "</span>" : "";
+        const edited = Array.isArray(d.edited_fields) && d.edited_fields.length ? d.edited_fields : [];
+        const html = type === "national_id"
+            ? cell("Surname", d.surname) + cell("Given name", d.given_names) + cell("Nationality", d.nationality) + cell("Sex", d.sex) + cell("Date of birth", d.date_of_birth) +
+              cell("NIN", d.nin) + cell("Card No.", d.card_number) + cell("Expiry", d.expires_on)
+            : cell("Village", d.village) + cell("Parish", d.parish) + cell("Sub-county", d.sub_county) + cell("County", d.county) + cell("District", d.district);
+        if (!html) return "";
+        const read = type === "national_id" ? d.front_read : d.back_read;
+        return '<div class="vc-idbox">' + html + '<small>' + (read ? "Read from the photo" : "Typed by the vendor") +
+            (type === "national_id" && edited.length ? " &middot; changed by the vendor after reading: " + esc(edited.join(", ").replace(/_/g, " ")) : "") + "</small></div>";
+    }
     function docRow(type, doc, required) {
-        const label = DOC_LABELS[type] || type;
+        const label = DOC_LABELS[type] || (type === "national_id_back" ? "Identity Document - back side" : type);
         if (!doc) {
             return '<div class="vc-docrow vc-docrow-missing"><span class="vc-filetype vc-ft-missing">' + svg(docIcon(type), 22) + "</span>" +
                 '<div class="vc-docrow-main"><div class="vc-name vc-name-sm">' + esc(label) + '</div><div class="vc-sub">Not uploaded yet</div></div>' +
@@ -687,7 +704,8 @@
             : '<span class="vc-badge vc-b-blue">Waiting review</span>';
         const reason = doc.rejection_reason || doc.action_required_reason;
         const idInfo = type === "national_id" && (doc.id_kind || doc.id_number)
-            ? '<div class="vc-sub">' + esc((doc.id_kind || "").replace(/_/g, " ")) + (doc.id_number ? " &middot; No. " + esc(doc.id_number) : "") + (doc.id_expires_on ? " &middot; expires " + esc(doc.id_expires_on) : "") + "</div>" : "";
+            ? '<div class="vc-sub">' + esc((doc.id_kind || "").replace(/_/g, " ")) + (doc.id_number ? " &middot; No. " + esc(doc.id_number) : "") + (doc.id_expires_on ? " &middot; expires " + esc(doc.id_expires_on) : "") + "</div>" + identityBlock(type)
+            : type === "national_id_back" ? identityBlock(type) : "";
         return '<div class="vc-docrow">' +
             (st === "pending" ? '<input type="checkbox" class="vc-docsel" data-vc-docsel value="' + esc(type) + '" aria-label="Select ' + esc(label) + '">' : '<span class="vc-docsel-ph"></span>') +
             '<span class="vc-filetype ' + (isPdf ? "vc-ft-pdf" : "vc-ft-img") + '">' + (isPdf ? "<b>PDF</b>" : svg("image", 22)) + "</span>" +

@@ -105,33 +105,36 @@ async function vssSave(path, body, statusId, successText) {
 
 // --- Load / render ---------------------------------------------------------
 
-// Called by vmLoadHome (vendor-mobile.js).
+// Called by vmLoadHome (vendor-mobile.js): the home page is the Vendor
+// Center dashboard (vendor-home.js). The shop details - the five sections
+// below - are filled in on the Profile page (vssLoadProfile).
 async function vssLoadHome(el) {
     const data = await vendorAuthorizedFetch("/api/vendors/me/shop-setup");
     if (data.error) { el.innerHTML = `<div class="vm-loading-state">${vendorEsc(data.error)}</div>`; return; }
     vssData = data;
-
-    // Home always opens on the Vendor Center dashboard (vendor-home.js): the
-    // greeting, Yours to do, Business metrics, Seller score and Learn how to
-    // do. The shop set-up sections follow underneath - in full while a
-    // section is still pending, as compact tiles once everything is done.
-    const done = data.all_completed && data.account.status === "approved";
     let homeHtml = "";
     try {
         const summary = await vendorAuthorizedFetch("/api/vendors/dashboard-summary");
-        if (!summary.error) {
-            homeHtml = window.VendorHome
-                ? VendorHome.render(data.account, summary, data)
-                : (done ? vmRenderHomeKpi({ business_name: data.account.business_name, owner_name: data.account.owner_name }, summary) : "");
-        }
+        if (!summary.error && window.VendorHome) homeHtml = VendorHome.render(data.account, summary, data);
     } catch (e) { console.error("dashboard-summary error:", e); }
-    el.innerHTML = homeHtml + `<div id="vss-root"></div>`;
-    if (!done && !vssActiveStep) {
+    if (!homeHtml) { vmShowScreen("account"); return; }      // no dashboard to show: go to the shop details
+    el.innerHTML = homeHtml;
+    if (window.VendorHome) VendorHome.afterRender();
+}
+
+// Called by vmLoadProfile (vendor-mobile.js): "Let's take your shop live!"
+// with Shop, Company, Shipping, Payment and Additional Information.
+async function vssLoadProfile(host) {
+    if (!host) return;
+    host.innerHTML = '<div id="vss-root"><div class="vm-loading-state">Loading...</div></div>';
+    const data = await vendorAuthorizedFetch("/api/vendors/me/shop-setup");
+    if (data.error) { host.innerHTML = `<div class="vm-loading-state">${vendorEsc(data.error)}</div>`; return; }
+    vssData = data;
+    if (!vssActiveStep) {
         const firstPending = data.steps.find((s) => !s.completed);
         vssActiveStep = firstPending ? firstPending.key : "shop";
     }
-    vssRender({ compact: done });
-    if (homeHtml && window.VendorHome) VendorHome.afterRender();
+    vssRender({ compact: false });
 }
 
 async function vssRefresh() {
@@ -245,6 +248,7 @@ function vssShopForm() {
         vssField({ label: "Account Email", value: a.email, readonly: true, required: true })
         + vssField({ label: "Account Phone", value: phoneLocal, readonly: true, required: true, prefix: "+256" })
         + vssField({ label: "Country of Registration", value: a.country, readonly: true })
+        + vssField({ label: "Account Class", value: /^uganda$/i.test(String(a.country || "Uganda").trim()) ? "National" : "International", readonly: true, required: true })
         + vssField({ label: "Account Type", value: typeLabel, readonly: true, required: true }));
 
     const shopIdBlock = `<div class="vss-field"><div class="vss-label-row"><span class="vss-label">Shop ID</span></div>
@@ -335,7 +339,16 @@ function vssCompanyForm() {
     const addr = vssSection("Legal Representative's Address", "Please provide the registered address of your business",
         vssAddressFields("business", c));
 
-    return lockedNote + details + rep + addr + `<div class="vss-actions"><button type="button" class="vss-btn" onclick="vssSaveCompany()">Submit</button></div><div class="vss-status" id="vss-company-status"></div>`;
+    // The legal representative's ID (front, back and the details read from it) is uploaded under Verification.
+    const kyc = window.vendorKycLastLoaded || null;
+    const idDoc = kyc ? (kyc.documents || []).find((d) => d.document_type === "national_id") : null;
+    const idNote = `<div class="vss-field"><div class="vss-label-row"><span class="vss-label">Identity document</span><span class="vss-req">Required</span></div>
+        <button type="button" class="vss-input vss-idlink" onclick="vmShowScreen('verification')"><span>${idDoc
+            ? "Uploaded - " + vendorEsc(String(idDoc.review_status || "pending").replace(/_/g, " ")) + ". Open to view or replace it"
+            : "Upload the front and the back of the ID"}</span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button>
+        <div class="vss-hint">The details printed on the ID are read from the photos and filled in for you.</div></div>`;
+    const repFull = rep.replace(/<\/div>\s*$/, idNote + "</div>");
+    return lockedNote + details + addr + repFull + `<div class="vss-actions"><button type="button" class="vss-btn" onclick="vssSaveCompany()">Submit</button></div><div class="vss-status" id="vss-company-status"></div>`;
 }
 
 function vssMultiSummary(detailsId) {

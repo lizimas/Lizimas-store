@@ -1,0 +1,67 @@
+/* Settings on a computer (vendor-settings.js): trail, Seller / Platform
+   Settings lists, then the section as a table. Phones are unchanged. */
+.vst-nav, .vst-titlebar, .vst-thead { display: none; }
+@media (min-width: 1024px) {
+    body.vsh-on .vm-screen.vst-fam { padding: 0 24px 32px; box-sizing: border-box; background: transparent; }
+    body.vsh-on .vm-screen.vst-fam > .vm-header { display: none !important; }
+    body.vsh-on .vst-nav { display: block; padding-top: 22px; }
+    .vst-trail { font-size: 14px; color: #8a8f98; margin: 0 14px 14px; }
+    .vst-trail span { margin: 0 8px; }
+    .vst-trail strong { color: #b98600; font-weight: 600; }
+    .vst-acc { background: #fff; border-radius: 4px; box-shadow: 0 1px 4px rgba(16,24,40,.14); margin-bottom: 16px; }
+    .vst-acc-head { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 18px 26px; background: none; border: 0; cursor: pointer; font: inherit; font-size: 15px; font-weight: 600; color: #1a1a2e; text-align: left; }
+    .vst-acc-head svg { transition: transform .15s; transform: rotate(180deg); }
+    .vst-acc.open .vst-acc-head svg { transform: rotate(0deg); }
+    .vst-acc-body { display: none; padding: 2px 26px 20px; }
+    .vst-acc.open .vst-acc-body { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    .vst-link { background: none; border: 0; padding: 6px 0; font: inherit; font-size: 14.5px; color: #475467; cursor: pointer; text-decoration: none; width: auto; text-align: left; }
+    .vst-link:hover { color: #1a1a2e; }
+    .vst-link.on { color: #b98600; font-weight: 600; }
+    .vst-plain { font-size: 14.5px; color: #475467; padding: 6px 0; }
+    .vst-plain span { color: #98a2b3; margin-left: 10px; }
+
+    /* title line: heading on the left, search and the Create button on the right */
+    body.vsh-on .vst-fam .vc-page { padding: 8px 0 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 14px; align-items: center; }
+    body.vsh-on .vst-fam .vc-page > * { grid-column: 1 / -1; }
+    body.vsh-on .vst-fam .vc-page > .vc-page-title { grid-column: 1; grid-row: 1; margin: 6px 0 18px; }
+    body.vsh-on .vst-fam .vc-page > .vc-center { grid-column: 2; grid-row: 1; margin: 0 0 12px; justify-content: flex-end; }
+    body.vsh-on #vm-screen-users .vc-page { grid-template-columns: minmax(0, 1fr) minmax(220px, 380px) auto; }
+    body.vsh-on #vm-screen-users .vc-page > .vc-search { grid-column: 2; grid-row: 1; margin: 0 0 12px; }
+    body.vsh-on #vm-screen-users .vc-page > .vc-center { grid-column: 3; }
+    body.vsh-on .vst-fam .vc-center .vc-btn, body.vsh-on .vst-titlebar .vc-btn { min-width: 0; width: auto; height: 46px; padding: 0 20px; border-radius: 4px; font-size: 14px; display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; }
+    body.vsh-on .vst-titlebar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 8px 0 12px; }
+    body.vsh-on .vst-titlebar .vc-page-title { margin: 0; }
+    body.vsh-on #vm-screen-pickers > .vm-card { background: none; box-shadow: none; padding: 0; margin: 0; border: 0; }
+    body.vsh-on #vm-screen-pickers > .vm-card > div:first-child:not(#vm-pickers-list) { font-size: 13px !important; color: #667085 !important; margin: -4px 0 14px !important; }
+    body.vsh-on #vm-screen-pickers > .vm-btn-row { display: none; }
+
+    /* the table */
+    body.vsh-on .vst-table { background: #fff; border-radius: 4px; box-shadow: 0 1px 4px rgba(16,24,40,.14); padding: 6px 20px 10px; }
+    body.vsh-on .vst-table > .vst-thead, body.vsh-on .vst-table > .vc-user-card, body.vsh-on .vst-table > .vc-app-card, body.vsh-on .vst-table > .vst-row {
+        display: grid; align-items: center; column-gap: 16px; padding: 18px 12px; margin: 0; background: none; box-shadow: none; border-radius: 0; border-bottom: 1px solid #e4e6eb; font-size: 14px; color: #1a1a2e; }
+    body.vsh-on .vst-table > .vst-thead { font-size: 13.5px; font-weight: 500; color: #475467; padding: 20px 12px 16px; }
+    body.vsh-on #vm-users-list > .vst-thead, body.vsh-on #vm-users-list > .vc-user-card { grid-template-columns: 1.2fr 1.5fr 1.4fr 1.5fr 190px; }
+    body.vsh-on #vm-channel-applications-list > .vst-thead, body.vsh-on #vm-channel-applications-list > .vc-app-card { grid-template-columns: 1.3fr 1fr 1.7fr 1fr .8fr .8fr 170px; }
+    body.vsh-on .vst-pickers > .vst-thead, body.vsh-on .vst-pickers > .vst-row { grid-template-columns: 1.2fr 1.4fr 1.1fr .9fr .9fr 110px; }
+    body.vsh-on .vst-table .vc-kv { display: contents; }
+    body.vsh-on .vst-table .vc-kv > span:first-child { display: none; }
+    body.vsh-on .vst-table .vc-kv > span:last-child { text-align: left; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    body.vsh-on .vst-table .vc-kv-actions { border: 0; padding: 0; margin: 0; }
+    body.vsh-on .vst-table .vc-icon-row { justify-content: flex-start; }
+    body.vsh-on .vst-table .vc-user-note { grid-column: 1 / -1; margin-top: 6px; }
+    body.vsh-on .vst-table .vc-pager { justify-content: flex-end; gap: 28px; padding: 16px 8px 6px; }
+    body.vsh-on .vst-table .vc-empty, body.vsh-on .vst-none { text-align: center; padding: 22px 0; margin: 0; font-size: 14px; color: #1a1a2e; }
+    .vst-foot { text-align: right; padding: 14px 12px 6px; font-size: 13px; color: #475467; }
+    .vst-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #c4c7cf; margin-right: 7px; }
+    .vst-dot.on { background: #16a34a; }
+
+    /* Shop Activation: the Settings screen shows only that switch */
+    body.vsh-on #vm-screen-settings.vst-fam > .vm-card { background: #fff; border-radius: 4px; box-shadow: 0 1px 4px rgba(16,24,40,.14); margin: 8px 0 0; max-width: 720px; }
+    body.vsh-on #vm-screen-settings.vst-fam > .vm-card ~ .vm-card { display: none; }
+    body.vsh-on #vm-screen-settings.vst-fam > .vm-card > .vm-group-header,
+    body.vsh-on #vm-screen-settings.vst-fam > .vm-card > button.vm-list-row { display: none; }
+    body.vsh-on #vm-screen-settings.vst-fam > .vm-card > div.vm-list-row { padding: 18px 4px; }
+    body.vsh-on #vm-screen-holiday-mode.vst-fam > .vm-card, body.vsh-on #vm-screen-commissions-fees.vst-fam > .vm-card { margin: 8px 0 0; border-radius: 4px; }
+}
+/* Profile on a computer: the shop details card already carries the heading. */
+@media (min-width: 1024px) { body.vsh-on #vm-screen-account > .vm-header { display: none !important; } body.vsh-on #vm-screen-account { padding-top: 14px; } }

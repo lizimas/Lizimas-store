@@ -150,11 +150,11 @@
             if (name !== "desk") {
                 const direct = ITEMS.find(i => i[0] === name);
                 current = direct ? name
-                    : ["consignments-create", "pickers", "pickers-create", "pickers-edit"].includes(name) ? "consignments"
+                    : ["consignments-create"].includes(name) ? "consignments"
                     : ["promo-campaigns", "promotions-propose", "promo-monitoring"].includes(name) ? "promotions"
                     : ["ads-create"].includes(name) ? "ads"
                     : ["statement-detail"].includes(name) ? "wallet"
-                    : ["users", "users-create", "users-edit", "holiday-mode", "channel", "channel-create", "channel-import", "channel-export"].includes(name) ? "settings" : current;
+                    : ["users", "users-create", "users-edit", "holiday-mode", "channel", "channel-create", "channel-import", "channel-export", "pickers", "pickers-create", "pickers-edit", "commissions-fees"].includes(name) ? "settings" : current;
                 mark();
             }
             return r;

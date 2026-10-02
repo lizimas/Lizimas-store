@@ -2891,3 +2891,8 @@ body.vc-profile-open { overflow: hidden; }
     .vc-review-status { border-left: 0; padding-left: 0; }
     .vc-card { padding: 16px; }
 }
+
+/* Details read from a vendor's ID, under the document row */
+.vc-idbox { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; padding: 8px 10px; background: #f8f9fb; border: 1px solid #eceef2; border-radius: 8px; font-size: 12.5px; color: #1a1a2e; }
+.vc-idbox em { font-style: normal; color: #667085; }
+.vc-idbox small { flex: 1 1 100%; color: #98a2b3; font-size: 11.5px; }

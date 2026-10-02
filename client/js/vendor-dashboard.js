@@ -503,28 +503,60 @@ function vdIdDocumentRow(label, doc, canEdit) {
     const esc = vendorEsc;
     const badge = !doc ? '<span style="color:#DC2626;">Not uploaded</span>'
         : `<span class="status-badge ${doc.review_status === "accepted" ? "status-paid" : doc.review_status === "rejected" ? "status-cancelled" : doc.review_status === "action_required" ? "status-pending" : "status-new"}">${(doc.review_status || "pending").replace(/_/g, " ")}</span>`;
+    const savedNow = (window.vendorKycLastLoaded && window.vendorKycLastLoaded.identity_details) || null;
+    const backDoc = ((window.vendorKycLastLoaded && window.vendorKycLastLoaded.documents) || []).find(d => d.document_type === "national_id_back");
     const details = doc && doc.id_kind
-        ? `<div style="font-size:12px; color:#555; margin-top:4px;">${esc(VD_ID_KINDS[doc.id_kind] || doc.id_kind)} &middot; No. ${esc(doc.id_number || "-")} &middot; expires ${esc(doc.id_expires_on || "-")}</div>` : "";
+        ? `<div style="font-size:12px; color:#555; margin-top:4px;">${esc(VD_ID_KINDS[doc.id_kind] || doc.id_kind)} &middot; No. ${esc(doc.id_number || "-")} &middot; expires ${esc(doc.id_expires_on || "-")}`
+            + (savedNow && (savedNow.surname || savedNow.given_names) ? ` &middot; ${esc([savedNow.surname, savedNow.given_names].filter(Boolean).join(" "))}` : "")
+            + (doc.id_kind === "national_id" ? ` &middot; back side ${backDoc ? "uploaded" : "<strong style=\"color:#b42318;\">not uploaded</strong>"}` : "") + `</div>` : "";
     const reason = doc && (doc.review_status === "rejected" ? doc.rejection_reason : doc.review_status === "action_required" ? doc.action_required_reason : "");
     const today = new Date(); today.setDate(today.getDate() + 1);
     const minDate = today.toISOString().slice(0, 10);
+    // Front first, then the back: the details printed on the card are read
+    // into the boxes (lz-id-ocr.js) and the vendor checks them before sending.
+    const saved = (window.vendorKycLastLoaded && window.vendorKycLastLoaded.identity_details) || {};
+    const sv = (k) => saved[k] == null ? "" : esc(saved[k]);
+    const box = (id, label, value, extra) => `<label class="vd-idf"><span>${label}</span><input id="${id}" type="text" autocomplete="off" value="${value}" ${extra || ""}></label>`;
     const form = canEdit ? `
         <details class="vd-id-upload" ${doc ? "" : "open"} style="margin-top:8px;">
             <summary style="cursor:pointer; color:#16264f; font-size:12.5px; font-weight:600;">${doc ? "Replace identity document" : "Upload identity document"}</summary>
-            <div style="display:grid; gap:10px; margin-top:10px; max-width:460px;">
-                <label style="font-size:12.5px; font-weight:600;">Document type
-                    <select id="vd-id-kind" style="display:block; width:100%; margin-top:4px; padding:8px; border:1px solid #ccc; border-radius:6px;">
+            <div class="vd-idform">
+                <label class="vd-idf vd-idf-wide"><span>Document type</span>
+                    <select id="vd-id-kind" onchange="vdIdKindChanged()">
                         <option value="">Choose...</option>
-                        ${Object.entries(VD_ID_KINDS).map(([k, v]) => `<option value="${k}"${doc && doc.id_kind === k ? " selected" : ""}>${v}</option>`).join("")}
+                        ${Object.entries(VD_ID_KINDS).map(([k, v]) => `<option value="${k}"${(doc && doc.id_kind === k) || (!doc && k === "national_id") ? " selected" : ""}>${v}</option>`).join("")}
                     </select></label>
-                <label style="font-size:12.5px; font-weight:600;">Document number <span style="font-weight:400; color:#888;">(exactly as printed)</span>
-                    <input id="vd-id-number" type="text" maxlength="30" autocomplete="off" value="${doc && doc.id_number ? esc(doc.id_number) : ""}" style="display:block; width:100%; box-sizing:border-box; margin-top:4px; padding:8px; border:1px solid #ccc; border-radius:6px; text-transform:uppercase;"></label>
-                <label style="font-size:12.5px; font-weight:600;">Expiry date
-                    <input id="vd-id-expires" type="date" placeholder="DD/MM/YYYY" min="${minDate}" value="${doc && doc.id_expires_on ? esc(doc.id_expires_on) : ""}" style="display:block; width:100%; box-sizing:border-box; margin-top:4px; padding:8px; border:1px solid #ccc; border-radius:6px;"></label>
-                <label style="font-size:12.5px; font-weight:600;">Photo of the document
-                    <span style="display:block; font-weight:400; color:#666; margin:2px 0 4px;">A clear colour photo of the whole document: all four corners visible, no glare, name, photo, number and expiry date readable.</span>
-                    <input id="vd-id-file" type="file" accept="image/jpeg,image/png,image/webp" onchange="vdCheckIdPhoto(this)" style="font-size:12px;"></label>
+
+                <div class="vd-idstep"><b>1</b><div><strong>Front of the document</strong>
+                    <span>A clear colour photo of the whole front: all four corners visible, no glare. The details are read from it and filled in below.</span>
+                    <input id="vd-id-file" type="file" accept="image/jpeg,image/png,image/webp" onchange="vdCheckIdPhoto(this)"></div></div>
                 <div id="vd-id-check" style="font-size:12.5px;"></div>
+
+                <div class="vd-idgrid">
+                    ${box("vd-id-surname", "Surname", sv("surname"), 'maxlength="80"')}
+                    ${box("vd-id-given", "Given name", sv("given_names"), 'maxlength="120"')}
+                    ${box("vd-id-nationality", "Nationality", sv("nationality"), 'maxlength="40" placeholder="Ex: UGA"')}
+                    <label class="vd-idf"><span>Sex</span><select id="vd-id-sex"><option value="">Choose...</option><option value="M"${saved.sex === "M" ? " selected" : ""}>M</option><option value="F"${saved.sex === "F" ? " selected" : ""}>F</option></select></label>
+                    <label class="vd-idf"><span>Date of birth</span><input id="vd-id-dob" type="date" value="${sv("date_of_birth")}"></label>
+                    <label class="vd-idf"><span id="vd-id-number-label">NIN</span><input id="vd-id-number" type="text" maxlength="30" autocomplete="off" value="${doc && doc.id_number ? esc(doc.id_number) : sv("nin")}" placeholder="Exactly as printed" style="text-transform:uppercase;"></label>
+                    ${box("vd-id-card", "Card No.", sv("card_number"), 'maxlength="20"')}
+                    <label class="vd-idf"><span>Date of expiry</span><input id="vd-id-expires" type="date" placeholder="DD/MM/YYYY" min="${minDate}" value="${doc && doc.id_expires_on ? esc(doc.id_expires_on) : sv("expires_on")}"></label>
+                </div>
+
+                <div id="vd-id-back-block">
+                    <div class="vd-idstep"><b>2</b><div><strong>Back of the document</strong>
+                        <span>A clear photo of the whole back of the card. The address printed on it is filled in below.</span>
+                        <input id="vd-id-back-file" type="file" accept="image/jpeg,image/png,image/webp" onchange="vdCheckIdBack(this)"></div></div>
+                    <div id="vd-id-back-check" style="font-size:12.5px;"></div>
+                    <div class="vd-idgrid">
+                        ${box("vd-id-village", "Village", sv("village"), 'maxlength="80"')}
+                        ${box("vd-id-parish", "Parish", sv("parish"), 'maxlength="80"')}
+                        ${box("vd-id-subcounty", "Sub-county", sv("sub_county"), 'maxlength="80"')}
+                        ${box("vd-id-county", "County", sv("county"), 'maxlength="80"')}
+                        ${box("vd-id-district", "District", sv("district"), 'maxlength="80"')}
+                    </div>
+                </div>
+                <p class="vd-idnote">Check every box against your card and correct anything that was read wrongly before you send it.</p>
                 <button type="button" id="vd-id-submit" onclick="vdSubmitIdDocument()" style="background:#1a1a2e; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; justify-self:start;">Upload document</button>
             </div>
         </details>` : "";
@@ -569,6 +601,62 @@ function vdIdTyped() {
     };
 }
 
+// What was read from the card, to tell later which boxes the vendor changed.
+let vdIdRead = null;
+const VD_ID_BOXES = { surname: "vd-id-surname", given_names: "vd-id-given", nationality: "vd-id-nationality", sex: "vd-id-sex", date_of_birth: "vd-id-dob",
+    nin: "vd-id-number", card_number: "vd-id-card", expires_on: "vd-id-expires" };
+const VD_ID_BACK_BOXES = { village: "vd-id-village", parish: "vd-id-parish", sub_county: "vd-id-subcounty", county: "vd-id-county", district: "vd-id-district" };
+function vdIdKindChanged() {
+    const kind = (document.getElementById("vd-id-kind") || {}).value;
+    const back = document.getElementById("vd-id-back-block"), label = document.getElementById("vd-id-number-label");
+    if (back) back.hidden = kind !== "national_id" && kind !== "";      // only the National ID card has a back side to send
+    if (label) label.textContent = kind === "passport" ? "Passport number" : kind === "driving_license" ? "Licence number" : "NIN";
+}
+// Puts what was read from the front into the boxes (an empty read never wipes what is typed).
+function vdFillIdBoxes(text, kindDetected) {
+    if (!window.LzIdOcr || !LzIdOcr.extractIdFields) return;
+    const f = LzIdOcr.extractIdFields(text);
+    vdIdRead = { front: f, back: (vdIdRead && vdIdRead.back) || {} };
+    const kindEl = document.getElementById("vd-id-kind");
+    if (kindEl && !kindEl.value && kindDetected) { kindEl.value = kindDetected; vdIdKindChanged(); }
+    const isNational = !kindEl || kindEl.value === "national_id" || kindEl.value === "";
+    Object.entries(VD_ID_BOXES).forEach(([key, id]) => {
+        if (!f[key] || (key === "nin" && !isNational)) return;
+        const el = document.getElementById(id);
+        if (el) { el.value = f[key]; el.classList.add("vd-id-filled"); }
+    });
+}
+async function vdCheckIdBack(input) {
+    const file = input.files && input.files[0];
+    const say = (html, tone) => {
+        const el = document.getElementById("vd-id-back-check"); if (!el) return;
+        const tones = { bad: "background:#FEF2F2; border:1px solid #FECACA; color:#991B1B;", ok: "background:#F0FDF4; border:1px solid #BBF7D0; color:#166534;", info: "color:#666;" };
+        el.innerHTML = html ? `<div style="${tones[tone] || ""} border-radius:8px; padding:8px 10px;">${html}</div>` : "";
+    };
+    if (!file) { say(""); return; }
+    if (file.size > 8 * 1024 * 1024) { say("That photo is larger than 8MB. Take a smaller photo.", "bad"); input.value = ""; return; }
+    if (!window.LzIdOcr) { say("&#10003; Photo chosen. Type the address from the back of the card below.", "ok"); return; }
+    say("Reading the back of the card...", "info");
+    try {
+        const read = await LzIdOcr.read(file, { generic: true, timeoutMs: 45000, onProgress: (m) => { if (m.status === "recognizing text") say(`Reading the back of the card... ${Math.round(m.progress * 100)}%`, "info"); } });
+        const b = read && read.text ? LzIdOcr.extractIdBack(read.text) : {};
+        vdIdRead = { front: (vdIdRead && vdIdRead.front) || {}, back: b };
+        let n = 0;
+        Object.entries(VD_ID_BACK_BOXES).forEach(([key, id]) => { const el = document.getElementById(id); if (el && b[key]) { el.value = b[key]; el.classList.add("vd-id-filled"); n++; } });
+        say(n ? `&#10003; Back read: ${n} of 5 details filled in below - check them against your card.` : "&#10003; Photo chosen. The address could not be read - please type it in below.", "ok");
+    } catch (e) { say("&#10003; Photo chosen. The address could not be read - please type it in below.", "ok"); }
+}
+// -> { front: {...}, back: {...} } as typed now, with the boxes that differ from what was read.
+function vdIdDetailsPayload() {
+    const val = (id) => { const el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; };
+    const front = {}, back = {}, edited = [];
+    Object.entries(VD_ID_BOXES).forEach(([key, id]) => { front[key] = val(id); if (vdIdRead && vdIdRead.front[key] && vdIdRead.front[key].toUpperCase() !== front[key].toUpperCase()) edited.push(key); });
+    Object.entries(VD_ID_BACK_BOXES).forEach(([key, id]) => { back[key] = val(id); if (vdIdRead && vdIdRead.back[key] && vdIdRead.back[key].toUpperCase() !== back[key].toUpperCase()) edited.push(key); });
+    front.edited_fields = edited; front.read = !!(vdIdRead && Object.values(vdIdRead.front).some(Boolean));
+    back.read = !!(vdIdRead && Object.values(vdIdRead.back || {}).some(Boolean));
+    return { front, back };
+}
+
 async function vdCheckIdPhoto(input) {
     vdIdPhotoResult = null; vdIdOcr = null; vdIdWarnShownFor = "";
     const file = input.files && input.files[0];
@@ -601,6 +689,7 @@ async function vdCheckIdPhoto(input) {
                 const a = LzIdOcr.analyze(read.text, read.confidence, vdIdTyped());
                 const expInput = document.getElementById("vd-id-expires");
                 if (expInput && !expInput.value && a.summary.expiry_read && a.ok) expInput.value = a.summary.expiry_read;
+                vdFillIdBoxes(read.text, a.summary.kind_detected);
                 // Only "not an ID" / "expired" reject the photo itself; a wrongly
                 // typed expiry is re-checked when Upload is pressed, after any fix.
                 const photoError = a.errors.find(e => e.code === "not_id" || e.code === "expired");
@@ -608,7 +697,10 @@ async function vdCheckIdPhoto(input) {
             }
         }
         const notes = (vdIdPhotoResult.warnings || []).map(w => w.text);
-        const readNote = vdIdOcr && !vdIdOcr.unavailable ? "Document read." : "The text couldn't be read automatically - the reviewer will check it.";
+        const filled = vdIdRead ? Object.keys(vdIdRead.front).filter(k => vdIdRead.front[k]).length : 0;
+        const readNote = vdIdOcr && !vdIdOcr.unavailable
+            ? (filled ? `Document read: ${filled} of 8 details filled in below - check them against your card.` : "Document read, but the details could not be picked out - please type them in below.")
+            : "The text couldn't be read automatically - please type the details in below.";
         vdIdMessage("&#10003; Photo looks clear. " + readNote + (notes.length ? "\n" + notes.map(n => "• " + vendorEsc(n)).join("\n") : ""), notes.length ? "warn" : "ok");
     } finally {
         if (btn) btn.disabled = false;
@@ -630,8 +722,21 @@ async function vdSubmitIdDocument() {
         }
         typed = fields.value;   // cleaned number and YYYY-MM-DD date
     }
-    if (!file) { vdIdMessage("Choose a photo of the document.", "bad"); return; }
+    if (!file) { vdIdMessage("Choose a photo of the front of the document.", "bad"); return; }
     if (vdIdPhotoResult && !vdIdPhotoResult.ok) { vdIdMessage(vendorEsc(vdIdPhotoResult.message), "bad"); return; }
+    // A National ID is sent with both sides and the details printed on it.
+    const idDetails = vdIdDetailsPayload();
+    const backInput = document.getElementById("vd-id-back-file");
+    const backFile = backInput && backInput.files[0];
+    if (typed.kind === "national_id") {
+        const missing = [["surname", "Surname"], ["given_names", "Given name"], ["sex", "Sex"], ["date_of_birth", "Date of birth"]].filter(([k]) => !idDetails.front[k]).map(([, l]) => l);
+        if (missing.length) { vdIdMessage("Fill in: " + missing.join(", ") + " - exactly as printed on the card.", "bad"); return; }
+        if (!backFile) {
+            vdIdMessage("Now choose a photo of the back of the card (step 2), then press Upload document.", "warn");
+            if (backInput && backInput.scrollIntoView) backInput.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+        }
+    }
 
     // Compare what was typed with what the document says.
     let ocrPayload = vdIdOcr && vdIdOcr.unavailable ? { unavailable: true } : null;
@@ -659,6 +764,7 @@ async function vdSubmitIdDocument() {
     formData.append("id_number", typed.number);
     formData.append("id_expires_on", typed.expires);
     if (ocrPayload) formData.append("ocr", JSON.stringify(ocrPayload));
+    formData.append("id_details", JSON.stringify(idDetails.front));
     formData.append("document", file);
     try {
         const response = await fetch(`${API_URL}/api/vendors/me/kyc/documents`, {
@@ -666,6 +772,21 @@ async function vdSubmitIdDocument() {
         });
         const result = await response.json();
         if (result.error) { vdIdMessage(vendorEsc(result.message || result.error), "bad"); return; }
+        // Then the back of the card, with the address read from it.
+        if (typed.kind === "national_id" && backFile) {
+            btn.textContent = "Uploading the back...";
+            const backData = new FormData();
+            backData.append("document_type", "national_id_back");
+            backData.append("id_details", JSON.stringify(idDetails.back));
+            backData.append("document", backFile);
+            const backRes = await fetch(`${API_URL}/api/vendors/me/kyc/documents`, { method: "POST", headers: { "Authorization": `Bearer ${getVendorToken()}` }, body: backData });
+            const backJson = await backRes.json().catch(() => ({}));
+            if (!backRes.ok || backJson.error) {
+                vdIdMessage("The front was uploaded, but the back was not: " + vendorEsc(backJson.message || backJson.error || "please try again") + "\nChoose the back photo again and press Upload document.", "bad");
+                return;
+            }
+        }
+        vdIdRead = null;
         loadVendorKyc();
     } catch (error) {
         console.error("vdSubmitIdDocument error:", error);

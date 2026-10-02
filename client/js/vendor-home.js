@@ -69,7 +69,7 @@
         const todo = [];
         if (setup && !setup.all_completed) {
             const done = (setup.steps || []).filter((s) => s.completed).length, total = (setup.steps || []).length || 5;
-            todo.push(todoCard(ART.setup, `Finish your shop setup (${done} of ${total})`, "Complete every section so your shop can go live", "CONTINUE SETUP", "document.getElementById('vss-root').scrollIntoView({behavior:'smooth',block:'start'})"));
+            todo.push(todoCard(ART.setup, `Finish your shop setup (${done} of ${total})`, "Complete every section so your shop can go live", "CONTINUE SETUP", "vmShowScreen('account')"));
         }
         todo.push(todoCard(ART.campaign, 'New campaigns (<span id="vh-campaigns">0</span>)', "Grow your sales by joining the next Lizimas Store campaign", "SEE CAMPAIGNS", "vmShowScreen('promo-campaigns')"));
         todo.push(todoCard(ART.box, `Available products (${Number((h.listings && h.listings.active) != null ? h.listings.active : (p.total || 0)).toLocaleString()})`, "List products to start selling on Lizimas Store", "CREATE PRODUCTS", "vmShowScreen('add-product')"));

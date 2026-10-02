@@ -415,5 +415,122 @@
         return Object.assign(analyze(r.text, r.confidence, typed, opts && opts.now), { rotation: r.rotation, text: r.text });
     }
 
-    return { nameCheck, nameWords, read, datesIn, analyze, parseMrz, readMrz, scanMrzExpiry, findDates, expiryFromLabel, detectKind, checkDigit, numberFound, readFile, MSG };
+    // ---- Details printed on the card (Oct 2026) --------------------------------
+    // The front of a National ID is read into the boxes of the upload form:
+    // surname, given name, nationality, sex, date of birth, NIN, card number and
+    // date of expiry. The labels sit on one line and their values on the next
+    // ("NATIONALITY SEX DATE OF BIRTH" / "UGA M 11.01.1985"), so each value is
+    // looked for after its label and recognised by its shape. Anything that
+    // can't be read is left empty for the vendor to type; nothing is guessed.
+    const FIELD_LABEL = /\b(SURNAME|GIVEN\s+NAMES?|NATIONALITY|SEX|DATE\s+OF\s+BIRTH|NIN|CARD\s+NO|DATE\s+OF\s+EXPIR\w*|HOLDER'?S?\s+SIGNATURE|REPUBLIC\s+OF|NATIONAL\s+ID)\b/;
+    // Letters only; stray marks and single letters picked up from the card's pattern are dropped.
+    const cleanName = (v) => String(v || "").replace(/[^A-Z' -]/g, " ").split(/\s+/).map((w) => w.replace(/^['-]+|['-]+$/g, "")).filter((w) => w.length > 1).join(" ").trim();
+    function linesOf(text) {
+        return normalize(text).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    }
+    // The text that belongs to a label: what follows it on the same line, or the next line.
+    function valueAfter(lines, label) {
+        for (let i = 0; i < lines.length; i++) {
+            const m = label.exec(lines[i]);
+            if (!m) continue;
+            const rest = lines[i].slice(m.index + m[0].length).replace(/^[\s:.\-]+/, "").trim();
+            if (rest && !FIELD_LABEL.test(rest)) return { value: rest, line: i };
+            for (let j = i + 1; j < Math.min(lines.length, i + 3); j++) {
+                if (!FIELD_LABEL.test(lines[j])) return { value: lines[j], line: j };
+            }
+            return { value: "", line: i };
+        }
+        return null;
+    }
+    // -> { surname, given_names, nationality, sex, date_of_birth, nin, card_number, expires_on }
+    function extractIdFields(text) {
+        const lines = linesOf(text), whole = lines.join("\n");
+        const out = { surname: "", given_names: "", nationality: "", sex: "", date_of_birth: "", nin: "", card_number: "", expires_on: "" };
+        const sur = valueAfter(lines, /\bSURNAME\b/), giv = valueAfter(lines, /\bGIVEN\s+NAMES?\b/);
+        if (sur) out.surname = cleanName(sur.value);
+        if (giv) out.given_names = cleanName(giv.value);
+        // NIN: 14 characters, C + M or F, e.g. CM85016102PE1C. O and 0 are often confused by OCR.
+        const nin = /\bC[MF][0-9A-Z]{12}\b/.exec(whole.replace(/[ ]/g, " "));
+        if (nin) out.nin = nin[0];
+        const card = valueAfter(lines, /\bCARD\s+NO\.?/);
+        const cardDigits = (card ? /\b\d{9}\b/.exec(card.value.replace(/[OQ]/g, "0")) : null) || /\b\d{9}\b/.exec(whole.replace(out.nin, " "));
+        if (cardDigits) out.card_number = cardDigits[0];
+        const nat = valueAfter(lines, /\bNATIONALITY\b/);
+        if (nat) {
+            const code = /\b([A-Z]{3})\b/.exec(nat.value.replace(/\bSEX\b|\bDATE\b|\bBIRTH\b/g, " "));
+            if (code) out.nationality = code[1];
+            const sex = /(?:^|\s)([MF])(?:\s|$)/.exec(nat.value);
+            if (sex) out.sex = sex[1];
+        }
+        const sexLine = !out.sex ? valueAfter(lines, /\bSEX\b/) : null;
+        if (sexLine) { const m = /(?:^|\s)([MF])(?:\s|$)/.exec(sexLine.value); if (m) out.sex = m[1]; }
+        if (!out.sex && out.nin) out.sex = out.nin[1];                      // the NIN's second letter is the sex
+        const dob = valueAfter(lines, /\bDATE\s+OF\s+BIRTH\b/);
+        const dobDates = dob ? datesIn(dob.value) : [];
+        const expiry = expiryFromLabel(normalize(text));
+        if (expiry) out.expires_on = expiry;
+        const today = todayIso();
+        if (dobDates.length) out.date_of_birth = dobDates.find((d) => d < today && d !== out.expires_on) || "";
+        if (!out.date_of_birth) {
+            // No usable label: the earliest past date on the card that is not the expiry.
+            const past = findDates(normalize(text)).map((d) => d.iso).filter((d) => d < today && d !== out.expires_on).sort();
+            if (past.length && Number(past[0].slice(0, 4)) > 1900) out.date_of_birth = past[0];
+        }
+        // The small labels are often lost in a phone photo. The card's layout
+        // still says which line is which: the two name lines follow the
+        // "NATIONAL ID CARD" heading (surname first), and the nationality code
+        // sits on the line with the date of birth.
+        const letters = (l) => (l.match(/[A-Z]/g) || []).length;
+        const nameLike = (l) => { const c = cleanName(l).replace(/(^| )[A-Z'-]( |$)/g, " ").replace(/\s+/g, " ").trim(); return c.length >= 3 && /[A-Z]{3,}/.test(c) && letters(c) >= 0.6 * l.replace(/\s/g, "").length && !FIELD_LABEL.test(l) && !/\d/.test(l) ? c : ""; };
+        if (!out.surname || !out.given_names) {
+            const head = lines.findIndex((l) => /\bID\s+CARD\b|\bNATIONAL\s+ID\b/.test(l));
+            if (head >= 0) {
+                const found = [];
+                for (let i = head + 1; i < lines.length && found.length < 2; i++) {
+                    if (/\d{2}\s?[./-]\s?\d{2}\s?[./-]\s?\d{4}|\bNIN\b|\bC[MF][0-9A-Z]{12}\b/.test(lines[i])) break;
+                    const n = nameLike(lines[i]);
+                    if (n) found.push(n);
+                }
+                if (!out.surname && found[0]) out.surname = found[0];
+                if (!out.given_names && found[1]) out.given_names = found[1];
+            }
+        }
+        if (!out.nationality) {
+            const dobLine = out.date_of_birth ? lines.find((l) => datesIn(l).includes(out.date_of_birth)) : null;
+            const code = dobLine ? /(?:^|[^A-Z])([A-Z]{3})(?:[^A-Z]|$)/.exec(dobLine.replace(/\b(SEX|NIN|DOB)\b/g, " ")) : null;
+            if (code) out.nationality = code[1];
+            else if (/\bUGA\b/.test(whole)) out.nationality = "UGA";
+        }
+        return out;
+    }
+    // The back of the card: where the holder comes from, and the machine-readable lines.
+    // -> { village, parish, sub_county, county, district, mrz_number, mrz_expiry }
+    function extractIdBack(text) {
+        const lines = linesOf(text);
+        const BACK_LABEL = /\b(VILLAGE|PARISH|S\.?\s?COUNTY|SUB\s*-?\s*COUNTY|COUNTY|DISTRICT)\b/;
+        const pick = (label) => {
+            for (let i = 0; i < lines.length; i++) {
+                const m = label.exec(lines[i]);
+                if (!m) continue;
+                let rest = lines[i].slice(m.index + m[0].length).replace(/^[\s:.\-]+/, "");
+                const next = BACK_LABEL.exec(rest);
+                if (next) rest = rest.slice(0, next.index);
+                rest = cleanName(rest);
+                if (rest) return rest;
+                if (lines[i + 1] && !BACK_LABEL.test(lines[i + 1]) && !/</.test(lines[i + 1])) return cleanName(lines[i + 1]);
+            }
+            return "";
+        };
+        const out = {
+            village: pick(/\bVILLAGE\b/), parish: pick(/\bPARISH\b/),
+            sub_county: pick(/\b(S\.?\s?COUNTY|SUB\s*-?\s*COUNTY)\b/),
+            county: pick(/(?<![S.]\s?)(?<!SUB\s?-?\s?)\bCOUNTY\b/), district: pick(/\bDISTRICT\b/),
+            mrz_number: "", mrz_expiry: ""
+        };
+        const mrz = readMrz(text);
+        if (mrz) { if (mrz.numberChecked && mrz.number) out.mrz_number = mrz.number; if (mrz.expiryChecked && mrz.expiry) out.mrz_expiry = mrz.expiry; }
+        return out;
+    }
+
+    return { extractIdFields, extractIdBack, nameCheck, nameWords, read, datesIn, analyze, parseMrz, readMrz, scanMrzExpiry, findDates, expiryFromLabel, detectKind, checkDigit, numberFound, readFile, MSG };
 });
