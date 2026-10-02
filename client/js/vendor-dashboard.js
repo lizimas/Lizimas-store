@@ -1888,7 +1888,7 @@ function vdRenderCatSpecs() {
         host.hidden = false;
         host.innerHTML = `<div class="vd-cat-title">Specifications for ${vendorEsc(path[path.length - 1] || tpl.group)} <span>(fill in what applies - empty ones are left out)</span></div><div class="vd-cat-grid">`
             + tpl.fields.map((x, i) => `<label class="vd-cat-field" data-label="${vendorEsc(x.label)}" data-key="${vendorEsc(x.label.toLowerCase())}"><span>${vendorEsc(x.label)}</span>
-                <input type="text" class="spec-value-input" maxlength="200" placeholder="${vendorEsc(x.hint)}"${x.options ? ` list="vd-cat-opt-${i}"` : ""}>
+                <input type="text" class="spec-value-input" maxlength="200" placeholder="${vendorEsc(x.hint)}"${x.kind === "n" ? ' inputmode="decimal"' : ""}${x.options ? ` list="vd-cat-opt-${i}"` : ""}>
                 ${x.options ? `<datalist id="vd-cat-opt-${i}">${x.options.map(o => `<option>${vendorEsc(o)}</option>`).join("")}</datalist>` : ""}</label>`).join("") + "</div>";
         host.querySelectorAll(".vd-cat-field").forEach(fl => { const v = have.get(fl.dataset.key); if (v) fl.querySelector(".spec-value-input").value = v; });
     } finally { vdCatSpecsBusy = false; }
